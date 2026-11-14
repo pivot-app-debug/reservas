@@ -203,8 +203,11 @@ class PivotVidrio {
   /// Línea fina del borde (arriba en la barra de abajo, abajo en la de arriba).
   static Color borde(PivotPaleta p) => _osc(p) ? const Color(0x33FFFFFF) : const Color(0x26E8000D);
 
-  /// Fondo de las barras de arriba: el del tema, translúcido y sin tinte.
-  static Color plano(PivotPaleta p) => p.fondo.withValues(alpha: _osc(p) ? 0.72 : 0.68);
+  /// Fondo de todas las barras (arriba y abajo): un velo neutro translúcido,
+  /// sin el tinte rosado del fondo del tema (Victor, 2026-11-14: algunas
+  /// barras se veían más rojizas que otras; "sin color, solo transparencia y
+  /// blur"). Lo que pasa por detrás se ve desenfocado.
+  static Color plano(PivotPaleta p) => _osc(p) ? const Color(0x8C000000) : const Color(0x99FFFFFF);
 
   /// Brillo de la parte superior (reflejo).
   static Color reflejo(PivotPaleta p) => _osc(p) ? const Color(0x14FFFFFF) : const Color(0x66FFFFFF);
