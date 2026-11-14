@@ -645,27 +645,34 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             body: LayoutBuilder(
               builder: (context, caja) {
                 _altoVista = caja.maxHeight;
+                // Con el calendario abierto la barra queda sólida; el cambio es
+                // con fundido (Victor, 2026-11-14: antes pasaba de golpe).
                 final cabecera = Vidrio(
-                  child: SafeArea(
-                    bottom: false,
-                    child: _Medida(
-                      alMedir: (alto) {
-                        final total = alto + MediaQuery.paddingOf(context).top;
-                        if ((total - _altoCabecera).abs() > 0.5) setState(() => _altoCabecera = total);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            transitionBuilder: (c, a) => FadeTransition(
-                              opacity: a,
-                              child: SizeTransition(sizeFactor: a, alignment: Alignment.topCenter, child: c),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOut,
+                    color: _calAbierto ? context.pivot.fondo : context.pivot.fondo.withValues(alpha: 0),
+                    child: SafeArea(
+                      bottom: false,
+                      child: _Medida(
+                        alMedir: (alto) {
+                          final total = alto + MediaQuery.paddingOf(context).top;
+                          if ((total - _altoCabecera).abs() > 0.5) setState(() => _altoCabecera = total);
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              transitionBuilder: (c, a) => FadeTransition(
+                                opacity: a,
+                                child: SizeTransition(sizeFactor: a, alignment: Alignment.topCenter, child: c),
+                              ),
+                              child: _buscando ? _barraBusqueda(context) : _barraNormal(context),
                             ),
-                            child: _buscando ? _barraBusqueda(context) : _barraNormal(context),
-                          ),
-                          if (!_buscando) _cabeceraTareas(context),
-                        ],
+                            if (!_buscando) _cabeceraTareas(context),
+                          ],
+                        ),
                       ),
                     ),
                   ),

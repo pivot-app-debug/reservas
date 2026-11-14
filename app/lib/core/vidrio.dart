@@ -20,7 +20,7 @@ class Vidrio extends StatelessWidget {
     // degradado, reflejo ni borde.
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: PivotVidrio.desenfoque, sigmaY: PivotVidrio.desenfoque),
+        filter: ImageFilter.blur(sigmaX: PivotVidrio.desenfoque, sigmaY: PivotVidrio.desenfoque, tileMode: TileMode.mirror),
         child: ColoredBox(color: PivotVidrio.plano(p), child: child),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/config_liga.dart';
@@ -124,47 +125,51 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     ];
     final indice = _indice.clamp(0, destinos.length - 1);
     ClavesTour.destinos = destinos.length;
-    return Scaffold(
-      // Barra de abajo de vidrio: el contenido pasa por detrás desenfocado.
-      extendBody: true,
-      // Con extendBody, el "+" de cada pestaña quedaba detrás de la barra
-      // (bug, Victor 2026-11-13: "desapareció el FAB de Calendario"): el
-      // Scaffold de adentro ubica el botón con viewPadding, que no incluía la barra.
-      body: Builder(
-        builder: (context) {
-          final mq = MediaQuery.of(context);
-          return MediaQuery(
-            data: mq.copyWith(viewPadding: mq.viewPadding.copyWith(bottom: mq.padding.bottom)),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: KeyedSubtree(key: ValueKey(indice), child: destinos[indice].$2),
+    // Barra de estado con íconos que contrastan en las pestañas sin AppBar.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: estiloBarraSistema(Theme.of(context).brightness),
+      child: Scaffold(
+        // Barra de abajo de vidrio: el contenido pasa por detrás desenfocado.
+        extendBody: true,
+        // Con extendBody, el "+" de cada pestaña quedaba detrás de la barra
+        // (bug, Victor 2026-11-13: "desapareció el FAB de Calendario"): el
+        // Scaffold de adentro ubica el botón con viewPadding, que no incluía la barra.
+        body: Builder(
+          builder: (context) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(viewPadding: mq.viewPadding.copyWith(bottom: mq.padding.bottom)),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: KeyedSubtree(key: ValueKey(indice), child: destinos[indice].$2),
+              ),
+            );
+          },
+        ),
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AvisoSinConexion(repo: widget.repo),
+            Vidrio(
+              abajo: true,
+              child: NavigationBar(
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                key: ClavesTour.navegacion,
+                selectedIndex: indice,
+                onDestinationSelected: (i) {
+                  if (i == 0 && indice == 0) {
+                    _irAHoy.disparar();
+                  } else {
+                    setState(() => _indice = i);
+                  }
+                },
+                destinations: [for (final d in destinos) d.$1],
+              ),
             ),
-          );
-        },
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AvisoSinConexion(repo: widget.repo),
-          Vidrio(
-            abajo: true,
-            child: NavigationBar(
-              backgroundColor: Colors.transparent,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              key: ClavesTour.navegacion,
-              selectedIndex: indice,
-              onDestinationSelected: (i) {
-                if (i == 0 && indice == 0) {
-                  _irAHoy.disparar();
-                } else {
-                  setState(() => _indice = i);
-                }
-              },
-              destinations: [for (final d in destinos) d.$1],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

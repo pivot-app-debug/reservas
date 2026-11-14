@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Paleta de Pivot (equivalente a colors.css de la web): TODOS los colores de
@@ -203,11 +204,11 @@ class PivotVidrio {
   /// Línea fina del borde (arriba en la barra de abajo, abajo en la de arriba).
   static Color borde(PivotPaleta p) => _osc(p) ? const Color(0x33FFFFFF) : const Color(0x26E8000D);
 
-  /// Fondo de todas las barras (arriba y abajo): un velo neutro translúcido,
-  /// sin el tinte rosado del fondo del tema (Victor, 2026-11-14: algunas
-  /// barras se veían más rojizas que otras; "sin color, solo transparencia y
-  /// blur"). Lo que pasa por detrás se ve desenfocado.
-  static Color plano(PivotPaleta p) => _osc(p) ? const Color(0x8C000000) : const Color(0x99FFFFFF);
+  /// Fondo de todas las barras (arriba y abajo): el mismo color de la página,
+  /// muy translúcido, así en reposo la barra no se distingue del fondo (sin
+  /// franja blanca ni rojiza) y lo que pasa por detrás se ve desenfocado
+  /// (Victor, 2026-11-14: "sin color, solo transparencia y blur").
+  static Color plano(PivotPaleta p) => p.fondo.withValues(alpha: _osc(p) ? 0.82 : 0.8);
 
   /// Brillo de la parte superior (reflejo).
   static Color reflejo(PivotPaleta p) => _osc(p) ? const Color(0x14FFFFFF) : const Color(0x66FFFFFF);
@@ -266,7 +267,15 @@ ThemeData construirTema(Brightness brillo) {
     extensions: [p],
     scaffoldBackgroundColor: p.fondo,
     textTheme: textos,
-    appBarTheme: AppBarTheme(backgroundColor: p.fondo, surfaceTintColor: p.fondo, foregroundColor: p.texto, elevation: 0),
+    appBarTheme: AppBarTheme(
+      backgroundColor: p.fondo,
+      surfaceTintColor: p.fondo,
+      foregroundColor: p.texto,
+      elevation: 0,
+      // Íconos de la barra de estado (hora, batería) oscuros en modo claro y
+      // claros en modo oscuro (Victor, 2026-11-14: en claro se veían blancos).
+      systemOverlayStyle: estiloBarraSistema(brillo),
+    ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: p.navegacion,
       indicatorColor: p.suave,
@@ -328,3 +337,12 @@ ThemeData construirTema(Brightness brillo) {
     pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: PredictiveBackPageTransitionsBuilder()}),
   );
 }
+
+/// Barra de estado del teléfono: fondo transparente e íconos que contrastan
+/// con el tema (oscuros en claro, claros en oscuro).
+SystemUiOverlayStyle estiloBarraSistema(Brightness brillo) => SystemUiOverlayStyle(
+  statusBarColor: const Color(0x00000000),
+  statusBarIconBrightness: brillo == Brightness.dark ? Brightness.light : Brightness.dark,
+  statusBarBrightness: brillo,
+  systemNavigationBarIconBrightness: brillo == Brightness.dark ? Brightness.light : Brightness.dark,
+);
