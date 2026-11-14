@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-14 (noche)
+- **Tesorería rediseñada:** debajo de la tarjeta roja, botones Ingreso y Egreso y luego "Usé plata del equipo" y "Devolví plata al equipo". Cuentas con botón "Transferir" (las que no son efectivo; abre la transferencia con esa cuenta de origen). Sección "Saldos de personas" a la vista con tarjetas de quién debe o tiene a favor y una tarjeta para ver todas o registrar. Formas de pago, Cuotas del mes, Fondos y Movimientos bajo "Administrar". El + solo crea cuentas.
+- **Bug roles de Mi perfil:** no se borraban en la base; la fila dependía de la caché de Equipo. Ahora la carga si falta y usa los roles de la propia ficha mientras tanto (así guardar no los pisa).
+- **Bug Pivots desde un perfil:** al hacer Pivot a alguien desde su ficha, volver atrás regresa a la ficha y no muestra la lista de Pivots.
+- **Permisos del servidor:** migración 20261114070000 devuelve a service_role los permisos sobre temporadas de descanso, rectificaciones, excepciones de cuota y reglas de asistencia ("permission denied").
+- Zona horaria con la lista IANA completa y buscador; textos de Rectificaciones; teléfonos de emergencia por seguro y sistema de atención.
+
 ## 2026-11-13 (sesión de las 4 p. m.)
 - **Bug de puntos:** los puntos de asistencia solo se recalculaban con el botón "Recalcular ahora" de Mi Liga web; desde que la lista se toma en la app (octubre) quedaron sin sumar. Ahora se recalculan al marcar a cada persona (`_recalcularPuntosAsistenciaPersona`) y el cron diario recalcula el mes actual y el anterior. Datos de septiembre a noviembre reparados sumando lo que faltaba (nunca se bajó un valor guardado).
 - **Regla de equipos:** mes calendario cerrado (en noviembre se evalúa octubre completo) y, por defecto, solo puntos de tareas (Victor). `config_tiers.puntos_fuente`, `periodo_unidad`, `gracia_unidad` (días, semanas, meses o años). recalcular-categorias, `getEstadisticasPersona` (período cerrado y en curso) usan la misma cuenta.

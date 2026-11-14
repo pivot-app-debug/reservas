@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import '../core/api.dart';
 import '../core/cargando.dart';
 import '../core/fechas.dart';
-import '../core/menu_acciones.dart';
 import '../core/tema.dart';
 import '../core/config_liga.dart';
 import '../pivots/buscador_liga.dart';
@@ -115,6 +114,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   Map<String, dynamic>? _r;
   String? _error_;
 
+  /// Personas con saldo (debe o a favor) para las tarjetas del inicio.
+  List<Map<String, dynamic>> _saldos = const [];
+
   List<Map<String, dynamic>> get _todas => [for (final c in (_r?['cuentas'] as List? ?? const [])) c as Map<String, dynamic>];
   List<Map<String, dynamic>> get _cuentas => _todas.where((c) => c['archivada'] != true).toList();
 
@@ -126,10 +128,14 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
 
   Future<void> _cargar() async {
     try {
-      final r = await repo.accion('resumen');
+      final rF = repo.accion('resumen');
+      final sF = repo.accion('saldos').then<Map<String, dynamic>?>((x) => x).catchError((Object _) => null);
+      final r = await rF;
+      final s = await sF;
       if (mounted) {
         setState(() {
           _r = r;
+          if (s != null) _saldos = [for (final x in (s['personas'] as List? ?? const [])) x as Map<String, dynamic>];
           _error_ = null;
         });
         final x = widget.resaltar;
@@ -411,8 +417,8 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     await _cargar();
   }
 
-  Future<void> _registrar(String tipo, {Map<String, dynamic>? corregir}) async {
-    final ok = await abrirFormularioMovimiento(context, repo: repo, cuentas: _cuentas, tipo: tipo, corregir: corregir);
+  Future<void> _registrar(String tipo, {Map<String, dynamic>? corregir, String? desde}) async {
+    final ok = await abrirFormularioMovimiento(context, repo: repo, cuentas: _cuentas, tipo: tipo, corregir: corregir, desdeCuenta: desde);
     if (ok == true) {
       if (mounted) _aviso(context, corregir != null ? 'Corregido: el original queda anulado en el historial.' : 'Registrado');
       await _cargar();
@@ -536,21 +542,138 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     await _cargar();
   }
 
-  void _mas() {
-    if (_cuentas.isEmpty) {
-      _cuenta();
-      return;
-    }
-    MenuAcciones.abrir(context, [
-      AccionMenu(Icons.account_balance_wallet_outlined, 'Nueva cuenta', () => _cuenta()),
-      AccionMenu(Icons.shopping_bag_outlined, 'Usé plata del equipo', () => _plataDelEquipo(devolver: false)),
-      AccionMenu(Icons.undo_rounded, 'Devolví plata al equipo', () => _plataDelEquipo(devolver: true)),
-      AccionMenu(Icons.person_outline_rounded, 'Saldo de una persona', () => _abrir(SaldosScreen(repo: repo, cuentas: _cuentas))),
-      AccionMenu(Icons.swap_horiz_rounded, 'Transferencia', () => _registrar('transferencia')),
-      AccionMenu(Icons.remove_circle_outline_rounded, 'Gasto', () => _registrar('egreso')),
-      AccionMenu(Icons.add_circle_outline_rounded, 'Ingreso', () => _registrar('ingreso')),
-    ]);
+  // Lo frecuente vive en la pantalla (Victor, 2026-11-14): el botón flotante
+  // solo crea cuentas.
+  void _mas() => _cuenta();
+
+  /// Ingreso/Egreso y los dos registros rápidos, debajo de la tarjeta roja.
+  Widget _acciones(BuildContext context) {
+    final p = context.pivot;
+    Widget chico(IconData i, String t, VoidCallback f) => Expanded(
+      child: OutlinedButton.icon(
+        onPressed: f,
+        icon: Icon(i, size: 18),
+        label: Text(t, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), foregroundColor: p.texto),
+      ),
+    );
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: () => _registrar('ingreso'),
+                icon: const Icon(Icons.add_circle_outline_rounded),
+                label: const Text('Ingreso'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: () => _registrar('egreso'),
+                icon: const Icon(Icons.remove_circle_outline_rounded),
+                label: const Text('Egreso'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            chico(Icons.shopping_bag_outlined, 'Usé plata del equipo', () => _plataDelEquipo(devolver: false)),
+            const SizedBox(width: 10),
+            chico(Icons.undo_rounded, 'Devolví plata al equipo', () => _plataDelEquipo(devolver: true)),
+          ],
+        ),
+      ],
+    );
   }
+
+  /// Tarjetas de quién debe o tiene a favor; la última abre la lista completa.
+  Widget _tarjetasSaldos(BuildContext context, PivotPaleta p) {
+    final l = _saldos;
+    Future<void> abrirPersona(Map<String, dynamic> x) async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SaldoPersonaScreen(repo: repo, cuentas: _cuentas, username: '${x['username']}', nombre: '${x['nombre']}'),
+        ),
+      );
+      await _cargar();
+    }
+
+    Widget tarjeta({required Widget child, required VoidCallback alTocar}) => Material(
+      color: p.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        onTap: alTocar,
+        child: Container(width: 132, padding: const EdgeInsets.all(12), child: child),
+      ),
+    );
+
+    return SizedBox(
+      height: 132,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: l.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          if (i == l.length) {
+            return tarjeta(
+              alTocar: () async {
+                await _abrir(SaldosScreen(repo: repo, cuentas: _cuentas));
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(l.isEmpty ? Icons.person_add_alt_rounded : Icons.people_alt_outlined, color: p.marcaTexto),
+                  const SizedBox(height: 8),
+                  Text(
+                    l.isEmpty ? 'Nadie debe. Registrar un saldo' : 'Ver todas',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                  ),
+                ],
+              ),
+            );
+          }
+          final x = l[i];
+          final s = (x['saldo'] as num?) ?? 0;
+          return tarjeta(
+            alTocar: () => abrirPersona(x),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 34),
+                const Spacer(),
+                Text(
+                  '${x['nombre']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                ),
+                Text(
+                  s < 0 ? 'Debe ${plata(-s)}' : 'A favor ${plata(s)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: s < 0 ? p.marcaTexto : p.textoSecundario),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _titulo(String t, PivotPaleta p) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+    child: Text(
+      t,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -578,7 +701,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                 ),
               ),
       ),
-      floatingActionButton: r == null ? null : FloatingActionButton(tooltip: 'Registrar', onPressed: _mas, child: const Icon(Icons.add_rounded)),
+      floatingActionButton: r == null ? null : FloatingActionButton(tooltip: 'Nueva cuenta', onPressed: _mas, child: const Icon(Icons.add_rounded)),
     );
   }
 
@@ -630,9 +753,11 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           ],
         ),
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: 12),
+      _acciones(context),
+      _titulo('CUENTAS', p),
       SizedBox(
-        height: 118,
+        height: 148,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: _cuentas.length,
@@ -667,6 +792,18 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                         ],
                       ),
                       const Spacer(),
+                      // Transferir desde la tarjeta (Victor, 2026-11-14): en
+                      // las cuentas que no son efectivo.
+                      if ('${c['tipo']}' != 'efectivo' && c['activa'] != false && _cuentas.length > 1)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => _registrar('transferencia', desde: '${c['id']}'),
+                            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                            label: const Text('Transferir'),
+                            style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 6)),
+                          ),
+                        ),
                       Text(
                         plata(c['saldo'] as num),
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: p.texto),
@@ -687,7 +824,23 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           },
         ),
       ),
-      const SizedBox(height: 14),
+      Resaltable(
+        id: 'saldos',
+        resaltado: _resaltado,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _titulo(
+              (saldos['personasDeben'] as num? ?? 0) == 0
+                  ? 'SALDOS DE PERSONAS'
+                  : 'SALDOS DE PERSONAS · ${saldos['personasDeben']} ${saldos['personasDeben'] == 1 ? 'DEBE' : 'DEBEN'} ${plata((saldos['totalDeben'] as num?) ?? 0)}',
+              p,
+            ),
+            _tarjetasSaldos(context, p),
+          ],
+        ),
+      ),
+      _titulo('ADMINISTRAR', p),
       // Formas de pago viven en Tesorería (Victor, 2026-11-14): cada medio es una cuenta.
       Resaltable(
         id: 'formasTesoreria',
@@ -711,19 +864,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           () => _abrir(CuotasMesScreen(repo: repo)),
         ),
       ),
-      Resaltable(
-        id: 'saldos',
-        resaltado: _resaltado,
-        child: _fila(
-          context,
-          Icons.people_alt_outlined,
-          'Saldos de personas',
-          (saldos['personasDeben'] as num? ?? 0) == 0
-              ? 'Nadie debe al equipo'
-              : '${saldos['personasDeben']} ${saldos['personasDeben'] == 1 ? 'persona debe' : 'personas deben'} ${plata((saldos['totalDeben'] as num?) ?? 0)}',
-          () => _abrir(SaldosScreen(repo: repo, cuentas: _cuentas)),
-        ),
-      ),
+
       Resaltable(
         id: 'fondos',
         resaltado: _resaltado,
@@ -934,11 +1075,12 @@ Future<bool?> abrirFormularioMovimiento(
   required List<Map<String, dynamic>> cuentas,
   required String tipo,
   Map<String, dynamic>? corregir,
+  String? desdeCuenta,
 }) {
   final activas = cuentas.where((c) => c['activa'] != false).toList();
   final monto = TextEditingController(text: corregir == null ? '' : '${corregir['monto']}');
   final desc = TextEditingController(text: corregir?['descripcion'] as String? ?? '');
-  String? cuenta = corregir?['cuentaId'] as String? ?? (activas.isEmpty ? null : activas.first['id'] as String);
+  String? cuenta = corregir?['cuentaId'] as String? ?? desdeCuenta ?? (activas.isEmpty ? null : activas.first['id'] as String);
   String? destino;
   var categoria = corregir?['categoria'] as String? ?? (tipo == 'ingreso' ? 'cuota' : 'otro');
   var fecha = DateTime.tryParse('${corregir?['fecha'] ?? ''}') ?? Fechas.hoy();
