@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/config_liga.dart';
 import '../core/iconos_marca.dart';
 import '../core/emergencias.dart';
 import '../core/fechas.dart';
@@ -182,7 +183,12 @@ class _EmergenciaScreenState extends State<EmergenciaScreen> {
       ('Dirección', direccion),
     ].where((x) => x.$2.trim().isNotEmpty).toList();
     final seguro = _hay('seguro');
-    if (!seguro && contactos.isEmpty && medica.isEmpty && identidad.isEmpty) {
+    // Teléfonos que la liga puso en Mi Liga → Salud y seguros (Victor, 2026-11-14).
+    final cfg = ConfigLiga.de(widget.repo.sesion);
+    final atencion = _v('atencion_medica');
+    final telAtencion = atencion.isNotEmpty && atencion != 'Seguro Privado' ? cfg.telefonoSalud(atencion) : null;
+    final telSeguro = _hay('seguro_contacto') ? _v('seguro_contacto') : (seguro ? cfg.telefonoSalud(_v('seguro')) : null);
+    if (!seguro && telAtencion == null && contactos.isEmpty && medica.isEmpty && identidad.isEmpty) {
       return [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 20, 8, 0),
@@ -201,8 +207,18 @@ class _EmergenciaScreenState extends State<EmergenciaScreen> {
           p,
           icono: Icons.health_and_safety_rounded,
           titulo: _v('seguro'),
-          subtitulo: _hay('seguro_contacto') ? 'Seguro privado · ${_v('seguro_contacto')}' : 'Seguro privado',
-          alTocar: _hay('seguro_contacto') ? () => _llamar(_v('seguro_contacto')) : null,
+          subtitulo: telSeguro != null ? 'Seguro privado · $telSeguro' : 'Seguro privado',
+          alTocar: telSeguro != null ? () => _llamar(telSeguro) : null,
+        ),
+      ],
+      if (telAtencion != null) ...[
+        const SizedBox(height: 12),
+        _botonGrande(
+          p,
+          icono: Icons.local_hospital_rounded,
+          titulo: atencion,
+          subtitulo: 'Se atiende aquí · $telAtencion',
+          alTocar: () => _llamar(telAtencion),
         ),
       ],
       if (contactos.isNotEmpty) ...[_subtitulo(p, 'Contactos de emergencia'), ...contactos],

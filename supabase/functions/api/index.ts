@@ -1002,8 +1002,17 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
       : null;
     const atencion = lista(reglasNuevas.atencionMedica);
     if (atencion) r.atencionMedica = atencion.includes('Seguro Privado') ? atencion : [...atencion, 'Seguro Privado'];
-    const seguros = lista(reglasNuevas.segurosPrivados);
+        const seguros = lista(reglasNuevas.segurosPrivados);
     if (seguros) r.segurosPrivados = seguros;
+    // Teléfono de emergencias opcional por opción de atención o seguro.
+    if (reglasNuevas.telefonosSalud && typeof reglasNuevas.telefonosSalud === 'object') {
+      const t: Record<string, string> = {};
+      for (const [k, v] of Object.entries(reglasNuevas.telefonosSalud)) {
+        const tel = String(v ?? '').replace(/[^0-9+ -]/g, '').trim().slice(0, 20);
+        if (String(k).trim() && tel) t[String(k).trim().slice(0, 60)] = tel;
+      }
+      r.telefonosSalud = t;
+    }
     if (reglasNuevas.graciaClases && typeof reglasNuevas.graciaClases === 'object') {
       const g: Record<string, number> = {};
       for (const [k, v] of Object.entries(reglasNuevas.graciaClases)) {

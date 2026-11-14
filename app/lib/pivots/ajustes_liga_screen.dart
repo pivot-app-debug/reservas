@@ -5,6 +5,7 @@ import '../ajustes/campos.dart';
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
+import '../core/zonas_horarias.dart';
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
@@ -71,6 +72,58 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     } catch (e) {
       m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
     }
+  }
+
+  /// Todas las zonas horarias del mundo con buscador (Victor, 2026-11-14).
+  Future<void> _elegirZona(BuildContext context, ConfigLiga c) async {
+    var q = '';
+    String sinTildes(String s) => s
+        .toLowerCase()
+        .replaceAll(RegExp('[áà]'), 'a')
+        .replaceAll(RegExp('[éè]'), 'e')
+        .replaceAll(RegExp('[íì]'), 'i')
+        .replaceAll(RegExp('[óò]'), 'o')
+        .replaceAll(RegExp('[úü]'), 'u');
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) {
+          final l = [
+            for (final e in zonasHorarias.entries)
+              if (q.isEmpty || sinTildes('${e.value} ${e.key}').contains(sinTildes(q))) e,
+          ];
+          return SizedBox(
+            height: MediaQuery.sizeOf(h).height * 0.85,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: TextField(
+                    autofocus: true,
+                    onChanged: (x) => set(() => q = x.trim()),
+                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'País o ciudad'),
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: EdgeInsets.only(bottom: 16 + MediaQuery.viewInsetsOf(h).bottom),
+                    itemCount: l.length,
+                    itemBuilder: (_, i) => ListTile(
+                      title: Text(l[i].value),
+                      trailing: l[i].key == c.zonaHoraria ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                      onTap: () => Navigator.of(h).pop(l[i].key),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (v != null && v != c.zonaHoraria && context.mounted) await _guardar(context, c, {'zonaHoraria': v});
   }
 
   Future<void> _elegir(BuildContext context, ConfigLiga c, String titulo, Map<String, String> opciones, String actual, String clave, {String? ayuda}) async {
@@ -176,6 +229,29 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   /// Listas de salud que cambian por país (Victor, 2026-11-14).
   Future<void> _salud(BuildContext context, ConfigLiga c) async {
     final atencion = [...c.atencionMedica], seguros = [...c.segurosPrivados];
+    final tels = {...c.telefonosSalud};
+    Future<void> editarTel(BuildContext h, StateSetter set, String x) async {
+      final ctl = TextEditingController(text: tels[x] ?? '');
+      final t = await showDialog<String>(
+        context: h,
+        builder: (d) => AlertDialog(
+          title: Text(x),
+          content: TextField(
+            controller: ctl,
+            autofocus: true,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'Teléfono de emergencias (opcional)'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.trim()), child: const Text('Listo')),
+          ],
+        ),
+      );
+      if (t == null) return;
+      set(() => t.isEmpty ? tels.remove(x) : tels[x] = t);
+    }
+
     final ctlA = TextEditingController(), ctlS = TextEditingController();
     Widget lista(StateSetter set, String titulo, String ayuda, List<String> l, TextEditingController ctl, {Set<String> fijas = const {}}) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -185,11 +261,23 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
         const SizedBox(height: 4),
         Text(ayuda, style: TextStyle(fontSize: 13, color: context.pivot.textoSecundario)),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [for (final x in l) fijas.contains(x) ? Chip(label: Text(x)) : InputChip(label: Text(x), onDeleted: () => set(() => l.remove(x)))],
-        ),
+        for (final x in l)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(x),
+            subtitle: Text(tels[x] == null ? 'Toca para poner un teléfono de emergencias' : 'Emergencias: ${tels[x]}'),
+            onTap: () => editarTel(context, set, x),
+            trailing: fijas.contains(x)
+                ? null
+                : IconButton(
+                    tooltip: 'Quitar',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => set(() {
+                      l.remove(x);
+                      tels.remove(x);
+                    }),
+                  ),
+          ),
         const SizedBox(height: 8),
         TextField(
           controller: ctl,
@@ -225,12 +313,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Salud y seguros', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text(
-                  'Lo que cada persona elige en Mi perfil → Salud y emergencia. Cambia según el país. '
-                  'Para quien usa salud pública, la ficha de emergencia muestra siempre el número de emergencias del país.',
-                  style: TextStyle(color: h.pivot.textoSecundario),
-                ),
                 lista(set, 'Dónde se atienden', 'Sistemas de salud pública o seguridad social del país.', atencion, ctlA, fijas: const {'Seguro Privado'}),
                 lista(set, 'Seguros privados', 'Aparecen cuando alguien elige "Seguro Privado". Siempre se puede escribir otro.', seguros, ctlS),
                 const SizedBox(height: 20),
@@ -242,7 +324,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
       ),
     );
     if (ok != true || !context.mounted) return;
-    await _guardarRegla(context, c, {'atencionMedica': atencion, 'segurosPrivados': seguros});
+    await _guardarRegla(context, c, {'atencionMedica': atencion, 'segurosPrivados': seguros, 'telefonosSalud': tels});
   }
 
   String _textoGracia(ConfigLiga c) {
@@ -593,7 +675,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               const SizedBox(height: 16),
               GrupoAjustes(
                 titulo: 'Reglas',
-                pie: 'Los cambios quedan en el historial de Equipos y puntos.',
                 filas: [
                   Resaltable(
                     id: 'tolerancia',
@@ -613,7 +694,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       icono: Icons.fact_check_outlined,
                       seccion: 'entrenamientos',
                       titulo: 'Rectificaciones',
-                      valor: 'Pedidos para corregir una asistencia mal tomada. Los Pivots tienen ${c.rectificacionDias} días para revisarlos',
+                      valor: 'Pedidos para corregir una asistencia mal tomada. Se revisan en ${c.rectificacionDias} días',
                       alTocar: () => _numero(context, c, 'Días para revisar una rectificación', 'rectificacionDias', c.rectificacionDias, 1, 60, 'días'),
                     ),
                   ),
@@ -635,7 +716,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       icono: Icons.hourglass_empty_rounded,
                       seccion: 'entrenamientos',
                       titulo: 'Inactividad',
-                      valor: 'Una persona pasa a inactiva después de ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
+                      valor: 'Pasa a inactiva tras ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
                       alTocar: () => _numero(context, c, 'Pasa a inactiva después de', 'inactividadDias', ConfigLiga.diasInactividad, 7, 365, 'días sin venir'),
                     ),
                   ),
@@ -697,8 +778,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       icono: Icons.schedule_rounded,
                       seccion: 'identidad',
                       titulo: 'Zona horaria',
-                      valor: zonas[c.zonaHoraria] ?? c.zonaHoraria,
-                      alTocar: () => _elegir(context, c, 'Zona horaria', zonas, c.zonaHoraria, 'zonaHoraria'),
+                      valor: zonasHorarias[c.zonaHoraria] ?? zonas[c.zonaHoraria] ?? c.zonaHoraria,
+                      alTocar: () => _elegirZona(context, c),
                     ),
                   ),
                 ],

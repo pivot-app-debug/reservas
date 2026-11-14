@@ -29,6 +29,9 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **Vencimiento de la cuota** (Mi Liga → Cobros): día de vencimiento, días de gracia y recargo fijo. Cuenta el día en que la persona envía el pago, no el de la aprobación; el total de la reserva muestra el recargo.
 - **Saldo al pagar la cuota:** si la persona tiene saldo con el equipo, al pagar ve "Usar mi saldo a favor" o "Pagar lo que debo junto con la cuota" y elige. El saldo se mueve solo cuando un Pivot confirma la reserva; si se cancela, vuelve. La Bandeja muestra cuánto se usó o se pagó.
 - **Privacidad** (Mi Liga): "Puntos de otras personas" se puede ocultar; cada persona sigue viendo los suyos y los Pivots ven todo. El servidor deja de enviar esos puntos.
+- **Zona horaria:** las 418 zonas del mundo (base IANA) con nombres en español y buscador por país o ciudad (`core/zonas_horarias.dart`).
+- **Mi Liga → Reglas:** textos más cortos que ya no se cortan (filas de hasta 3 líneas) y sin "los cambios quedan en el historial".
+- **Salud y seguros:** cada opción de atención y cada seguro puede tener un teléfono de emergencias (`reglas_liga.telefonosSalud`); la ficha de emergencia muestra el de la persona según dónde se atiende (o su seguro), además del número de emergencias del país. Sin el texto largo de la hoja.
 - **Barras de vidrio sin franja:** el velo de las barras es el mismo color de la página (80 %), así en reposo no se ve una franja blanca ni rojiza (Tesorería e Inventario tenían contenido rojo justo debajo); el desenfoque usa `TileMode.mirror`.
 - **Calendario:** al abrir o cerrar el calendario, la barra pasa a sólida (y vuelve) con un fundido.
 - **Barra de estado del teléfono:** íconos oscuros en modo claro y claros en oscuro (`estiloBarraSistema`, en el tema de las AppBar y en las pestañas).

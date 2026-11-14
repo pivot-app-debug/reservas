@@ -64,6 +64,15 @@ class ConfigLiga extends ChangeNotifier {
   static const atencionPorDefecto = ['MSP (Ministerio de Salud Pública)', 'IESS', 'Seguro Privado'];
   static const segurosPorDefecto = ['Saludsa', 'Ecuasanitas', 'Humana', 'BMI del Ecuador', 'Confiamed', 'BUPA Ecuador', 'Pan American Life', 'CruzBlanca'];
   List<String> get atencionMedica => [for (final x in (reglas['atencionMedica'] as List?) ?? atencionPorDefecto) '$x'];
+
+  /// Teléfono de emergencias de una opción de atención o seguro (si la liga lo puso).
+  String? telefonoSalud(String opcion) {
+    final t = ((reglas['telefonosSalud'] as Map?) ?? const {})[opcion];
+    return t == null || '$t'.trim().isEmpty ? null : '$t'.trim();
+  }
+
+  Map<String, String> get telefonosSalud => {for (final e in ((reglas['telefonosSalud'] as Map?) ?? const {}).entries) '${e.key}': '${e.value}'};
+
   List<String> get segurosPrivados => [for (final x in (reglas['segurosPrivados'] as List?) ?? segurosPorDefecto) '$x'];
 
   /// Días sin venir para verse como inactivx (lo usan Equipo y Calendario).

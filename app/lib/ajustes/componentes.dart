@@ -123,7 +123,7 @@ class FilaAjuste extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       v.isEmpty ? 'Sin completar' : v,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13.5, color: p.textoSecundario, fontStyle: v.isEmpty ? FontStyle.italic : FontStyle.normal),
                     ),
