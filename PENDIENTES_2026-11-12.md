@@ -507,3 +507,8 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Datos de emergencia: la lista de seguros médicos es de Ecuador; que se edite en Mi Liga (agregar, editar, quitar) y, con salud pública, mostrar siempre el número de emergencias del país (casi siempre 911).
 - [x] Barras superiores de vidrio en toda la app (salvo emergencia, comunidad y asistente, a propósito).
 - [x] Comprobantes dentro de la app con recordatorios y borrado a los 30 días (2026-11-14). Pendiente de decidir: si una reserva sin comprobante se cancela sola antes de la clase (hoy queda pendiente hasta que un Pivot decida). La web antigua sigue solo con WhatsApp.
+
+## O. Nueva ronda (Victor, 2026-11-14 16:22)
+- [ ] Calendario: al abrir o cerrar el calendario, la barra de arriba cambia con fundido (sin salto de sólida a transparente); con el calendario abierto queda sólida.
+- [ ] Modo claro: íconos de la barra de estado del teléfono (batería, hora) se ven blancos; deben ser oscuros.
+- [ ] Cobro por equipo (Equipos y puntos), junto con "tipos de equipo" y "reglas por equipo" (sección N): por mes, por clase o sin cobro (solo reservar), con condiciones (con equipamiento propio → mes; sin él → clase; Quindes → mes y equipo propio). Reglas hoy fijas por nombre de equipo que conviene mover a cada equipo (propuesta para Victor): quién paga cuota (hoy `paga_cuota` por persona), si se reserva o se marca Asistiré, condición para marcar Asistiré (hoy Mirlxs: mes pagado o reserva), precio propio del equipo, cancelar/reagendar (horas antes, crédito), punto extra por pronto pago (día 15, hoy para todos), clases de gracia (ya por equipo), préstamo de equipamiento (ya por equipo), fondos de viaje (ya por equipo), tolerancia de llegada y requisitos de asistencia.
