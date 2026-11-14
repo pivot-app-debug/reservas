@@ -132,10 +132,13 @@ class _PivotsScreenState extends State<PivotsScreen> {
         _atajoHecho = true;
         final ya = l.where((x) => x.username == widget.persona!.username).firstOrNull;
         if (ya != null) {
-          _editar(ya);
+          await _editar(ya);
         } else if (_puedeEditar) {
-          _nombrar(widget.persona);
+          await _nombrar(widget.persona);
         }
+        // Desde la ficha de una persona: al terminar se vuelve a la ficha,
+        // no a la lista de Pivots (bug, Victor 2026-11-14).
+        if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
@@ -258,38 +261,40 @@ class _PivotsScreenState extends State<PivotsScreen> {
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Pivots y permisos', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: l == null
-            ? (_error != null ? Center(child: Text(_error!)) : const PivotCargando(centrarEnPantalla: true))
-            : RefreshIndicator(
-                key: const ValueKey('l'),
-                onRefresh: _cargar,
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-                      child: Text(
-                        'Cada Pivot ve y gestiona solo sus áreas, y recibe avisos solo de ellas.',
-                        style: TextStyle(fontSize: 13, color: p.textoSecundario),
+      body: widget.persona != null && _error == null
+          ? const PivotCargando(centrarEnPantalla: true)
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: l == null
+                  ? (_error != null ? Center(child: Text(_error!)) : const PivotCargando(centrarEnPantalla: true))
+                  : RefreshIndicator(
+                      key: const ValueKey('l'),
+                      onRefresh: _cargar,
+                      child: ListView(
+                        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                            child: Text(
+                              'Cada Pivot ve y gestiona solo sus áreas, y recibe avisos solo de ellas.',
+                              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                            ),
+                          ),
+                          for (final x in l)
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                leading: AvatarPersona(nombre: x.nombre, foto: x.foto, tamano: 40),
+                                title: Text(x.yo ? '${x.nombre} (tú)' : x.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: Text(x.principal ? 'Pivot principal · todas las áreas' : textoAreas(x.areas)),
+                                trailing: const Icon(Icons.chevron_right_rounded),
+                                onTap: () => _editar(x),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    for (final x in l)
-                      Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: AvatarPersona(nombre: x.nombre, foto: x.foto, tamano: 40),
-                          title: Text(x.yo ? '${x.nombre} (tú)' : x.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(x.principal ? 'Pivot principal · todas las áreas' : textoAreas(x.areas)),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => _editar(x),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-      ),
+            ),
       floatingActionButton: _puedeEditar && l != null
           ? FloatingActionButton(tooltip: 'Nombrar Pivot', onPressed: _nombrar, child: const Icon(Icons.add_rounded))
           : null,

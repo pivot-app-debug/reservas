@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/paises.dart';
@@ -23,6 +25,9 @@ class MiPerfilEditable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final equipo = EquipoRepo.de(sesion);
+    // Sin esto, con la caché de Equipo vacía la fila se veía sin roles
+    // (Victor, 2026-11-14). `cargar()` no hace nada si ya está cargado.
+    if (equipo.personas == null) unawaited(equipo.cargar());
     final s = sesion;
     return ListenableBuilder(
       listenable: s,
@@ -58,7 +63,13 @@ class MiPerfilEditable extends StatelessWidget {
                 ListenableBuilder(
                   listenable: equipo,
                   builder: (context, _) {
-                    final roles = equipo.persona(s.nombre ?? '')?.roles ?? const <String>[];
+                    // Fuente: Equipo; si aún no llegó, los de tu propia ficha.
+                    final roles =
+                        equipo.persona(s.nombre ?? '')?.roles ??
+                        [
+                          for (final r in (s.datos['roles'] is List ? s.datos['roles'] as List : const []))
+                            if ('$r' != 'No definido') '$r',
+                        ];
                     return FilaAjuste(
                       icono: Icons.shield_outlined,
                       seccion: 'roles',
