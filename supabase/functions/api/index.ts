@@ -4109,7 +4109,10 @@ async function adminMarcarAsistencia(params: Record<string, any>): Promise<Recor
   // if/else de `esCorreccion` a propósito -- antes vivía solo en la rama
   // no-corrección, así que re-marcar a alguien (corrección) nunca lo
   // reactivaba.
-  if (estado === 'A tiempo' || estado === 'Tarde') await _reactivarPorAsistencia(nombre, idEvento);
+    if (estado === 'A tiempo' || estado === 'Tarde') {
+    await _reactivarPorAsistencia(nombre, idEvento);
+    try { await _deudaSiVinoSinPago(nombre, idEvento); } catch (e) { console.error('[deuda] al marcar:', e); }
+  }
 
   // Batch 8 (ver MANIFEST.md): recalcula los stats de ESTA persona apenas
   // se confirma que la asistencia quedó guardada -- antes solo pasaba con
@@ -4404,7 +4407,10 @@ async function _aplicarRectificacion(idEvento: string, nombre: string, estadoSol
   }
   // Una rectificación aprobada a 'A tiempo'/'Tarde' es una marca real de
   // presente, mismo efecto que en adminMarcarAsistencia().
-  if (estadoSolicitado === 'A tiempo' || estadoSolicitado === 'Tarde') await _reactivarPorAsistencia(nombre, idEvento);
+    if (estadoSolicitado === 'A tiempo' || estadoSolicitado === 'Tarde') {
+    await _reactivarPorAsistencia(nombre, idEvento);
+    try { await _deudaSiVinoSinPago(nombre, idEvento); } catch (e) { console.error('[deuda] rectificación:', e); }
+  }
 }
 
 async function adminSetEstadoRectificacion(params: Record<string, any>): Promise<Record<string, any>> {
@@ -5140,6 +5146,56 @@ async function cancelarMiSolicitud(params: Record<string, any>): Promise<Record<
 }
 
 /**
+ * Editar un pedido propio pendiente (Victor, 2026-11-14): en una reserva de
+ * clase, cambiar a otra clase próxima; en una excepción o un préstamo,
+ * cambiar el motivo. Lo demás se cancela y se pide de nuevo.
+ * Reserva sin `idEvento`: devuelve las clases a las que se puede cambiar.
+ */
+async function editarMiSolicitud(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const tipo = String(params.tipo ?? ''), id = String(params.id ?? '');
+  const YA = 'Ya no está pendiente: un Pivot la revisó.';
+  if (tipo === 'reserva') {
+    const { data: r } = await supabase.from('reservas').select('id, id_evento, tipo').eq('id', id).eq('nombre_usuario', yo).eq('estado', 'Pendiente').maybeSingle();
+    if (!r) return { exito: false, error: YA };
+    if (r.tipo !== 'clase') return { exito: false, error: 'La mensualidad no se cambia: cancélala y pide la del mes que quieras.' };
+    const hoy = _hoyEcuadorISO();
+    const hasta = new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);
+    const [{ data: evs }, { data: mias }] = await Promise.all([
+      supabase.from('asistencias').select('id_evento, fecha, inicia, donde, tipo_evento')
+        .gte('fecha', hoy).lte('fecha', hasta).in('estado', ['Evento Programado', 'Próximo']).order('fecha').order('inicia').limit(60),
+      supabase.from('reservas').select('id_evento').eq('nombre_usuario', yo).in('estado', ['Pendiente', 'Confirmada']).not('id_evento', 'is', null),
+    ]);
+    const tomadas = new Set((mias ?? []).map((x: any) => x.id_evento));
+    const opciones = (evs ?? []).filter((e: any) => e.id_evento !== r.id_evento && !tomadas.has(e.id_evento));
+    const nuevo = String(params.idEvento ?? '');
+    if (!nuevo) return { exito: true, opciones: opciones.map((e: any) => ({ idEvento: e.id_evento, fecha: e.fecha, inicia: e.inicia, donde: e.donde, tipo: e.tipo_evento })) };
+    if (!opciones.some((e: any) => e.id_evento === nuevo)) return { exito: false, error: 'Esa clase ya no está disponible.' };
+    const u = await supabase.from('reservas').update({ id_evento: nuevo }).eq('id', id).eq('estado', 'Pendiente').select('id');
+    if (u.error || !u.data?.length) return { exito: false, error: YA };
+    return { exito: true };
+  }
+  const motivo = String(params.motivo ?? '').trim().slice(0, 500);
+  if (!motivo) return { exito: false, error: 'Escribe el motivo.' };
+  if (tipo === 'excepcion') {
+    const { data: x } = await supabase.from('solicitudes_excepcion').select('id, tipo, datos').eq('id', id).eq('nombre', yo).eq('estado', 'pendiente').maybeSingle();
+    if (!x) return { exito: false, error: YA };
+    const datos = { ...(x.datos ?? {}) };
+    if (x.tipo === 'ausencias') datos.motivo = motivo; else datos.situacionEconomica = motivo;
+    const u = await supabase.from('solicitudes_excepcion').update({ datos }).eq('id', id).eq('estado', 'pendiente').select('id');
+    if (u.error || !u.data?.length) return { exito: false, error: YA };
+    return { exito: true };
+  }
+  if (tipo === 'prestamo') {
+    const u = await supabase.from('inventario_prestamos').update({ motivo }).eq('id', id).eq('username', yo).eq('estado', 'pendiente').select('id');
+    if (u.error || !u.data?.length) return { exito: false, error: YA };
+    return { exito: true };
+  }
+  return { exito: false, error: 'Esta solicitud no se puede editar: cancélala y pídela de nuevo.' };
+}
+
+/**
  * Deuda por clases o cuotas que un Pivot pasó a deuda (`aplicar` 'con_cuota'),
  * menos lo ya pagado así; nunca más que la deuda total disponible (`disp` < 0).
  */
@@ -5175,15 +5231,67 @@ async function adminDeudaReserva(params: Record<string, any>): Promise<Record<st
     const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', r.id_evento).maybeSingle();
     if (ev?.fecha) que = `Clase del ${String(ev.fecha).slice(8, 10)}/${String(ev.fecha).slice(5, 7)}`;
   }
+    await _pasarADeuda(r, que, monto, email);
+  return { exito: true };
+}
+
+async function _pasarADeuda(r: Record<string, any>, que: string, monto: number, por: string): Promise<void> {
   await supabase.from('reservas').update({ estado: 'Cancelada', motivo_rechazo: 'Pasó a deuda' }).eq('id', r.id);
   await supabase.from('saldos_movimientos').insert({
     username: r.nombre_usuario, persona_nombre: await _nombrePersona(r.nombre_usuario), fecha: _hoyEcuadorISO(),
-    monto: -monto, tipo: 'cargo', aplicar: 'con_cuota', concepto: `${que} sin pagar`, por: email,
+    monto: -monto, tipo: 'cargo', aplicar: 'con_cuota', concepto: `${que} sin pagar`, por,
   });
   await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Quedó una deuda' },
     contents: { es: `No pudimos confirmar el pago de tu ${que.toLowerCase()}. Quedó una deuda de $${monto.toFixed(2)} que pagarás junto con tu próxima reserva.` }, url: APP_URL }).catch(() => {});
-  return { exito: true };
 }
+
+// Reservas de clase nunca aprobadas (Victor, 2026-11-14): 2 h después de que
+// termina la clase se cierran solas. Si la persona vino (la lista la marca
+// presente), queda la deuda de esa clase; si no, se cancela y se le avisa por
+// qué. Si la lista se toma después, `_deudaSiVinoSinPago()` crea la deuda.
+const SIN_APROBAR = 'No se aprobó antes de la clase';
+const _fechaCorta = (f: string) => `${String(f).slice(8, 10)}/${String(f).slice(5, 7)}`;
+
+async function _vinoAlEvento(nombre: string, idEvento: string): Promise<boolean> {
+  const { data } = await supabase.from('log_asistencias').select('estado, origen, marca_temporal')
+    .eq('id_evento', idEvento).eq('nombre_usuario', nombre).not('origen', 'in', '("Usuario","AsistenciaAnticipada")')
+    .order('marca_temporal', { ascending: false }).limit(1);
+  return ['A tiempo', 'Tarde'].includes(String(data?.[0]?.estado ?? ''));
+}
+
+async function _cerrarReservasVencidas(ahora: number): Promise<void> {
+  const { data: rs } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, monto, id_evento')
+    .eq('estado', 'Pendiente').eq('tipo', 'clase').not('id_evento', 'is', null).limit(500);
+  if (!rs?.length) return;
+  const ids = [...new Set(rs.map((r: any) => r.id_evento))];
+  const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina').in('id_evento', ids);
+  const ev: Record<string, any> = {};
+  for (const e of evs ?? []) ev[e.id_evento] = e;
+  for (const r of rs) {
+    const e = ev[r.id_evento];
+    if (!e?.fecha) continue;
+    const fin = Date.parse(`${e.fecha}T${String(e.termina || e.inicia || '23:59:00').slice(0, 8)}-05:00`);
+    if (!Number.isFinite(fin) || ahora < fin + 2 * 3600 * 1000) continue;
+    const que = `Clase del ${_fechaCorta(e.fecha)}`;
+    const monto = _num2(Number(r.monto) || 0);
+    if (monto > 0 && await _vinoAlEvento(r.nombre_usuario, r.id_evento)) { await _pasarADeuda(r, que, monto, 'automático'); continue; }
+    const u = await supabase.from('reservas').update({ estado: 'Cancelada', motivo_rechazo: SIN_APROBAR }).eq('id', r.id).eq('estado', 'Pendiente').select('id');
+    if (!u.data?.length) continue;
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Se canceló tu reserva' },
+      contents: { es: `Tu reserva de la ${que.toLowerCase()} se canceló porque el pago no se aprobó antes de la clase. Si ya pagaste, escríbele a un Pivot.` }, url: APP_URL }).catch(() => {});
+  }
+}
+
+/** Al marcar presente: si su reserva de esa clase se canceló por no aprobarse, queda la deuda. */
+async function _deudaSiVinoSinPago(nombre: string, idEvento: string): Promise<void> {
+  const { data: r } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, monto, id_evento')
+    .eq('nombre_usuario', nombre).eq('id_evento', idEvento).eq('estado', 'Cancelada').eq('motivo_rechazo', SIN_APROBAR).limit(1).maybeSingle();
+  const monto = _num2(Number(r?.monto) || 0);
+  if (!r || !(monto > 0)) return;
+  const { data: e } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
+  await _pasarADeuda(r, e?.fecha ? `Clase del ${_fechaCorta(e.fecha)}` : 'Clase', monto, 'automático');
+}
+
 
 async function _saldoPersonas(username?: string): Promise<Record<string, number>> {
   let q = supabase.from('saldos_movimientos').select('username, monto').eq('anulado', false);
@@ -7788,8 +7896,8 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
   const [res, rect, exc, prest, asig, { data: fila }] = await Promise.all([
                 supabase.from('reservas').select('id, id_evento, tipo, mes_texto, estado, monto, created_at, motivo_rechazo, comprobante_subido_en').eq('nombre_usuario', yo).gte('created_at', desde),
     supabase.from('rectificaciones_asistencia').select('id, fecha_evento, estado_solicitado, decision, created_at').eq('nombre', yo).gte('created_at', desde),
-    supabase.from('solicitudes_excepcion').select('id, tipo, estado, mes_aplicacion, nota_admin, created_at, vigente_hasta, indefinida, efecto').eq('nombre', yo).gte('created_at', desde),
-    supabase.from('inventario_prestamos').select('id, detalle, estado, tipo, hasta, created_at, desde, devuelto_en').eq('username', yo).gte('created_at', desde),
+        supabase.from('solicitudes_excepcion').select('id, tipo, datos, estado, mes_aplicacion, nota_admin, created_at, vigente_hasta, indefinida, efecto').eq('nombre', yo).gte('created_at', desde),
+    supabase.from('inventario_prestamos').select('id, detalle, motivo, estado, tipo, hasta, created_at, desde, devuelto_en').eq('username', yo).gte('created_at', desde),
     supabase.from('asignaciones_tareas').select('id, tarea_id, estado, nota_rechazo, fecha_envio, fecha_revision').eq('nombre_usuario', yo).not('fecha_envio', 'is', null).gte('fecha_envio', desde),
     supabase.from('equipo').select('foto_perfil, fecha_nacimiento, emerg1_nombre, emerg1_telefono, necesita_patines, necesita_protecciones, push_notificaciones_activas, solicitud_lesion_pendiente').eq('username', yo).maybeSingle(),
   ]);
@@ -7813,7 +7921,8 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     items.push({
       tipo: 'reserva', id: r.id,
       titulo: r.tipo === 'mensual' ? `Mensualidad ${r.mes_texto ?? ''}`.trim() : `${e?.tipo_evento || 'Clase'}${e?.fecha ? ' del ' + dia(e.fecha) : ''}`,
-                        faltaComprobante: r.estado === 'Pendiente' && Number(r.monto) > 0 && !r.comprobante_subido_en,
+                                                faltaComprobante: r.estado === 'Pendiente' && Number(r.monto) > 0 && !r.comprobante_subido_en,
+      editable: r.estado === 'Pendiente' && r.tipo === 'clase' ? 'clase' : null,
             detalle: r.estado === 'Pendiente' ? (Number(r.monto) > 0 && !r.comprobante_subido_en ? 'Falta el comprobante: súbelo para que un Pivot confirme tu pago.' : 'Un Pivot confirmará tu pago.') : r.estado === 'Confirmada' ? 'Pago confirmado.' : (r.motivo_rechazo === 'Pasó a deuda' ? 'No se confirmó el pago: quedó como deuda y la pagarás con tu próxima reserva.' : r.motivo_rechazo ? `Rechazada: ${r.motivo_rechazo}` : 'Reserva cancelada.'),
       estado: r.estado === 'Pendiente' ? 'pendiente' : r.estado === 'Confirmada' ? 'aprobada' : 'rechazada', fecha: r.created_at,
     });
@@ -7833,13 +7942,16 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     }
     items.push({
       tipo: 'excepcion', id: r.id, titulo: r.tipo === 'ausencias' ? 'Excepción de cuota por ausencias' : 'Excepción de cuota por dificultad económica',
+      editable: r.estado === 'pendiente' ? 'motivo' : null,
+      motivo: String((r.tipo === 'ausencias' ? r.datos?.motivo : r.datos?.situacionEconomica) ?? ''),
       detalle: r.estado === 'aprobada' ? (r.indefinida ? 'Aprobada, sin fecha de fin.' : r.vigente_hasta ? `Aprobada hasta ${r.vigente_hasta}.` : 'Aprobada.') : r.estado === 'rechazada' ? (r.nota_admin ? `No se aprobó: ${r.nota_admin}` : 'No se aprobó.') : 'Un Pivot la revisará.',
       estado: r.estado === 'aprobada' ? 'aprobada' : r.estado === 'rechazada' ? 'rechazada' : 'pendiente', fecha: r.created_at,
     });
   }
   for (const p of prest.data ?? []) {
     items.push({
-      tipo: 'prestamo', id: p.id, titulo: `${p.tipo === 'uso' ? 'Usar' : 'Te llevaste'} ${p.detalle ?? 'equipamiento del equipo'}`,
+            tipo: 'prestamo', id: p.id, titulo: `${p.tipo === 'uso' ? 'Usar' : 'Te llevaste'} ${p.detalle ?? 'equipamiento del equipo'}`,
+      editable: p.estado === 'pendiente' ? 'motivo' : null, motivo: String(p.motivo ?? ''),
             detalle: p.estado === 'pendiente' ? 'Un Pivot lo revisará.' : p.estado === 'activo' ? (p.hasta ? `Aprobado hasta el ${dia(p.hasta)}.` : 'Aprobado.') : p.estado === 'devuelto' ? 'Devuelto.' : p.estado === 'cancelado' ? 'Lo cancelaste.' : 'No se aprobó.',
       estado: p.estado === 'pendiente' ? 'pendiente' : p.estado === 'rechazado' ? 'rechazada' : p.estado === 'cancelado' ? 'cancelada' : 'aprobada', fecha: p.devuelto_en ?? p.desde ?? p.created_at,
     });
@@ -8716,7 +8828,8 @@ async function cronRecordatorioEvento(): Promise<Record<string, any>> {
 // background; tocar la notificación abre el detalle del evento.
 async function cronRecordatorio1Dia(): Promise<Record<string, any>> {
   const ahora = Date.now();
-  try { await _recordarComprobantes(ahora); } catch (e) { console.error('[comprobantes] recordatorios:', e); }
+    try { await _recordarComprobantes(ahora); } catch (e) { console.error('[comprobantes] recordatorios:', e); }
+  try { await _cerrarReservasVencidas(ahora); } catch (e) { console.error('[reservas] cerrar vencidas:', e); }
   const enVentana = await _eventosEnVentana(ahora + 90 * 60 * 1000, ahora + 24 * 3600 * 1000 + 5 * 60 * 1000, [0, 1, 2]);
   // Limpieza de registros viejos del anti-duplicado (best-effort).
   await supabase.from('push_enviados').delete().lt('enviado_en', new Date(ahora - 30 * 24 * 3600 * 1000).toISOString());
@@ -9782,7 +9895,8 @@ Deno.serve(async (req: Request) => {
                         case 'adminTesoreria':                  return json(await adminTesoreria(params));
             case 'getOpcionesLogin':                return json(await getOpcionesLogin());
                                     case 'getMiSaldo':                      return json(await getMiSaldo(params));
-                        case 'cancelarMiSolicitud':             return json(await cancelarMiSolicitud(params));
+                                                case 'cancelarMiSolicitud':             return json(await cancelarMiSolicitud(params));
+      case 'editarMiSolicitud':               return json(await editarMiSolicitud(params));
             case 'subirComprobante':                return json(await subirComprobante(params));
             case 'enviarCodigoCorreo':              return json(await enviarCodigoCorreo(params));
             case 'verificarCodigoCorreo':           return json(await verificarCodigoCorreo(params));

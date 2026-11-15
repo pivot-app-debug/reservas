@@ -522,3 +522,14 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Mi Liga → Rectificaciones: el texto de abajo se corta; quitar "los cambios quedan en el historial".
 - [x] Salud y seguros: teléfono de emergencias opcional por cada opción de atención y seguro; la ficha de emergencia muestra el número según el sistema de atención de la persona. Quitar el texto largo bajo el título de la hoja.
 - [x] **Hecho 2026-11-14:** Tesorería rediseño: Formas de pago adentro (sale de Mi Liga); botones Ingreso y Egreso bajo la tarjeta roja; luego "Usé plata del equipo" y "Devolví plata al equipo"; sección de saldos de personas a la vista en el inicio de Tesorería (tarjetas con quién debe o tiene a favor) con botón para agregar; "Transferir" como botón en cada tarjeta de cuenta; el + solo con "Nueva cuenta".
+
+## P. Reestructuración de Mi Liga y faltantes (Victor, 2026-11-14 desde las 17:40)
+- [ ] Maqueta "Nueva Mi Liga — maqueta" (8 pantallas) enviada: esperar visto bueno antes de programar. Propuesta en la maqueta: que el punto extra vaya hasta el día de vencimiento (hoy es fijo el 15, igual que los avisos 1, 14 y 16).
+- [x] Formas de pago fuera de Mi Liga → Cobros; queda solo en Tesorería (y en el buscador).
+- [ ] Estados: fila "Estados" con otro ícono; sumar Enfermedad, Situación personal o fuerza mayor y Otro (también en No asistiré de la anticipada), sin cuota por defecto (Victor: una regla podría cobrarles). Al asistir ya se vuelve a Activx y se cierran las anticipadas en curso (`_reactivarPorAsistencia`). Preguntado a Victor si se hace ahora o con las reglas por tipo (estados editables).
+- [x] Bandeja → Mis pedidos: "Cambiar clase" en reservas de clase pendientes (`editarMiSolicitud`, clases de los próximos 45 días) y "Editar motivo" en excepciones y préstamos. La mensualidad y las rectificaciones se cancelan y se piden de nuevo.
+- [x] Salud y seguros: pantalla propia (`pivots/salud_liga_screen.dart`) con tarjetas, agregar, editar nombre y teléfono, quitar.
+- [x] Vencimiento de la cuota: pantalla explicativa (`pivots/vencimiento_screen.dart`) con el mes día a día, ejemplos que cambian con los valores y recomendación (recargo apagado). Hoy el vencimiento solo decide el recargo.
+- [x] Reservas de clase nunca aprobadas: 2 h después de que termina la clase se cancelan solas con aviso del motivo; si la lista marca a la persona presente, queda la deuda de esa clase (también si la lista se toma después). `_cerrarReservasVencidas` en el cron horario, `_deudaSiVinoSinPago` al marcar presente o aprobar una rectificación.
+- [ ] Quien vino a una clase por la que debía pagar y no tenía reserva: ¿también queda deuda? Preguntado a Victor (depende de las reglas de cobro por equipo).
+- [x] $495 sin importar (Pichincha $265, $35 sin medio, $195 de reservas sin medio): quedan fuera de las cuentas hasta que Victor revise las cuentas.

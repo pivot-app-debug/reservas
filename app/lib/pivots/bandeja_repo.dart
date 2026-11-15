@@ -146,6 +146,20 @@ class BandejaRepo extends ChangeNotifier {
     await cargarMia();
   }
 
+  /// Clases a las que se puede cambiar una reserva propia pendiente.
+  Future<List<Map<String, dynamic>>> opcionesCambio(MiPedido x) async {
+    final r = await _api.post('editarMiSolicitud', {'tipo': x.tipo, 'id': '${x.m['id']}'});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudieron cargar las clases.'}');
+    return [for (final o in (r['opciones'] as List? ?? const [])) Map<String, dynamic>.from(o as Map)];
+  }
+
+  /// Cambia la clase de una reserva o el motivo de una solicitud (Victor, 2026-11-14).
+  Future<void> editarMio(MiPedido x, {String? idEvento, String? motivo}) async {
+    final r = await _api.post('editarMiSolicitud', {'tipo': x.tipo, 'id': '${x.m['id']}', 'idEvento': ?idEvento, 'motivo': ?motivo});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar.'}');
+    await cargarMia();
+  }
+
   Future<void> marcarVista() async {
     _ultimaVista = DateTime.now();
     _recomVistas = {for (final r in recomendaciones) r.clave};

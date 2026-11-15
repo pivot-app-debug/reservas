@@ -77,6 +77,13 @@ Reglas de siempre:
    - **Transparencia**: si se activa, el equipo ve totales y en qué se gasta. Nunca pagos, deudas ni mora de otras personas: eso solo lo ven Pivots con permiso de Finanzas.
    - **Cálculos**: con pruebas automáticas que comparan totales.
    - **Aviso legal** revisado por abogado (Pivot no administra fondos).
+5b. [ ] **Reestructuración de Mi Liga** (Victor, 2026-11-14; maqueta "Nueva Mi Liga — maqueta" esperando visto bueno; detalle en PENDIENTES sección P):
+   - Inicio: Equipos (tarjetas deslizables + nuevo equipo), Tesorería (resumen con Ingreso y Egreso), Pivots (un panel con permisos y pedidos), Reglas y Datos de la liga.
+   - Ajustes por equipo con "Igual que la liga" o valor propio: cobro, clases de gracia, asistencia, requisitos, equipamiento, fondos.
+   - Cobros dentro de Tesorería como modalidades (mensual, por clase, paquete, curso, inscripción, sin cobro) que cada equipo elige.
+   - Reglas por tipo con asistente (ejemplos y consecuencias claras), globales o por equipo; cada regla rige desde que se guarda.
+   - Personalización que falta: moneda, estados editables, tipos de evento, temporadas de descanso con reglas, documentos.
+   - [x] Hecho 2026-11-14: Formas de pago solo en Tesorería; Vencimiento de la cuota explicado en su pantalla; Salud y seguros en pantalla propia.
 6. [ ] **Planes de pago, cursos e inscripción rápida**:
    - **Planes**:
      - 1 a 12 meses o N clases.

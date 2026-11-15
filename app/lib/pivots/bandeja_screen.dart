@@ -151,13 +151,74 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     }
   }
 
-  /// Cancelar un pedido propio pendiente. Para cambiarlo: cancelar y pedir de nuevo.
+  /// Cambiar la clase de una reserva o el motivo de una solicitud propia.
+  Future<void> _editarMio(MiPedido x) async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      if (x.m['editable'] == 'clase') {
+        final ops = await repo.opcionesCambio(x);
+        if (!mounted) return;
+        if (ops.isEmpty) {
+          m.showSnackBar(const SnackBar(content: Text('No hay otras clases próximas para cambiar.')));
+          return;
+        }
+        final p = context.pivot;
+        final elegida = await showModalBottomSheet<String>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          builder: (h) => SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(h).height * 0.7),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                children: [
+                  Text('¿A qué clase la cambias?', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text('El pago y el comprobante pasan a la clase nueva.', style: TextStyle(color: p.textoSecundario)),
+                  const SizedBox(height: 8),
+                  for (final o in ops)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.event_rounded, color: p.marcaTexto),
+                      title: Text(_fechaClase(o)),
+                      subtitle: Text([o['tipo'], o['donde']].where((v) => '${v ?? ''}'.isNotEmpty).join(' · ')),
+                      onTap: () => Navigator.of(h).pop('${o['idEvento']}'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+        if (elegida == null || !mounted) return;
+        await repo.editarMio(x, idEvento: elegida);
+        m.showSnackBar(const SnackBar(content: Text('Listo: tu reserva cambió de clase.')));
+      } else {
+        final v = await editarTexto(context, titulo: 'Motivo', valor: '${x.m['motivo'] ?? ''}', maxLength: 500, lineas: 4);
+        if (v == null || v.trim().isEmpty || !mounted) return;
+        await repo.editarMio(x, motivo: v.trim());
+        m.showSnackBar(const SnackBar(content: Text('Motivo actualizado.')));
+      }
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    }
+  }
+
+  static String _fechaClase(Map<String, dynamic> o) {
+    final d = DateTime.tryParse('${o['fecha']}');
+    final h = '${o['inicia'] ?? ''}';
+    final hora = h.length >= 5 ? h.substring(0, 5) : h; // `inicia` es time: 19:10:00
+    return '${d == null ? o['fecha'] : '${Fechas.dia(d)} ${Fechas.corta(d)}'}${hora.isEmpty ? '' : ' · $hora'}';
+  }
+
+  /// Cancelar un pedido propio pendiente.
   Future<void> _cancelarMio(MiPedido x) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
         title: const Text('¿Cancelar esta solicitud?'),
-        content: Text('"${x.titulo}" deja de llegarles a los Pivots. Si querías cambiar algo, cancélala y vuelve a pedirla.'),
+        content: Text('"${x.titulo}" deja de llegarles a los Pivots.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Cancelar solicitud')),
@@ -467,6 +528,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                 _TarjetaMiPedido(
                   x: x,
                   alCancelar: () => _cancelarMio(x),
+                  alEditar: x.estado == 'pendiente' && x.m['editable'] != null ? () => _editarMio(x) : null,
                   alSubir: x.m['faltaComprobante'] == true
                       ? () async {
                           if (await subirComprobante(context, ReservasRepo(repo.sesion), ['${x.m['id']}'])) await repo.cargarMia();
@@ -1041,9 +1103,10 @@ class _Comprobante extends StatelessWidget {
 }
 
 class _TarjetaMiPedido extends StatelessWidget {
-  const _TarjetaMiPedido({required this.x, required this.alCancelar, this.alSubir});
+  const _TarjetaMiPedido({required this.x, required this.alCancelar, this.alSubir, this.alEditar});
   final MiPedido x;
   final VoidCallback alCancelar;
+  final VoidCallback? alEditar;
   final VoidCallback? alSubir;
 
   @override
@@ -1091,14 +1154,23 @@ class _TarjetaMiPedido extends StatelessWidget {
                           ),
                         ),
                       if (cancelable)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                            onPressed: alCancelar,
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            label: const Text('Cancelar solicitud'),
-                          ),
+                        Wrap(
+                          spacing: 12,
+                          children: [
+                            if (alEditar != null)
+                              TextButton.icon(
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                                onPressed: alEditar,
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                label: Text(x.m['editable'] == 'clase' ? 'Cambiar clase' : 'Editar motivo'),
+                              ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                              onPressed: alCancelar,
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              label: const Text('Cancelar solicitud'),
+                            ),
+                          ],
                         ),
                     ],
                   ),

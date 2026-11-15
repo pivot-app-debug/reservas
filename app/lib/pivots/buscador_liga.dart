@@ -30,7 +30,7 @@ const entradasLiga = [
   EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Equipo', 'administradores admins áreas acceso permisos roles'),
   EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Equipo', 'aprobar solicitudes otro pivot automático'),
   EntradaAjuste('canal', 'Canal de comunicación', 'Mi Liga › Comunicación', 'whatsapp telegram signal teléfono llamar mensajes'),
-  EntradaAjuste('formas', 'Formas de pago', 'Mi Liga › Cobros', 'medios billetera virtual banco transferencia efectivo enlace comprobante logo color'),
+
   EntradaAjuste('mensualidad', 'Mensualidad', 'Mi Liga › Cobros', 'precio cuota mes valor'),
   EntradaAjuste('clase', 'Valor por clase', 'Mi Liga › Cobros', 'precio por clase valor clase suelta'),
   EntradaAjuste('tolerancia', 'Tolerancia para llegadas tarde', 'Mi Liga › Reglas', 'tarde minutos llegar atraso lista tolerancia de llegada'),
@@ -57,7 +57,13 @@ const entradasLiga = [
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos y puntos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Mi Liga › Tesorería', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
-  EntradaAjuste('formasTesoreria', 'Formas de pago (Tesorería)', 'Mi Liga › Tesorería', 'medios cuentas billetera banco', dentro: 'tesoreria'),
+  EntradaAjuste(
+    'formasTesoreria',
+    'Formas de pago',
+    'Mi Liga › Tesorería',
+    'medios cuentas billetera virtual banco transferencia efectivo enlace comprobante logo color',
+    dentro: 'tesoreria',
+  ),
   EntradaAjuste('saldos', 'Saldos de personas', 'Mi Liga › Tesorería', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
   EntradaAjuste('fondos', 'Fondos de viaje', 'Mi Liga › Tesorería', 'viaje torneo reparto asistencia', dentro: 'tesoreria'),
   EntradaAjuste('movimientos', 'Todos los movimientos', 'Mi Liga › Tesorería', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),

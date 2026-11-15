@@ -13,8 +13,9 @@ import '../core/selector_plazo.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
+import 'salud_liga_screen.dart';
+import 'vencimiento_screen.dart';
 import 'categorias_screen.dart';
-import 'formas_pago_screen.dart';
 import 'pivots_screen.dart';
 
 /// Mi perfil → Ajustes de la liga (solo Pivots, Victor 2026-11-13): un solo
@@ -226,107 +227,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     }
   }
 
-  /// Listas de salud que cambian por país (Victor, 2026-11-14).
-  Future<void> _salud(BuildContext context, ConfigLiga c) async {
-    final atencion = [...c.atencionMedica], seguros = [...c.segurosPrivados];
-    final tels = {...c.telefonosSalud};
-    Future<void> editarTel(BuildContext h, StateSetter set, String x) async {
-      final ctl = TextEditingController(text: tels[x] ?? '');
-      final t = await showDialog<String>(
-        context: h,
-        builder: (d) => AlertDialog(
-          title: Text(x),
-          content: TextField(
-            controller: ctl,
-            autofocus: true,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Teléfono de emergencias (opcional)'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.trim()), child: const Text('Listo')),
-          ],
-        ),
-      );
-      if (t == null) return;
-      set(() => t.isEmpty ? tels.remove(x) : tels[x] = t);
-    }
-
-    final ctlA = TextEditingController(), ctlS = TextEditingController();
-    Widget lista(StateSetter set, String titulo, String ayuda, List<String> l, TextEditingController ctl, {Set<String> fijas = const {}}) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 16),
-        Text(titulo, style: const TextStyle(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        Text(ayuda, style: TextStyle(fontSize: 13, color: context.pivot.textoSecundario)),
-        const SizedBox(height: 8),
-        for (final x in l)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(x),
-            subtitle: Text(tels[x] == null ? 'Toca para poner un teléfono de emergencias' : 'Emergencias: ${tels[x]}'),
-            onTap: () => editarTel(context, set, x),
-            trailing: fijas.contains(x)
-                ? null
-                : IconButton(
-                    tooltip: 'Quitar',
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => set(() {
-                      l.remove(x);
-                      tels.remove(x);
-                    }),
-                  ),
-          ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: ctl,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: InputDecoration(
-            hintText: 'Agregar',
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.add_rounded),
-              onPressed: () {
-                final t = ctl.text.trim();
-                if (t.isNotEmpty && !l.contains(t)) set(() => l.add(t));
-                ctl.clear();
-              },
-            ),
-          ),
-          onSubmitted: (t) {
-            if (t.trim().isNotEmpty && !l.contains(t.trim())) set(() => l.add(t.trim()));
-            ctl.clear();
-          },
-        ),
-      ],
-    );
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Salud y seguros', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                lista(set, 'Dónde se atienden', 'Sistemas de salud pública o seguridad social del país.', atencion, ctlA, fijas: const {'Seguro Privado'}),
-                lista(set, 'Seguros privados', 'Aparecen cuando alguien elige "Seguro Privado". Siempre se puede escribir otro.', seguros, ctlS),
-                const SizedBox(height: 20),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    await _guardarRegla(context, c, {'atencionMedica': atencion, 'segurosPrivados': seguros, 'telefonosSalud': tels});
-  }
-
   String _textoGracia(ConfigLiga c) {
     final g = c.graciaPorEquipo;
     if (g.isEmpty) return 'Ningún equipo tiene clases de gracia';
@@ -410,68 +310,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     final g = c.cuotaGraciaDias > 0 ? ' + ${c.cuotaGraciaDias} ${c.cuotaGraciaDias == 1 ? 'día' : 'días'} de gracia' : '';
     final r = c.cuotaRecargo > 0 ? ' · recargo ${_plata(c.cuotaRecargo)}' : ' · sin recargo';
     return 'Vence el día ${c.cuotaVenceDia}$g$r';
-  }
-
-  Future<void> _vencimiento(BuildContext context, ConfigLiga c) async {
-    var dia = c.cuotaVenceDia, gracia = c.cuotaGraciaDias;
-    final ctl = TextEditingController(text: c.cuotaRecargo == 0 ? '' : '${c.cuotaRecargo}');
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Vencimiento de la cuota', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text(
-                  'Si alguien envía su pago después del día de vencimiento y los días de gracia, se le suma el recargo. '
-                  'Cuenta el día en que envía la solicitud, no el día en que un Pivot la aprueba. Los pagos ya hechos no cambian.\n\n'
-                  'Ejemplo: día 10, 3 días de gracia y \$2 de recargo. Quien envía el pago de noviembre hasta el 13 de noviembre paga el precio normal; desde el 14 paga \$2 más. Con el día en 0, la cuota no vence.',
-                  style: TextStyle(color: h.pivot.textoSecundario),
-                ),
-                const SizedBox(height: 16),
-                const Text('Día de vencimiento', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                SelectorNumero(valor: dia, min: 0, max: 28, etiqueta: dia == 0 ? 'no vence' : 'de cada mes', alCambiar: (n) => set(() => dia = n.toInt())),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  child: dia == 0
-                      ? const SizedBox(width: double.infinity)
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 16),
-                            const Text('Días de gracia', style: TextStyle(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            SelectorNumero(valor: gracia, min: 0, max: 27, etiqueta: 'días', alCambiar: (n) => set(() => gracia = n.toInt())),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: ctl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                              decoration: const InputDecoration(labelText: 'Recargo (monto fijo)', prefixText: '\$ ', helperText: 'Vacío o 0 = sin recargo'),
-                            ),
-                          ],
-                        ),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    final recargo = num.tryParse(ctl.text.replaceAll(',', '.')) ?? 0;
-    await _guardarRegla(context, c, {'cuotaVenceDia': dia, 'cuotaGraciaDias': gracia, 'cuotaRecargo': dia == 0 ? 0 : recargo});
   }
 
   /// Buscador: lleva al ajuste (abriendo la subsección si hace falta) y lo
@@ -614,18 +452,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               GrupoAjustes(
                 titulo: 'Cobros',
                 pie: 'Los planes y cupones llegan en la siguiente etapa.',
+                // Formas de pago vive solo en Tesorería (Victor, 2026-11-14).
                 filas: [
-                  Resaltable(
-                    id: 'formas',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.credit_card_rounded,
-                      seccion: 'cuota',
-                      titulo: 'Formas de pago',
-                      valor: c.mediosActivos.isEmpty ? 'Sin medios de pago' : c.mediosActivos.map((m) => m.nombre).join(' · '),
-                      alTocar: () => SubAjustes.abrir(context, FormasPagoScreen(config: c)),
-                    ),
-                  ),
                   Resaltable(
                     id: 'mensualidad',
                     resaltado: _resaltado,
@@ -645,7 +473,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       seccion: 'cuota',
                       titulo: 'Vencimiento de la cuota',
                       valor: _textoVencimiento(c),
-                      alTocar: () => _vencimiento(context, c),
+                      alTocar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
                     ),
                   ),
                   Resaltable(
@@ -754,7 +582,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       seccion: 'salud',
                       titulo: 'Salud y seguros',
                       valor: '${c.atencionMedica.length} opciones de atención · ${c.segurosPrivados.length} seguros privados',
-                      alTocar: () => _salud(context, c),
+                      alTocar: () => SubAjustes.abrir(context, SaludLigaScreen(config: c)),
                     ),
                   ),
                   Resaltable(
