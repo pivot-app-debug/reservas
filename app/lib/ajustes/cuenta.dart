@@ -85,11 +85,14 @@ class CuentaScreen extends StatelessWidget {
               filas: [
                 FilaAjuste(
                   icono: Icons.restart_alt_rounded,
-                  titulo: 'Reestablecer tour guiado de Pivot',
+                  titulo: 'Ver de nuevo los tours guiados',
                   alTocar: () async {
                     final m = ScaffoldMessenger.of(context);
                     final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('tour.calendario.visto');
+                    // Todos los tours (Calendario, evento, Equipo, ficha, Mi perfil, Mi Liga, Bandeja).
+                    for (final k in prefs.getKeys().where((k) => k.startsWith('tour.')).toList()) {
+                      await prefs.remove(k);
+                    }
                     m.showSnackBar(const SnackBar(content: Text('Tours guiados reestablecidos')));
                   },
                 ),

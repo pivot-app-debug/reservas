@@ -7,6 +7,7 @@ import '../core/zonas_horarias.dart';
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
+import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
@@ -99,7 +100,34 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   void initState() {
     super.initState();
     _cargarInicio();
+    // Tour de Mi Liga (Victor, 2026-11-15).
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted || !widget.pestana || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour.miliga.v1',
+        pasos: [
+          PasoTour(
+            clave: _kEquipos,
+            titulo: 'Tus equipos',
+            texto: 'Toca un equipo para ver y cambiar todo lo suyo: requisitos, cobro, clases de gracia y fondos. Con "+" creas otro.',
+          ),
+          PasoTour(
+            clave: _kTesoreria,
+            titulo: 'Tesorería',
+            texto: 'Cuánto hay en las cuentas. Registra un ingreso o un egreso desde aquí; toca la tarjeta para ver todo.',
+          ),
+          PasoTour(clave: _kReglas, titulo: 'Reglas', texto: 'Cómo funciona la liga: cobros, asistencia, puntos y equipamiento, y a quién aplica cada regla.'),
+          PasoTour(clave: _kLupa, titulo: 'Busca un ajuste', texto: 'Escribe lo que quieres cambiar (por ejemplo "tarde" o "precio") y te lleva directo.'),
+        ],
+      );
+    });
   }
+
+  final _kEquipos = GlobalKey(debugLabel: 'tour-liga-equipos');
+  final _kTesoreria = GlobalKey(debugLabel: 'tour-liga-tesoreria');
+  final _kReglas = GlobalKey(debugLabel: 'tour-liga-reglas');
+  final _kLupa = GlobalKey(debugLabel: 'tour-liga-lupa');
 
   Future<void> _cargarInicio() async {
     EquipoRepo.de(sesion).cargar();
@@ -176,7 +204,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
         style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.sobreSuave),
       ),
     );
-        return SizedBox(
+    return SizedBox(
       height: 184,
       child: l == null
           ? const Center(child: PivotCargando())
@@ -339,7 +367,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
             Text(pestana ? 'Mi Liga' : 'Ajustes de la liga', style: const TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
-        actions: [IconButton(tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
+        actions: [IconButton(key: _kLupa, tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
       ),
       body: ListenableBuilder(
         listenable: c,
@@ -354,10 +382,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _titulo(context, 'EQUIPOS'),
-                Resaltable(id: 'equipos', resaltado: _resaltado, child: _tarjetasEquipos(context)),
+                Resaltable(
+                  id: 'equipos',
+                  resaltado: _resaltado,
+                  child: KeyedSubtree(key: _kEquipos, child: _tarjetasEquipos(context)),
+                ),
                 if (sesion.tieneArea('finanzas')) ...[
                   _titulo(context, 'TESORERÍA'),
-                  Resaltable(id: 'tesoreria', resaltado: _resaltado, child: _tarjetaTesoreria(context)),
+                  Resaltable(
+                    id: 'tesoreria',
+                    resaltado: _resaltado,
+                    child: KeyedSubtree(key: _kTesoreria, child: _tarjetaTesoreria(context)),
+                  ),
                 ],
                 _titulo(context, 'ADMINISTRAR'),
                 GrupoAjustes(
@@ -377,6 +413,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       id: 'reglas',
                       resaltado: _resaltado,
                       child: FilaAjuste(
+                        key: _kReglas,
                         icono: Icons.rule_folder_outlined,
                         seccion: 'entrenamientos',
                         titulo: 'Reglas',

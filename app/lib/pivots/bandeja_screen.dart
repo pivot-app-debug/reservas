@@ -5,6 +5,7 @@ import '../core/api.dart';
 import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/ajustes_screen.dart';
 import '../ajustes/componentes.dart';
@@ -44,8 +45,32 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
   @override
   void initState() {
     super.initState();
-    _recargar();
+    _recargar().then((_) {
+      // Tour de la Bandeja (Victor, 2026-11-15), cuando ya hay algo que mostrar.
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+        Tour.mostrarSiCorresponde(
+          context,
+          preferencia: 'tour.bandeja.v1',
+          pasos: [
+            PasoTour(
+              clave: _kPorRevisar,
+              titulo: 'Por revisar',
+              texto: 'Pagos, reservas y pedidos del equipo. Apruebas o rechazas con motivo; en los pagos ves el comprobante o lo pides con un toque.',
+            ),
+            PasoTour(
+              clave: _kMios,
+              titulo: 'Tus pedidos',
+              texto: 'Cómo quedó cada cosa que pediste. Si falta el comprobante, súbelo aquí; mientras esté pendiente, puedes cambiarlo o cancelarlo.',
+            ),
+          ],
+        );
+      });
+    });
   }
+
+  final _kPorRevisar = GlobalKey(debugLabel: 'tour-bandeja-revisar');
+  final _kMios = GlobalKey(debugLabel: 'tour-bandeja-mios');
 
   Future<void> _recargar() async {
     await Future.wait([repo.cargar(forzar: true), repo.cargarMia(), if (repo.esPivot) _cargarVigentes()]);
@@ -490,10 +515,13 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
             );
           }
           final hijos = <Widget>[];
+          var primero = true;
           for (final (tipo, titulo, icono) in _grupos) {
             final l = repo.pedidos.where((x) => x.tipo == tipo).toList();
             if (l.isEmpty) continue;
-            hijos.add(_Encabezado(titulo: titulo, icono: icono, cantidad: l.length));
+            final enc = _Encabezado(titulo: titulo, icono: icono, cantidad: l.length);
+            hijos.add(primero ? KeyedSubtree(key: _kPorRevisar, child: enc) : enc);
+            primero = false;
             // Cambios de equipo: cuenta regresiva hasta el corte (Victor, 2026-11-13).
             if (tipo == TipoPedido.equipo) hijos.add(_CuentaCorte(corte: DateTime.tryParse('${l.first.m['corte'] ?? ''}')));
             for (final x in l) {
@@ -522,7 +550,12 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
           }
           // Lo de cada persona: sus pedidos y lo que la app recomienda.
           if (repo.misPedidos.isNotEmpty) {
-            hijos.add(_Encabezado(titulo: 'Tus pedidos', icono: Icons.send_rounded, cantidad: repo.misPedidos.length));
+            hijos.add(
+              KeyedSubtree(
+                key: _kMios,
+                child: _Encabezado(titulo: 'Tus pedidos', icono: Icons.send_rounded, cantidad: repo.misPedidos.length),
+              ),
+            );
             for (final x in repo.misPedidos.take(20)) {
               hijos.add(
                 _TarjetaMiPedido(

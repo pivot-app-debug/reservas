@@ -5,6 +5,7 @@ import '../core/api.dart';
 import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import 'desglose_screen.dart';
 import 'equipo_modelos.dart';
 import 'equipo_repo.dart';
@@ -78,7 +79,22 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     super.initState();
     repo.cargar();
     _cargar(_anio);
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour.estadisticas.v1',
+        pasos: [
+          PasoTour(clave: _kProgreso, titulo: 'Tu equipo', texto: 'Qué pide tu equipo cada mes y cuánto te falta. Si no llegas, aquí ves el aviso con tiempo.'),
+          PasoTour(clave: _kMes, titulo: 'Elige el mes', texto: 'Toca aquí para ver cualquier mes. Tocar un número muestra de dónde sale.'),
+        ],
+      );
+    });
   }
+
+  // Tour de Estadísticas (Victor, 2026-11-15).
+  final _kMes = GlobalKey(debugLabel: 'tour-est-mes');
+  final _kProgreso = GlobalKey(debugLabel: 'tour-est-progreso');
 
   Future<void> _cargar(int anio) async {
     if (_datos.containsKey(anio)) return;
@@ -255,7 +271,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
           _graficoCaja(d),
           const SizedBox(height: 12),
           if (_anio == _hoy.year && d.progreso != null) ...[
-            _ProgresoCategoria(progreso: d.progreso!, yo: _yo, verPrivado: _yo || repo.esAdmin),
+            _ProgresoCategoria(key: _kProgreso, progreso: d.progreso!, yo: _yo, verPrivado: _yo || repo.esAdmin),
             const SizedBox(height: 12),
           ],
           _anioCaja(d),
@@ -290,6 +306,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       titulo: Row(
         children: [
           Material(
+            key: _kMes,
             color: pal.suave,
             shape: const StadiumBorder(),
             child: InkWell(
@@ -446,7 +463,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 /// Tarjeta de Equipo (Victor, 2026-11-13): qué pide la actual,
 /// cuánto lleva, qué falta y cómo sumar, en tono amable.
 class _ProgresoCategoria extends StatelessWidget {
-  const _ProgresoCategoria({required this.progreso, required this.yo, required this.verPrivado});
+  const _ProgresoCategoria({super.key, required this.progreso, required this.yo, required this.verPrivado});
   final Map<String, dynamic> progreso;
   final bool yo;
   final bool verPrivado;

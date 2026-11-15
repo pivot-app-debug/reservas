@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/datos_pendientes.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../equipo/estadisticas.dart';
 import '../equipo/equipo_repo.dart';
@@ -46,7 +47,28 @@ class _AjustesScreenState extends State<AjustesScreen> {
     super.initState();
     if (eventos.cuota == null) eventos.recargarCuota();
     NotificacionesScreen.precargar(sesion.api);
+    // Tour de Mi perfil (Victor, 2026-11-15): solo lo que no es obvio.
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour.perfil.v1',
+        pasos: [
+          PasoTour(clave: _kPagos, titulo: 'Pagos y reservas', texto: 'Tus recibos, tus reservas (para cambiarlas o cancelarlas) y cómo vas con la cuota.'),
+          PasoTour(
+            clave: _kExcepcion,
+            titulo: 'Excepción de cuota',
+            texto: 'Si no puedes pagar un mes por ausencia o por una dificultad, pídela aquí. Un Pivot la revisa.',
+          ),
+          PasoTour(clave: _kComentarios, titulo: '¿Algo no funciona?', texto: 'Cuéntanos un error o una idea desde aquí.'),
+        ],
+      );
+    });
   }
+
+  final _kPagos = GlobalKey(debugLabel: 'tour-perfil-pagos');
+  final _kExcepcion = GlobalKey(debugLabel: 'tour-perfil-excepcion');
+  final _kComentarios = GlobalKey(debugLabel: 'tour-perfil-comentarios');
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +106,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                 filas: [
                   if (pagos)
                     FilaAjuste(
+                      key: _kPagos,
                       icono: Icons.receipt_long_rounded,
                       seccion: 'reservas',
                       titulo: 'Mis pagos y reservas',
@@ -93,6 +116,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     ),
                   if (conFicha && pagaCuota)
                     FilaAjuste(
+                      key: _kExcepcion,
                       icono: Icons.volunteer_activism_rounded,
                       seccion: 'cuota',
                       titulo: 'Excepción de cuota',
@@ -152,6 +176,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     alTocar: () => SubAjustes.abrir(context, CuentaScreen(sesion: sesion)),
                   ),
                   FilaAjuste(
+                    key: _kComentarios,
                     icono: Icons.forum_outlined,
                     seccion: 'cuenta',
                     titulo: 'Enviar comentarios',

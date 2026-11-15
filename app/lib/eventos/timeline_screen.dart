@@ -149,6 +149,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   final _kMas = GlobalKey(debugLabel: 'tour-mas');
   final _kTarjeta = GlobalKey(debugLabel: 'tour-tarjeta');
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
+  final _kBandeja = GlobalKey(debugLabel: 'tour-bandeja');
   String? _idTarjetaTour;
 
   EventosRepo get repo => widget.repo;
@@ -807,6 +808,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           const Spacer(),
           // Bandeja para todas las personas (2026-11-13): campana con novedades.
           IconButton(
+            key: _kBandeja,
             tooltip: _bandeja.hayNovedades ? 'Bandeja (hay novedades)' : (_bandeja.total > 0 ? 'Bandeja (${_bandeja.total} por revisar)' : 'Bandeja'),
             icon: IconoBandeja(novedades: _bandeja.hayNovedades, pendientes: _bandeja.esPivot ? _bandeja.total : 0),
             onPressed: () {
@@ -1349,9 +1351,17 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     final textoMas = 'Toca aquí para $lista.';
     await Tour.mostrarSiCorresponde(
       context,
-      preferencia: 'tour.calendario.visto',
+      // v2 (2026-11-15): tour nuevo para la app nueva, también para quien vio el anterior.
+      preferencia: 'tour.calendario.v2',
       pasos: [
         PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
+        PasoTour(
+          clave: _kBandeja,
+          titulo: 'Tu bandeja',
+          texto: _esAdmin
+              ? 'Aquí llega lo que hay que revisar: pagos, reservas, rectificaciones y pedidos. También ves tus propios pedidos y cómo quedaron.'
+              : 'Aquí ves tus pedidos (reservas, pagos, rectificaciones) y cómo quedaron. Si se mueve la campana, hay novedades.',
+        ),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
         PasoTour(
           clave: _kTareas,

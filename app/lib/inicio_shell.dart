@@ -50,7 +50,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   Future<void> _recordarDatos() async {
     if (!mounted || Tour.activo) return;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('tour.calendario.visto') != true || !mounted) return;
+    if (prefs.getBool('tour.calendario.v2') != true || !mounted) return;
     await DatosPendientes.recordarSiCorresponde(context, widget.sesion, abrir: (clave) => abrirPendiente(context, widget.sesion, clave));
   }
 

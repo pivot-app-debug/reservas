@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../eventos/widgets_comunes.dart';
 import '../pivots/pivots_screen.dart';
 import 'emergencia_screen.dart';
@@ -51,10 +52,46 @@ class PersonaScreen extends StatelessWidget {
   }
 }
 
-class _Ficha extends StatelessWidget {
+class _Ficha extends StatefulWidget {
   const _Ficha({required this.repo, required this.p});
   final EquipoRepo repo;
   final Integrante p;
+
+  @override
+  State<_Ficha> createState() => _FichaState();
+}
+
+class _FichaState extends State<_Ficha> {
+  EquipoRepo get repo => widget.repo;
+  Integrante get p => widget.p;
+
+  // Tour de la ficha de una persona (Victor, 2026-11-15).
+  final _kAcciones = GlobalKey(debugLabel: 'tour-ficha-acciones');
+  final _kStats = GlobalKey(debugLabel: 'tour-ficha-stats');
+  final _kPivot = GlobalKey(debugLabel: 'tour-ficha-pivot');
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      final yo = repo.esYo(p);
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour.ficha.v1',
+        pasos: [
+          if (!yo) PasoTour(clave: _kAcciones, titulo: 'Escribe o llama', texto: 'Con la app que usa la liga, sin buscar su número.'),
+          PasoTour(
+            clave: _kStats,
+            titulo: 'Estadísticas',
+            texto: 'Asistencia, puntos y cómo va con los requisitos de su equipo. Puedes ver cualquier mes y tocar un número para ver de dónde sale.',
+          ),
+          if (repo.esAdmin)
+            PasoTour(clave: _kPivot, titulo: 'Funciones de Pivot', texto: 'Cambiar su equipo o estado, registrar un pago, asistencias externas y más.'),
+        ],
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,11 +169,12 @@ class _Ficha extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            _acciones(context, pal, yo),
+            KeyedSubtree(key: _kAcciones, child: _acciones(context, pal, yo)),
             const SizedBox(height: 18),
             // Estadísticas en su propia pantalla (Victor, 2026-11-13).
             Center(
               child: OutlinedButton.icon(
+                key: _kStats,
                 onPressed: () => EstadisticasScreen.abrir(context, repo, p),
                 icon: const Icon(Icons.insights_rounded, size: 18),
                 label: const Text('Ver estadísticas'),
@@ -152,7 +190,13 @@ class _Ficha extends StatelessWidget {
               ),
             ],
             // También en tu propia ficha: un Pivot puede registrar su pago.
-            if (repo.esAdmin) ...[const SizedBox(height: 18), _Administracion(repo: repo, p: p)],
+            if (repo.esAdmin) ...[
+              const SizedBox(height: 18),
+              KeyedSubtree(
+                key: _kPivot,
+                child: _Administracion(repo: repo, p: p),
+              ),
+            ],
           ],
         ),
       ),

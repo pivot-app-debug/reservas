@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/reloj.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../reservas/gestionar_reserva.dart';
 import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
@@ -45,6 +46,40 @@ class DetalleScreen extends StatefulWidget {
 class _DetalleScreenState extends State<DetalleScreen> {
   EventosRepo get repo => widget.repo;
   bool _confirmacionPedida = false;
+
+  // Tour del detalle de un evento (Victor, 2026-11-15).
+  final _kResumen = GlobalKey(debugLabel: 'tour-ev-resumen');
+  final _kRespuesta = GlobalKey(debugLabel: 'tour-ev-respuesta');
+  final _kEquipo = GlobalKey(debugLabel: 'tour-ev-equipo');
+  final _kLista = GlobalKey(debugLabel: 'tour-ev-lista');
+  final _kAdmin = GlobalKey(debugLabel: 'tour-ev-admin');
+  bool _tourPedido = false;
+
+  void _tour(Evento ev) {
+    if (_tourPedido || ev.finalizado || ev.cancelado) return;
+    _tourPedido = true;
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour.evento.v1',
+        pasos: [
+          PasoTour(clave: _kResumen, titulo: 'Dónde y cuándo', texto: 'Hora, lugar y, si los hay, el mapa para llegar y el video del lugar.'),
+          PasoTour(
+            clave: _kRespuesta,
+            titulo: 'Tu respuesta',
+            texto: 'Marca Asistiré o No asistiré. Puedes cambiarla hasta que empiece; el equipo ve quién va.',
+          ),
+          PasoTour(clave: _kEquipo, titulo: 'Quiénes van', texto: 'Las respuestas del equipo. Toca a alguien para ver su ficha.'),
+          if (_esAdmin)
+            PasoTour(clave: _kLista, titulo: 'Tomar asistencia', texto: 'Cuando llega la hora, marcas quién vino a tiempo o tarde. Eso suma los puntos.'),
+          if (_esAdmin)
+            PasoTour(clave: _kAdmin, titulo: 'Opciones de Pivot', texto: 'Editar, cancelar o borrar el evento, y cambiar la respuesta de una persona.'),
+        ],
+      );
+    });
+  }
+
   _Grupo _grupo = _Grupo.asisten;
   List<Persona>? _sinRespuesta;
   bool _cargandoSinRespuesta = false;
@@ -221,6 +256,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             }
           });
         }
+        _tour(ev);
         return Scaffold(
           extendBodyBehindAppBar: true,
           appBar: AppBar(
@@ -240,16 +276,22 @@ class _DetalleScreenState extends State<DetalleScreen> {
             ],
           ),
           floatingActionButton: _esAdmin
-              ? FloatingActionButton(tooltip: 'Opciones de administración', onPressed: () => _menuAdmin(ev), child: const Icon(Icons.edit_calendar_outlined))
+              ? FloatingActionButton(
+                  key: _kAdmin,
+                  tooltip: 'Opciones de administración',
+                  onPressed: () => _menuAdmin(ev),
+                  child: const Icon(Icons.edit_calendar_outlined),
+                )
               : null,
           body: ListView(
             padding: EdgeInsets.fromLTRB(0, 8 + altoBarra(context), 0, 96),
             children: [
-              _resumen(context, ev),
+              KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
               if (_esAdmin && ev.sePuedeTomarAsistencia)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: FilledButton.icon(
+                    key: _kLista,
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -265,9 +307,14 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   ),
                 ),
               // Pasado o cancelado (Victor, 2026-11-12): sin botones de respuesta.
-              if (!ev.finalizado && !ev.cancelado) _tuAsistencia(context, ev),
+              if (!ev.finalizado && !ev.cancelado) KeyedSubtree(key: _kRespuesta, child: _tuAsistencia(context, ev)),
               if (!ev.cancelado) _tuReserva(context, ev),
-              if (ev.cancelado) _ibanAIr(context, ev) else if (ev.finalizado) _quienesFueron(context, ev) else _equipo(context, ev),
+              if (ev.cancelado)
+                _ibanAIr(context, ev)
+              else if (ev.finalizado)
+                _quienesFueron(context, ev)
+              else
+                KeyedSubtree(key: _kEquipo, child: _equipo(context, ev)),
             ],
           ),
         );

@@ -542,5 +542,5 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Seguridad (2026-11-14): `getReservasPersona` solo devuelve las reservas propias (o a un Pivot); `actualizarTallaReserva` exige sesión y además ahora sí guarda (la web mandaba otros nombres de campos y nunca se guardaba).
 - [ ] Probar en teléfonos reales (velocidad, desenfoque, iPhone agregado a la pantalla de inicio).
 - [ ] Cambiar la dirección principal a Flutter web y dejar la vieja congelada unas semanas.
-- [ ] Tours guiados completos en cada sección (Android y web).
+- [x] Tours guiados en cada sección (2026-11-15): Calendario v2, evento, Equipo, ficha, Estadísticas, Mi perfil, Mi Liga, Bandeja.
 - [x] Mi Liga reestructurada (2026-11-15): inicio con Equipos y Tesorería, ajustes por equipo, pantalla de Reglas, Cobros en Tesorería, Pedidos de Pivots en Pivots, canal en Comunidad. Falta: el asistente "+ Nueva regla" y que las reglas fijas se puedan editar (motor de reglas en el servidor), después de que Victor valide "Pivot — Reglas actuales".
