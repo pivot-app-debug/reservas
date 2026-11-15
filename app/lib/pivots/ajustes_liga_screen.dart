@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../ajustes/campos.dart';
 import '../ajustes/componentes.dart';
-import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/zonas_horarias.dart';
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
-import '../core/selector_plazo.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
+import '../core/cargando.dart';
+import '../finanzas/tesoreria_repo.dart';
+import '../finanzas/cobros_screen.dart';
+import 'reglas_screen.dart';
+import 'editores_liga.dart';
 import 'archivadas_screen.dart';
 import 'avisos_screen.dart';
 import '../equipo/equipo_repo.dart';
 import 'salud_liga_screen.dart';
-import 'vencimiento_screen.dart';
 import 'categorias_screen.dart';
 import 'pivots_screen.dart';
 
@@ -66,255 +67,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     super.dispose();
   }
 
-  static String _plata(num? v) => v == null ? 'Sin definir' : '\$${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
-
-  Future<void> _guardar(BuildContext context, ConfigLiga c, Map<String, Object?> cambios) async {
-    final m = ScaffoldMessenger.of(context);
-    try {
-      await c.guardar(cambios);
-      m.showSnackBar(const SnackBar(content: Text('Guardado')));
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
-    }
-  }
-
-  /// Todas las zonas horarias del mundo con buscador (Victor, 2026-11-14).
-  Future<void> _elegirZona(BuildContext context, ConfigLiga c) async {
-    var q = '';
-    String sinTildes(String s) => s
-        .toLowerCase()
-        .replaceAll(RegExp('[áà]'), 'a')
-        .replaceAll(RegExp('[éè]'), 'e')
-        .replaceAll(RegExp('[íì]'), 'i')
-        .replaceAll(RegExp('[óò]'), 'o')
-        .replaceAll(RegExp('[úü]'), 'u');
-    final v = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final l = [
-            for (final e in zonasHorarias.entries)
-              if (q.isEmpty || sinTildes('${e.value} ${e.key}').contains(sinTildes(q))) e,
-          ];
-          return SizedBox(
-            height: MediaQuery.sizeOf(h).height * 0.85,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: TextField(
-                    autofocus: true,
-                    onChanged: (x) => set(() => q = x.trim()),
-                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'País o ciudad'),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.only(bottom: 16 + MediaQuery.viewInsetsOf(h).bottom),
-                    itemCount: l.length,
-                    itemBuilder: (_, i) => ListTile(
-                      title: Text(l[i].value),
-                      trailing: l[i].key == c.zonaHoraria ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
-                      onTap: () => Navigator.of(h).pop(l[i].key),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-    if (v != null && v != c.zonaHoraria && context.mounted) await _guardar(context, c, {'zonaHoraria': v});
-  }
-
-  Future<void> _elegir(BuildContext context, ConfigLiga c, String titulo, Map<String, String> opciones, String actual, String clave, {String? ayuda}) async {
-    final v = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-            ),
-            if (ayuda != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(ayuda, style: TextStyle(fontSize: 13.5, color: h.pivot.textoSecundario)),
-              ),
-            for (final e in opciones.entries)
-              ListTile(
-                leading: clave == 'canal' ? Icon(ConfigLiga.iconoDe(e.key)) : null,
-                title: Text(e.value),
-                trailing: e.key == actual ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
-                onTap: () => Navigator.of(h).pop(e.key),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (v != null && v != actual && context.mounted) await _guardar(context, c, {clave: v});
-  }
-
-  Future<void> _precio(BuildContext context, ConfigLiga c, String titulo, num? actual, String clave) async {
-    final ctl = TextEditingController(text: actual == null ? '' : '$actual');
-    final v = await showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text(titulo),
-        content: TextField(
-          controller: ctl,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-          decoration: const InputDecoration(prefixText: '\$ '),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.replaceAll(',', '.')), child: const Text('Guardar')),
-        ],
-      ),
-    );
-    final n = num.tryParse(v ?? '');
-    if (n != null && context.mounted) await _guardar(context, c, {clave: n});
-  }
-
-  Future<void> _numero(BuildContext context, ConfigLiga c, String titulo, String clave, int actual, int min, int max, String etiqueta) async {
-    var v = actual;
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 16),
-                SelectorNumero(valor: v, min: min, max: max, paso: max > 100 ? 5 : 1, etiqueta: etiqueta, alCambiar: (n) => set(() => v = n.toInt())),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (ok != true || v == actual || !context.mounted) return;
-    final m = ScaffoldMessenger.of(context);
-    try {
-      await c.guardarReglas({clave: v});
-      m.showSnackBar(const SnackBar(content: Text('Guardado')));
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
-    }
-  }
-
-  Future<void> _guardarRegla(BuildContext context, ConfigLiga c, Map<String, Object?> cambios) async {
-    final m = ScaffoldMessenger.of(context);
-    try {
-      await c.guardarReglas(cambios);
-      m.showSnackBar(const SnackBar(content: Text('Guardado')));
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
-    }
-  }
-
-  String _textoGracia(ConfigLiga c) {
-    final g = c.graciaPorEquipo;
-    if (g.isEmpty) return 'Ningún equipo tiene clases de gracia';
-    return [for (final e in g.entries) '${e.key}: ${e.value == 0 ? 'paga antes' : '${e.value} ${e.value == 1 ? 'clase' : 'clases'}'}'].join(' · ');
-  }
-
-  /// Clases de gracia por equipo (Victor, 2026-11-14).
-  Future<void> _gracia(BuildContext context, ConfigLiga c) async {
-    final m = ScaffoldMessenger.of(context);
-    List<String> equipos;
-    try {
-      final r = await sesion.api.get('getTiers', {'adminToken': sesion.adminToken});
-      equipos = [for (final t in (r['tiers'] as List? ?? const [])) '${(t as Map)['nombre']}'];
-    } catch (_) {
-      m.showSnackBar(const SnackBar(content: Text('No se pudieron cargar los equipos. Revisa tu conexión.')));
-      return;
-    }
-    if (!context.mounted) return;
-    final v = <String, int?>{for (final e in equipos) e: c.graciaClases(e)};
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Clases de gracia', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text(
-                  'Cuántas clases del mes puede venir alguien sin haber pagado la cuota. Después, al marcar Asistiré, la app le pide pagar. '
-                  'Con 0, paga antes de marcar Asistiré. Si un equipo no la usa, sigue su propia regla (por ejemplo, reservar y pagar cada clase).',
-                  style: TextStyle(color: h.pivot.textoSecundario),
-                ),
-                for (final e in equipos) ...[
-                  const SizedBox(height: 14),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(v[e] == null ? 'No usa clases de gracia' : 'Usa clases de gracia'),
-                    value: v[e] != null,
-                    onChanged: (x) => set(() => v[e] = x ? 1 : null),
-                  ),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    child: v[e] == null
-                        ? const SizedBox(width: double.infinity)
-                        : SelectorNumero(
-                            valor: v[e]!,
-                            min: 0,
-                            max: 10,
-                            etiqueta: v[e] == 0 ? 'paga antes' : 'clases al mes',
-                            alCambiar: (n) => set(() => v[e] = n.toInt()),
-                          ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    await _guardarRegla(context, c, {
-      'graciaClases': {
-        for (final e in v.entries)
-          if (e.value != null) e.key: e.value,
-      },
-    });
-  }
-
-  String _textoVencimiento(ConfigLiga c) {
-    if (c.cuotaVenceDia == 0) return 'No vence';
-    final g = c.cuotaGraciaDias > 0 ? ' + ${c.cuotaGraciaDias} ${c.cuotaGraciaDias == 1 ? 'día' : 'días'} de gracia' : '';
-    final r = c.cuotaRecargo > 0 ? ' · recargo ${_plata(c.cuotaRecargo)}' : ' · sin recargo';
-    return 'Vence el día ${c.cuotaVenceDia}$g$r';
-  }
-
   /// Buscador: lleva al ajuste (abriendo la subsección si hace falta) y lo
   /// hace parpadear.
   Future<void> _buscar() async {
@@ -325,13 +77,249 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
         SubAjustes.abrir(context, CategoriasScreen(sesion: sesion, resaltar: e.id));
       case 'tesoreria':
         SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion, resaltar: e.id));
+      case 'cobros':
+        SubAjustes.abrir(context, CobrosScreen(sesion: sesion, resaltar: e.id));
+      case 'reglas':
+        SubAjustes.abrir(context, ReglasScreen(sesion: sesion, resaltar: e.id));
+      case 'pivots':
+        SubAjustes.abrir(context, PivotsScreen(sesion: sesion));
       default:
         _resaltado.value = null;
         _resaltado.value = e.id;
     }
   }
 
+  // ─── Inicio de Mi Liga (Victor, 2026-11-14): Equipos, Tesorería, Pivots,
+  // Reglas, Comunicación y Datos de la liga.
+  List<Map<String, dynamic>>? _equipos;
+  Map<String, dynamic>? _tesoreria;
+  late final _tesRepo = TesoreriaRepo(sesion);
+
   @override
+  void initState() {
+    super.initState();
+    _cargarInicio();
+  }
+
+  Future<void> _cargarInicio() async {
+    EquipoRepo.de(sesion).cargar();
+    try {
+      final r = await sesion.api.get('getTiers', {'adminToken': sesion.adminToken});
+      if (mounted) {
+        setState(
+          () => _equipos = [
+            for (final t in (r['tiers'] as List? ?? const []))
+              if (t is Map<String, dynamic>) t,
+          ]..sort((a, b) => ((a['orden'] as num?) ?? 0).compareTo((b['orden'] as num?) ?? 0)),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _equipos = const []);
+    }
+    if (!sesion.tieneArea('finanzas')) return;
+    try {
+      final t = await _tesRepo.accion('resumen');
+      if (mounted) setState(() => _tesoreria = t);
+    } catch (_) {}
+  }
+
+  Future<void> _abrir(Widget w) async {
+    await SubAjustes.abrir(context, w);
+    if (mounted) _cargarInicio();
+  }
+
+  Future<void> _movimiento(String tipo) async {
+    final cuentas = [
+      for (final c in (_tesoreria?['cuentas'] as List? ?? const []))
+        if (c is Map<String, dynamic> && c['archivada'] != true) c,
+    ];
+    if (cuentas.isEmpty) {
+      await _abrir(TesoreriaScreen(sesion: sesion));
+      return;
+    }
+    final ok = await abrirFormularioMovimiento(context, repo: _tesRepo, cuentas: cuentas, tipo: tipo);
+    if (ok == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrado')));
+      _cargarInicio();
+    }
+  }
+
+  Widget _titulo(BuildContext context, String t) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+    child: Text(
+      t,
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
+    ),
+  );
+
+  Widget _tarjetasEquipos(BuildContext context) {
+    final p = context.pivot;
+    final l = _equipos;
+    final gente = EquipoRepo.de(sesion);
+    Widget tarjeta({required Widget child, required VoidCallback alTocar, double ancho = 168, bool borde = false}) => Material(
+      color: borde ? Colors.transparent : p.tarjeta,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(PivotRadios.grande),
+        side: borde ? BorderSide(color: p.bordeSuave, width: 1.5) : BorderSide.none,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(PivotRadios.grande),
+        onTap: alTocar,
+        child: Container(width: ancho, padding: const EdgeInsets.all(14), child: child),
+      ),
+    );
+    Widget etiqueta(String t) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.sobreSuave),
+      ),
+    );
+        return SizedBox(
+      height: 184,
+      child: l == null
+          ? const Center(child: PivotCargando())
+          : ListenableBuilder(
+              listenable: gente,
+              builder: (context, _) => ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: l.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) {
+                  if (i == l.length) {
+                    return tarjeta(
+                      ancho: 110,
+                      borde: true,
+                      alTocar: () => _abrir(CategoriasScreen(sesion: sesion, resaltar: 'nuevoEquipo')),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_rounded, size: 30, color: p.marcaTexto),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Nuevo equipo',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final t = l[i];
+                  final nombre = '${t['nombre']}';
+                  final cuantas = gente.personas?.where((x) => x.categoria == nombre).length;
+                  final req = (t['requisitos'] as Map?) ?? const {};
+                  final propio = req['patinesPropios'] == true || req['proteccionesPropias'] == true;
+                  return tarjeta(
+                    alTocar: () => _abrir(AjustesEquipoScreen(sesion: sesion, nombre: nombre)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LogoEquipo(nombre: nombre, url: t['logo'] as String?, tamano: 44),
+                        const Spacer(),
+                        Text(
+                          nombre,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
+                        ),
+                        Text(
+                          cuantas == null ? ' ' : '$cuantas ${cuantas == 1 ? 'persona' : 'personas'}',
+                          style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(spacing: 4, runSpacing: 4, children: [etiqueta(propio ? 'Mensual' : 'Por clase o mes'), if (propio) etiqueta('Equipo propio')]),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+    );
+  }
+
+  Widget _tarjetaTesoreria(BuildContext context) {
+    final r = _tesoreria;
+    final mes = (r?['mes'] as Map?) ?? const {};
+    final saldos = (r?['saldos'] as Map?) ?? const {};
+    final deben = (saldos['personasDeben'] as num?) ?? 0;
+    const blanco = PivotPaleta.sobreSeccion;
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(PivotRadios.grande),
+          onTap: () => _abrir(TesoreriaScreen(sesion: sesion)),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Total en cuentas', style: TextStyle(color: blanco.withValues(alpha: 0.85))),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: blanco),
+                  ],
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Text(
+                    r == null ? '…' : plata((r['total'] as num?) ?? 0),
+                    key: ValueKey(r == null),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: blanco),
+                  ),
+                ),
+                if (r != null) ...[
+                  Text(
+                    'Este mes: +${plata((mes['ingresos'] as num?) ?? 0)} · −${plata((mes['egresos'] as num?) ?? 0)}',
+                    style: TextStyle(color: blanco.withValues(alpha: 0.9)),
+                  ),
+                  if (deben > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '$deben ${deben == 1 ? 'persona debe' : 'personas deben'} ${plata((saldos['totalDeben'] as num?) ?? 0)}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: blanco),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(backgroundColor: blanco, foregroundColor: context.pivot.marcaTexto),
+                        onPressed: () => _movimiento('ingreso'),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Ingreso'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: blanco,
+                          side: BorderSide(color: blanco.withValues(alpha: 0.7)),
+                        ),
+                        onPressed: () => _movimiento('egreso'),
+                        icon: const Icon(Icons.remove_rounded),
+                        label: const Text('Egreso'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = ConfigLiga.de(sesion);
@@ -355,291 +343,117 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
       ),
       body: ListenableBuilder(
         listenable: c,
-        builder: (context, _) => SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16, 8 + arriba, 16, 40 + MediaQuery.paddingOf(context).bottom),
-          // Todo construido: el buscador puede llevar a cualquier fila.
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Tesorería vive en Mi Liga (Victor, 2026-11-13).
-              if (sesion.tieneArea('finanzas'))
+        builder: (context, _) => RefreshIndicator(
+          edgeOffset: arriba,
+          onRefresh: _cargarInicio,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(16, arriba, 16, 40 + MediaQuery.paddingOf(context).bottom),
+            // Todo construido: el buscador puede llevar a cualquier fila.
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _titulo(context, 'EQUIPOS'),
+                Resaltable(id: 'equipos', resaltado: _resaltado, child: _tarjetasEquipos(context)),
+                if (sesion.tieneArea('finanzas')) ...[
+                  _titulo(context, 'TESORERÍA'),
+                  Resaltable(id: 'tesoreria', resaltado: _resaltado, child: _tarjetaTesoreria(context)),
+                ],
+                _titulo(context, 'ADMINISTRAR'),
                 GrupoAjustes(
                   filas: [
                     Resaltable(
-                      id: 'tesoreria',
+                      id: 'pivots',
                       resaltado: _resaltado,
                       child: FilaAjuste(
-                        icono: Icons.account_balance_wallet_outlined,
-                        seccion: 'cuota',
-                        titulo: 'Tesorería',
-                        valor: 'Cuentas, movimientos, saldos y fondos de viaje',
-                        alTocar: () => SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion)),
+                        icono: Icons.admin_panel_settings_outlined,
+                        seccion: 'roles',
+                        titulo: 'Pivots y permisos',
+                        valor: 'Quién es Pivot, qué áreas gestiona y cómo se aprueban sus pedidos',
+                        alTocar: () => _abrir(PivotsScreen(sesion: sesion)),
+                      ),
+                    ),
+                    Resaltable(
+                      id: 'reglas',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.rule_folder_outlined,
+                        seccion: 'entrenamientos',
+                        titulo: 'Reglas',
+                        valor: 'Cobros, asistencia, puntos, equipamiento y privacidad',
+                        alTocar: () => _abrir(ReglasScreen(sesion: sesion)),
+                      ),
+                    ),
+                    if (sesion.tieneArea('liga'))
+                      Resaltable(
+                        id: 'avisos',
+                        resaltado: _resaltado,
+                        child: FilaAjuste(
+                          icono: Icons.campaign_outlined,
+                          seccion: 'telefono',
+                          titulo: 'Avisos al equipo',
+                          valor: 'Enviar un mensaje ahora o programado',
+                          alTocar: () => _abrir(AvisosScreen(sesion: sesion)),
+                        ),
+                      ),
+                    if (sesion.tieneArea('equipo'))
+                      Resaltable(
+                        id: 'archivadas',
+                        resaltado: _resaltado,
+                        child: FilaAjuste(
+                          icono: Icons.inventory_outlined,
+                          seccion: 'roles',
+                          titulo: 'Personas archivadas',
+                          valor: 'Ver y restaurar a quienes salieron de Equipo',
+                          alTocar: () => _abrir(ArchivadasScreen(repo: EquipoRepo.de(sesion))),
+                        ),
+                      ),
+                  ],
+                ),
+                _titulo(context, 'DATOS DE LA LIGA'),
+                GrupoAjustes(
+                  pie: 'El país define el prefijo de teléfono y los números de emergencia. La zona horaria se aplicará a los horarios cuando la app admita varias ligas; por ahora todo usa la hora de Ecuador.',
+                  filas: [
+                    Resaltable(
+                      id: 'salud',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.health_and_safety_outlined,
+                        seccion: 'salud',
+                        titulo: 'Salud y seguros',
+                        valor: '${c.atencionMedica.length} opciones de atención · ${c.segurosPrivados.length} seguros privados',
+                        alTocar: () => _abrir(SaludLigaScreen(config: c)),
+                      ),
+                    ),
+                    Resaltable(
+                      id: 'pais',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.flag_outlined,
+                        seccion: 'identidad',
+                        titulo: 'País',
+                        valor: Paises.porCodigo(c.pais).nombre,
+                        alTocar: () async {
+                          final p = await elegirPais(context, paisEquipo: c.pais, actual: Paises.porCodigo(c.pais), titulo: 'País de la liga');
+                          if (p != null && p.codigo != c.pais && context.mounted) await guardarLiga(context, c, {'pais': p.codigo});
+                        },
+                      ),
+                    ),
+                    Resaltable(
+                      id: 'zona',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.schedule_rounded,
+                        seccion: 'identidad',
+                        titulo: 'Zona horaria',
+                        valor: zonasHorarias[c.zonaHoraria] ?? zonas[c.zonaHoraria] ?? c.zonaHoraria,
+                        alTocar: () => elegirZonaLiga(context, c),
                       ),
                     ),
                   ],
                 ),
-              GrupoAjustes(
-                titulo: 'Equipo',
-                filas: [
-                  Resaltable(
-                    id: 'equipos',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.workspace_premium_outlined,
-                      seccion: 'cuota',
-                      titulo: 'Equipos y puntos',
-                      valor: 'Qué pide cada una para mantenerse o subir',
-                      alTocar: () => SubAjustes.abrir(context, CategoriasScreen(sesion: sesion)),
-                    ),
-                  ),
-                  if (sesion.tieneArea('equipo'))
-                    Resaltable(
-                      id: 'archivadas',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        icono: Icons.inventory_outlined,
-                        seccion: 'roles',
-                        titulo: 'Personas archivadas',
-                        valor: 'Ver y restaurar a quienes salieron de Equipo',
-                        alTocar: () => SubAjustes.abrir(context, ArchivadasScreen(repo: EquipoRepo.de(sesion))),
-                      ),
-                    ),
-                  Resaltable(
-                    id: 'pivots',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.admin_panel_settings_outlined,
-                      seccion: 'roles',
-                      titulo: 'Pivots y permisos',
-                      valor: 'Quién es Pivot y qué áreas gestiona',
-                      alTocar: () => SubAjustes.abrir(context, PivotsScreen(sesion: sesion)),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'pedidos',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.verified_user_outlined,
-                      seccion: 'roles',
-                      titulo: 'Pedidos de Pivots',
-                      valor: c.solicitudesPivots == 'auto' ? 'Se aprueban solos' : 'Los aprueba otro Pivot',
-                      alTocar: () => _elegir(
-                        context,
-                        c,
-                        'Pedidos de Pivots',
-                        const {'otro': 'Los aprueba otro Pivot (más seguro)', 'auto': 'Se aprueban solos'},
-                        c.solicitudesPivots,
-                        'solicitudesPivots',
-                        ayuda:
-                            'Cuando un Pivot pide algo para sí (excepción de cuota, rectificación, equipamiento, lesión o una tarea), quién lo aprueba. '
-                            'Si la liga tiene un solo Pivot, se aprueba solo. Los pagos siempre los confirma otro Pivot.',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GrupoAjustes(
-                titulo: 'Comunicación',
-                filas: [
-                  if (sesion.tieneArea('liga'))
-                    Resaltable(
-                      id: 'avisos',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        icono: Icons.campaign_outlined,
-                        seccion: 'telefono',
-                        titulo: 'Avisos al equipo',
-                        valor: 'Enviar un mensaje ahora o programado',
-                        alTocar: () => SubAjustes.abrir(context, AvisosScreen(sesion: sesion)),
-                      ),
-                    ),
-                  Resaltable(
-                    id: 'canal',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: c.icono,
-                      seccion: 'telefono',
-                      titulo: 'Canal de comunicación',
-                      valor: c.nombreCanal,
-                      alTocar: () => _elegir(
-                        context,
-                        c,
-                        'Canal de comunicación',
-                        ConfigLiga.canales,
-                        c.canal,
-                        'canal',
-                        ayuda: 'La app con la que se escribe a las personas del equipo desde su ficha.',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GrupoAjustes(
-                titulo: 'Cobros',
-                pie: 'Los planes y cupones llegan en la siguiente etapa.',
-                // Formas de pago vive solo en Tesorería (Victor, 2026-11-14).
-                filas: [
-                  Resaltable(
-                    id: 'mensualidad',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.calendar_month_outlined,
-                      seccion: 'cuota',
-                      titulo: 'Mensualidad',
-                      valor: _plata(c.precioMensual),
-                      alTocar: () => _precio(context, c, 'Mensualidad', c.precioMensual, 'precioMensual'),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'vencimiento',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.event_busy_outlined,
-                      seccion: 'cuota',
-                      titulo: 'Vencimiento de la cuota',
-                      valor: _textoVencimiento(c),
-                      alTocar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'clase',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.confirmation_number_outlined,
-                      seccion: 'cuota',
-                      titulo: 'Valor por clase',
-                      valor: _plata(c.precioPorClase),
-                      alTocar: () => _precio(context, c, 'Valor por clase', c.precioPorClase, 'precioPorClase'),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'gracia',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.redeem_outlined,
-                      seccion: 'cuota',
-                      titulo: 'Clases de gracia',
-                      valor: _textoGracia(c),
-                      alTocar: () => _gracia(context, c),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GrupoAjustes(
-                titulo: 'Reglas',
-                filas: [
-                  Resaltable(
-                    id: 'tolerancia',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.timer_outlined,
-                      seccion: 'entrenamientos',
-                      titulo: 'Tolerancia para llegadas tarde',
-                      valor: '${c.toleranciaMin} minutos: después se sugiere marcar Tarde',
-                      alTocar: () => _numero(context, c, 'Tolerancia para llegadas tarde', 'toleranciaMin', c.toleranciaMin, 0, 120, 'minutos'),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'rectificaciones',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.fact_check_outlined,
-                      seccion: 'entrenamientos',
-                      titulo: 'Rectificaciones',
-                      valor: 'Pedidos para corregir una asistencia mal tomada. Se revisan en ${c.rectificacionDias} días',
-                      alTocar: () => _numero(context, c, 'Días para revisar una rectificación', 'rectificacionDias', c.rectificacionDias, 1, 60, 'días'),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'minimo',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.groups_2_outlined,
-                      seccion: 'entrenamientos',
-                      titulo: 'Pocas personas en un evento',
-                      valor: c.eventosMinPersonas == 0 ? 'No se sugiere cancelar' : 'Con menos de ${c.eventosMinPersonas}, se sugiere cancelar',
-                      alTocar: () => _numero(context, c, 'Sugerir cancelar con menos de', 'eventosMinPersonas', c.eventosMinPersonas, 0, 200, 'personas'),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'inactividad',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.hourglass_empty_rounded,
-                      seccion: 'entrenamientos',
-                      titulo: 'Inactividad',
-                      valor: 'Pasa a inactiva tras ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
-                      alTocar: () => _numero(context, c, 'Pasa a inactiva después de', 'inactividadDias', ConfigLiga.diasInactividad, 7, 365, 'días sin venir'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GrupoAjustes(
-                titulo: 'Privacidad',
-                pie: 'Los Pivots siempre ven todo. Cada persona siempre ve sus propios puntos.',
-                filas: [
-                  Resaltable(
-                    id: 'ranking',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.leaderboard_outlined,
-                      seccion: 'privacidad',
-                      titulo: 'Puntos de otras personas',
-                      valor: c.rankingVisible ? 'Todo el equipo ve los puntos de todas las personas' : 'Cada persona solo ve sus puntos',
-                      derecha: Switch(value: c.rankingVisible, onChanged: (v) => _guardarRegla(context, c, {'rankingVisible': v})),
-                      alTocar: () => _guardarRegla(context, c, {'rankingVisible': !c.rankingVisible}),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GrupoAjustes(
-                titulo: 'Datos de la liga',
-                pie: 'El país define el prefijo de teléfono y los números de emergencia. La zona horaria se guarda y se aplicará a los horarios cuando la app admita varias ligas; por ahora todo usa la hora de Ecuador.',
-                filas: [
-                  Resaltable(
-                    id: 'salud',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.health_and_safety_outlined,
-                      seccion: 'salud',
-                      titulo: 'Salud y seguros',
-                      valor: '${c.atencionMedica.length} opciones de atención · ${c.segurosPrivados.length} seguros privados',
-                      alTocar: () => SubAjustes.abrir(context, SaludLigaScreen(config: c)),
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'pais',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.flag_outlined,
-                      seccion: 'identidad',
-                      titulo: 'País',
-                      valor: Paises.porCodigo(c.pais).nombre,
-                      alTocar: () async {
-                        final p = await elegirPais(context, paisEquipo: c.pais, actual: Paises.porCodigo(c.pais), titulo: 'País de la liga');
-                        if (p != null && p.codigo != c.pais && context.mounted) await _guardar(context, c, {'pais': p.codigo});
-                      },
-                    ),
-                  ),
-                  Resaltable(
-                    id: 'zona',
-                    resaltado: _resaltado,
-                    child: FilaAjuste(
-                      icono: Icons.schedule_rounded,
-                      seccion: 'identidad',
-                      titulo: 'Zona horaria',
-                      valor: zonasHorarias[c.zonaHoraria] ?? zonas[c.zonaHoraria] ?? c.zonaHoraria,
-                      alTocar: () => _elegirZona(context, c),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

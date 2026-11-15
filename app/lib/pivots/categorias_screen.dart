@@ -1,6 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../core/config_liga.dart';
+import 'reglas_screen.dart';
+import 'editores_liga.dart';
+
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -1463,6 +1468,83 @@ class _EquipoScreenState extends State<_EquipoScreen> {
               final_: Switch(value: t['califica_fondos_viaje'] == true, onChanged: (v) => _guardar({'califica_fondos_viaje': v ? 'true' : ''})),
             ),
             _Fila(icono: Icons.rule_rounded, titulo: 'Entrar con el enlace', texto: _textoRequisitos, alTocar: _requisitos),
+            // Ajustes del equipo en un solo lugar (Victor, 2026-11-14): lo
+            // propio del equipo y, aparte, las reglas de toda la liga.
+            ListenableBuilder(
+              listenable: ConfigLiga.de(s),
+              builder: (context, _) {
+                final c = ConfigLiga.de(s);
+                final g = c.graciaClases(_nombre);
+                Widget titulo(String x) => Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  child: Text(
+                    x,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  ),
+                );
+                void reglas(String id) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ReglasScreen(sesion: s, equipo: _nombre, resaltar: id),
+                  ),
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    titulo('COBRO'),
+                    _Fila(
+                      icono: Icons.redeem_outlined,
+                      titulo: 'Clases de gracia',
+                      texto: g == null
+                          ? 'No usa: sigue su regla de pago'
+                          : (g == 0 ? 'Paga antes de marcar Asistiré' : '$g ${g == 1 ? 'clase' : 'clases'} al mes sin haber pagado'),
+                      alTocar: () => editarGracia(context, s, c, soloEquipo: _nombre),
+                      final_: ChipAlcance(equipo: _nombre),
+                    ),
+                    _Fila(
+                      icono: Icons.event_busy_outlined,
+                      titulo: 'Fecha límite de pago',
+                      texto: textoVencimiento(c),
+                      alTocar: () => reglas('vencimiento'),
+                      final_: const ChipAlcance(),
+                    ),
+                    titulo('ASISTENCIA'),
+                    _Fila(
+                      icono: Icons.timer_outlined,
+                      titulo: 'Tolerancia para llegadas tarde',
+                      texto: '${c.toleranciaMin} minutos',
+                      alTocar: () => reglas('tolerancia'),
+                      final_: const ChipAlcance(),
+                    ),
+                    _Fila(
+                      icono: Icons.hourglass_empty_rounded,
+                      titulo: 'Inactividad',
+                      texto: 'Tras ${ConfigLiga.diasInactividad} días sin venir',
+                      alTocar: () => reglas('inactividad'),
+                      final_: const ChipAlcance(),
+                    ),
+                    _Fila(
+                      icono: Icons.fact_check_outlined,
+                      titulo: 'Rectificaciones',
+                      texto: 'Se revisan en ${c.rectificacionDias} días. Siempre aplica a toda la liga',
+                      alTocar: () => reglas('rectificaciones'),
+                      final_: const ChipAlcance(),
+                    ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ReglasScreen(sesion: s, equipo: _nombre),
+                        ),
+                      ),
+                      icon: const Icon(Icons.rule_folder_outlined),
+                      label: Text('Ver todas las reglas de $_nombre'),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              },
+            ),
             _Fila(
               icono: Icons.link_rounded,
               titulo: 'Enlace de invitación',
@@ -1830,5 +1912,60 @@ class _Impacto extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Ajustes de un equipo por su nombre (Mi Liga → tarjetas de equipos):
+/// carga los equipos y la gente, y muestra la misma pantalla de Equipos y puntos.
+class AjustesEquipoScreen extends StatefulWidget {
+  const AjustesEquipoScreen({super.key, required this.sesion, required this.nombre});
+  final Sesion sesion;
+  final String nombre;
+
+  @override
+  State<AjustesEquipoScreen> createState() => _AjustesEquipoScreenState();
+}
+
+class _AjustesEquipoScreenState extends State<AjustesEquipoScreen> {
+  List<Map<String, dynamic>>? _tiers;
+  List<_Persona> _gente = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.sesion, token = {'adminToken': s.adminToken};
+    Future.wait([s.api.get('getTiers', token), s.api.get('adminDatosCategorias', token)])
+        .then((r) {
+          if (!mounted) return;
+          setState(() {
+            _tiers = [
+              for (final t in (r[0]['tiers'] as List? ?? const []))
+                if (t is Map<String, dynamic>) t,
+            ]..sort((a, b) => ((a['orden'] as num?) ?? 0).compareTo((b['orden'] as num?) ?? 0));
+            _gente = [
+              for (final p in (r[1]['personas'] as List? ?? const []))
+                if (p is Map<String, dynamic>) _Persona(p),
+            ];
+          });
+        })
+        .catchError((Object e) {
+          if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
+        });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = _tiers;
+    final i = l?.indexWhere((t) => '${t['nombre']}' == widget.nombre) ?? -1;
+    if (l == null || i < 0) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.nombre)),
+        body: Center(
+          child: _error != null ? Text(_error!) : (l == null ? const PivotCargando(centrarEnPantalla: true) : const Text('Ese equipo ya no existe.')),
+        ),
+      );
+    }
+    return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: _gente);
   }
 }

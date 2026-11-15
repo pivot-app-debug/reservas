@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../ajustes/componentes.dart';
 import '../core/api.dart';
+import '../core/config_liga.dart';
 import '../core/asistente.dart';
 import '../core/cargando.dart';
 import '../core/tema.dart';
@@ -11,6 +13,7 @@ import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../core/vidrio.dart';
+import 'editores_liga.dart';
 
 /// Áreas que puede tener un Pivot (Victor, 2026-11-13). El servidor bloquea
 /// cada acción según su área (`AREA_DE_ACCION`) y filtra la Bandeja y los avisos.
@@ -291,6 +294,35 @@ class _PivotsScreenState extends State<PivotsScreen> {
                                 onTap: () => _editar(x),
                               ),
                             ),
+                          // Pedidos de Pivots aquí, junto a quiénes son (Victor, 2026-11-14).
+                          const SizedBox(height: 12),
+                          ListenableBuilder(
+                            listenable: ConfigLiga.de(widget.sesion),
+                            builder: (context, _) {
+                              final c = ConfigLiga.de(widget.sesion);
+                              return GrupoAjustes(
+                                filas: [
+                                  FilaAjuste(
+                                    icono: Icons.verified_user_outlined,
+                                    seccion: 'roles',
+                                    titulo: 'Pedidos de Pivots',
+                                    valor: c.solicitudesPivots == 'auto' ? 'Se aprueban solos' : 'Los aprueba otro Pivot',
+                                    alTocar: () => elegirLiga(
+                                      context,
+                                      c,
+                                      'Pedidos de Pivots',
+                                      const {'otro': 'Los aprueba otro Pivot (más seguro)', 'auto': 'Se aprueban solos'},
+                                      c.solicitudesPivots,
+                                      'solicitudesPivots',
+                                      ayuda:
+                                          'Cuando un Pivot pide algo para sí (excepción de cuota, rectificación, equipamiento, lesión o una tarea), quién lo aprueba. '
+                                          'Si la liga tiene un solo Pivot, se aprueba solo. Los pagos siempre los confirma otro Pivot.',
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),

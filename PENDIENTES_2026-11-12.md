@@ -543,3 +543,4 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [ ] Probar en teléfonos reales (velocidad, desenfoque, iPhone agregado a la pantalla de inicio).
 - [ ] Cambiar la dirección principal a Flutter web y dejar la vieja congelada unas semanas.
 - [ ] Tours guiados completos en cada sección (Android y web).
+- [x] Mi Liga reestructurada (2026-11-15): inicio con Equipos y Tesorería, ajustes por equipo, pantalla de Reglas, Cobros en Tesorería, Pedidos de Pivots en Pivots, canal en Comunidad. Falta: el asistente "+ Nueva regla" y que las reglas fijas se puedan editar (motor de reglas en el servidor), después de que Victor valide "Pivot — Reglas actuales".

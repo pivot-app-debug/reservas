@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-15 (madrugada)
+- **Nueva Mi Liga:** inicio con tarjetas de Equipos (deslizables, con "Nuevo equipo"), tarjeta de Tesorería con Ingreso y Egreso, y Administrar (Pivots y permisos, Reglas, Avisos, Personas archivadas) y Datos de la liga.
+- **Ajustes de un equipo:** lo de Equipos y puntos más Cobro (clases de gracia de ese equipo) y las reglas de toda la liga con su etiqueta "Toda la liga" o "Solo Quindes", y "Ver todas las reglas de Quindes".
+- **Reglas:** una pantalla por temas (Cobros, Asistencia, Puntos y equipos, Equipamiento, Privacidad) con filtro por equipo. Las que hoy están escritas en la app se ven con candado ("Fija por ahora").
+- **Tesorería → Cobros:** mensualidad y valor por clase (con a quién aplica), formas de pago y fecha límite.
+- Pedidos de Pivots pasa a Pivots y permisos; el canal de comunicación pasa a Equipo → Comunidad (botón arriba, solo Pivots).
+
 ## 2026-11-14 (23:30)
 - **Lo que faltaba de la web vieja, en la app:** Avisos al equipo (ahora o programados, por la app y por la web) y quién recibe avisos; clase gratis (cupón) en la ficha; personas archivadas con restaurar; ver y borrar asistencias externas; quitar la aprobación de una tarea; tareas archivadas; Enviar comentarios; cambiar talla o protecciones de una reserva.
 - **Seguridad:** las reservas de una persona solo se pueden pedir con su propia sesión (o la de un Pivot); cambiar la talla de una reserva exige sesión y ahora sí se guarda (en la web no funcionaba).

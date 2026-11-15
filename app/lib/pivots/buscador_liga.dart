@@ -25,24 +25,37 @@ class EntradaAjuste {
 }
 
 const entradasLiga = [
-  EntradaAjuste('tesoreria', 'Tesorería', 'Mi Liga', 'dinero cuentas caja banco saldo plata finanzas'),
-  EntradaAjuste('equipos', 'Equipos y puntos', 'Mi Liga › Equipo', 'categorías quindes mirlxs subir bajar reglas mínimos'),
-  EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Equipo', 'administradores admins áreas acceso permisos roles'),
-  EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Equipo', 'aprobar solicitudes otro pivot automático'),
-  EntradaAjuste('canal', 'Canal de comunicación', 'Mi Liga › Comunicación', 'whatsapp telegram signal teléfono llamar mensajes'),
-
-  EntradaAjuste('mensualidad', 'Mensualidad', 'Mi Liga › Cobros', 'precio cuota mes valor'),
-  EntradaAjuste('clase', 'Valor por clase', 'Mi Liga › Cobros', 'precio por clase valor clase suelta'),
-  EntradaAjuste('tolerancia', 'Tolerancia para llegadas tarde', 'Mi Liga › Reglas', 'tarde minutos llegar atraso lista tolerancia de llegada'),
-  EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido'),
-  EntradaAjuste('minimo', 'Pocas personas en un evento', 'Mi Liga › Reglas', 'cancelar mínimo personas evento'),
-  EntradaAjuste('inactividad', 'Inactividad', 'Mi Liga › Reglas', 'inactivos días sin venir'),
-  EntradaAjuste('gracia', 'Clases de gracia', 'Mi Liga › Cobros', 'gracia gratis sin pagar primera clase cuota equipo'),
-  EntradaAjuste('vencimiento', 'Vencimiento de la cuota', 'Mi Liga › Cobros', 'vence día gracia recargo multa tarde atraso pagar'),
-  EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Privacidad', 'ranking tabla privacidad ver puntos ocultar'),
+  EntradaAjuste('equipos', 'Equipos', 'Mi Liga', 'categorías quindes mirlxs equipo ajustes de un equipo'),
+  EntradaAjuste('tesoreria', 'Tesorería', 'Mi Liga', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
+  EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Administrar', 'administradores admins áreas acceso permisos roles'),
+  EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
+  EntradaAjuste('reglas', 'Reglas', 'Mi Liga › Administrar', 'reglas cobros asistencia puntos equipamiento privacidad'),
+  EntradaAjuste('avisos', 'Avisos al equipo', 'Mi Liga › Administrar', 'notificaciones mensaje enviar programar push anuncio quién recibe'),
+  EntradaAjuste('archivadas', 'Personas archivadas', 'Mi Liga › Administrar', 'usuarios eliminadas restaurar volver archivo bajas'),
   EntradaAjuste('salud', 'Salud y seguros', 'Mi Liga › Datos de la liga', 'seguro médico privado salud pública emergencia atención iess msp'),
   EntradaAjuste('pais', 'País', 'Mi Liga › Datos de la liga', 'país teléfono prefijo'),
   EntradaAjuste('zona', 'Zona horaria', 'Mi Liga › Datos de la liga', 'hora horario reloj'),
+  // Dentro de Reglas.
+  EntradaAjuste(
+    'vencimiento',
+    'Fecha límite de pago',
+    'Mi Liga › Reglas',
+    'vence vencimiento día gracia recargo multa tarde atraso pagar mora',
+    dentro: 'reglas',
+  ),
+  EntradaAjuste(
+    'tolerancia',
+    'Tolerancia para llegadas tarde',
+    'Mi Liga › Reglas',
+    'tarde minutos llegar atraso lista tolerancia de llegada',
+    dentro: 'reglas',
+  ),
+  EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),
+  EntradaAjuste('minimo', 'Pocas personas en un evento', 'Mi Liga › Reglas', 'cancelar mínimo personas evento', dentro: 'reglas'),
+  EntradaAjuste('inactividad', 'Inactividad', 'Mi Liga › Reglas', 'inactivos días sin venir', dentro: 'reglas'),
+  EntradaAjuste('gracia_Quindes', 'Clases de gracia', 'Mi Liga › Reglas', 'gracia gratis sin pagar primera clase cuota equipo', dentro: 'reglas'),
+  EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
+  EntradaAjuste('prestamo', 'Préstamo de equipamiento', 'Mi Liga › Reglas', 'prestar patines protecciones excepcional emergencia', dentro: 'reglas'),
   // Dentro de Equipos y puntos.
   EntradaAjuste(
     'corte',
@@ -54,18 +67,19 @@ const entradasLiga = [
   EntradaAjuste('puntos', 'Puntos por asistencia', 'Mi Liga › Equipos y puntos', 'valor a tiempo tarde puntos fecha', dentro: 'equipos'),
   EntradaAjuste('queCuenta', 'Qué cuenta como clase', 'Mi Liga › Equipos y puntos', 'clase tipos de evento partido llegadas tarde suman', dentro: 'equipos'),
   EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos y puntos', 'quién cambió registro auditoría', dentro: 'equipos'),
-  EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos y puntos', 'nuevo equipo agregar', dentro: 'equipos'),
+  EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
+  // Dentro de Tesorería → Cobros.
+  EntradaAjuste('mensualidad', 'Mensualidad', 'Mi Liga › Tesorería › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
+  EntradaAjuste('clase', 'Valor por clase', 'Mi Liga › Tesorería › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
+  EntradaAjuste(
+    'formas',
+    'Formas de pago',
+    'Mi Liga › Tesorería › Cobros',
+    'medios cuentas billetera virtual banco transferencia efectivo enlace comprobante logo color',
+    dentro: 'cobros',
+  ),
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Mi Liga › Tesorería', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
-  EntradaAjuste('archivadas', 'Personas archivadas', 'Mi Liga › Equipo', 'usuarios eliminadas restaurar volver archivo bajas'),
-  EntradaAjuste('avisos', 'Avisos al equipo', 'Mi Liga › Comunicación', 'notificaciones mensaje enviar programar push anuncio quién recibe'),
-  EntradaAjuste(
-    'formasTesoreria',
-    'Formas de pago',
-    'Mi Liga › Tesorería',
-    'medios cuentas billetera virtual banco transferencia efectivo enlace comprobante logo color',
-    dentro: 'tesoreria',
-  ),
   EntradaAjuste('saldos', 'Saldos de personas', 'Mi Liga › Tesorería', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
   EntradaAjuste('fondos', 'Fondos de viaje', 'Mi Liga › Tesorería', 'viaje torneo reparto asistencia', dentro: 'tesoreria'),
   EntradaAjuste('movimientos', 'Todos los movimientos', 'Mi Liga › Tesorería', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
@@ -85,7 +99,7 @@ List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true}) {
   if (palabras.isEmpty) return const [];
   final r = <(int, EntradaAjuste)>[];
   for (final e in entradasLiga) {
-    if (!tesoreria && (e.id == 'tesoreria' || e.dentro == 'tesoreria')) continue;
+    if (!tesoreria && (e.id == 'tesoreria' || e.dentro == 'tesoreria' || e.dentro == 'cobros')) continue;
     final t = _sinTildes(e.titulo), todo = _sinTildes('${e.titulo} ${e.ruta} ${e.palabras}');
     if (!palabras.every(todo.contains)) continue;
     // Primero lo que coincide con el nombre.

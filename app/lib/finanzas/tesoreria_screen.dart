@@ -8,13 +8,12 @@ import '../core/api.dart';
 import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
-import '../core/config_liga.dart';
 import '../pivots/buscador_liga.dart';
-import '../pivots/formas_pago_screen.dart';
 import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
+import 'cobros_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
 
@@ -848,9 +847,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         child: _fila(
           context,
           Icons.payments_outlined,
-          'Formas de pago',
-          'Cada medio es una cuenta: lo que se paga por ahí entra solo',
-          () => _abrir(FormasPagoScreen(config: ConfigLiga.de(widget.sesion))),
+          'Cobros',
+          'Mensualidad, valor por clase, formas de pago y fecha límite',
+          () => _abrir(CobrosScreen(sesion: widget.sesion)),
         ),
       ),
       Resaltable(

@@ -1,6 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../core/config_liga.dart';
+import '../pivots/editores_liga.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
@@ -234,6 +238,29 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Comunidad', style: TextStyle(fontWeight: FontWeight.w700)),
+        // Canal de comunicación de la liga, solo para Pivots (Victor, 2026-11-14).
+        actions: [
+          if (repo.esPivot)
+            ListenableBuilder(
+              listenable: ConfigLiga.de(repo.sesion),
+              builder: (context, _) {
+                final c = ConfigLiga.de(repo.sesion);
+                return IconButton(
+                  tooltip: 'Canal de comunicación: ${c.nombreCanal}',
+                  icon: Icon(c.icono),
+                  onPressed: () => elegirLiga(
+                    context,
+                    c,
+                    'Canal de comunicación',
+                    ConfigLiga.canales,
+                    c.canal,
+                    'canal',
+                    ayuda: 'La app con la que se escribe a las personas del equipo desde su ficha.',
+                  ),
+                );
+              },
+            ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: AnimatedOpacity(opacity: _guardando ? 1 : 0, duration: const Duration(milliseconds: 200), child: const LinearProgressIndicator(minHeight: 3)),
