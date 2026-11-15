@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../core/api.dart';
+import 'boton_google.dart';
 import '../core/tema.dart';
 import 'sesion.dart';
 
@@ -28,12 +33,33 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nombre = TextEditingController();
   final _telefono = TextEditingController();
 
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleWeb;
+  bool _googleWebListo = false;
+
   @override
   void initState() {
     super.initState();
     widget.sesion.loginCorreoActivo().then((v) {
       if (mounted && v) setState(() => _correoActivo = true);
     });
+    if (kIsWeb) _prepararGoogleWeb();
+  }
+
+  Future<void> _prepararGoogleWeb() async {
+    try {
+      final eventos = await widget.sesion.prepararGoogleWeb();
+      _googleWeb = eventos.listen(
+        (e) {
+          if (e is GoogleSignInAuthenticationEventSignIn) _ejecutar(() => widget.sesion.conCuentaGoogle(e.user));
+        },
+        onError: (Object _) {
+          if (mounted) setState(() => _error = 'No se pudo iniciar sesión con Google.');
+        },
+      );
+      if (mounted) setState(() => _googleWebListo = true);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Google no está disponible. Entra con usuario y contraseña.');
+    }
   }
 
   @override
@@ -41,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
     for (final c in [_identificador, _pin, _correo, _codigo, _nombre, _telefono]) {
       c.dispose();
     }
+    _googleWeb?.cancel();
     super.dispose();
   }
 
@@ -124,13 +151,22 @@ class _LoginScreenState extends State<LoginScreen> {
       key: const ValueKey('inicio'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton(
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-          onPressed: _ocupado ? null : () => _ejecutar(widget.sesion.conGoogle),
-          child: _ocupado
-              ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: context.pivot.sobreMarca))
-              : const Text('Entrar con Google'),
-        ),
+        if (kIsWeb)
+          // Web: el botón oficial de Google (no se puede abrir desde uno propio).
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _googleWebListo && !_ocupado
+                ? Center(child: botonGoogleWeb())
+                : const SizedBox(height: 52, child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
+          )
+        else
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            onPressed: _ocupado ? null : () => _ejecutar(widget.sesion.conGoogle),
+            child: _ocupado
+                ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: context.pivot.sobreMarca))
+                : const Text('Entrar con Google'),
+          ),
         const SizedBox(height: 12),
         if (_correoActivo) ...[
           const SizedBox(height: 4),

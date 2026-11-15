@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -65,6 +66,7 @@ class _ControlActualizacionState extends State<ControlActualizacion> with Widget
   }
 
   Future<void> _revisar() async {
+    if (kIsWeb) return; // la web siempre está en la última versión
     if (_revisando) return;
     _revisando = true;
     try {

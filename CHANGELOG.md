@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-14 (22:30)
+- **Versión web de la app (prueba):** la app Flutter compila para la web y se publica sola en app.quindesvolcanicos.com/nueva/ sin tocar la web actual. En la web: botón de Google oficial, sin ficha de emergencia, sin aviso de actualización y, por ahora, sin notificaciones (falta la configuración web de Firebase).
+
 ## 2026-11-14 (21:00)
 - **Reservas no aprobadas:** 2 h después de la clase se cancelan solas y se avisa a la persona por qué; si estuvo en la lista, queda la deuda de esa clase (también si la lista se toma después).
 - **Mis pedidos:** "Cambiar clase" en reservas de clase pendientes y "Editar motivo" en excepciones y préstamos.

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../core/fechas.dart';
@@ -444,7 +445,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       tick: _tick,
       alTocar: () => _abrir(x),
       // Emergencia solo para quien fue marcadx hoy a tiempo o tarde (Victor, 2026-11-07).
-      emergencia: repo.esAdmin && x.presenteHoy && !repo.esYo(x) ? () => EmergenciaScreen.abrir(context, repo, x) : null,
+      emergencia: !kIsWeb && repo.esAdmin && x.presenteHoy && !repo.esYo(x) ? () => EmergenciaScreen.abrir(context, repo, x) : null,
       archivar: repo.esAdmin && x.inactivx && !repo.esYo(x) ? () => _archivar(x) : null,
     );
   }

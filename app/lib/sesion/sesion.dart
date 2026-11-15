@@ -95,6 +95,23 @@ class Sesion extends ChangeNotifier {
       if (e.code == GoogleSignInExceptionCode.canceled) throw LoginFallido('');
       throw LoginFallido('No se pudo iniciar sesión con Google (${e.code.name}).');
     }
+    await _entrarConCuentaGoogle(cuenta);
+  }
+
+  /// Web: el botón oficial de Google avisa por `authenticationEvents`.
+  /// Devuelve las cuentas que van entrando para que la pantalla las procese.
+  static bool _googleWebListo = false;
+  Future<Stream<GoogleSignInAuthenticationEvent>> prepararGoogleWeb() async {
+    final gs = GoogleSignIn.instance;
+    if (!_googleWebListo) {
+      await gs.initialize(clientId: ApiConfig.googleWebClientId);
+      _googleWebListo = true;
+    }
+    return gs.authenticationEvents;
+  }
+
+  Future<void> _entrarConCuentaGoogle(GoogleSignInAccount cuenta) async {
+    final gs = GoogleSignIn.instance;
     final idToken = cuenta.authentication.idToken;
     if (idToken == null) throw LoginFallido('Google no devolvió la identidad de la cuenta.');
     final res = await api.post('loginGoogle', {'idToken': idToken});
@@ -108,6 +125,8 @@ class Sesion extends ChangeNotifier {
     }
     await _guardar(res);
   }
+
+  Future<void> conCuentaGoogle(GoogleSignInAccount cuenta) => _entrarConCuentaGoogle(cuenta);
 
   // ─── Inicio y cuenta con correo (preparado; se activa desde el servidor) ──
   /// ¿El servidor ya permite entrar con correo? (`login_correo`).

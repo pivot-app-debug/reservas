@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -168,7 +169,7 @@ class _Ficha extends StatelessWidget {
         _Accion(icono: canal.icono, texto: canal.nombreCanalCorto, alTocar: () => canal.escribir(completo)),
       if (!yo && tel.isNotEmpty) _Accion(icono: Icons.call_rounded, texto: 'Llamar', alTocar: () => launchUrl(Uri.parse('tel:$completo'))),
       // En Equipo, Emergencia está siempre disponible para admins (Victor, 2026-11-07).
-      if (repo.esAdmin && !yo)
+      if (repo.esAdmin && !yo && !kIsWeb)
         _Accion(icono: Icons.emergency_rounded, texto: 'Emergencia', roja: true, alTocar: () => EmergenciaScreen.abrir(context, repo, p)),
     ];
     if (botones.isEmpty) return const SizedBox.shrink();

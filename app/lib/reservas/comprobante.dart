@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -31,8 +32,10 @@ Future<bool> subirComprobante(BuildContext context, ReservasRepo repo, List<Stri
     m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo subir. Revisa tu conexión e intenta de nuevo.')));
     return false;
   } finally {
-    try {
-      await File(x.path).delete();
-    } catch (_) {}
+    if (!kIsWeb) {
+      try {
+        await File(x.path).delete();
+      } catch (_) {}
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,8 +23,13 @@ class EmergenciaScreen extends StatefulWidget {
   final EquipoRepo repo;
   final Integrante persona;
 
-  static Future<void> abrir(BuildContext context, EquipoRepo repo, Integrante p) {
-    return Navigator.of(context).push(
+  static Future<void> abrir(BuildContext context, EquipoRepo repo, Integrante p) async {
+    // Datos sensibles: nunca en la web (Victor, acordado para Flutter web).
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La ficha de emergencia solo se abre en la app de Android.')));
+      return;
+    }
+    await Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 260),
         reverseTransitionDuration: const Duration(milliseconds: 200),

@@ -533,3 +533,11 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Reservas de clase nunca aprobadas: 2 h después de que termina la clase se cancelan solas con aviso del motivo; si la lista marca a la persona presente, queda la deuda de esa clase (también si la lista se toma después). `_cerrarReservasVencidas` en el cron horario, `_deudaSiVinoSinPago` al marcar presente o aprobar una rectificación.
 - [ ] Quien vino a una clase por la que debía pagar y no tenía reserva: ¿también queda deuda? Preguntado a Victor (depende de las reglas de cobro por equipo).
 - [x] $495 sin importar (Pichincha $265, $35 sin medio, $195 de reservas sin medio): quedan fuera de las cuentas hasta que Victor revise las cuentas.
+
+## Q. Flutter web reemplaza a la PWA vieja (Victor, 2026-11-14 22:11)
+- [x] Web de prueba en /nueva/ (workflow App Web).
+- [ ] Notificaciones en la web: Victor crea una app web en el proyecto de Firebase y pasa la configuración y la clave VAPID.
+- [ ] Faltantes respecto de la web vieja: enviar notificaciones (ahora o programadas), cupones por persona, ver y restaurar personas eliminadas, ver y borrar asistencias externas, quitar validación de una tarea y tareas archivadas, estado de notificaciones por persona, enviar comentarios (bug/sugerencia), cambiar talla o protecciones de una reserva hecha.
+- [ ] Probar en teléfonos reales (velocidad, desenfoque, iPhone agregado a la pantalla de inicio).
+- [ ] Cambiar la dirección principal a Flutter web y dejar la vieja congelada unas semanas.
+- [ ] Tours guiados completos en cada sección (Android y web).

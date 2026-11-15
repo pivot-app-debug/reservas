@@ -78,6 +78,12 @@ class Push {
   /// Arranque desde main(), DESPUÉS de dibujar la interfaz: nunca lanza ni
   /// bloquea (timeout de 15 s).
   static Future<void> arrancarSeguro() async {
+    // Web: sin la configuración web de Firebase todavía (Victor la crea en
+    // la consola); hasta entonces la web no recibe notificaciones.
+    if (kIsWeb) {
+      if (!_listo.isCompleted) _listo.complete();
+      return;
+    }
     try {
       await Firebase.initializeApp().timeout(const Duration(seconds: 15));
       await iniciar().timeout(const Duration(seconds: 15));
