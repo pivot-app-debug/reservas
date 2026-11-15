@@ -8497,7 +8497,7 @@ async function registrarDispositivoPush(params: Record<string, any>): Promise<Re
   const fcmToken = String(params.fcmToken ?? '').trim();
   if (fcmToken.length < 20 || fcmToken.length > 4096) return { exito: false, error: 'Token de dispositivo inválido.' };
   const { error } = await supabase.from('dispositivos_push').upsert(
-    { token: fcmToken, username, plataforma: 'android', actualizado_en: new Date().toISOString() },
+        { token: fcmToken, username, plataforma: params.plataforma === 'web' ? 'web' : 'android', actualizado_en: new Date().toISOString() },
     { onConflict: 'token' },
   );
   if (error) return { exito: false, error: error.message };

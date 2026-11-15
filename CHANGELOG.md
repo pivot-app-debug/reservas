@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-15 (notificaciones web)
+- **Notificaciones en la versión web:** con la app web de Firebase (configuración de Victor) y su clave push. En segundo plano las muestra `/firebase-messaging-sw.js`; con la pestaña abierta, el navegador. Cada dispositivo se guarda como 'web' o 'android'.
+
 ## 2026-11-15 (tours)
 - **Tours guiados nuevos** (Android y web), la primera vez que se abre cada pantalla y sin explicar lo obvio: Calendario (versión nueva con la Bandeja; también para quien vio el anterior), detalle de un evento, Equipo, ficha de una persona, Estadísticas, Mi perfil, Mi Liga y Bandeja. "Ver de nuevo los tours guiados" (Cuenta y acceso) los reinicia todos.
 

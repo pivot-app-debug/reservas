@@ -536,7 +536,7 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 
 ## Q. Flutter web reemplaza a la PWA vieja (Victor, 2026-11-14 22:11)
 - [x] Web de prueba en /nueva/ (workflow App Web).
-- [ ] Notificaciones en la web: Victor crea una app web en el proyecto de Firebase y pasa la configuración y la clave VAPID.
+- [x] Notificaciones en la web (2026-11-15). Ojo en iPhone: solo con la app agregada a la pantalla de inicio (iOS 16.4+) y el permiso puede requerir tocar un botón; probar.
 - [x] Faltantes respecto de la web vieja (2026-11-14): Avisos al equipo (ahora o programados, `avisos_programados`), Quién recibe avisos, clase gratis (cupón) en la ficha, personas archivadas con restaurar, ver y borrar asistencias externas, quitar aprobación de una tarea, tareas archivadas (solo lectura), Enviar comentarios (WhatsApp o correo), cambiar talla o protecciones de una reserva.
 - [ ] Borrar una tarea archivada: la web la borra y resta los puntos ya ganados. Choca con la regla de oro (no tocar puntajes anteriores); preguntar a Victor antes de pasarlo.
 - [x] Seguridad (2026-11-14): `getReservasPersona` solo devuelve las reservas propias (o a un Pivot); `actualizarTallaReserva` exige sesión y además ahora sí guarda (la web mandaba otros nombres de campos y nunca se guardaba).

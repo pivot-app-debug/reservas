@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+
+import 'aviso_web.dart';
+import 'opciones_web.dart';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 
@@ -78,9 +82,16 @@ class Push {
   /// Arranque desde main(), DESPUÉS de dibujar la interfaz: nunca lanza ni
   /// bloquea (timeout de 15 s).
   static Future<void> arrancarSeguro() async {
-    // Web: sin la configuración web de Firebase todavía (Victor la crea en
-    // la consola); hasta entonces la web no recibe notificaciones.
+    // Web (2026-11-15): Firebase con la app web; en segundo plano las muestra
+    // /firebase-messaging-sw.js; con la pestaña abierta, el navegador.
     if (kIsWeb) {
+      try {
+        await Firebase.initializeApp(options: firebaseWeb).timeout(const Duration(seconds: 15));
+        FirebaseMessaging.onMessage.listen((m) => mostrarAvisoWeb('${m.data['titulo'] ?? 'Pivot'}', '${m.data['cuerpo'] ?? ''}'));
+        disponible = true;
+      } catch (e) {
+        debugPrint('Notificaciones web no disponibles: $e');
+      }
       if (!_listo.isCompleted) _listo.complete();
       return;
     }
@@ -120,7 +131,7 @@ class Push {
     try {
       final fm = FirebaseMessaging.instance;
       await fm.requestPermission();
-      final token = await fm.getToken();
+      final token = await fm.getToken(vapidKey: kIsWeb ? vapidWeb : null);
       if (token != null) await _enviarToken(api, token);
       fm.onTokenRefresh.listen((t) => _enviarToken(api, t));
     } catch (e) {
@@ -139,7 +150,7 @@ class Push {
 
   static Future<void> _enviarToken(Api api, String token) async {
     try {
-      await api.post('registrarDispositivoPush', {'fcmToken': token});
+      await api.post('registrarDispositivoPush', {'fcmToken': token, 'plataforma': kIsWeb ? 'web' : 'android'});
     } catch (e) {
       debugPrint('No se pudo registrar el dispositivo: $e');
     }
