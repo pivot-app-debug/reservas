@@ -11,6 +11,7 @@ import '../equipo/persona_screen.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
+import 'comentarios.dart';
 import 'componentes.dart';
 import 'excepciones_panel.dart';
 import 'datos_screens.dart';
@@ -149,6 +150,13 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     valor: 'Usuario, contraseña, cerrar sesión',
                     pendiente: conFicha && d['tienePassword'] == false,
                     alTocar: () => SubAjustes.abrir(context, CuentaScreen(sesion: sesion)),
+                  ),
+                  FilaAjuste(
+                    icono: Icons.forum_outlined,
+                    seccion: 'cuenta',
+                    titulo: 'Enviar comentarios',
+                    valor: 'Un error, una idea o una duda',
+                    alTocar: () => enviarComentarios(context),
                   ),
                 ],
               ),

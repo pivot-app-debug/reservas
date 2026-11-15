@@ -200,10 +200,29 @@ class _TareaScreenState extends State<TareaScreen> {
                   x.nombreMostrar,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.texto),
                 ),
-                Text(x.enRevision ? 'Enviada a revisión' : 'En curso', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                Text(
+                  x.estado == 'aprobada' ? 'Aprobada' : (x.enRevision ? 'Enviada a revisión' : 'En curso'),
+                  style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                ),
               ],
             ),
           ),
+          if (repo.esAdmin && x.estado == 'aprobada')
+            IconButton(
+              tooltip: 'Quitar aprobación',
+              onPressed: _ocupado
+                  ? null
+                  : () async {
+                      if (await _confirmar(
+                        '¿Quitar la aprobación?',
+                        'Vuelve a revisión y a ${x.nombreMostrar} se le restan los puntos de esta tarea.',
+                        'Quitar',
+                      )) {
+                        await _hacer(() => repo.quitarAprobacion(x), 'Aprobación quitada');
+                      }
+                    },
+              icon: const Icon(Icons.remove_done_rounded),
+            ),
           if (revisar) ...[
             IconButton(tooltip: 'Devolver', onPressed: _ocupado ? null : () => _devolver(x), icon: const Icon(Icons.undo_rounded)),
             IconButton.filled(

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -385,6 +386,68 @@ class _AdministracionState extends State<_Administracion> {
     }
   }
 
+  /// Lista de asistencias externas con borrar (recalcula los puntos de ese mes).
+  Future<void> _verExternas() async {
+    final repo = widget.repo, p = widget.p;
+    final m = ScaffoldMessenger.of(context);
+    List<Map<String, dynamic>> l;
+    try {
+      l = await repo.asistenciasExternas(p);
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudieron cargar. Revisa tu conexión.')));
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(h).height * 0.75),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              children: [
+                Text('Asistencias externas', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('Borrar una le resta los puntos de asistencia de ese mes.', style: TextStyle(color: h.pivot.textoSecundario)),
+                const SizedBox(height: 8),
+                if (l.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text('No tiene asistencias externas.', style: TextStyle(color: h.pivot.textoSecundario)),
+                  ),
+                for (final x in l)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.event_available_rounded, color: h.pivot.marcaTexto),
+                    title: Text(DateTime.tryParse('${x['fecha']}') == null ? '${x['fecha']}' : Fechas.corta(DateTime.parse('${x['fecha']}'))),
+                    subtitle: '${x['lugar'] ?? ''}'.isEmpty ? null : Text('${x['lugar']}'),
+                    trailing: IconButton(
+                      tooltip: 'Borrar',
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: () async {
+                        if (!await _confirmar('¿Borrar esta asistencia externa?', 'Se le restan los puntos de asistencia de ese mes.', 'Borrar')) return;
+                        try {
+                          await repo.eliminarAsistenciaExterna('${x['idEvento']}');
+                          set(() => l.remove(x));
+                          m.showSnackBar(const SnackBar(content: Text('Asistencia externa borrada')));
+                        } catch (e) {
+                          m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo borrar.')));
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _asistenciaExterna() async {
     final res = await showModalBottomSheet<(DateTime, String)>(
       context: context,
@@ -600,6 +663,22 @@ class _AdministracionState extends State<_Administracion> {
                   title: const Text('Registrar asistencia externa'),
                   subtitle: const Text('Un entrenamiento fuera de la liga. Suma puntos de asistencia.'),
                   onTap: _asistenciaExterna,
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.history_rounded, color: pal.marcaTexto),
+                  title: const Text('Ver asistencias externas'),
+                  subtitle: const Text('Las registradas, con opción de borrar una.'),
+                  onTap: _verExternas,
+                ),
+                // Clase gratis de bienvenida (web "Cupones", Victor 2026-11-14).
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(Icons.local_activity_outlined, color: pal.marcaTexto),
+                  title: const Text('Clase gratis disponible'),
+                  subtitle: const Text('Cupón de bienvenida para reservar una clase sin pagar.'),
+                  value: p.cuponDisponible,
+                  onChanged: (v) => _hacer(() => repo.cambiarCupon(p, v), v ? 'Tiene una clase gratis' : 'Ya no tiene clase gratis'),
                 ),
                 // Archivar solo con inactividad (Victor, 2026-11-07); el
                 // servidor además lo impide con reservas o cuotas activas.

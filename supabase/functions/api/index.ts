@@ -209,7 +209,7 @@ for (const [area, acciones] of Object.entries({
   inventario: ['adminInventarioLista', 'adminPrestamo', 'adminReglaPrestamo', 'adminGuardarEquipamiento'],
   tareas: ['adminCrearTarea', 'adminEditarTarea', 'adminEliminarTarea', 'adminArchivarTarea', 'adminEliminarTareaArchivada', 'adminValidarTarea', 'adminDesvalidarTarea',
     'adminEditarAsignacionesTarea', 'adminCrearTareaRecurrente', 'adminEditarTareaRecurrente', 'adminEstadoTareaRecurrente', 'adminAplicarTareaRecurrenteHistorico'],
-    liga: ['adminSubirLogo', 'adminGuardarConfigLiga', 'adminGuardarComunidad', 'adminAgregarAdmin', 'adminQuitarAdmin', 'adminEnviarPush'],
+        liga: ['adminSubirLogo', 'adminGuardarConfigLiga', 'adminGuardarComunidad', 'adminAgregarAdmin', 'adminQuitarAdmin', 'adminEnviarPush', 'adminEnviarAviso', 'adminAvisosProgramados', 'adminGetEstadoPush'],
 })) for (const a of acciones) AREA_DE_ACCION[a] = area;
 
 /** Áreas de un Pivot por email (todas si es el principal, el sistema o no tiene límite). */
@@ -4812,6 +4812,10 @@ function _fechaDMA(iso: string | null): string | null {
 
 async function getReservasPersona(params: Record<string, any>): Promise<any[]> {
   const { nombre } = params;
+  // Solo las propias (2026-11-14): antes cualquiera podía pedir las reservas
+  // de otra persona por su usuario. Un Pivot con sesión válida también puede.
+  const propia = !!nombre && (await _validarToken(params.token)) === nombre;
+  if (!propia && !(params.adminToken && await _validarAdminToken(String(params.adminToken)))) return [];
   const { data: reservas } = await supabase.from('reservas').select('*').eq('nombre_usuario', nombre).order('fecha_pago', { ascending: false });
   if (!reservas?.length) return [];
   // Enrich with asistencias data for clase reservas
@@ -4942,13 +4946,21 @@ async function getTallasDisponiblesParaFecha(params: Record<string, any>): Promi
   return result;
 }
 
+// Cambiar la talla de patines de una reserva de clase propia (2026-11-14).
+// Antes esperaba `id`/`talla`/`idEvento` sin sesión, pero la web manda
+// `nombre`/`fecha` (id_evento)/`tallaNueva`: nunca guardaba. Ahora valida la
+// sesión y busca la reserva propia de ese evento, igual que las protecciones.
 async function actualizarTallaReserva(params: Record<string, any>): Promise<Record<string, any>> {
-  const { id, talla, idEvento } = params;
-  // Verificar disponibilidad
+  const nombre = String(params.nombre ?? ''), idEvento = String(params.fecha ?? params.idEvento ?? ''), talla = String(params.tallaNueva ?? params.talla ?? '').trim();
+  if (!nombre || (await _validarToken(params.token)) !== nombre) return { exito: false, error: 'Sesión inválida.' };
+  if (!idEvento || !talla) return { exito: false, error: 'Faltan datos.' };
+  const { data: mia } = await supabase.from('reservas').select('id').eq('nombre_usuario', nombre).eq('id_evento', idEvento).neq('estado', 'Cancelada').limit(1).maybeSingle();
+  if (!mia) return { exito: false, error: 'Reserva no encontrada.' };
   const { data: stock } = await supabase.from('equipamiento_tallas').select('cantidad').eq('talla', talla).maybeSingle();
-  const { data: usadas } = await supabase.from('reservas').select('id').eq('id_evento', idEvento).eq('talla', talla).neq('estado', 'Cancelada').neq('id', id);
-  if ((usadas?.length ?? 0) >= (stock?.cantidad ?? 0)) return { exito: false, error: 'Sin patines talla ' + talla + ' disponibles para esa fecha.' };
-  await supabase.from('reservas').update({ talla }).eq('id', id);
+  const { data: usadas } = await supabase.from('reservas').select('id').eq('id_evento', idEvento).eq('talla', talla).neq('estado', 'Cancelada').neq('id', mia.id);
+  if ((usadas?.length ?? 0) >= (stock?.cantidad ?? 0)) return { exito: false, error: 'No quedan patines talla ' + talla + ' para esa clase.' };
+  const { error } = await supabase.from('reservas').update({ talla }).eq('id', mia.id);
+  if (error) return { exito: false, error: 'No se pudo guardar.' };
   return { exito: true };
 }
 
@@ -5825,7 +5837,9 @@ async function adminToggleCupon(params: Record<string, any>): Promise<Record<str
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
   const { nombre, cuponDisponible } = params;
   if (!nombre) return { exito: false, error: 'Parámetros inválidos.' };
-  const { error } = await supabase.from('equipo').update({ cupon_disponible: !!cuponDisponible }).eq('username', nombre);
+    // La app manda 'true'/'false' como texto (form-urlencoded); la web, booleano.
+  const valor = cuponDisponible === true || String(cuponDisponible) === 'true';
+  const { error } = await supabase.from('equipo').update({ cupon_disponible: valor }).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
   return { exito: true };
 }
@@ -7114,7 +7128,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   // (token de usuarix, o sin token) recibe el roster SIN esas claves.
   const vistaAdmin = params.adminToken ? !!(await _validarAdminToken(String(params.adminToken))) : false;
   const { data: filas } = await supabase.from('equipo')
-        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica')
+        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible')
     .is('eliminado_en', null)
     .order('username');
   const personas = filas ?? [];
@@ -7513,7 +7527,8 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
     tierModo: r.tier_modo ?? 'auto',
     ...(vistaAdmin ? {
       solicitudLesionPendiente: r.solicitud_lesion_pendiente === true,
-      exentaCuota: r.exenta_cuota === true,
+            exentaCuota: r.exenta_cuota === true,
+      cuponDisponible: r.cupon_disponible === true,
       esAdminMiembro: adminEmails.has(String(r.email ?? '').toLowerCase()),
     } : {}),
         // Roles en el equipo y cumpleaños (solo "mm-dd" y solo si es público).
@@ -8278,6 +8293,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
       { clave: 'tarea_nueva', nombre: 'Tareas nuevas', descripcion: 'Cuando se publica una tarea que puedes tomar.', categoria: 'Tareas' },
   { clave: 'tarea_vence', nombre: 'Tareas por vencer', descripcion: 'Un día antes de que venza una tarea que tomaste.', categoria: 'Tareas' },
   { clave: 'tarea_revisada', nombre: 'Revisión de tus tareas', descripcion: 'Cuando admins aprueban o devuelven una tarea que enviaste.', categoria: 'Tareas' },
+    { clave: 'aviso_pivots', nombre: 'Avisos de los Pivots', descripcion: 'Mensajes que los Pivots envían al equipo.', categoria: 'Equipo' },
   { clave: 'avisos_admin', nombre: 'Avisos para admins', descripcion: 'Resumen antes del entrenamiento, bajas de última hora, solicitudes pendientes y cambios de reservas.', categoria: 'Administración', soloAdmin: true },
 ];
 const CATALOGO_CLAVES = new Set(CATALOGO_NOTIFICACIONES.map((c) => c.clave));
@@ -8785,6 +8801,7 @@ const _BTN_NO_ASISTIRE = { id: 'no-asistire', text: 'No asistiré', url: '_osp=d
 //     les lleguen 2 avisos del mismo evento.
 async function cronRecordatorioEvento(): Promise<Record<string, any>> {
   const ahora = Date.now();
+  try { await _enviarAvisosProgramados(); } catch (e) { console.error('[avisos] programados:', e); }
   const enVentana = await _eventosEnVentana(ahora + 55 * 60 * 1000, ahora + 65 * 60 * 1000, [0, 1]);
   if (!enVentana.length) return { exito: true, eventos: 0, enviados: 0 };
 
@@ -9045,17 +9062,77 @@ async function adminGetEstadoPush(params: Record<string, any>): Promise<Record<s
     .select('username, nombre_derby, foto_perfil, estado_miembro, push_estado, push_actualizado')
     .is('eliminado_en', null)
     .order('username');
-  if (error) return { exito: false, error: error.message };
-  const personas = (data ?? [])
-    .filter((r: any) => EQUIPO_ACTIVO_FILTRO(r))
+    if (error) return { exito: false, error: error.message };
+  const activos = (data ?? []).filter((r: any) => EQUIPO_ACTIVO_FILTRO(r));
+  // App Android: tiene al menos un dispositivo registrado (FCM).
+  const conApp = await _tokensFcmDe(activos.map((r: any) => r.username));
+  const personas = activos
     .map((r: any) => ({
       username: r.username,
       nombreDerby: r.nombre_derby || r.username,
       fotoPerfil: r.foto_perfil || '',
       pushEstado: r.push_estado || null,
       pushActualizado: r.push_actualizado || null,
+      app: conApp.has(r.username),
     }));
   return { exito: true, personas };
+}
+
+// ─── Avisos de los Pivots (Victor, 2026-11-14) ──────────────────────────────
+// Reemplazo de adminEnviarPush para la app: llega por la app (FCM) y por la
+// web (OneSignal) vía sendPush. `destino` = 'todos' o lista de usernames.
+// Con `enviarEn` futuro queda en `avisos_programados` y lo manda el cron de
+// cada 10 minutos (`_enviarAvisosProgramados`).
+async function _mandarAviso(titulo: string, mensaje: string, destino: unknown): Promise<void> {
+  const todos = destino === 'todos' || !Array.isArray(destino) || !destino.length;
+  await sendPush({
+    tipo: 'aviso_pivots', ...(todos ? { broadcastEquipo: true } : { include_external_user_ids: (destino as any[]).map(String) }),
+    headings: { es: titulo }, contents: { es: mensaje }, url: APP_URL,
+  });
+}
+
+async function adminEnviarAviso(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const titulo = String(params.titulo ?? '').trim().slice(0, 80), mensaje = String(params.mensaje ?? '').trim().slice(0, 500);
+  if (!titulo || !mensaje) return { exito: false, error: 'Escribe el título y el mensaje.' };
+  let destino: any = 'todos';
+  try { const d = JSON.parse(String(params.destino ?? '"todos"')); if (Array.isArray(d) && d.length) destino = d.map(String); } catch { /* todos */ }
+  const enviarEn = params.enviarEn ? Date.parse(String(params.enviarEn)) : NaN;
+  if (Number.isFinite(enviarEn) && enviarEn > Date.now() + 60 * 1000) {
+    const { error } = await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date(enviarEn).toISOString(), creado_por: email });
+    if (error) return { exito: false, error: 'No se pudo programar.' };
+    return { exito: true, programado: true };
+  }
+  await _mandarAviso(titulo, mensaje, destino);
+  await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date().toISOString(), enviado_en: new Date().toISOString(), creado_por: email });
+  return { exito: true, programado: false };
+}
+
+/** accion: listar (próximos y últimos 20 enviados) | cancelar (id). */
+async function adminAvisosProgramados(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  if (params.accion === 'cancelar') {
+    const { data } = await supabase.from('avisos_programados').update({ cancelado_en: new Date().toISOString() })
+      .eq('id', String(params.id ?? '')).is('enviado_en', null).is('cancelado_en', null).select('id');
+    return data?.length ? { exito: true } : { exito: false, error: 'Ese aviso ya se envió o se canceló.' };
+  }
+  const [{ data: prox }, { data: env }] = await Promise.all([
+    supabase.from('avisos_programados').select('id, titulo, mensaje, destino, enviar_en').is('enviado_en', null).is('cancelado_en', null).order('enviar_en'),
+    supabase.from('avisos_programados').select('id, titulo, mensaje, destino, enviado_en').not('enviado_en', 'is', null).order('enviado_en', { ascending: false }).limit(20),
+  ]);
+  return { exito: true, programados: prox ?? [], enviados: env ?? [] };
+}
+
+async function _enviarAvisosProgramados(): Promise<void> {
+  const { data } = await supabase.from('avisos_programados').select('id, titulo, mensaje, destino')
+    .is('enviado_en', null).is('cancelado_en', null).lte('enviar_en', new Date().toISOString()).limit(20);
+  for (const a of data ?? []) {
+    // Marca primero: si el cron se solapa, no se manda dos veces.
+    const { data: tomado } = await supabase.from('avisos_programados').update({ enviado_en: new Date().toISOString() }).eq('id', a.id).is('enviado_en', null).select('id');
+    if (tomado?.length) await _mandarAviso(a.titulo, a.mensaje, a.destino);
+  }
 }
 
 async function adminEnviarPush(params: Record<string, any>): Promise<Record<string, any>> {
@@ -10068,7 +10145,9 @@ Deno.serve(async (req: Request) => {
       case 'getEstadisticasPersona':         return json(await getEstadisticasPersona(params));
       case 'adminGetQueLlevar':              return json(await adminGetQueLlevar());
       // Push
-      case 'adminEnviarPush':               return json(await adminEnviarPush(params));
+            case 'adminEnviarPush':               return json(await adminEnviarPush(params));
+      case 'adminEnviarAviso':              return json(await adminEnviarAviso(params));
+      case 'adminAvisosProgramados':        return json(await adminAvisosProgramados(params));
       case 'notificarCambioAsistenciaInterno': {
         const secretHeader = req.headers.get('x-cron-secret') ?? '';
         if (!CRON_SECRET || secretHeader !== CRON_SECRET) return json({ error: 'No autorizado.' }, 401);

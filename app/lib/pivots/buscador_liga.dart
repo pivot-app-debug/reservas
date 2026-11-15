@@ -57,6 +57,8 @@ const entradasLiga = [
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos y puntos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Mi Liga › Tesorería', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
+  EntradaAjuste('archivadas', 'Personas archivadas', 'Mi Liga › Equipo', 'usuarios eliminadas restaurar volver archivo bajas'),
+  EntradaAjuste('avisos', 'Avisos al equipo', 'Mi Liga › Comunicación', 'notificaciones mensaje enviar programar push anuncio quién recibe'),
   EntradaAjuste(
     'formasTesoreria',
     'Formas de pago',

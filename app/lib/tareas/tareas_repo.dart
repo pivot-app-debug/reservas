@@ -215,6 +215,19 @@ class TareasRepo extends ChangeNotifier {
     if (nota.isNotEmpty) 'notaRechazo': nota,
   });
 
+  /// Quita la aprobación de una tarea ya aprobada: vuelve a revisión y se le
+  /// restan esos puntos (corrige un error del Pivot; web "Desvalidar").
+  Future<void> quitarAprobacion(PersonaTarea p) => _accion('adminDesvalidarTarea', {..._admin, 'idAsignacion': p.idAsignacion});
+
+  /// Tareas archivadas con quién las hizo (solo lectura).
+  Future<List<Map<String, dynamic>>> archivadas() async {
+    final l = await _api.getLista('getTareasArchivadas', _admin);
+    return [
+      for (final x in l)
+        if (x is Map) Map<String, dynamic>.from(x),
+    ];
+  }
+
   Future<List<Recurrente>> recurrentes() async {
     final r = await _api.get('adminGetTareasRecurrentes', _admin);
     if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudieron cargar.'}');

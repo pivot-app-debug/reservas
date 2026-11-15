@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-14 (23:30)
+- **Lo que faltaba de la web vieja, en la app:** Avisos al equipo (ahora o programados, por la app y por la web) y quién recibe avisos; clase gratis (cupón) en la ficha; personas archivadas con restaurar; ver y borrar asistencias externas; quitar la aprobación de una tarea; tareas archivadas; Enviar comentarios; cambiar talla o protecciones de una reserva.
+- **Seguridad:** las reservas de una persona solo se pueden pedir con su propia sesión (o la de un Pivot); cambiar la talla de una reserva exige sesión y ahora sí se guarda (en la web no funcionaba).
+
 ## 2026-11-14 (22:30)
 - **Versión web de la app (prueba):** la app Flutter compila para la web y se publica sola en app.quindesvolcanicos.com/nueva/ sin tocar la web actual. En la web: botón de Google oficial, sin ficha de emergencia, sin aviso de actualización y, por ahora, sin notificaciones (falta la configuración web de Firebase).
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ajustes/componentes.dart';
+import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../eventos/anticipada.dart';
@@ -57,6 +59,64 @@ class _HojaGestionarState extends State<_HojaGestionar> {
     }
   }
 
+  Future<void> _cambiarTalla() async {
+    final repo = ReservasRepo(widget.repo.sesion);
+    final m = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    List<String> libres;
+    try {
+      libres = await repo.tallasLibres(widget.reserva.clave);
+    } catch (_) {
+      m.showSnackBar(const SnackBar(content: Text('No se pudieron cargar las tallas. Revisa tu conexión.')));
+      return;
+    }
+    if (!mounted) return;
+    if (libres.isEmpty) {
+      m.showSnackBar(const SnackBar(content: Text('No quedan otras tallas libres para esa clase.')));
+      return;
+    }
+    final t = await elegirOpciones(
+      context,
+      titulo: 'Talla de patines',
+      opciones: libres,
+      valor: widget.reserva.talla,
+      ayuda: 'Solo las tallas con patines libres para esa clase.',
+    );
+    if (t == null || t == widget.reserva.talla) return;
+    try {
+      await repo.cambiarTalla(widget.reserva, t);
+      widget.repo.cargar(forzar: true);
+      nav.pop();
+      m.showSnackBar(SnackBar(content: Text('Listo: patines talla $t')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar.')));
+    }
+  }
+
+  Future<void> _cambiarProtecciones() async {
+    final repo = ReservasRepo(widget.repo.sesion);
+    final m = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    final actual = widget.reserva.protecciones == 'Sí' ? 'Casco, Muñequeras, Rodilleras, Coderas' : widget.reserva.protecciones;
+    final v = await elegirOpciones(
+      context,
+      titulo: 'Protecciones',
+      opciones: const ['Casco', 'Muñequeras', 'Rodilleras', 'Coderas'],
+      valor: actual,
+      multi: true,
+      ayuda: 'Las que necesitas del equipo para esa clase.',
+    );
+    if (v == null || v == actual) return;
+    try {
+      await repo.cambiarProtecciones(widget.reserva, v.trim().isEmpty ? 'No' : v);
+      widget.repo.cargar(forzar: true);
+      nav.pop();
+      m.showSnackBar(const SnackBar(content: Text('Protecciones actualizadas')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -99,6 +159,24 @@ class _HojaGestionarState extends State<_HojaGestionar> {
                           icon: const Icon(Icons.calendar_month_outlined),
                           label: Text(r.mensual ? 'Cambiar de mes' : 'Cambiar de fecha'),
                         ),
+                        if (!r.mensual && r.conPatines) ...[
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                            onPressed: _ocupado ? null : _cambiarTalla,
+                            icon: const Icon(Icons.roller_skating_outlined),
+                            label: Text('Cambiar talla de patines (${r.talla})'),
+                          ),
+                        ],
+                        if (!r.mensual && r.conProtecciones) ...[
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                            onPressed: _ocupado ? null : _cambiarProtecciones,
+                            icon: const Icon(Icons.shield_outlined),
+                            label: const Text('Cambiar protecciones'),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), foregroundColor: p.marcaTexto),

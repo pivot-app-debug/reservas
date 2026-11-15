@@ -57,6 +57,9 @@ class Integrante {
 
   // Solo llegan con vista admin.
   bool get exentaCuota => m['exentaCuota'] == true;
+
+  /// Clase gratis de bienvenida disponible (solo llega a Pivots).
+  bool get cuponDisponible => m['cuponDisponible'] == true;
   bool get esAdminMiembro => m['esAdminMiembro'] == true;
   bool get solicitudLesionPendiente => m['solicitudLesionPendiente'] == true;
 

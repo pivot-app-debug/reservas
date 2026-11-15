@@ -225,6 +225,29 @@ class EquipoRepo extends ChangeNotifier {
   }
 
   /// Asistencia fuera de la liga (web `_eqRegistrarAsistExterna()`); recalcula puntos.
+  /// Clase gratis de bienvenida: darla o quitarla (web "Cupones").
+  Future<void> cambiarCupon(Integrante p, bool disponible) => _admin('adminToggleCupon', {'nombre': p.username, 'cuponDisponible': '$disponible'});
+
+  /// Asistencias externas de una persona, de la más nueva a la más vieja.
+  Future<List<Map<String, dynamic>>> asistenciasExternas(Integrante p) async {
+    final r = await _api.post('adminGetAsistenciasExternas', {'adminToken': sesion.adminToken, 'idJugadora': p.username});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudieron cargar.'}');
+    return [for (final x in (r['asistencias'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+  }
+
+  Future<void> eliminarAsistenciaExterna(String idEvento) => _admin('adminEliminarAsistenciaExterna', {'idEvento': idEvento});
+
+  /// Personas archivadas por un Pivot (se pueden restaurar).
+  Future<List<Map<String, dynamic>>> archivadas() async {
+    final l = await _api.getLista('adminGetUsuarios', {'adminToken': sesion.adminToken});
+    return [
+      for (final x in l)
+        if (x is Map && x['eliminado'] == true) Map<String, dynamic>.from(x),
+    ]..sort((a, b) => '${a['nombreDerby']}'.toLowerCase().compareTo('${b['nombreDerby']}'.toLowerCase()));
+  }
+
+  Future<void> restaurar(String username) => _admin('adminRestaurarUsuario', {'nombre': username});
+
   Future<void> registrarAsistenciaExterna(Integrante p, DateTime fecha, String lugar) =>
       _admin('adminRegistrarAsistenciaExterna', {'idJugadora': p.username, 'fecha': Fechas.iso(fecha), 'lugar': lugar.trim()});
 

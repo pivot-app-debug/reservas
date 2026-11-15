@@ -104,7 +104,17 @@ class ResultadoReserva {
 /// reagendar". `clave` es lo que espera el servidor: el id del evento o el
 /// nombre del mes.
 class ReservaActiva {
-  const ReservaActiva({required this.clave, required this.mensual, required this.estado, this.dia, this.mes, this.hora = '', this.lugar = ''});
+  const ReservaActiva({
+    required this.clave,
+    required this.mensual,
+    required this.estado,
+    this.dia,
+    this.mes,
+    this.hora = '',
+    this.lugar = '',
+    this.talla = '',
+    this.protecciones = '',
+  });
   final String clave;
   final bool mensual;
   final String estado;
@@ -112,6 +122,11 @@ class ReservaActiva {
   final DateTime? mes; // mensual: primer día del mes
   final String hora;
   final String lugar;
+
+  /// Equipamiento del club reservado para esa clase ('' o 'No' = ninguno).
+  final String talla, protecciones;
+  bool get conPatines => talla.isNotEmpty && talla.toLowerCase() != 'no';
+  bool get conProtecciones => protecciones.isNotEmpty && protecciones.toLowerCase() != 'no';
 
   String get titulo => mensual
       ? 'Cuota de ${ReglaAnticipada.nombreMes(mes!)}'
@@ -148,6 +163,8 @@ class ReservaActiva {
       dia: dia,
       hora: (r['horaInicio'] ?? '').toString(),
       lugar: (r['donde'] ?? '').toString(),
+      talla: (r['talla'] ?? '').toString(),
+      protecciones: (r['protecciones'] ?? '').toString(),
     );
   }
 }
@@ -257,6 +274,17 @@ class ReservasRepo {
           tallaAgotada: f['disponible'] != true && necesitaPatines && (f['razon'] ?? '').toString().trim().toLowerCase() == agotada,
         ),
     ];
+  }
+
+  /// Cambiar la talla o las protecciones de una reserva de clase hecha.
+  Future<void> cambiarTalla(ReservaActiva r, String talla) async {
+    final res = await _api.post('actualizarTallaReserva', {'nombre': sesion.nombre, 'fecha': r.clave, 'tallaNueva': talla});
+    if (res['exito'] == false) throw ApiException('${res['error'] ?? 'No se pudo guardar.'}');
+  }
+
+  Future<void> cambiarProtecciones(ReservaActiva r, String protecciones) async {
+    final res = await _api.post('actualizarProtecReserva', {'nombre': sesion.nombre, 'fecha': r.clave, 'protecNueva': protecciones});
+    if (res['exito'] == false) throw ApiException('${res['error'] ?? 'No se pudo guardar.'}');
   }
 
   /// Tallas con patines libres para una fecha (`getTallasDisponiblesParaFecha`).

@@ -8,6 +8,7 @@ import '../core/tema.dart';
 import '../eventos/widgets_comunes.dart';
 import 'crear_tarea_screen.dart';
 import 'recurrentes_screen.dart';
+import 'tareas_archivadas_screen.dart';
 import 'tarea_screen.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
@@ -109,6 +110,18 @@ class _TareasScreenState extends State<TareasScreen> {
                 ],
         ),
         if (repo.esAdmin) RecurrentesScreen(repo: repo),
+        if (repo.esAdmin)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo))),
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Ver tareas archivadas'),
+              ),
+            ),
+          ),
         if (sugeridas.isNotEmpty)
           GrupoAjustes(
             titulo: 'SUGERIDAS PARA TI',

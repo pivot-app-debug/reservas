@@ -13,6 +13,9 @@ import '../core/selector_plazo.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
+import 'archivadas_screen.dart';
+import 'avisos_screen.dart';
+import '../equipo/equipo_repo.dart';
 import 'salud_liga_screen.dart';
 import 'vencimiento_screen.dart';
 import 'categorias_screen.dart';
@@ -389,6 +392,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       alTocar: () => SubAjustes.abrir(context, CategoriasScreen(sesion: sesion)),
                     ),
                   ),
+                  if (sesion.tieneArea('equipo'))
+                    Resaltable(
+                      id: 'archivadas',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.inventory_outlined,
+                        seccion: 'roles',
+                        titulo: 'Personas archivadas',
+                        valor: 'Ver y restaurar a quienes salieron de Equipo',
+                        alTocar: () => SubAjustes.abrir(context, ArchivadasScreen(repo: EquipoRepo.de(sesion))),
+                      ),
+                    ),
                   Resaltable(
                     id: 'pivots',
                     resaltado: _resaltado,
@@ -427,6 +442,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               GrupoAjustes(
                 titulo: 'Comunicación',
                 filas: [
+                  if (sesion.tieneArea('liga'))
+                    Resaltable(
+                      id: 'avisos',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.campaign_outlined,
+                        seccion: 'telefono',
+                        titulo: 'Avisos al equipo',
+                        valor: 'Enviar un mensaje ahora o programado',
+                        alTocar: () => SubAjustes.abrir(context, AvisosScreen(sesion: sesion)),
+                      ),
+                    ),
                   Resaltable(
                     id: 'canal',
                     resaltado: _resaltado,
