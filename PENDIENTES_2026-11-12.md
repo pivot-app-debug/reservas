@@ -534,6 +534,11 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [ ] Quien vino a una clase por la que debía pagar y no tenía reserva: ¿también queda deuda? Preguntado a Victor (depende de las reglas de cobro por equipo).
 - [x] $495 sin importar (Pichincha $265, $35 sin medio, $195 de reservas sin medio): quedan fuera de las cuentas hasta que Victor revise las cuentas.
 
+## R. Revisión de Victor (2026-11-15, 00:45)
+- [x] Los 15 puntos (tour del Calendario, Nuevo equipo, enlaces de invitación, títulos, subsecciones, reglas fuera del equipo, Viajes, botón "+", carga de Mi Liga, Pivots, fecha límite de pago con punto extra y avisos que la siguen, "Recompensas por pagar a tiempo").
+- [ ] Confirmar con Victor la fecha límite de la liga (hoy sin guardar: se usa el 15).
+- [ ] Sección Recompensas (clases de gracia, bonos, descuentos, premios por asistencia), personalizable por el Pivot.
+
 ## Q. Flutter web reemplaza a la PWA vieja (Victor, 2026-11-14 22:11)
 - [x] Web de prueba en /nueva/ (workflow App Web).
 - [x] Notificaciones en la web (2026-11-15). Ojo en iPhone: solo con la app agregada a la pantalla de inicio (iOS 16.4+) y el permiso puede requerir tocar un botón; probar.

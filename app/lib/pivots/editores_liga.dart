@@ -193,55 +193,42 @@ Future<void> editarGracia(BuildContext context, Sesion sesion, ConfigLiga c, {St
   }
   if (!context.mounted) return;
   final v = <String, int?>{for (final e in equipos) e: c.graciaClases(e)};
-  final ok = await showModalBottomSheet<bool>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (h) => StatefulBuilder(
-      builder: (h, set) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Clases de gracia', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              Text(
-                'Cuántas clases del mes puede venir alguien sin haber pagado la cuota. Después, al marcar Asistiré, la app le pide pagar. '
-                'Con 0, paga antes de marcar Asistiré. Si un equipo no la usa, sigue su propia regla (por ejemplo, reservar y pagar cada clase).',
-                style: TextStyle(color: h.pivot.textoSecundario),
-              ),
-              for (final e in equipos) ...[
-                const SizedBox(height: 14),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(v[e] == null ? 'No usa clases de gracia' : 'Usa clases de gracia'),
-                  value: v[e] != null,
-                  onChanged: (x) => set(() => v[e] = x ? 1 : null),
-                ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  child: v[e] == null
-                      ? const SizedBox(width: double.infinity)
-                      : SelectorNumero(
-                          valor: v[e]!,
-                          min: 0,
-                          max: 10,
-                          etiqueta: v[e] == 0 ? 'paga antes' : 'clases al mes',
-                          alCambiar: (n) => set(() => v[e] = n.toInt()),
-                        ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-            ],
-          ),
-        ),
+  // Se guardan todos los equipos aunque se edite uno solo (si no, se borraban los demás).
+  final visibles = soloEquipo == null ? equipos : equipos.where((e) => e == soloEquipo).toList();
+  // Subsección en vez de hoja (Victor, 2026-11-15).
+  final ok = await abrirSubseccion(
+    context,
+    titulo: soloEquipo == null ? 'Clases de gracia' : 'Clases de gracia de $soloEquipo',
+    contenido: (set) => [
+      Text(
+        'Cuántas clases del mes puede venir alguien sin haber pagado la cuota. Después, al marcar Asistiré, la app le pide pagar. '
+        'Con 0, paga antes de marcar Asistiré. Si un equipo no la usa, sigue su propia regla (por ejemplo, reservar y pagar cada clase).',
+        style: TextStyle(color: context.pivot.textoSecundario),
       ),
-    ),
+      for (final e in visibles) ...[
+        const SizedBox(height: 14),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(v[e] == null ? 'No usa clases de gracia' : 'Usa clases de gracia'),
+          value: v[e] != null,
+          onChanged: (x) => set(() => v[e] = x ? 1 : null),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: v[e] == null
+              ? const SizedBox(width: double.infinity)
+              : SelectorNumero(
+                  valor: v[e]!,
+                  min: 0,
+                  max: 10,
+                  etiqueta: v[e] == 0 ? 'paga antes' : 'clases al mes',
+                  alCambiar: (n) => set(() => v[e] = n.toInt()),
+                ),
+        ),
+      ],
+    ],
   );
   if (ok != true || !context.mounted) return;
   await guardarReglaLiga(context, c, {
@@ -253,10 +240,10 @@ Future<void> editarGracia(BuildContext context, Sesion sesion, ConfigLiga c, {St
 }
 
 String textoVencimiento(ConfigLiga c) {
-  if (c.cuotaVenceDia == 0) return 'No vence';
-  final g = c.cuotaGraciaDias > 0 ? ' + ${c.cuotaGraciaDias} ${c.cuotaGraciaDias == 1 ? 'día' : 'días'} de gracia' : '';
-  final r = c.cuotaRecargo > 0 ? ' · recargo ${plataLiga(c.cuotaRecargo)}' : ' · sin recargo';
-  return 'Vence el día ${c.cuotaVenceDia}$g$r';
+  final d = c.cuotaVenceDia >= 1 && c.cuotaVenceDia <= 28 ? c.cuotaVenceDia : 15; // igual que el servidor
+  final g = c.cuotaRecargo > 0 && c.cuotaGraciaDias > 0 ? ' (+${c.cuotaGraciaDias} ${c.cuotaGraciaDias == 1 ? 'día' : 'días'} de margen)' : '';
+  final r = c.cuotaRecargo > 0 ? ' · recargo ${plataLiga(c.cuotaRecargo)}$g' : ' · sin recargo';
+  return 'Día $d de cada mes$r';
 }
 
 /// A quién aplica un ajuste (Victor, 2026-11-14): "Toda la liga" o "Solo Quindes".
@@ -279,4 +266,52 @@ class ChipAlcance extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Subsección para editar algo con "Guardar" (Victor, 2026-11-15: nada de
+/// hojas inferiores enormes). Devuelve true si se guarda.
+Future<bool?> abrirSubseccion(
+  BuildContext context, {
+  required String titulo,
+  required List<Widget> Function(StateSetter set) contenido,
+  String boton = 'Guardar',
+}) {
+  return Navigator.of(context).push<bool>(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, _, _) => StatefulBuilder(
+        builder: (h, set) => Scaffold(
+          appBar: AppBar(
+            title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          body: SafeArea(
+            top: false,
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.viewInsetsOf(h).bottom),
+              children: [
+                ...contenido(set),
+                const SizedBox(height: 20),
+                FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  onPressed: () => Navigator.of(h).pop(true),
+                  child: Text(boton),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      transitionsBuilder: (_, a, _, child) {
+        final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: c,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0.06, 0), end: Offset.zero).animate(c),
+            child: child,
+          ),
+        );
+      },
+    ),
+  );
 }

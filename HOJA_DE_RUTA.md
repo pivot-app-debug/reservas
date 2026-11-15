@@ -84,6 +84,7 @@ Reglas de siempre:
    - Reglas por tipo con asistente (ejemplos y consecuencias claras), globales o por equipo; cada regla rige desde que se guarda.
    - Personalización que falta: moneda, estados editables, tipos de evento, temporadas de descanso con reglas, documentos.
    - [x] Hecho 2026-11-14: Formas de pago solo en Tesorería; Vencimiento de la cuota explicado en su pantalla; Salud y seguros en pantalla propia.
+   - [x] Hecho 2026-11-15: revisión de 15 puntos de Victor (PENDIENTES sección R). Fecha límite de pago con calendario; punto extra y avisos siguen la fecha límite; Viajes como sección propia; reglas del equipo en Reglas. Falta: sección Recompensas y motor de reglas.
 6. [ ] **Planes de pago, cursos e inscripción rápida**:
    - **Planes**:
      - 1 a 12 meses o N clases.

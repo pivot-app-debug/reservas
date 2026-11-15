@@ -2,6 +2,18 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-15 (revisión de Victor, 15 puntos)
+- **Fecha límite de pago** (antes "Vencimiento de la cuota"): el día se elige en un calendario del 1 al 28 (sin + y −) y "Así se ve un mes" se arma con ese día. **El punto extra y los avisos ahora siguen la fecha límite** (antes eran fijos 1, 14, 15 y 16): aviso el día 1, último aviso el día anterior, punto extra hasta la fecha límite y aviso de pendiente el día siguiente. Sin fecha guardada se usa el 15. Los días de margen y el recargo quedan juntos dentro de "Recargo por pagar tarde".
+- **Ajustes de un equipo:** solo nombre, mantener/subir/bajar, orden, tarjeta "Invita a jugar" (compartir o copiar el enlace) y "Ver las reglas de <equipo>". El cobro, la asistencia y el equipamiento se editan en Reglas.
+- **Nuevo equipo** abre la pantalla nueva (no la vista vieja) y su tarjeta tiene el mismo formato "+" que Comunidad.
+- **Viajes** pasa a ser su propia sección en Mi Liga (qué equipos reciben fondos y los viajes).
+- Las hojas grandes (gracia, equipamiento, detalle de un Pivot) ahora son subsecciones a pantalla completa.
+- Pivots: asistente "Agrega un nuevo Pivot" con aviso de cautela; "Otro Pivot aprueba sus pedidos" como interruptor con botón de información.
+- "Recompensas por pagar a tiempo" (antes punto extra) en Reglas.
+- Inscripción: si la persona queda en el equipo por defecto porque no cumple los requisitos, la página le explica por qué.
+- Tour del Calendario corregido (búsqueda y filtros juntos, línea de tiempo bien marcada); se quitaron los de Mi perfil, Equipo y Bandeja.
+- **Bug corregido:** editar la clase de gracia de un equipo borraba la de los demás.
+
 ## 2026-11-15 (notificaciones web)
 - **Notificaciones en la versión web:** con la app web de Firebase (configuración de Victor) y su clave push. En segundo plano las muestra `/firebase-messaging-sw.js`; con la pestaña abierta, el navegador. Cada dispositivo se guarda como 'web' o 'android'.
 

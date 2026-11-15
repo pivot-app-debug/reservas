@@ -150,6 +150,15 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   final _kTarjeta = GlobalKey(debugLabel: 'tour-tarjeta');
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
   final _kBandeja = GlobalKey(debugLabel: 'tour-bandeja');
+  final _kFiltros = GlobalKey(debugLabel: 'tour-filtros');
+
+  /// Rectángulo en pantalla de un widget (para unir dos botones en un paso).
+  static Rect? _rectDe(GlobalKey k) {
+    final ro = k.currentContext?.findRenderObject();
+    if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
+    return ro.localToGlobal(Offset.zero) & ro.size;
+  }
+
   String? _idTarjetaTour;
 
   EventosRepo get repo => widget.repo;
@@ -831,6 +840,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           // Filtros en un solo lugar (Victor, 2026-11-12): qué mostrar, tipo
           // y lugar de evento, área de tarea. Con el número de activos.
           IconButton(
+            key: _kFiltros,
             tooltip: _cantidadFiltros > 0 ? 'Filtros ($_cantidadFiltros activos)' : 'Filtros',
             icon: Badge(
               isLabelVisible: _cantidadFiltros > 0,
@@ -1368,8 +1378,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           titulo: 'Tareas del equipo',
           texto: 'Aquí ves las tareas para tomar. Las tuyas aparecen en el calendario el día que vencen, y las atrasadas, arriba en rojo.',
         ),
+        // Filtros y lupa juntos en un solo recorte (Victor, 2026-11-15).
         PasoTour(
-          clave: _kBuscar,
+          clave: _kFiltros,
+          ajuste: (r) => r.expandToInclude(_rectDe(_kBuscar) ?? r),
           titulo: 'Busca y filtra',
           texto: 'Con la lupa buscas eventos, tareas, cumpleaños o lugares. Con el botón de al lado eliges qué ver: eventos o tareas, tipo, lugar o área.',
         ),
@@ -1384,7 +1396,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         // no dejaría lugar para la tarjeta y el recorte no se notaría).
         PasoTour(
           clave: _kLista,
-          ajuste: (r) => Rect.fromLTWH(r.left + 10, r.top + 6, r.width - 20, r.height * 0.5),
+          // Debajo de la cabecera de vidrio (antes marcaba la barra de arriba).
+          ajuste: (r) => Rect.fromLTWH(r.left + 10, r.top + _altoCabecera + 8, r.width - 20, (r.height - _altoCabecera) * 0.45),
           titulo: 'Explora la línea de tiempo',
           texto: 'Desliza para ver lo pasado y lo próximo: eventos, tus tareas, cumpleaños y temporadas de descanso. Arriba eliges ver todo, solo eventos o solo tareas.',
         ),

@@ -634,17 +634,24 @@ function inscEnviar() {
         // de .insc-step.activo — por eso no desaparecen solos al reemplazar
         // .page-wrap por la pantalla de éxito, hay que ocultarlos a mano.
         document.querySelectorAll('.cta-footer-fixed').forEach(function(f) { f.style.display = 'none'; });
-        document.getElementById('exito-nombre').textContent = nombre;
+                document.getElementById('exito-nombre').textContent = nombre;
         document.querySelector('.page-wrap').innerHTML = document.getElementById('section-exito').outerHTML;
         var _exitoEl = document.getElementById('section-exito');
         _exitoEl.style.display = 'block';
+        // Enlace de un equipo cuyos requisitos no cumple: se explica por qué (2026-11-15).
+        if (res.avisoEquipo) {
+          var _av = document.createElement('p');
+          _av.textContent = res.avisoEquipo;
+          _av.style.marginTop = '16px';
+          _exitoEl.appendChild(_av);
+        }
         _exitoEl.style.transition = 'opacity 0.4s ease';
         setTimeout(function() {
           _exitoEl.style.opacity = '0';
           setTimeout(function() {
             window.location.href = 'https://app.quindesvolcanicos.com?nuevx=1&nombre=' + encodeURIComponent(nombre) + '&patines=' + (patines==='Sí'?'si':'no') + '&protec=' + encodeURIComponent(protec || 'No') + (talla?'&talla='+encodeURIComponent(talla):'') + '&token=' + encodeURIComponent(G.idToken||'');
           }, 400);
-        }, 3600);
+                }, res.avisoEquipo ? 9000 : 3600);
       } else {
         errMsg('err-p6', res.error || 'Error al registrarse. Intenta de nuevo.');
       }

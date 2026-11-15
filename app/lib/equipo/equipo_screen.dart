@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../core/fechas.dart';
 import '../core/tema.dart';
-import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/componentes.dart';
@@ -45,33 +44,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
   final _tick = ValueNotifier<int>(0);
   Timer? _reloj;
   bool _scrolleando = false;
-
-  // Tour de Equipo (Victor, 2026-11-15).
-  final _kBuscar = GlobalKey(debugLabel: 'tour-eq-buscar');
-  final _kFiltros = GlobalKey(debugLabel: 'tour-eq-filtros');
-  final _kAccesos = GlobalKey(debugLabel: 'tour-eq-accesos');
-  bool _tourPedido = false;
-
-  void _tour() {
-    if (_tourPedido) return;
-    _tourPedido = true;
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      Tour.mostrarSiCorresponde(
-        context,
-        preferencia: 'tour.equipo.v1',
-        pasos: [
-          PasoTour(clave: _kBuscar, titulo: 'Busca a alguien', texto: 'Por nombre, número, rol o equipo. También escribiendo "lesión" o "cumpleaños".'),
-          PasoTour(clave: _kFiltros, titulo: 'Filtra por rol', texto: 'Muestra solo jammers, blockers, coaches u otro rol.'),
-          PasoTour(
-            clave: _kAccesos,
-            titulo: 'Comunidad e Inventario',
-            texto: 'Los grupos y redes de la liga, y el equipamiento: pedir prestado, avisar si te llevaste algo y lo que hay en el botiquín.',
-          ),
-        ],
-      );
-    });
-  }
 
   @override
   void initState() {
@@ -153,13 +125,12 @@ class _EquipoScreenState extends State<EquipoScreen> {
               ListenableBuilder(
                 listenable: repo,
                 builder: (context, _) => IconButton(
-                  key: _kFiltros,
                   tooltip: 'Filtros',
                   onPressed: _abrirFiltros,
                   icon: Badge(isLabelVisible: repo.hayFiltros, smallSize: 8, child: const Icon(Icons.tune_rounded)),
                 ),
               ),
-            if (!_buscando) IconButton(key: _kBuscar, tooltip: 'Buscar', onPressed: _alternarBusqueda, icon: const Icon(Icons.search_rounded)),
+            if (!_buscando) IconButton(tooltip: 'Buscar', onPressed: _alternarBusqueda, icon: const Icon(Icons.search_rounded)),
           ],
         ),
         body: ListenableBuilder(
@@ -185,7 +156,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
               cuerpo = _resultados(context, p, personas);
             } else {
               cuerpo = _lista(context, p, personas);
-              _tour();
             }
             return Stack(
               children: [
@@ -360,7 +330,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
     }
 
     return Padding(
-      key: _kAccesos,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         children: [

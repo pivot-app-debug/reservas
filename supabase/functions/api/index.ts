@@ -1448,14 +1448,21 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
   if (foto && foto.startsWith('http')) row.foto_perfil = foto;
   // Enlace de invitación de un equipo (Mi Liga, 2026-11-13): entra directo a
   // ese equipo si cumple sus requisitos; si no, al equipo inicial.
-  const codigoEquipo = String(params.equipo ?? '').trim();
+    const codigoEquipo = String(params.equipo ?? '').trim();
+  let avisoEquipo = '';
   if (codigoEquipo) {
     const { data: t } = await supabase.from('config_tiers').select('nombre, requisitos').eq('codigo_invitacion', codigoEquipo).maybeSingle();
     if (t) {
       const req = (t.requisitos ?? {}) as Record<string, any>;
       const usa = (v: unknown) => { const x = String(v ?? '').trim().toLowerCase(); return x !== '' && x !== 'no'; };
       const cumple = !(req.patinesPropios && usa(necesitaPatines)) && !(req.proteccionesPropias && usa(necesitaProtecciones));
-      if (cumple) row.categoria = t.nombre;
+            if (cumple) row.categoria = t.nombre;
+      // Si no cumple, entra al equipo inicial y se le dice por qué (Victor, 2026-11-15).
+      else {
+        const falta = [req.patinesPropios && usa(necesitaPatines) ? 'patines' : '', req.proteccionesPropias && usa(necesitaProtecciones) ? 'protecciones' : ''].filter(Boolean).join(' y ');
+                const { data: ini } = await supabase.from('config_tiers').select('nombre').eq('es_default', true).maybeSingle();
+        avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}:  ${t.nombre} pide ${falta} propios. Cuando tengas tu equipamiento, cámbialo en tu perfil y tu equipo se revisará en el próximo corte.`;
+      }
     }
   }
   if (guardarFecha === 'si' && _normalizarFechaNac(fechaNac)) {
@@ -1477,7 +1484,7 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
     contents: { es: `${nombre} se unió hoy. ¡Bienvenidx!` },
     url: APP_URL + '/?tab=equipo',
   });
-  return { exito: true, token, nombre, datos: getDatosCompletos(newRow) };
+  return { exito: true, token, nombre, datos: getDatosCompletos(newRow), ...(avisoEquipo ? { avisoEquipo } : {}) };
 }
 
 // ─── Registro Express (registro-express/) ──────────────────────────────────
@@ -9650,8 +9657,13 @@ async function _estadosCuotaMes(usernames: string[], mes: string): Promise<Recor
   return out;
 }
 
-/** Día hasta el que pagar la cuota da 1 punto extra (Victor: incluye el 15). */
-const DIA_PUNTO_EXTRA = 15;
+/** Día hasta el que pagar la cuota da 1 punto extra (incluido): la fecha
+ *  límite de la liga (`cuotaVenceDia`); sin fecha límite, el 15 (Victor,
+ *  2026-11-15: el punto extra va hasta el vencimiento). */
+async function _diaPuntoExtra(): Promise<number> {
+  const d = Number((await _reglasLiga()).cuotaVenceDia) || 0;
+  return d >= 1 && d <= 28 ? d : 15;
+}
 
 /** Mes 'aaaa-mm' que paga una reserva mensual: el de `mes_texto`; el año sale de
  *  `validez_hasta` (reservas viejas vencían días después del fin de mes). */
@@ -9679,8 +9691,9 @@ async function _recordatoriosCuota(hoyIso: string): Promise<void> {
     tipo: 'cuota_pendiente', include_external_user_ids: usuarios, headings: { es: titulo }, contents: { es: texto }, url: APP_URL + '/?tab=ajustes',
   }) : Promise.resolve();
 
+    const DIA_PUNTO_EXTRA = await _diaPuntoExtra();
   if (dia === 1) await enviar(deben, `Cuota de ${nombreMes}`, `Ya puedes pagar tu cuota de ${nombreMes}. Si pagas hasta el ${DIA_PUNTO_EXTRA}, recibes un punto extra.`);
-  if (dia === DIA_PUNTO_EXTRA - 1) await enviar(deben, 'Último día para tu punto extra', `Mañana es el último día para pagar tu cuota de ${nombreMes} y recibir tu punto extra.`);
+  if (DIA_PUNTO_EXTRA > 2 && dia === DIA_PUNTO_EXTRA - 1) await enviar(deben, 'Último día para tu punto extra', `Mañana es el último día para pagar tu cuota de ${nombreMes} y recibir tu punto extra.`);
   if (dia === DIA_PUNTO_EXTRA + 1) await enviar(deben, `Aún no pagas ${nombreMes}`, `Aún no has pagado tu cuota de ${nombreMes}. Recuerda hacer tu pago.`);
 
     // Clases de gracia usadas (Mi Liga → Cobros, por equipo): ayer fue su
@@ -9791,7 +9804,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
   let ganoPunto = false;
     const mesCuota = reservaAntes ? _mesDeReserva(reservaAntes) : '';
   if (estado === 'Confirmada' && reservaAntes?.tipo === 'mensual' && reservaAntes.estado === 'Pendiente' && !reservaAntes.punto_extra_en && /^\d{4}-\d{2}$/.test(mesCuota)) {
-    const limite = `${mesCuota}-${String(DIA_PUNTO_EXTRA).padStart(2, '0')}`;
+        const limite = `${mesCuota}-${String(await _diaPuntoExtra()).padStart(2, '0')}`;
     if (String(reservaAntes.fecha_pago ?? '').slice(0, 10) && String(reservaAntes.fecha_pago).slice(0, 10) <= limite) {
       await _acreditarPuntosExtra(reservaAntes.nombre_usuario, Number(mesCuota.slice(0, 4)), Number(mesCuota.slice(5, 7)), 1);
       await supabase.from('reservas').update({ punto_extra_en: new Date().toISOString() }).eq('id', id);

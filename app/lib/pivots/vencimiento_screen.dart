@@ -3,14 +3,13 @@ import 'package:flutter/services.dart';
 
 import '../core/api.dart';
 import '../core/config_liga.dart';
-import '../core/selector_plazo.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 
-/// Vencimiento de la cuota explicado (Victor, 2026-11-14): qué hace cada
-/// valor, con ejemplos que cambian según lo elegido y una recomendación.
-/// Hoy el vencimiento solo decide desde cuándo corre el recargo; los
-/// recordatorios (1, 14 y 16) y el punto extra (hasta el 15) van aparte.
+/// Fecha límite de pago de la cuota (Victor, 2026-11-15): se elige el día
+/// en un calendario (sin + y -), y el mes de ejemplo se arma con ese día:
+/// el punto extra, los avisos y el recargo siguen la fecha límite, igual
+/// que el servidor (`_diaPuntoExtra`). Sin fecha guardada, se usa el 15.
 class VencimientoScreen extends StatefulWidget {
   const VencimientoScreen({super.key, required this.config});
   final ConfigLiga config;
@@ -20,8 +19,10 @@ class VencimientoScreen extends StatefulWidget {
 }
 
 class _VencimientoScreenState extends State<VencimientoScreen> {
-  static const _diaPuntoExtra = 15; // igual que DIA_PUNTO_EXTRA del servidor
-  late int _dia = widget.config.cuotaVenceDia, _gracia = widget.config.cuotaGraciaDias;
+  static const _porDefecto = 15; // igual que el servidor cuando no hay fecha guardada
+  static const _opcionesGracia = [0, 1, 2, 3, 5, 7, 10];
+  late final bool _sinGuardar = widget.config.cuotaVenceDia < 1 || widget.config.cuotaVenceDia > 28;
+  late int _dia = _sinGuardar ? _porDefecto : widget.config.cuotaVenceDia, _gracia = widget.config.cuotaGraciaDias;
   late bool _conRecargo = widget.config.cuotaRecargo > 0;
   late final _recargo = TextEditingController(text: widget.config.cuotaRecargo > 0 ? '${widget.config.cuotaRecargo}' : '');
   bool _guardando = false;
@@ -34,20 +35,20 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
 
   num get _monto => num.tryParse(_recargo.text.replaceAll(',', '.')) ?? 0;
   String _plata(num v) => '\$${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
+  bool get _recargoActivo => _conRecargo && _monto > 0;
 
   bool get _cambio =>
-      _dia != widget.config.cuotaVenceDia || _gracia != widget.config.cuotaGraciaDias || (_conRecargo ? _monto : 0) != widget.config.cuotaRecargo;
+      _sinGuardar ||
+      _dia != widget.config.cuotaVenceDia ||
+      (_conRecargo ? _gracia : 0) != widget.config.cuotaGraciaDias ||
+      (_conRecargo ? _monto : 0) != widget.config.cuotaRecargo;
 
   Future<void> _guardar() async {
     setState(() => _guardando = true);
     final m = ScaffoldMessenger.of(context);
     try {
-      await widget.config.guardarReglas({
-        'cuotaVenceDia': _dia,
-        'cuotaGraciaDias': _dia == 0 ? 0 : _gracia,
-        'cuotaRecargo': _dia == 0 || !_conRecargo ? 0 : _monto,
-      });
-      m.showSnackBar(const SnackBar(content: Text('Guardado. Rige para los pagos que lleguen desde ahora.')));
+      await widget.config.guardarReglas({'cuotaVenceDia': _dia, 'cuotaGraciaDias': _conRecargo ? _gracia : 0, 'cuotaRecargo': _conRecargo ? _monto : 0});
+      m.showSnackBar(const SnackBar(content: Text('Guardado. Rige desde ahora; los pagos y puntos anteriores no cambian.')));
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
@@ -56,16 +57,29 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
     }
   }
 
+  List<Widget> _mes() {
+    final n = _dia, inicioRecargo = n + _gracia + 1;
+    return [
+      if (n > 1) const _Paso(dia: '1', titulo: 'Recordatorio de cuota', texto: 'Se avisa a todas las personas que ya pueden pagar.'),
+      if (n > 2) _Paso(dia: '${n - 1}', titulo: 'Último aviso', texto: 'Solo a quien todavía no pagó: mañana es la fecha límite.'),
+      _Paso(
+        dia: '$n',
+        titulo: 'Fecha límite',
+        texto: n == 1 ? 'Recordatorio y último día para pagar a tiempo y recibir el punto extra.' : 'Último día para pagar a tiempo y recibir el punto extra.',
+        fuerte: true,
+      ),
+      if (n < 28) _Paso(dia: '${n + 1}', titulo: 'Aviso de cuota pendiente', texto: 'A quien todavía no pagó.'),
+      if (_recargoActivo && inicioRecargo <= 31)
+        _Paso(dia: '$inicioRecargo', titulo: 'Empieza el recargo', texto: 'Desde hoy, al pagar se suma ${_plata(_monto)}.'),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final ultimo = _dia + _gracia;
-    final ejemploDia = _dia == 0
-        ? 'Con 0 la cuota no vence: nunca hay recargo, sin importar el día en que paguen.'
-        : 'Quien envía su pago hasta el $_dia${_gracia > 0 ? ' (o hasta el $ultimo con la gracia)' : ''} paga el precio normal.';
-    final ejemploRecargo = !_conRecargo || _monto <= 0
-        ? 'Sin recargo, el vencimiento no cambia lo que se paga: sirve solo como referencia.'
-        : 'Desde el día ${ultimo + 1}, al pagar se ve "Mensualidad + ${_plata(_monto)} de recargo". Cuenta el día en que la persona envía el pago, no el día en que un Pivot lo aprueba.';
+    final ejemploRecargo = !_recargoActivo
+        ? 'Sin recargo, pagar tarde no cuesta más: solo se pierde el punto extra.'
+        : 'Desde el día ${_dia + _gracia + 1}, al pagar se ve "Mensualidad + ${_plata(_monto)} de recargo". Cuenta el día en que la persona envía el pago, no el día en que un Pivot lo aprueba.';
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -73,115 +87,90 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Vencimiento de la cuota', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Fecha límite de pago', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
           Text(
-            'Define hasta qué día se puede pagar la cuota del mes sin atraso. Si activas el recargo, quien pague después lo paga.',
+            'Elige hasta qué día se puede pagar la cuota del mes a tiempo. Quien paga hasta ese día recibe un punto extra.',
             style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
+          ),
+          if (_sinGuardar) ...[
+            const SizedBox(height: 10),
+            _Ejemplo('Todavía no hay una fecha guardada: hoy se usa el día $_porDefecto. Guarda para dejarla fija.'),
+          ],
+          const SizedBox(height: 18),
+          const _Titulo('FECHA LÍMITE (DÍA DE CADA MES)'),
+          _Tarjeta(
+            child: _Calendario(dia: _dia, alElegir: (d) => setState(() => _dia = d)),
           ),
           const SizedBox(height: 18),
           const _Titulo('ASÍ SE VE UN MES'),
           _Tarjeta(
-            child: Column(
-              children: [
-                const _Paso(dia: '1', titulo: 'Recordatorio de cuota', texto: '"Si pagas hasta el 15, recibes un punto extra."'),
-                const _Paso(dia: '14', titulo: 'Último aviso para el punto extra', texto: 'Solo a quien todavía no pagó.'),
-                const _Paso(dia: '$_diaPuntoExtra', titulo: 'Último día del punto extra', texto: 'Quien pagó hasta hoy recibe un punto al aprobarse su pago.'),
-                const _Paso(dia: '16', titulo: 'Aviso de cuota pendiente', texto: 'A quien todavía no pagó.'),
-                if (_dia > 0)
-                  _Paso(
-                    dia: '$ultimo',
-                    titulo: 'Vence la cuota',
-                    texto: _conRecargo && _monto > 0 ? 'Desde el día siguiente se suma el recargo.' : 'Sin recargo: nada cambia al pasar este día.',
-                    fuerte: true,
-                  ),
-              ],
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Column(key: ValueKey('$_dia-$_gracia-$_recargoActivo-$_monto'), children: _mes()),
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Los avisos y el punto extra no dependen del vencimiento: siempre son los días 1, 14, 15 y 16.',
-            style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
-          ),
           const SizedBox(height: 18),
-          const _Titulo('DÍA DE VENCIMIENTO'),
+          const _Titulo('RECARGO POR PAGAR TARDE'),
           _Tarjeta(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SelectorNumero(
-                  valor: _dia,
-                  min: 0,
-                  max: 28,
-                  etiqueta: _dia == 0 ? 'no vence' : 'de cada mes',
-                  alCambiar: (n) => setState(() => _dia = n.toInt()),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Cobrar recargo', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Un monto fijo que se suma a la cuota de quien paga después de la fecha límite.'),
+                  value: _conRecargo,
+                  onChanged: (v) => setState(() => _conRecargo = v),
                 ),
-                const SizedBox(height: 10),
-                _Ejemplo(ejemploDia),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  child: !_conRecargo
+                      ? const SizedBox(width: double.infinity)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _recargo,
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                              decoration: const InputDecoration(labelText: 'Monto del recargo', prefixText: '\$ '),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Días de margen antes del recargo',
+                              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final g in _opcionesGracia)
+                                  ChoiceChip(
+                                    label: Text(g == 0 ? 'Ninguno' : '$g ${g == 1 ? 'día' : 'días'}'),
+                                    selected: _gracia == g,
+                                    onSelected: (_) => setState(() => _gracia = g),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
+                ),
+                _Ejemplo(ejemploRecargo),
               ],
             ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            child: _dia == 0
-                ? const SizedBox(width: double.infinity)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 18),
-                      const _Titulo('DÍAS DE GRACIA'),
-                      _Tarjeta(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SelectorNumero(valor: _gracia, min: 0, max: 27, etiqueta: 'días', alCambiar: (n) => setState(() => _gracia = n.toInt())),
-                            const SizedBox(height: 10),
-                            _Ejemplo(
-                              _gracia == 0
-                                  ? 'Sin gracia, el recargo corre desde el día siguiente al vencimiento.'
-                                  : 'Margen para quien se atrasa unos días: hasta el $ultimo todavía no hay recargo.',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      const _Titulo('RECARGO POR ATRASO'),
-                      _Tarjeta(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Cobrar recargo', style: TextStyle(fontWeight: FontWeight.w700)),
-                              value: _conRecargo,
-                              onChanged: (v) => setState(() => _conRecargo = v),
-                            ),
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                              child: !_conRecargo
-                                  ? const SizedBox(width: double.infinity)
-                                  : Padding(
-                                      padding: const EdgeInsets.only(bottom: 10),
-                                      child: TextField(
-                                        controller: _recargo,
-                                        onChanged: (_) => setState(() {}),
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                                        decoration: const InputDecoration(labelText: 'Monto fijo', prefixText: '\$ '),
-                                      ),
-                                    ),
-                            ),
-                            _Ejemplo(ejemploRecargo),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
           ),
           const SizedBox(height: 18),
           Container(
@@ -198,7 +187,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
                 Text(
                   'Deja el recargo apagado: los avisos y el punto extra ya motivan a pagar a tiempo. '
                   'Actívalo solo si muchas personas pagan tarde varios meses seguidos, y avísalo al equipo antes. '
-                  'Un cambio rige para los pagos que lleguen desde que lo guardas; los anteriores no cambian.',
+                  'Un cambio rige desde que lo guardas; los pagos y puntos anteriores no cambian.',
                   style: TextStyle(height: 1.4, color: p.sobreSuave),
                 ),
               ],
@@ -208,6 +197,58 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
           FilledButton(onPressed: _cambio && !_guardando ? _guardar : null, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
         ],
       ),
+    );
+  }
+}
+
+/// Días 1 a 28 en una grilla de 7 columnas, como un calendario. Se llega
+/// hasta el 28 para que la fecha exista en todos los meses.
+class _Calendario extends StatelessWidget {
+  const _Calendario({required this.dia, required this.alElegir});
+  final int dia;
+  final ValueChanged<int> alElegir;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Column(
+      children: [
+        for (var fila = 0; fila < 4; fila++)
+          Row(
+            children: [
+              for (var c = 1; c <= 7; c++)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Builder(
+                        builder: (_) {
+                          final d = fila * 7 + c, sel = d == dia;
+                          return Material(
+                            color: sel ? p.marca : p.fondo,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () => alElegir(d),
+                              child: Center(
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 180),
+                                  style: TextStyle(fontWeight: sel ? FontWeight.w900 : FontWeight.w600, color: sel ? p.sobreMarca : p.texto),
+                                  child: Text('$d'),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(height: 6),
+        Text('Se puede elegir hasta el 28 para que la fecha exista en todos los meses.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+      ],
     );
   }
 }

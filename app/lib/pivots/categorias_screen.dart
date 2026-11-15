@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../core/config_liga.dart';
 import 'reglas_screen.dart';
 import 'editores_liga.dart';
 
@@ -505,31 +505,8 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
   }
 
   /// Hoja corta con contenido y "Guardar". Devuelve true si se guarda.
-  Future<bool?> _hoja({required String titulo, required List<Widget> Function(StateSetter set) contenido}) => showModalBottomSheet<bool>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (h) => StatefulBuilder(
-      builder: (h, set) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(h).height * 0.88),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                ...contenido(set),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
+  Future<bool?> _hoja({required String titulo, required List<Widget> Function(StateSetter set) contenido}) =>
+      abrirSubseccion(context, titulo: titulo, contenido: contenido);
 
   @override
   Widget build(BuildContext context) {
@@ -1120,7 +1097,6 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   String get _inicial => '${widget.tiers.firstWhere((x) => x['es_default'] == true, orElse: () => widget.tiers.last)['nombre']}';
   List<_Persona> get _miembros => widget.gente.where((x) => x.categoria == _nombre && x.evaluable && !x.usaEquipo).toList();
   List<_Persona> get _candidatos => _debajo == null ? const [] : widget.gente.where((x) => x.categoria == _nombreDebajo && x.evaluable).toList();
-  Map<String, dynamic> get _req => (t['requisitos'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
 
   void _aviso(String m) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -1144,31 +1120,9 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     }
   }
 
-  Future<bool?> _hoja(String titulo, List<Widget> Function(StateSetter set) contenido, {String boton = 'Guardar'}) => showModalBottomSheet<bool>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (h) => StatefulBuilder(
-      builder: (h, set) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(h).height * 0.9),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                ...contenido(set),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: Text(boton)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
+  // Subsección en vez de hoja inferior (Victor, 2026-11-15).
+  Future<bool?> _hoja(String titulo, List<Widget> Function(StateSetter set) contenido, {String boton = 'Guardar'}) =>
+      abrirSubseccion(context, titulo: titulo, contenido: contenido, boton: boton);
 
   Widget _impacto(_Regla antes, _Regla ahora) =>
       _Impacto(antes: antes, ahora: ahora, miembros: _miembros, candidatos: _candidatos, nombre: _nombre, debajo: _nombreDebajo);
@@ -1312,29 +1266,6 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     }
   }
 
-  Future<void> _requisitos() async {
-    var patines = _req['patinesPropios'] == true;
-    var prot = _req['proteccionesPropias'] == true;
-    final ok = await _hoja('Entrar con el enlace', (set) {
-      return [
-        Text('Quien se inscribe con el enlace de $_nombre entra directo si cumple esto:', style: TextStyle(color: context.pivot.textoSecundario)),
-        SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Patines propios'), value: patines, onChanged: (v) => set(() => patines = v)),
-        SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Protecciones propias'), value: prot, onChanged: (v) => set(() => prot = v)),
-        _Nota(texto: 'Si no lo cumple, entra a $_inicial.'),
-      ];
-    });
-    if (ok == true) {
-      await _guardar({
-        'requisitos': {'patinesPropios': patines, 'proteccionesPropias': prot},
-      });
-    }
-  }
-
-  String get _textoRequisitos {
-    final x = [if (_req['patinesPropios'] == true) 'patines propios', if (_req['proteccionesPropias'] == true) 'protecciones propias'].join(' y ');
-    return x.isEmpty ? 'Sin requisitos: entra directo' : 'Pide $x';
-  }
-
   String get _enlace => '${ApiConfig.webAppUrl}/inscripcion/?equipo=${t['codigo_invitacion'] ?? ''}';
 
   Future<void> _mover(int d) async {
@@ -1460,100 +1391,76 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                   ),
                 ),
             ],
-            _Fila(
-              icono: Icons.flight_takeoff_rounded,
-              titulo: 'Fondos de viaje',
-              texto: 'Quienes están aquí califican para fondos de viaje.',
-              alTocar: () => _guardar({'califica_fondos_viaje': t['califica_fondos_viaje'] == true ? '' : 'true'}),
-              final_: Switch(value: t['califica_fondos_viaje'] == true, onChanged: (v) => _guardar({'califica_fondos_viaje': v ? 'true' : ''})),
-            ),
-            _Fila(icono: Icons.rule_rounded, titulo: 'Entrar con el enlace', texto: _textoRequisitos, alTocar: _requisitos),
-            // Ajustes del equipo en un solo lugar (Victor, 2026-11-14): lo
-            // propio del equipo y, aparte, las reglas de toda la liga.
-            ListenableBuilder(
-              listenable: ConfigLiga.de(s),
-              builder: (context, _) {
-                final c = ConfigLiga.de(s);
-                final g = c.graciaClases(_nombre);
-                Widget titulo(String x) => Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-                  child: Text(
-                    x,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-                  ),
-                );
-                void reglas(String id) => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ReglasScreen(sesion: s, equipo: _nombre, resaltar: id),
-                  ),
-                );
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            // Invitar al equipo (Victor, 2026-11-15): a la vista y fácil de
+            // compartir. Quien no cumple lo que pide el equipo entra al inicial
+            // y la inscripción le explica por qué.
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    titulo('COBRO'),
-                    _Fila(
-                      icono: Icons.redeem_outlined,
-                      titulo: 'Clases de gracia',
-                      texto: g == null
-                          ? 'No usa: sigue su regla de pago'
-                          : (g == 0 ? 'Paga antes de marcar Asistiré' : '$g ${g == 1 ? 'clase' : 'clases'} al mes sin haber pagado'),
-                      alTocar: () => editarGracia(context, s, c, soloEquipo: _nombre),
-                      final_: ChipAlcance(equipo: _nombre),
-                    ),
-                    _Fila(
-                      icono: Icons.event_busy_outlined,
-                      titulo: 'Fecha límite de pago',
-                      texto: textoVencimiento(c),
-                      alTocar: () => reglas('vencimiento'),
-                      final_: const ChipAlcance(),
-                    ),
-                    titulo('ASISTENCIA'),
-                    _Fila(
-                      icono: Icons.timer_outlined,
-                      titulo: 'Tolerancia para llegadas tarde',
-                      texto: '${c.toleranciaMin} minutos',
-                      alTocar: () => reglas('tolerancia'),
-                      final_: const ChipAlcance(),
-                    ),
-                    _Fila(
-                      icono: Icons.hourglass_empty_rounded,
-                      titulo: 'Inactividad',
-                      texto: 'Tras ${ConfigLiga.diasInactividad} días sin venir',
-                      alTocar: () => reglas('inactividad'),
-                      final_: const ChipAlcance(),
-                    ),
-                    _Fila(
-                      icono: Icons.fact_check_outlined,
-                      titulo: 'Rectificaciones',
-                      texto: 'Se revisan en ${c.rectificacionDias} días. Siempre aplica a toda la liga',
-                      alTocar: () => reglas('rectificaciones'),
-                      final_: const ChipAlcance(),
-                    ),
-                    const SizedBox(height: 4),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ReglasScreen(sesion: s, equipo: _nombre),
+                    const Row(
+                      children: [
+                        Icon(Icons.person_add_alt_1_rounded, color: PivotPaleta.sobreSeccion),
+                        SizedBox(width: 8),
+                        Text(
+                          'Invita a jugar',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
                         ),
-                      ),
-                      icon: const Icon(Icons.rule_folder_outlined),
-                      label: Text('Ver todas las reglas de $_nombre'),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
+                    Text(
+                      _piso
+                          ? 'Quien se inscribe con este enlace entra a $_nombre.'
+                          : 'Quien se inscribe con este enlace entra a $_nombre si cumple lo que pide; si no, a $_nombreDebajo, y se le explica por qué.',
+                      style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92)),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(backgroundColor: PivotPaleta.sobreSeccion, foregroundColor: p.marcaTexto),
+                            onPressed: () => SharePlus.instance.share(ShareParams(text: 'Únete a $_nombre en Pivot: $_enlace')),
+                            icon: const Icon(Icons.share_rounded),
+                            label: const Text('Compartir'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: PivotPaleta.sobreSeccion,
+                              side: BorderSide(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.7)),
+                            ),
+                            onPressed: () async {
+                              await Clipboard.setData(ClipboardData(text: _enlace));
+                              _aviso('Enlace copiado');
+                            },
+                            icon: const Icon(Icons.copy_rounded),
+                            label: const Text('Copiar'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                );
-              },
+                ),
+              ),
             ),
-            _Fila(
-              icono: Icons.link_rounded,
-              titulo: 'Enlace de invitación',
-              texto: _enlace,
-              alTocar: () async {
-                await Clipboard.setData(ClipboardData(text: _enlace));
-                _aviso('Enlace copiado');
-              },
-              final_: const Icon(Icons.copy_rounded),
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ReglasScreen(sesion: s, equipo: _nombre),
+                ),
+              ),
+              icon: const Icon(Icons.rule_folder_outlined),
+              label: Text('Ver las reglas de $_nombre'),
             ),
             if (!_piso) ...[
               const SizedBox(height: 16),
@@ -1968,4 +1875,99 @@ class _AjustesEquipoScreenState extends State<AjustesEquipoScreen> {
     }
     return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: _gente);
   }
+}
+
+/// Crear un equipo desde Mi Liga: el asistente directo; al terminar o volver,
+/// regresa a Mi Liga (Victor, 2026-11-15).
+class NuevoEquipoScreen extends StatefulWidget {
+  const NuevoEquipoScreen({super.key, required this.sesion});
+  final Sesion sesion;
+
+  @override
+  State<NuevoEquipoScreen> createState() => _NuevoEquipoScreenState();
+}
+
+class _NuevoEquipoScreenState extends State<NuevoEquipoScreen> {
+  Map<String, dynamic>? _inicial;
+  List<_Persona> _gente = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.sesion, token = {'adminToken': s.adminToken};
+    Future.wait([s.api.get('getTiers', token), s.api.get('adminDatosCategorias', token)])
+        .then((r) {
+          if (!mounted) return;
+          final l = [
+            for (final t in (r[0]['tiers'] as List? ?? const []))
+              if (t is Map<String, dynamic>) t,
+          ];
+          setState(() {
+            _inicial = l.firstWhere((t) => t['es_default'] == true, orElse: () => l.last);
+            _gente = [
+              for (final p in (r[1]['personas'] as List? ?? const []))
+                if (p is Map<String, dynamic>) _Persona(p),
+            ];
+          });
+        })
+        .catchError((Object e) {
+          if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
+        });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final i = _inicial;
+    if (i == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Nuevo equipo')),
+        body: Center(child: _error != null ? Text(_error!) : const PivotCargando(centrarEnPantalla: true)),
+      );
+    }
+    return _NuevoEquipoAsistente(sesion: widget.sesion, inicial: i, gente: _gente);
+  }
+}
+
+/// Equipamiento propio que pide un equipo (Reglas → Equipamiento, Victor
+/// 2026-11-15). Quien se inscribe con su enlace y no lo cumple entra al
+/// equipo inicial. Devuelve true si se guardó.
+Future<bool> editarEquipamientoPropio(BuildContext context, Sesion s, Map<String, dynamic> t) async {
+  final req = (t['requisitos'] as Map?) ?? const {};
+  var patines = req['patinesPropios'] == true;
+  var prot = req['proteccionesPropias'] == true;
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Equipamiento propio en ${t['nombre']}',
+    contenido: (set) => [
+      Text(
+        'Qué tiene que tener propio quien está en ${t['nombre']}. Quien se inscribe con su enlace sin cumplirlo entra al equipo inicial y se le explica por qué.',
+        style: TextStyle(color: context.pivot.textoSecundario),
+      ),
+      const SizedBox(height: 8),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Patines propios'), value: patines, onChanged: (v) => set(() => patines = v)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Protecciones propias'), value: prot, onChanged: (v) => set(() => prot = v)),
+    ],
+  );
+  if (ok != true || !context.mounted) return false;
+  final m = ScaffoldMessenger.of(context);
+  try {
+    final cambios = {
+      'requisitos': {'patinesPropios': patines, 'proteccionesPropias': prot},
+    };
+    final base = _Regla.de(t).params({...t, ...cambios});
+    await _guardarTier(s, {...base, ...cambios.map((k, v) => MapEntry(k, jsonEncode(v)))});
+    m.showSnackBar(const SnackBar(content: Text('Guardado')));
+    return true;
+  } catch (e) {
+    m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    return false;
+  }
+}
+
+/// Si quienes están en un equipo reciben fondos de viaje (Viajes, Victor 2026-11-15).
+Future<void> cambiarFondosViaje(Sesion s, Map<String, dynamic> t, bool recibe) async {
+  final cambios = {'califica_fondos_viaje': recibe ? 'true' : ''};
+  final base = _Regla.de(t).params({...t, ...cambios});
+  await _guardarTier(s, {...base, ...cambios});
 }

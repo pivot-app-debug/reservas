@@ -203,6 +203,13 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Revisión 2026-11-15: fecha límite, equipos y subsecciones
+- **Fecha límite de pago** (`pivots/vencimiento_screen.dart`): calendario 1–28 (`_Calendario`), mes de ejemplo dinámico, recargo y días de margen en una sola tarjeta. Guarda `cuotaVenceDia`, `cuotaGraciaDias` (0 sin recargo) y `cuotaRecargo` en `reglas_liga`. Resumen en `textoVencimiento()` (`editores_liga.dart`).
+- Servidor: `_diaPuntoExtra()` devuelve `cuotaVenceDia` si está entre 1 y 28, si no 15. Lo usan `_recordatoriosCuota` (aviso el 1, el día anterior y el siguiente) y el tope del punto extra. Rige desde que se guarda; los puntos ya dados no cambian.
+- `abrirSubseccion(context, titulo, contenido, boton)` (`editores_liga.dart`): reemplaza hojas grandes por una pantalla completa con fade/slide que devuelve `true` al guardar. `editarGracia` filtra por equipo pero guarda la lista entera.
+- `categorias_screen.dart`: `NuevoEquipoScreen`, `editarEquipamientoPropio()` (lo usa Reglas → Equipamiento), `cambiarFondosViaje()` (lo usa Tesorería → Viajes, `FondosViajeScreen`).
+- `inscribirPersona` devuelve `avisoEquipo` cuando asigna el equipo por defecto por no cumplir requisitos; `inscripcion/inscripcion.js` lo muestra y espera 9 s antes de redirigir.
+
 ## Cuota mensual: vencimiento (2026-11-07)
 - Cada reserva mensual vence el **último día de su mes**. BD: `fn_vigencia_mensual(mes_texto, fecha_pago)` + trigger `trg_reservas_vigencia_mensual` llenan `validez_hasta` si viene vacío (migración `20261107160000_reservas_vigencia_mensual.sql`, con relleno de las filas viejas). `mes_texto` no trae año: se toma el de `fecha_pago`, corrigiendo el cruce de año (Enero pagado en diciembre = enero siguiente).
 - `getReservasPersona` devuelve `validezHasta` ("d/m/aaaa") en cada mensual (helper `_vigenciaMensualISO`, mismo cálculo que la BD). `guardarReserva` solo choca con una mensual del mismo mes **y año**.

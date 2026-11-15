@@ -13,6 +13,7 @@ import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
+import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
 import 'cobros_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
@@ -864,11 +865,6 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         ),
       ),
 
-      Resaltable(
-        id: 'fondos',
-        resaltado: _resaltado,
-        child: _fila(context, Icons.flight_takeoff_rounded, 'Fondos de viaje', 'Reparto por asistencia', () => _abrir(FondosViajeScreen(repo: repo))),
-      ),
       Resaltable(
         id: 'movimientos',
         resaltado: _resaltado,
@@ -2007,10 +2003,41 @@ class FondosViajeScreen extends StatefulWidget {
 class _FondosViajeScreenState extends State<FondosViajeScreen> {
   List<Map<String, dynamic>>? _fondos;
 
+  /// Equipos y si reciben fondos (antes un interruptor en cada equipo).
+  List<Map<String, dynamic>> _equipos = const [];
+
   @override
   void initState() {
     super.initState();
     _cargar();
+    _cargarEquipos();
+  }
+
+  Future<void> _cargarEquipos() async {
+    try {
+      final s = widget.repo.sesion;
+      final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
+      if (mounted) {
+        setState(
+          () => _equipos = [
+            for (final t in (r['tiers'] as List? ?? const []))
+              if (t is Map<String, dynamic>) t,
+          ]..sort((a, b) => ((a['orden'] as num?) ?? 0).compareTo((b['orden'] as num?) ?? 0)),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _cambiarEquipo(Map<String, dynamic> t, bool v) async {
+    setState(() => t['califica_fondos_viaje'] = v);
+    try {
+      await cambiarFondosViaje(widget.repo.sesion, t, v);
+    } catch (e) {
+      if (mounted) {
+        setState(() => t['califica_fondos_viaje'] = !v);
+        _aviso(context, _error(e));
+      }
+    }
   }
 
   Future<void> _cargar() async {
@@ -2045,7 +2072,7 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Fondos de viaje', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Viajes', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: l == null
           ? const PivotCargando(centrarEnPantalla: true)
@@ -2053,10 +2080,40 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
               children: [
                 Text(
-                  'Califican quienes están en equipos con "Fondos de viaje" (Equipos y puntos). Se reparte por % de asistencia en la ventana que elijas.',
+                  'Cada viaje reparte un monto entre quienes reciben fondos, según su % de asistencia en las fechas que elijas (por ejemplo, de 90 a 100 % recibe el 50 %).',
                   style: TextStyle(fontSize: 13, color: p.textoSecundario),
                 ),
-                const SizedBox(height: 8),
+                if (_equipos.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                    child: Text(
+                      'QUIÉNES RECIBEN FONDOS',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                    ),
+                  ),
+                  Material(
+                    color: p.tarjeta,
+                    borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        for (final t in _equipos)
+                          SwitchListTile(
+                            title: Text('${t['nombre']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            value: t['califica_fondos_viaje'] == true,
+                            onChanged: (v) => _cambiarEquipo(t, v),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  child: Text(
+                    'VIAJES',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  ),
+                ),
                 if (l.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 24),

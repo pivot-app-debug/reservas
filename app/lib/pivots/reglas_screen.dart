@@ -30,20 +30,29 @@ class ReglasScreen extends StatefulWidget {
 class _ReglasScreenState extends State<ReglasScreen> {
   late String? _equipo = widget.equipo;
   List<String> _equipos = const [];
+  List<Map<String, dynamic>> _tiers = const [];
   final _resaltado = ValueNotifier<String?>(null);
 
   Sesion get s => widget.sesion;
 
+  Future<void> _cargarEquipos() async {
+    try {
+      final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
+      if (!mounted) return;
+      setState(() {
+        _tiers = [
+          for (final t in (r['tiers'] as List? ?? const []))
+            if (t is Map<String, dynamic>) t,
+        ]..sort((a, b) => ((a['orden'] as num?) ?? 0).compareTo((b['orden'] as num?) ?? 0));
+        _equipos = [for (final t in _tiers) '${t['nombre']}'];
+      });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
-    s.api
-        .get('getTiers', {'adminToken': s.adminToken})
-        .then((r) {
-          if (!mounted) return;
-          setState(() => _equipos = [for (final t in (r['tiers'] as List? ?? const [])) '${(t as Map)['nombre']}']);
-        })
-        .catchError((Object _) {});
+    _cargarEquipos();
     final x = widget.resaltar;
     if (x != null) WidgetsBinding.instance.addPostFrameCallback((_) => _resaltado.value = x);
   }
@@ -140,7 +149,12 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   textoVencimiento(c),
                   editar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
                 ),
-                _regla('puntoExtra', Icons.star_outline_rounded, 'Punto extra por pagar a tiempo', 'Quien paga la cuota hasta el 15 suma 1 punto'),
+                _regla(
+                  'puntoExtra',
+                  Icons.star_outline_rounded,
+                  'Recompensas por pagar a tiempo',
+                  c.cuotaVenceDia == 0 ? 'Quien paga la cuota hasta el 15 suma 1 punto' : 'Quien paga la cuota hasta el día ${c.cuotaVenceDia} suma 1 punto',
+                ),
                 _regla(
                   'quienPaga',
                   Icons.payments_outlined,
@@ -241,14 +255,25 @@ class _ReglasScreenState extends State<ReglasScreen> {
             GrupoAjustes(
               titulo: 'Equipamiento',
               filas: [
-                _regla(
-                  'propio',
-                  Icons.roller_skating_outlined,
-                  'Equipamiento propio obligatorio',
-                  'Quien usa patines o protecciones del club pasa a Mirlxs',
-                  equipo: 'Quindes',
-                  seccion: 'equipamiento',
-                ),
+                // Equipamiento propio de cada equipo (antes "Entrar con el enlace", Victor 2026-11-15).
+                for (final t in _tiers.where((t) => t['es_default'] != true))
+                  _regla(
+                    'propio_${t['nombre']}',
+                    Icons.roller_skating_outlined,
+                    'Equipamiento propio',
+                    () {
+                      final req = (t['requisitos'] as Map?) ?? const {};
+                      final x = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'].join(' y ');
+                      return x.isEmpty
+                          ? 'No pide equipamiento propio'
+                          : 'Pide $x propios. Quien usa los del club pasa a ${_tiers.lastWhere((e) => e['es_default'] == true, orElse: () => t)['nombre']}';
+                    }(),
+                    equipo: '${t['nombre']}',
+                    seccion: 'equipamiento',
+                    editar: () async {
+                      if (await editarEquipamientoPropio(context, s, t)) _cargarEquipos();
+                    },
+                  ),
                 _regla(
                   'prestamo',
                   Icons.handshake_outlined,

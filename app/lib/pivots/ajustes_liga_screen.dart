@@ -207,7 +207,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     return SizedBox(
       height: 184,
       child: l == null
-          ? const Center(child: PivotCargando())
+          ? const Center(child: PivotCargando(tamano: 48, centrarEnPantalla: false))
           : ListenableBuilder(
               listenable: gente,
               builder: (context, _) => ListView.separated(
@@ -216,20 +216,26 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (_, i) {
                   if (i == l.length) {
+                    // Como "Agregar" en Comunidad (Victor, 2026-11-15).
+                    final (degradado, sobre) = PivotPaleta.seccion('salud', Theme.of(context).brightness);
                     return tarjeta(
-                      ancho: 110,
-                      borde: true,
-                      alTocar: () => _abrir(CategoriasScreen(sesion: sesion, resaltar: 'nuevoEquipo')),
+                      ancho: 132,
+                      alTocar: () => _abrir(NuevoEquipoScreen(sesion: sesion)),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.add_rounded, size: 30, color: p.marcaTexto),
-                          const SizedBox(height: 6),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(12)),
+                            child: Icon(Icons.add_rounded, color: sobre),
+                          ),
+                          const Spacer(),
                           Text(
                             'Nuevo equipo',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                            style: TextStyle(fontWeight: FontWeight.w700, height: 1.2, color: p.texto),
                           ),
+                          Text('Con sus propias reglas', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                         ],
                       ),
                     );
@@ -421,6 +427,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                         alTocar: () => _abrir(ReglasScreen(sesion: sesion)),
                       ),
                     ),
+                    if (sesion.tieneArea('finanzas'))
+                      Resaltable(
+                        id: 'viajes',
+                        resaltado: _resaltado,
+                        child: FilaAjuste(
+                          icono: Icons.flight_takeoff_rounded,
+                          seccion: 'notificaciones',
+                          titulo: 'Viajes',
+                          valor: 'Fondos de viaje y cómo se reparten',
+                          alTocar: () => _abrir(FondosViajeScreen(repo: _tesRepo)),
+                        ),
+                      ),
                     if (sesion.tieneArea('liga'))
                       Resaltable(
                         id: 'avisos',

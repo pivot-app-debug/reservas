@@ -81,7 +81,7 @@ const entradasLiga = [
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Mi Liga › Tesorería', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Mi Liga › Tesorería', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
-  EntradaAjuste('fondos', 'Fondos de viaje', 'Mi Liga › Tesorería', 'viaje torneo reparto asistencia', dentro: 'tesoreria'),
+  EntradaAjuste('viajes', 'Viajes', 'Mi Liga › Administrar', 'fondos de viaje torneo reparto asistencia'),
   EntradaAjuste('movimientos', 'Todos los movimientos', 'Mi Liga › Tesorería', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
   EntradaAjuste('transparencia', 'Transparencia', 'Mi Liga › Tesorería', 'equipo ve totales público', dentro: 'tesoreria'),
 ];
@@ -99,7 +99,7 @@ List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true}) {
   if (palabras.isEmpty) return const [];
   final r = <(int, EntradaAjuste)>[];
   for (final e in entradasLiga) {
-    if (!tesoreria && (e.id == 'tesoreria' || e.dentro == 'tesoreria' || e.dentro == 'cobros')) continue;
+    if (!tesoreria && (e.id == 'tesoreria' || e.id == 'viajes' || e.dentro == 'tesoreria' || e.dentro == 'cobros')) continue;
     final t = _sinTildes(e.titulo), todo = _sinTildes('${e.titulo} ${e.ruta} ${e.palabras}');
     if (!palabras.every(todo.contains)) continue;
     // Primero lo que coincide con el nombre.

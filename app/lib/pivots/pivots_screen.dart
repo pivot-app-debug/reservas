@@ -168,57 +168,8 @@ class _PivotsScreenState extends State<PivotsScreen> {
   Future<void> _editar(PivotInfo x) async {
     final sel = {...x.areas};
     final soloVer = !_puedeEditar || x.principal;
-    final res = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final p = h.pivot;
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      AvatarPersona(nombre: x.nombre, foto: x.foto, tamano: 44),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(x.nombre, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    x.principal
-                        ? 'Pivot principal: siempre tiene todas las áreas.'
-                        : (soloVer ? 'Para cambiar áreas necesitas "Liga y Pivots".' : 'Qué puede ver y hacer. Recibe avisos solo de estas áreas.'),
-                    style: TextStyle(color: p.textoSecundario),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final a in areasPivot.entries)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: sel.contains(a.key),
-                      secondary: Icon(a.value.$3, color: p.marcaTexto),
-                      title: Text(a.value.$1, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text(a.value.$2),
-                      onChanged: soloVer ? null : (v) => set(() => v == true ? sel.add(a.key) : sel.remove(a.key)),
-                    ),
-                  if (!soloVer) ...[
-                    const SizedBox(height: 12),
-                    FilledButton(onPressed: sel.isEmpty ? null : () => Navigator.of(h).pop('guardar'), child: const Text('Guardar')),
-                    if (!x.yo) TextButton(onPressed: () => Navigator.of(h).pop('quitar'), child: const Text('Quitar como Pivot')),
-                  ],
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+    // Pantalla propia en vez de hoja grande (Victor, 2026-11-15).
+    final res = await SubAjustes.abrir<String>(context, _PivotDetalleScreen(x: x, sel: sel, soloVer: soloVer));
     if (!mounted || res == null) return;
     try {
       if (res == 'guardar') {
@@ -302,22 +253,37 @@ class _PivotsScreenState extends State<PivotsScreen> {
                               final c = ConfigLiga.de(widget.sesion);
                               return GrupoAjustes(
                                 filas: [
+                                  // Interruptor con ⓘ en vez de hoja (Victor, 2026-11-15).
                                   FilaAjuste(
                                     icono: Icons.verified_user_outlined,
                                     seccion: 'roles',
-                                    titulo: 'Pedidos de Pivots',
-                                    valor: c.solicitudesPivots == 'auto' ? 'Se aprueban solos' : 'Los aprueba otro Pivot',
-                                    alTocar: () => elegirLiga(
-                                      context,
-                                      c,
-                                      'Pedidos de Pivots',
-                                      const {'otro': 'Los aprueba otro Pivot (más seguro)', 'auto': 'Se aprueban solos'},
-                                      c.solicitudesPivots,
-                                      'solicitudesPivots',
-                                      ayuda:
-                                          'Cuando un Pivot pide algo para sí (excepción de cuota, rectificación, equipamiento, lesión o una tarea), quién lo aprueba. '
-                                          'Si la liga tiene un solo Pivot, se aprueba solo. Los pagos siempre los confirma otro Pivot.',
+                                    titulo: 'Otro Pivot aprueba sus pedidos',
+                                    valor: c.solicitudesPivots == 'auto' ? 'Apagado: se aprueban solos' : 'Más seguro',
+                                    derecha: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          tooltip: 'Qué significa',
+                                          icon: const Icon(Icons.info_outline_rounded),
+                                          onPressed: () => showDialog<void>(
+                                            context: context,
+                                            builder: (d) => AlertDialog(
+                                              title: const Text('Pedidos de Pivots'),
+                                              content: const Text(
+                                                'Cuando un Pivot pide algo para sí (excepción de cuota, rectificación, equipamiento, lesión o una tarea), otro Pivot lo aprueba. '
+                                                'Si la liga tiene un solo Pivot, se aprueba solo. Los pagos siempre los confirma otro Pivot.',
+                                              ),
+                                              actions: [TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
+                                            ),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: c.solicitudesPivots != 'auto',
+                                          onChanged: (v) => guardarLiga(context, c, {'solicitudesPivots': v ? 'otro' : 'auto'}),
+                                        ),
+                                      ],
                                     ),
+                                    alTocar: () => guardarLiga(context, c, {'solicitudesPivots': c.solicitudesPivots == 'auto' ? 'otro' : 'auto'}),
                                   ),
                                 ],
                               );
@@ -409,12 +375,13 @@ class _NombrarPivotAsistenteState extends State<NombrarPivotAsistente> {
       adelante: _adelante,
       alAtras: () => _ir(-1),
       tituloPaso: switch (_paso) {
-        _PasoPivot.persona => '¿Quién?',
+        _PasoPivot.persona => 'Agrega un nuevo Pivot',
         _PasoPivot.areas => '¿Qué áreas gestiona?',
         _PasoPivot.confirmar => '¿Todo bien?',
       },
       ayuda: switch (_paso) {
-        _PasoPivot.persona => 'Solo aparecen personas con correo: lo necesitan para entrar como Pivot.',
+        _PasoPivot.persona =>
+          'Esta persona podrá gestionar opciones avanzadas, así que úsalo con cautela. Solo aparecen personas con correo: lo necesitan para entrar como Pivot.',
         _PasoPivot.areas => 'Solo verá y recibirá avisos de estas áreas. Puedes cambiarlas cuando quieras.',
         _PasoPivot.confirmar => null,
       },
@@ -534,6 +501,74 @@ class _NombrarPivotAsistenteState extends State<NombrarPivotAsistente> {
         const SizedBox(height: 8),
         Text('Se le avisará por notificación.', style: TextStyle(color: p.textoSecundario)),
       ],
+    );
+  }
+}
+
+/// Áreas de un Pivot: qué puede ver y hacer (antes era una hoja inferior).
+class _PivotDetalleScreen extends StatefulWidget {
+  const _PivotDetalleScreen({required this.x, required this.sel, required this.soloVer});
+  final PivotInfo x;
+  final Set<String> sel;
+  final bool soloVer;
+
+  @override
+  State<_PivotDetalleScreen> createState() => _PivotDetalleScreenState();
+}
+
+class _PivotDetalleScreenState extends State<_PivotDetalleScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final x = widget.x, sel = widget.sel, soloVer = widget.soloVer;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(x.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+        children: [
+          Center(
+            child: AvatarPersona(nombre: x.nombre, foto: x.foto, tamano: 72),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            x.principal
+                ? 'Pivot principal: siempre tiene todas las áreas.'
+                : (soloVer ? 'Para cambiar áreas necesitas "Liga y Pivots".' : 'Qué puede ver y hacer. Recibe avisos solo de estas áreas.'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.textoSecundario),
+          ),
+          const SizedBox(height: 12),
+          Material(
+            color: p.tarjeta,
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final a in areasPivot.entries)
+                  CheckboxListTile(
+                    value: sel.contains(a.key),
+                    secondary: Icon(a.value.$3, color: p.marcaTexto),
+                    title: Text(a.value.$1, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(a.value.$2),
+                    onChanged: soloVer ? null : (v) => setState(() => v == true ? sel.add(a.key) : sel.remove(a.key)),
+                  ),
+              ],
+            ),
+          ),
+          if (!soloVer) ...[
+            const SizedBox(height: 16),
+            FilledButton(onPressed: sel.isEmpty ? null : () => Navigator.of(context).pop('guardar'), child: const Text('Guardar')),
+            if (!x.yo) TextButton(onPressed: () => Navigator.of(context).pop('quitar'), child: const Text('Quitar como Pivot')),
+          ],
+        ],
+      ),
     );
   }
 }
