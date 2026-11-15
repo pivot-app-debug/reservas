@@ -65,7 +65,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
       _Paso(
         dia: '$n',
         titulo: 'Fecha límite',
-        texto: n == 1 ? 'Recordatorio y último día para pagar a tiempo y recibir el punto extra.' : 'Último día para pagar a tiempo y recibir el punto extra.',
+        texto: n == 1 ? 'Recordatorio y último día para pagar a tiempo y recibir la recompensa.' : 'Último día para pagar a tiempo y recibir la recompensa.',
         fuerte: true,
       ),
       if (n < 28) _Paso(dia: '${n + 1}', titulo: 'Aviso de cuota pendiente', texto: 'A quien todavía no pagó.'),
@@ -78,7 +78,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final ejemploRecargo = !_recargoActivo
-        ? 'Sin recargo, pagar tarde no cuesta más: solo se pierde el punto extra.'
+        ? 'Sin recargo, pagar tarde no cuesta más: solo se pierde la recompensa por pagar a tiempo.'
         : 'Desde el día ${_dia + _gracia + 1}, al pagar se ve "Mensualidad + ${_plata(_monto)} de recargo". Cuenta el día en que la persona envía el pago, no el día en que un Pivot lo aprueba.';
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -93,7 +93,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
           Text(
-            'Elige hasta qué día se puede pagar la cuota del mes a tiempo. Quien paga hasta ese día recibe un punto extra.',
+            'Elige hasta qué día se puede pagar la cuota del mes a tiempo. Quien paga hasta ese día recibe la recompensa por pagar a tiempo.',
             style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
           ),
           if (_sinGuardar) ...[
@@ -185,7 +185,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Deja el recargo apagado: los avisos y el punto extra ya motivan a pagar a tiempo. '
+                  'Deja el recargo apagado: los avisos y la recompensa ya motivan a pagar a tiempo. '
                   'Actívalo solo si muchas personas pagan tarde varios meses seguidos, y avísalo al equipo antes. '
                   'Un cambio rige desde que lo guardas; los pagos y puntos anteriores no cambian.',
                   style: TextStyle(height: 1.4, color: p.sobreSuave),

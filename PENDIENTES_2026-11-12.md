@@ -536,8 +536,9 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 
 ## R. Revisión de Victor (2026-11-15, 00:45)
 - [x] Los 15 puntos (tour del Calendario, Nuevo equipo, enlaces de invitación, títulos, subsecciones, reglas fuera del equipo, Viajes, botón "+", carga de Mi Liga, Pivots, fecha límite de pago con punto extra y avisos que la siguen, "Recompensas por pagar a tiempo").
-- [ ] Confirmar con Victor la fecha límite de la liga (hoy sin guardar: se usa el 15).
-- [ ] Sección Recompensas (clases de gracia, bonos, descuentos, premios por asistencia), personalizable por el Pivot.
+- [x] Fecha límite de la liga: 15 (guardada 2026-11-15).
+- [x] Recompensas por pagar a tiempo personalizables: encender o apagar, puntos, clase gratis, saldo a favor (2026-11-15).
+- [ ] Recompensas por asistencia constante o alta (idea del punto 15; falta definir con Victor).
 
 ## Q. Flutter web reemplaza a la PWA vieja (Victor, 2026-11-14 22:11)
 - [x] Web de prueba en /nueva/ (workflow App Web).

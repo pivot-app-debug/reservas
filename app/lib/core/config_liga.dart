@@ -52,6 +52,16 @@ class ConfigLiga extends ChangeNotifier {
   int get cuotaVenceDia => (reglas['cuotaVenceDia'] as num?)?.toInt() ?? 0;
   int get cuotaGraciaDias => (reglas['cuotaGraciaDias'] as num?)?.toInt() ?? 0;
   num get cuotaRecargo => (reglas['cuotaRecargo'] as num?) ?? 0;
+
+  /// Día hasta el que se paga a tiempo (incluido); sin fecha guardada, el 15 (igual que el servidor).
+  int get diaFechaLimite => cuotaVenceDia >= 1 && cuotaVenceDia <= 28 ? cuotaVenceDia : 15;
+
+  /// Recompensas por pagar a tiempo (Victor, 2026-11-15). Sin guardar: 1 punto.
+  Map<String, dynamic> get recompensaPago {
+    final x = reglas['recompensaPago'];
+    return x is Map<String, dynamic> ? x : const {'activa': true, 'puntos': 1, 'claseGratis': false, 'saldo': 0};
+  }
+
   bool get rankingVisible => reglas['rankingVisible'] != false;
 
   /// Clases de gracia por equipo: null = no aplica a ese equipo; 0 = paga antes.

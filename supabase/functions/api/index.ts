@@ -921,7 +921,11 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   // persona envía la solicitud; nunca cambia pagos ya hechos.
   cuotaVenceDia: 0,
   cuotaGraciaDias: 0,
-  cuotaRecargo: 0,
+    cuotaRecargo: 0,
+  // Recompensas por pagar a tiempo (Victor, 2026-11-15): qué recibe quien
+  // envía el pago de su cuota hasta la fecha límite. Se puede combinar.
+  // Un cambio rige para los pagos que se aprueben desde ahora.
+  recompensaPago: { activa: true, puntos: 1, claseGratis: false, saldo: 0 },
     // Privacidad: si las demás personas (no Pivots) ven los puntos de otras.
   rankingVisible: true,
   // Clases de gracia por equipo (Victor, 2026-11-14): cuántas clases puede
@@ -1020,6 +1024,16 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
         if (String(k).trim() && Number.isFinite(n)) g[String(k).trim().slice(0, 60)] = Math.min(10, Math.max(0, n));
       }
       r.graciaClases = g;
+    }
+        if (reglasNuevas.recompensaPago && typeof reglasNuevas.recompensaPago === 'object') {
+      const x = reglasNuevas.recompensaPago, si = (v: unknown) => v === true || v === 'true';
+      const pts = Math.round(Number(x.puntos)), sal = Math.round(Number(x.saldo) * 100) / 100;
+      r.recompensaPago = {
+        activa: si(x.activa),
+        puntos: Number.isFinite(pts) ? Math.min(10, Math.max(0, pts)) : 0,
+        claseGratis: si(x.claseGratis),
+        saldo: Number.isFinite(sal) ? Math.min(1000, Math.max(0, sal)) : 0,
+      };
     }
     if (reglasNuevas.rankingVisible !== undefined) r.rankingVisible = reglasNuevas.rankingVisible !== false && reglasNuevas.rankingVisible !== 'false';
     if (reglasNuevas.tardeCuentaClase !== undefined) r.tardeCuentaClase = reglasNuevas.tardeCuentaClase !== false && reglasNuevas.tardeCuentaClase !== 'false';
@@ -9660,6 +9674,22 @@ async function _estadosCuotaMes(usernames: string[], mes: string): Promise<Recor
 /** Día hasta el que pagar la cuota da 1 punto extra (incluido): la fecha
  *  límite de la liga (`cuotaVenceDia`); sin fecha límite, el 15 (Victor,
  *  2026-11-15: el punto extra va hasta el vencimiento). */
+async function _recompensaPago(): Promise<{ activa: boolean; puntos: number; claseGratis: boolean; saldo: number }> {
+  const x = (await _reglasLiga()).recompensaPago ?? {};
+  const puntos = Math.max(0, Number(x.puntos) || 0), saldo = Math.max(0, Number(x.saldo) || 0), claseGratis = x.claseGratis === true;
+  return { activa: x.activa !== false && (puntos > 0 || claseGratis || saldo > 0), puntos, claseGratis, saldo };
+}
+
+/** "un punto extra", "2 puntos extra y una clase gratis", etc. */
+function _textoRecompensa(x: { puntos: number; claseGratis: boolean; saldo: number }): string {
+  const partes = [
+    ...(x.puntos > 0 ? [x.puntos === 1 ? 'un punto extra' : `${x.puntos} puntos extra`] : []),
+    ...(x.claseGratis ? ['una clase gratis'] : []),
+    ...(x.saldo > 0 ? [`$${x.saldo % 1 === 0 ? x.saldo : x.saldo.toFixed(2)} de saldo a favor`] : []),
+  ];
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : (partes[0] ?? '');
+}
+
 async function _diaPuntoExtra(): Promise<number> {
   const d = Number((await _reglasLiga()).cuotaVenceDia) || 0;
   return d >= 1 && d <= 28 ? d : 15;
@@ -9691,9 +9721,14 @@ async function _recordatoriosCuota(hoyIso: string): Promise<void> {
     tipo: 'cuota_pendiente', include_external_user_ids: usuarios, headings: { es: titulo }, contents: { es: texto }, url: APP_URL + '/?tab=ajustes',
   }) : Promise.resolve();
 
-    const DIA_PUNTO_EXTRA = await _diaPuntoExtra();
-  if (dia === 1) await enviar(deben, `Cuota de ${nombreMes}`, `Ya puedes pagar tu cuota de ${nombreMes}. Si pagas hasta el ${DIA_PUNTO_EXTRA}, recibes un punto extra.`);
-  if (DIA_PUNTO_EXTRA > 2 && dia === DIA_PUNTO_EXTRA - 1) await enviar(deben, 'Último día para tu punto extra', `Mañana es el último día para pagar tu cuota de ${nombreMes} y recibir tu punto extra.`);
+        const DIA_PUNTO_EXTRA = await _diaPuntoExtra();
+  const rec = await _recompensaPago(), premio = rec.activa ? _textoRecompensa(rec) : '';
+  if (dia === 1) await enviar(deben, `Cuota de ${nombreMes}`, premio
+    ? `Ya puedes pagar tu cuota de ${nombreMes}. Si pagas hasta el ${DIA_PUNTO_EXTRA}, recibes ${premio}.`
+    : `Ya puedes pagar tu cuota de ${nombreMes}. La fecha límite es el ${DIA_PUNTO_EXTRA}.`);
+  if (DIA_PUNTO_EXTRA > 2 && dia === DIA_PUNTO_EXTRA - 1) await enviar(deben, premio ? 'Último día para tu recompensa' : 'Mañana es la fecha límite', premio
+    ? `Mañana es el último día para pagar tu cuota de ${nombreMes} y recibir ${premio}.`
+    : `Mañana es el último día para pagar tu cuota de ${nombreMes} a tiempo.`);
   if (dia === DIA_PUNTO_EXTRA + 1) await enviar(deben, `Aún no pagas ${nombreMes}`, `Aún no has pagado tu cuota de ${nombreMes}. Recuerda hacer tu pago.`);
 
     // Clases de gracia usadas (Mi Liga → Cobros, por equipo): ayer fue su
@@ -9764,7 +9799,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
   const id = params.id ?? params.fila;
   const { estado } = params;
   if (!id || !estado) return { exito: false, error: 'Parámetros inválidos.' };
-                const { data: reservaAntes } = await supabase.from('reservas').select('nombre_usuario, id_evento, tipo, monto, medio_pago, medio_nombre, mes_texto, uso_cupon, saldo_aplicado, saldo_movimiento_id, fecha_pago, validez_hasta, punto_extra_en, estado').eq('id', id).maybeSingle();
+                const { data: reservaAntes } = await supabase.from('reservas').select('nombre_usuario, id_evento, tipo, monto, medio_pago, medio_nombre, mes_texto, uso_cupon, saldo_aplicado, saldo_movimiento_id, fecha_pago, validez_hasta, punto_extra_en, recompensa, estado').eq('id', id).maybeSingle();
     // Rechazo con motivo (Victor, 2026-11-13): se guarda y se le avisa de inmediato.
   const motivo = String(params.motivo ?? '').trim().slice(0, 120);
   const mensaje = String(params.mensaje ?? '').trim().slice(0, 400);
@@ -9801,24 +9836,52 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
   // (`fecha_pago`, nunca la fecha de aprobación). Una sola vez por reserva
   // (`punto_extra_en`); si después se cancela, se descuenta. Solo aplica a
   // aprobaciones desde ahora: nada cambia hacia atrás.
-  let ganoPunto = false;
+    // Recompensas por pagar a tiempo (Victor, 2026-11-15): lo que diga
+  // `recompensaPago` al aprobar (puntos, clase gratis, saldo a favor). Lo que
+  // se dio queda en `reservas.recompensa` para deshacer exactamente eso.
+  let premio = '';
     const mesCuota = reservaAntes ? _mesDeReserva(reservaAntes) : '';
   if (estado === 'Confirmada' && reservaAntes?.tipo === 'mensual' && reservaAntes.estado === 'Pendiente' && !reservaAntes.punto_extra_en && /^\d{4}-\d{2}$/.test(mesCuota)) {
         const limite = `${mesCuota}-${String(await _diaPuntoExtra()).padStart(2, '0')}`;
-    if (String(reservaAntes.fecha_pago ?? '').slice(0, 10) && String(reservaAntes.fecha_pago).slice(0, 10) <= limite) {
-      await _acreditarPuntosExtra(reservaAntes.nombre_usuario, Number(mesCuota.slice(0, 4)), Number(mesCuota.slice(5, 7)), 1);
-      await supabase.from('reservas').update({ punto_extra_en: new Date().toISOString() }).eq('id', id);
-      ganoPunto = true;
+    const rec = await _recompensaPago();
+    if (rec.activa && String(reservaAntes.fecha_pago ?? '').slice(0, 10) && String(reservaAntes.fecha_pago).slice(0, 10) <= limite) {
+      const u = reservaAntes.nombre_usuario, dado: Record<string, any> = { puntos: 0, clase: false, saldo: 0, saldoMov: null };
+      if (rec.puntos > 0) {
+        await _acreditarPuntosExtra(u, Number(mesCuota.slice(0, 4)), Number(mesCuota.slice(5, 7)), rec.puntos);
+        dado.puntos = rec.puntos;
+      }
+      if (rec.claseGratis) {
+        // Una sola a la vez: si ya tiene una sin usar, no se acumula.
+        const { data: eq } = await supabase.from('equipo').select('cupon_disponible').eq('username', u).maybeSingle();
+        if (eq && !eq.cupon_disponible) {
+          await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', u);
+          dado.clase = true;
+        }
+      }
+      if (rec.saldo > 0) {
+        const { data: mov } = await supabase.from('saldos_movimientos').insert({
+          username: u, persona_nombre: await _nombrePersona(u), fecha: _hoyEcuadorISO(), monto: _num2(rec.saldo), tipo: 'abono', aplicar: 'aparte',
+          concepto: `Recompensa por pagar a tiempo${reservaAntes.mes_texto ? ` (${reservaAntes.mes_texto})` : ''}`, por: adminEmail,
+        }).select('id').maybeSingle();
+        if (mov?.id) { dado.saldo = rec.saldo; dado.saldoMov = mov.id; }
+      }
+      await supabase.from('reservas').update({ punto_extra_en: new Date().toISOString(), recompensa: dado }).eq('id', id);
+      premio = _textoRecompensa({ puntos: dado.puntos, claseGratis: dado.clase, saldo: dado.saldo });
     }
   } else if (estado === 'Cancelada' && reservaAntes?.punto_extra_en && /^\d{4}-\d{2}$/.test(mesCuota)) {
-    await _acreditarPuntosExtra(reservaAntes.nombre_usuario, Number(mesCuota.slice(0, 4)), Number(mesCuota.slice(5, 7)), -1);
-    await supabase.from('reservas').update({ punto_extra_en: null }).eq('id', id);
+    // Sin `recompensa` guardada (aprobada antes del 2026-11-15) fue 1 punto.
+    const dado = reservaAntes.recompensa ?? { puntos: 1 };
+    const u = reservaAntes.nombre_usuario;
+    if (Number(dado.puntos) > 0) await _acreditarPuntosExtra(u, Number(mesCuota.slice(0, 4)), Number(mesCuota.slice(5, 7)), -Number(dado.puntos));
+    if (dado.clase) await supabase.from('equipo').update({ cupon_disponible: false }).eq('username', u).eq('cupon_disponible', true);
+    if (dado.saldoMov) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: adminEmail }).eq('id', dado.saldoMov);
+    await supabase.from('reservas').update({ punto_extra_en: null, recompensa: null }).eq('id', id);
   }
   // Aviso de pago aprobado (rechazo: arriba, con motivo).
   if (estado === 'Confirmada' && reservaAntes?.estado === 'Pendiente' && reservaAntes.nombre_usuario) {
     const mesTxt = mesCuota ? _MESES_ES[Number(mesCuota.slice(5, 7)) - 1] : String(reservaAntes.mes_texto ?? '').toLowerCase();
     const texto = reservaAntes.tipo === 'mensual'
-      ? `Recibimos tu pago de ${mesTxt}, ¡gracias!${ganoPunto ? ' Ganaste un punto extra por pagar a tiempo.' : ''}`
+      ? `Recibimos tu pago de ${mesTxt}, ¡gracias!${premio ? ` Por pagar a tiempo recibes ${premio}.` : ''}`
       : 'Tu reserva fue confirmada. ¡Nos vemos en la pista!';
     await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario], headings: { es: reservaAntes.tipo === 'mensual' ? 'Pago confirmado' : 'Reserva confirmada' }, contents: { es: texto }, url: APP_URL }).catch(() => {});
   }

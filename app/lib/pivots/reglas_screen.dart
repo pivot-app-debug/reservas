@@ -10,6 +10,8 @@ import '../sesion/sesion.dart';
 import 'buscador_liga.dart';
 import 'categorias_screen.dart';
 import 'editores_liga.dart';
+import 'recompensas_screen.dart';
+
 import 'vencimiento_screen.dart';
 
 /// Reglas de la liga en un solo lugar (Victor, 2026-11-14), por tema y con
@@ -153,7 +155,8 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'puntoExtra',
                   Icons.star_outline_rounded,
                   'Recompensas por pagar a tiempo',
-                  c.cuotaVenceDia == 0 ? 'Quien paga la cuota hasta el 15 suma 1 punto' : 'Quien paga la cuota hasta el día ${c.cuotaVenceDia} suma 1 punto',
+                  resumenRecompensa(c),
+                  editar: () => SubAjustes.abrir(context, RecompensasPagoScreen(config: c)),
                 ),
                 _regla(
                   'quienPaga',
@@ -218,7 +221,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'inactividad',
                   Icons.hourglass_empty_rounded,
                   'Inactividad',
-                  'Pasa a inactiva tras ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
+                  'Pasa a Inactivx tras ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
                   seccion: 'entrenamientos',
                   editar: () => numeroLiga(context, c, 'Pasa a inactiva después de', 'inactividadDias', ConfigLiga.diasInactividad, 7, 365, 'días sin venir'),
                 ),

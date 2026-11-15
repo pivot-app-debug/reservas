@@ -203,6 +203,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Recompensas por pagar a tiempo (2026-11-15)
+- `reglas_liga.recompensaPago = { activa, puntos (0–10), claseGratis, saldo (0–1000) }`; por defecto 1 punto. Servidor: `_recompensaPago()`, `_textoRecompensa()`. Al aprobar una cuota enviada hasta `_diaPuntoExtra()` se da: puntos (`_acreditarPuntosExtra`), clase gratis (`equipo.cupon_disponible`, solo si no tenía una) y saldo a favor (`saldos_movimientos` abono 'aparte'). Lo dado queda en `reservas.recompensa` (migración `20261115193000_reservas_recompensa.sql`); al cancelar se revierte eso (sin `recompensa`, 1 punto como antes).
+- App: `pivots/recompensas_screen.dart` (`RecompensasPagoScreen`, `textoRecompensa`, `resumenRecompensa`); `ConfigLiga.diaFechaLimite` y `recompensaPago`.
+- Liga: `cuotaVenceDia` = 15 guardado el 2026-11-15 a pedido de Victor.
+
 ## Revisión 2026-11-15: fecha límite, equipos y subsecciones
 - **Fecha límite de pago** (`pivots/vencimiento_screen.dart`): calendario 1–28 (`_Calendario`), mes de ejemplo dinámico, recargo y días de margen en una sola tarjeta. Guarda `cuotaVenceDia`, `cuotaGraciaDias` (0 sin recargo) y `cuotaRecargo` en `reglas_liga`. Resumen en `textoVencimiento()` (`editores_liga.dart`).
 - Servidor: `_diaPuntoExtra()` devuelve `cuotaVenceDia` si está entre 1 y 28, si no 15. Lo usan `_recordatoriosCuota` (aviso el 1, el día anterior y el siguiente) y el tope del punto extra. Rige desde que se guarda; los puntos ya dados no cambian.

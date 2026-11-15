@@ -50,6 +50,13 @@ const entradasLiga = [
     'tarde minutos llegar atraso lista tolerancia de llegada',
     dentro: 'reglas',
   ),
+  EntradaAjuste(
+    'puntoExtra',
+    'Recompensas por pagar a tiempo',
+    'Mi Liga › Reglas',
+    'punto extra premio bono descuento clase gratis saldo a favor pronto pago',
+    dentro: 'reglas',
+  ),
   EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),
   EntradaAjuste('minimo', 'Pocas personas en un evento', 'Mi Liga › Reglas', 'cancelar mínimo personas evento', dentro: 'reglas'),
   EntradaAjuste('inactividad', 'Inactividad', 'Mi Liga › Reglas', 'inactivos días sin venir', dentro: 'reglas'),

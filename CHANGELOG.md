@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-15 (recompensas por pagar a tiempo)
+- **Fecha límite de pago de la liga: día 15** (guardada; antes no había ninguna y se usaba 15 por defecto). Se edita en Reglas → Fecha límite de pago.
+- **Recompensas por pagar a tiempo** (Reglas → Cobros): encender o apagar, y qué se recibe, combinable: puntos extra (1, 2, 3 o 5), clase gratis (no se acumula) y saldo a favor (monto). Se gana pagando hasta la fecha límite incluida. Rige para los pagos que se aprueben desde que se guarda; si el pago se cancela, se quita exactamente lo que se dio (`reservas.recompensa`). Los avisos de cuota dicen la recompensa elegida.
+- Texto "Pasa a inactiva" corregido a "Pasa a Inactivx".
+
 ## 2026-11-15 (revisión de Victor, 15 puntos)
 - **Fecha límite de pago** (antes "Vencimiento de la cuota"): el día se elige en un calendario del 1 al 28 (sin + y −) y "Así se ve un mes" se arma con ese día. **El punto extra y los avisos ahora siguen la fecha límite** (antes eran fijos 1, 14, 15 y 16): aviso el día 1, último aviso el día anterior, punto extra hasta la fecha límite y aviso de pendiente el día siguiente. Sin fecha guardada se usa el 15. Los días de margen y el recargo quedan juntos dentro de "Recargo por pagar tarde".
 - **Ajustes de un equipo:** solo nombre, mantener/subir/bajar, orden, tarjeta "Invita a jugar" (compartir o copiar el enlace) y "Ver las reglas de <equipo>". El cobro, la asistencia y el equipamiento se editan en Reglas.
