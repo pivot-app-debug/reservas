@@ -4,11 +4,8 @@ import '../ajustes/componentes.dart';
 import '../core/config_liga.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
-import '../equipo/inventario_modelos.dart';
-import '../equipo/inventario_screen.dart';
 import '../sesion/sesion.dart';
 import 'buscador_liga.dart';
-import 'categorias_screen.dart';
 import 'cobro_equipo_screen.dart';
 
 import 'editores_liga.dart';
@@ -33,7 +30,7 @@ class ReglasScreen extends StatefulWidget {
 }
 
 class _ReglasScreenState extends State<ReglasScreen> {
-  late String? _equipo = widget.equipo;
+  late final String? _equipo = widget.equipo;
   List<String> _equipos = const [];
   List<Map<String, dynamic>> _tiers = const [];
   final _resaltado = ValueNotifier<String?>(null);
@@ -132,7 +129,6 @@ class _ReglasScreenState extends State<ReglasScreen> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final c = ConfigLiga.de(s);
-    final gracia = c.graciaPorEquipo;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -148,31 +144,12 @@ class _ReglasScreenState extends State<ReglasScreen> {
           padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
           children: [
             Text(
-              'Cómo funciona la liga: cobros, asistencia, puntos, equipamiento y privacidad. Un cambio rige desde que lo guardas; lo anterior no cambia.',
+              'Las reglas de toda la liga. Lo de cada equipo (cobros, clases de gracia, equipamiento, puntos y requisitos) está dentro de cada equipo en Mi Liga. Un cambio rige desde que lo guardas; lo anterior no cambia.',
               style: TextStyle(fontSize: 14, height: 1.4, color: p.texto),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  for (final e in [null, ..._equipos])
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        showCheckmark: false,
-                        label: Text(e ?? 'Toda la liga'),
-                        selected: _equipo == e,
-                        onSelected: (_) => setState(() => _equipo = e),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
             GrupoAjustes(
-              titulo: 'Cobros',
+              titulo: 'Pagos',
               filas: [
                 _regla(
                   'vencimiento',
@@ -181,51 +158,24 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   textoVencimiento(c),
                   editar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
                 ),
-
-                for (final e in _equipos)
-                  _regla(
-                    'cobro_$e',
-                    Icons.payments_outlined,
-                    'Cómo paga',
-                    textoCobroEquipo(c, e),
-                    equipo: e,
-                    editar: () => SubAjustes.abrir(context, CobroEquipoScreen(config: c, equipo: e)),
-                  ),
-                for (final e in (_equipos.isEmpty ? gracia.keys : _equipos))
-                  _regla(
-                    'gracia_$e',
-                    Icons.redeem_outlined,
-                    'Clases de gracia',
-                    gracia[e] == null
-                        ? 'No usa: sigue su regla de pago'
-                        : (gracia[e] == 0
-                              ? 'Debe pagar antes de marcar Asistiré'
-                              : '${gracia[e]} ${gracia[e] == 1 ? 'clase' : 'clases'} al mes sin haber pagado; después debe pagar'),
-                    equipo: e,
-                    editar: () => editarGracia(context, s, c, soloEquipo: e),
-                  ),
                 _regla(
-                  'seisClases',
+                  'reservas',
                   Icons.event_available_outlined,
-                  'Clases para reservar',
-                  'Se ven las ${c.reservaClasesVisibles} próximas; ${c.reservaCierraHoras == 0 ? 'se puede reservar hasta que empieza' : 'se cierra ${c.reservaCierraHoras} ${c.reservaCierraHoras == 1 ? 'hora' : 'horas'} antes de empezar'}',
+                  'Reservas por clase',
+                  'Se ven las ${c.reservaClasesVisibles} próximas; ${c.reservaCierraHoras == 0 ? 'se reserva hasta que empieza' : 'cierra ${c.reservaCierraHoras} ${c.reservaCierraHoras == 1 ? 'hora' : 'horas'} antes'}; sin aprobar se cierra ${c.sinAprobarHoras} ${c.sinAprobarHoras == 1 ? 'hora' : 'horas'} después',
                   editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
                 ),
                 _regla(
                   'cupon',
                   Icons.local_activity_outlined,
                   'Clase gratis de bienvenida',
-                  'Una por persona nueva; ${c.cuponCancelarMin == 0 ? 'vuelve siempre que cancele' : 'vuelve si cancela con ${c.cuponCancelarMin % 60 == 0 ? '${c.cuponCancelarMin ~/ 60} ${c.cuponCancelarMin == 60 ? 'hora' : 'horas'}' : '${c.cuponCancelarMin} minutos'} de anticipación'}',
-                  editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
-                ),
-                _regla(
-                  'sinAprobar',
-                  Icons.cancel_outlined,
-                  'Reserva sin aprobar',
-                  '${c.sinAprobarHoras} ${c.sinAprobarHoras == 1 ? 'hora' : 'horas'} después de la clase se cancela; si vino, queda la deuda',
-                  editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
+                  !c.cuponBienvenida
+                      ? 'Apagada'
+                      : (!c.cuponVuelve ? 'Una por persona nueva; no vuelve si cancela' : 'Una por persona nueva; vuelve si cancela a tiempo'),
+                  editar: () => SubAjustes.abrir(context, ClaseBienvenidaScreen(config: c)),
                 ),
                 _regla('sinReserva', Icons.person_off_outlined, 'Vino sin reserva', 'Si debía pagar esa clase, queda la deuda del valor por clase'),
+                _regla('sinPago', Icons.how_to_reg_outlined, 'Asistiré sin pago', 'Si paga por mes y no ha pagado, al marcar Asistiré se le pide pagar'),
               ],
             ),
             const SizedBox(height: 16),
@@ -248,30 +198,43 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   seccion: 'entrenamientos',
                 ),
                 for (final r in _recompensas)
-                  if (_equipo == null || r.equipo == null || r.equipo == _equipo)
-                    Resaltable(
-                      id: 'rec_${r.id}',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        icono: Icons.emoji_events_outlined,
-                        seccion: 'entrenamientos',
-                        titulo: r.nombre,
-                        valor: '${r.resumen}${r.otorgadas > 0 ? ' · ${r.otorgadas} ${r.otorgadas == 1 ? 'vez' : 'veces'} dada' : ''}',
-                        derecha: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ChipAlcance(equipo: r.equipo),
-                            Switch(value: r.activa, onChanged: (v) => _activarRecompensa(r, v)),
-                          ],
-                        ),
-                        alTocar: () => _abrirRecompensa(r),
+                  Resaltable(
+                    id: 'rec_${r.id}',
+                    resaltado: _resaltado,
+                    child: FilaAjuste(
+                      icono: Icons.emoji_events_outlined,
+                      seccion: 'entrenamientos',
+                      titulo: r.nombre,
+                      valor: '${r.resumen}${r.otorgadas > 0 ? ' · ${r.otorgadas} ${r.otorgadas == 1 ? 'vez' : 'veces'} dada' : ''}',
+                      derecha: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ChipAlcance(equipo: r.equipo),
+                          Switch(value: r.activa, onChanged: (v) => _activarRecompensa(r, v)),
+                        ],
                       ),
+                      alTocar: () => _abrirRecompensa(r),
                     ),
+                  ),
                 FilaAjuste(
                   icono: Icons.add_rounded,
                   titulo: 'Nueva recompensa',
                   valor: 'Premia la asistencia con puntos, clases o descuentos',
                   alTocar: _abrirRecompensa,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GrupoAjustes(
+              titulo: 'Estados',
+              filas: [
+                _regla(
+                  'estados',
+                  Icons.person_pin_outlined,
+                  'Estados',
+                  'Lesionadx, De viaje, Enfermedad, Situación personal, Otro e Inactividad',
+                  seccion: 'entrenamientos',
+                  editar: () => SubAjustes.abrir(context, EstadosScreen(config: c)),
                 ),
               ],
             ),
@@ -312,83 +275,6 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   c.eventosMinPersonas == 0 ? 'No se sugiere cancelar' : 'Con menos de ${c.eventosMinPersonas}, se sugiere cancelar',
                   seccion: 'entrenamientos',
                   editar: () => numeroLiga(context, c, 'Sugerir cancelar con menos de', 'eventosMinPersonas', c.eventosMinPersonas, 0, 200, 'personas'),
-                ),
-                _regla(
-                  'inactividad',
-                  Icons.hourglass_empty_rounded,
-                  'Inactividad',
-                  'Pasa a Inactivx tras ${ConfigLiga.diasInactividad} días sin venir a ningún evento',
-                  seccion: 'entrenamientos',
-                  editar: () => numeroLiga(context, c, 'Pasa a inactiva después de', 'inactividadDias', ConfigLiga.diasInactividad, 7, 365, 'días sin venir'),
-                ),
-                _regla(
-                  'sinPago',
-                  Icons.how_to_reg_outlined,
-                  'Asistiré sin pago',
-                  'Si paga por mes y no ha pagado, al marcar Asistiré se le pide pagar',
-                  seccion: 'entrenamientos',
-                ),
-                for (final e in estadosEditables.entries)
-                  _regla(
-                    'estado_${e.key}',
-                    e.value.$1,
-                    e.key,
-                    textoEstado(c, e.key),
-                    seccion: 'entrenamientos',
-                    editar: () => SubAjustes.abrir(context, EstadoScreen(config: c, estado: e.key)),
-                  ),
-                _regla(
-                  'reactivar',
-                  Icons.directions_run_rounded,
-                  'Volver a Activx',
-                  'Si viene a entrenar (a horario o tarde) estando en otro estado, vuelve a Activx y usa su clase de gracia o queda con deuda si no pagó',
-                  seccion: 'entrenamientos',
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GrupoAjustes(
-              titulo: 'Puntos y equipos',
-              filas: [
-                _regla(
-                  'equipos',
-                  Icons.workspace_premium_outlined,
-                  'Requisitos de cada equipo',
-                  'Qué pide cada uno para mantenerse, subir o bajar, y cuántos puntos da asistir',
-                  editar: () => SubAjustes.abrir(context, CategoriasScreen(sesion: s)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GrupoAjustes(
-              titulo: 'Equipamiento',
-              filas: [
-                // Equipamiento propio de cada equipo (antes "Entrar con el enlace", Victor 2026-11-15).
-                for (final t in _tiers.where((t) => t['es_default'] != true))
-                  _regla(
-                    'propio_${t['nombre']}',
-                    Icons.roller_skating_outlined,
-                    'Equipamiento propio',
-                    () {
-                      final req = (t['requisitos'] as Map?) ?? const {};
-                      final x = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'].join(' y ');
-                      return x.isEmpty
-                          ? 'No pide equipamiento propio'
-                          : 'Pide $x propios. Quien usa los del club pasa a ${_tiers.lastWhere((e) => e['es_default'] == true, orElse: () => t)['nombre']}';
-                    }(),
-                    equipo: '${t['nombre']}',
-                    seccion: 'equipamiento',
-                    editar: () async {
-                      if (await editarEquipamientoPropio(context, s, t)) _cargarEquipos();
-                    },
-                  ),
-                _regla(
-                  'prestamo',
-                  Icons.handshake_outlined,
-                  'Préstamo de equipamiento',
-                  'Cuándo puede pedir equipamiento del club cada equipo',
-                  seccion: 'equipamiento',
-                  editar: () => SubAjustes.abrir(context, ReglasPrestamoScreen(repo: InventarioRepo(s))),
                 ),
               ],
             ),

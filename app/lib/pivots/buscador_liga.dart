@@ -60,10 +60,19 @@ const entradasLiga = [
   ),
   EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),
   EntradaAjuste('minimo', 'Pocas personas en un evento', 'Mi Liga › Reglas', 'cancelar mínimo personas evento', dentro: 'reglas'),
-  EntradaAjuste('inactividad', 'Inactividad', 'Mi Liga › Reglas', 'inactivos días sin venir', dentro: 'reglas'),
-  EntradaAjuste('gracia_Quindes', 'Clases de gracia', 'Mi Liga › Reglas', 'gracia gratis sin pagar primera clase cuota equipo', dentro: 'reglas'),
+  EntradaAjuste(
+    'estados',
+    'Estados',
+    'Mi Liga › Reglas',
+    'lesionadx lesión viaje enfermedad situación personal otro inactividad inactivos pausado aprobar',
+    dentro: 'reglas',
+  ),
+  EntradaAjuste('reservas', 'Reservas por clase', 'Mi Liga › Reglas', 'reservar clases cierre sin aprobar próximas', dentro: 'reglas'),
+  EntradaAjuste('cupon', 'Clase gratis de bienvenida', 'Mi Liga › Reglas', 'cupón primera clase gratis nueva persona cancelar', dentro: 'reglas'),
+  EntradaAjuste('equipos', 'Clases de gracia', 'Mi Liga › Equipos › cada equipo', 'gracia gratis sin pagar primera clase cuota equipo'),
   EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
-  EntradaAjuste('prestamo', 'Préstamo de equipamiento', 'Mi Liga › Reglas', 'prestar patines protecciones excepcional emergencia', dentro: 'reglas'),
+  EntradaAjuste('equipos', 'Préstamo de equipamiento', 'Mi Liga › Equipos › cada equipo', 'prestar patines protecciones excepcional emergencia'),
+  EntradaAjuste('equipos', 'Cobros de un equipo', 'Mi Liga › Equipos › cada equipo', 'cómo paga mensualidad por clase precio propio exentos no pagan cuota'),
   // Dentro de Equipos y puntos.
   EntradaAjuste(
     'corte',

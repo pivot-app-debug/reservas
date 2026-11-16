@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'reglas_screen.dart';
-import 'cobro_equipo_screen.dart' show modosCobro;
+import 'cobro_equipo_screen.dart' show modosCobro, CobroEquipoScreen, textoCobroEquipo;
+import '../equipo/inventario_modelos.dart';
+import '../equipo/inventario_screen.dart';
+import '../ajustes/componentes.dart' show SubAjustes;
+
 import '../core/config_liga.dart';
 
 import 'editores_liga.dart';
@@ -1114,6 +1117,80 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         'si no, entra a $_nombreDebajo y se le explica por qué.';
   }
 
+  /// Cobros, clase de gracia, equipamiento y lo de toda la liga que afecta
+  /// al equipo (antes en Reglas → "Puntos y equipos").
+  List<Widget> _reglasDelEquipo(BuildContext context) {
+    final c = ConfigLiga.de(s);
+    final porMes = const {'mes', 'elige', 'segun_equipamiento'}.contains('${c.cobroEquipo(_nombre)['modo']}');
+    final g = c.graciaClases(_nombre);
+    final req = (t['requisitos'] as Map?) ?? const {};
+    final propio = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'].join(' y ');
+    Future<void> abrir(Widget w) async {
+      await SubAjustes.abrir(context, w);
+      if (mounted) setState(() {});
+    }
+
+    return [
+      const SizedBox(height: 8),
+      const _Seccion('PAGOS'),
+      _Fila(
+        icono: Icons.payments_outlined,
+        titulo: 'Cobros',
+        texto: textoCobroEquipo(c, _nombre),
+        alTocar: () => abrir(CobroEquipoScreen(config: c, equipo: _nombre)),
+      ),
+      if (porMes)
+        _Fila(
+          icono: Icons.redeem_outlined,
+          titulo: 'Clases de gracia',
+          texto: g == null
+              ? 'No usa clases de gracia'
+              : (g == 0 ? 'Debe pagar antes de marcar Asistiré' : '$g ${g == 1 ? 'clase' : 'clases'} al mes sin haber pagado'),
+          alTocar: () async {
+            await editarGracia(context, s, c, soloEquipo: _nombre);
+            if (mounted) setState(() {});
+          },
+        ),
+      const SizedBox(height: 8),
+      const _Seccion('EQUIPAMIENTO'),
+      if (!_piso)
+        _Fila(
+          icono: Icons.roller_skating_outlined,
+          titulo: 'Equipamiento propio',
+          texto: propio.isEmpty ? 'No pide equipamiento propio' : 'Pide $propio propios',
+          alTocar: () async {
+            if (await editarEquipamientoPropio(context, s, t) && mounted) {
+              final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
+              final nuevo = (r['tiers'] as List? ?? const []).whereType<Map>().where((x) => x['id'] == t['id']);
+              if (mounted && nuevo.isNotEmpty) setState(() => t = Map<String, dynamic>.from(nuevo.first));
+            }
+          },
+        ),
+      _Fila(
+        icono: Icons.handshake_outlined,
+        titulo: 'Préstamo de equipamiento',
+        texto: 'Cuándo puede pedir equipamiento del club',
+        alTocar: () => abrir(ReglasPrestamoScreen(repo: InventarioRepo(s))),
+      ),
+      const SizedBox(height: 8),
+      const _Seccion('DE TODA LA LIGA'),
+      for (final (id, icono, titulo, texto) in const [
+        ('puntos', Icons.star_outline_rounded, 'Puntos por asistencia', 'Cuántos puntos da venir a horario o tarde'),
+        ('queCuenta', Icons.event_available_outlined, 'Qué cuenta como clase', 'Qué eventos suman para los requisitos'),
+        ('corte', Icons.event_repeat_rounded, 'Cuándo se aplican los cambios', 'Cuándo se sube o baja de equipo'),
+        ('historial', Icons.history_rounded, 'Historial de cambios', 'Últimos 6 meses'),
+      ])
+        _Fila(
+          icono: icono,
+          titulo: titulo,
+          texto: '$texto · cambia para todos los equipos',
+          alTocar: () => id == 'historial'
+              ? Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => HistorialAjustesScreen(sesion: s)))
+              : abrir(CategoriasScreen(sesion: s, resaltar: id)),
+        ),
+    ];
+  }
+
   String get _inicial => '${widget.tiers.firstWhere((x) => x['es_default'] == true, orElse: () => widget.tiers.last)['nombre']}';
   List<_Persona> get _miembros => widget.gente.where((x) => x.categoria == _nombre && x.evaluable && !x.usaEquipo).toList();
   List<_Persona> get _candidatos => _debajo == null ? const [] : widget.gente.where((x) => x.categoria == _nombreDebajo && x.evaluable).toList();
@@ -1399,17 +1476,9 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 4),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ReglasScreen(sesion: s, equipo: _nombre),
-                ),
-              ),
-              icon: const Icon(Icons.rule_folder_outlined),
-              label: Text('Ver las reglas de $_nombre'),
-            ),
+            // Reglas del equipo dentro del equipo (Victor, 2026-11-16); las
+            // de toda la liga que lo afectan, con su etiqueta.
+            ..._reglasDelEquipo(context),
             if (!_piso) ...[
               const SizedBox(height: 16),
               Center(

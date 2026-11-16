@@ -948,17 +948,23 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   // Estados (Victor, 2026-11-15): si congelan el equipo y si eximen de la
   // cuota. Lesionadx siempre exime; Ausente nunca congela.
   estados: {
-    'Lesionadx': { congela: true, exentaCuota: true },
-    'De viaje': { congela: true, exentaCuota: false },
-    'Ausente': { congela: false, exentaCuota: false },
-    'Enfermedad': { activo: true, congela: true, exentaCuota: true },
-    'Situación personal': { activo: true, congela: true, exentaCuota: true },
-    'Otro': { activo: true, congela: false, exentaCuota: false },
+        // aprobacion (Victor, 2026-11-16): el pedido llega a un Pivot y el estado
+    // cambia recién cuando lo aprueba.
+    'Lesionadx': { congela: true, exentaCuota: true, aprobacion: true },
+    'De viaje': { congela: true, exentaCuota: false, aprobacion: false },
+    'Ausente': { congela: false, exentaCuota: false, aprobacion: false },
+    'Enfermedad': { activo: true, congela: true, exentaCuota: true, aprobacion: true },
+    'Situación personal': { activo: true, congela: true, exentaCuota: true, aprobacion: true },
+    'Otro': { activo: true, congela: false, exentaCuota: false, aprobacion: true },
   },
   // Reservas (antes fijas en el código).
   reservaClasesVisibles: 6,   // próximas clases que se pueden reservar
   reservaCierraHoras: 2,      // se deja de reservar N horas antes de empezar
-  cuponCancelarMin: 60,       // el cupón vuelve si cancela con esta anticipación
+    cuponCancelarMin: 60,       // el cupón vuelve si cancela con esta anticipación
+  // Clase gratis de bienvenida (Victor, 2026-11-16): si se da a quien se
+  // inscribe y si vuelve al cancelar. Apagar no quita las ya dadas.
+  cuponBienvenida: true,
+  cuponVuelve: true,
   sinAprobarHoras: 2,         // reserva sin aprobar: se cierra N horas después de la clase
     // Privacidad: si las demás personas (no Pivots) ven los puntos de otras.
   rankingVisible: true,
@@ -1050,7 +1056,8 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
           ...(e[k] ?? {}),
           ...(v.congela !== undefined ? { congela: si(v.congela) } : {}),
           ...(ESTADOS_NUEVOS.includes(k) && v.exentaCuota !== undefined ? { exentaCuota: si(v.exentaCuota) } : {}),
-          ...(ESTADOS_NUEVOS.includes(k) && v.activo !== undefined ? { activo: si(v.activo) } : {}),
+                    ...(ESTADOS_NUEVOS.includes(k) && v.activo !== undefined ? { activo: si(v.activo) } : {}),
+          ...(k !== 'De viaje' && v.aprobacion !== undefined ? { aprobacion: si(v.aprobacion) } : {}),
         };
       }
       r.estados = e;
@@ -1064,6 +1071,7 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
       if (t.length && t.reduce((s: number, x: any) => s + x.pct, 0) <= 100) r.repartoViaje = t;
     }
     entero('reservaClasesVisibles', 1, 20); entero('reservaCierraHoras', 0, 48); entero('cuponCancelarMin', 0, 1440); entero('sinAprobarHoras', 1, 72);
+    for (const k of ['cuponBienvenida', 'cuponVuelve']) if (reglasNuevas[k] !== undefined) r[k] = reglasNuevas[k] !== false;
     if (reglasNuevas.cobroEquipos && typeof reglasNuevas.cobroEquipos === 'object') {
       const modos = ['mes', 'clase', 'elige', 'segun_equipamiento', 'sin_cobro'];
       const precio = (v: unknown) => { if (v == null || v === '') return null; const n = Math.round(Number(v) * 100) / 100; return Number.isFinite(n) && n >= 0 ? Math.min(100000, n) : null; };
@@ -1557,7 +1565,8 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
   const row: Record<string, any> = {
     username: nombre, email, pronombres, prefijo, telefono,
     necesita_patines: necesitaPatines, talla, necesita_protecciones: necesitaProtecciones,
-    cupon_disponible: true, permisos_configurados: true,
+    // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16).
+    cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false, permisos_configurados: true,
     fecha_registro: new Date().toISOString(),
   };
     if (pinHash && pinHash.length === 64) row.pin_hash = pinHash;
@@ -1630,7 +1639,8 @@ async function inscribirPersonaExpress(params: Record<string, any>): Promise<Rec
   const row: Record<string, any> = {
     username: nombre, email: '', pronombres, prefijo: '', telefono: '',
     necesita_patines: necesitaPatines, talla, necesita_protecciones: necesitaProtecciones,
-    cupon_disponible: true, permisos_configurados: true,
+    // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16).
+    cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false, permisos_configurados: true,
     fecha_registro: new Date().toISOString(), pin_hash: pinHash,
   };
 
@@ -2651,7 +2661,7 @@ async function adminBandeja(params: Record<string, any>): Promise<Record<string,
         supabase.from('rectificaciones_asistencia').select('id, nombre, id_evento, fecha_evento, estado_solicitado, created_at').eq('decision', 'Pendiente')
       .gte('created_at', new Date(Date.now() - (await _diasRectificacion()) * 86400000).toISOString()).order('created_at', { ascending: true }),
     supabase.from('solicitudes_excepcion').select('id, nombre, tipo, datos, mes_aplicacion, created_at, admins_destino').eq('estado', 'pendiente').order('created_at', { ascending: true }),
-    supabase.from('equipo').select('username').eq('solicitud_lesion_pendiente', true).is('eliminado_en', null),
+        supabase.from('equipo').select('username, solicitud_estado, solicitud_estado_en').or('solicitud_lesion_pendiente.eq.true,solicitud_estado.not.is.null').is('eliminado_en', null),
     supabase.from('asignaciones_tareas').select('id, tarea_id, nombre_usuario, fecha_envio').eq('estado', 'pendiente_revision').order('fecha_envio', { ascending: true }),
   ]);
     const excVisibles: any[] = [];
@@ -2703,7 +2713,7 @@ async function adminBandeja(params: Record<string, any>): Promise<Record<string,
     })),
     rectificaciones: (rect.data ?? []).map((r: any) => ({ id: r.id, ...persona(r.nombre), estadoSolicitado: r.estado_solicitado, fechaEvento: r.fecha_evento, creada: r.created_at, evento: evento(r.id_evento) })),
     excepciones: excVisibles.map((r: any) => ({ id: r.id, ...persona(r.nombre), tipo: r.tipo, datos: r.datos, mesAplicacion: r.mes_aplicacion, creada: r.created_at })),
-    lesiones: (les.data ?? []).map((r: any) => ({ ...persona(r.username) })),
+        lesiones: (les.data ?? []).map((r: any) => ({ ...persona(r.username), estado: r.solicitud_estado ?? 'Lesionadx', creada: r.solicitud_estado_en ?? null })),
         prestamos: prestPendAjenos.map((p: any) => ({ id: p.id, ...persona(p.username), articulo: p.articulo, detalle: p.detalle ?? '', creada: p.created_at, tipo: p.tipo ?? 'salida', motivo: p.motivo ?? '', permanente: !!p.permanente })),
     tareas: (asig.data ?? []).map((a: any) => ({
       idAsignacion: a.id, ...persona(a.nombre_usuario), enviada: a.fecha_envio,
@@ -5061,7 +5071,7 @@ async function cancelarReserva(params: Record<string, any>): Promise<Record<stri
   // cualquiera que cancelara una reserva confirmada, la hubiera pagado con
   // cupón o no. Al reagendar, el cupón viaja con la reserva.
   let cuponRestaurado = false;
-    if (r.uso_cupon && r.id_evento && (await _faltaAlMenos(r.id_evento, Number((await _reglasLiga()).cuponCancelarMin) || 0))) {
+        if (r.uso_cupon && r.id_evento && (await _reglasLiga()).cuponVuelve !== false && (await _faltaAlMenos(r.id_evento, Number((await _reglasLiga()).cuponCancelarMin) || 0))) {
     await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', nombre);
     cuponRestaurado = true;
   }
@@ -5300,7 +5310,8 @@ async function cancelarMiSolicitud(params: Record<string, any>): Promise<Record<
   } else if (tipo === 'prestamo') {
     r = await supabase.from('inventario_prestamos').update({ estado: 'cancelado' }).eq('id', id).eq('username', yo).eq('estado', 'pendiente').select('id');
   } else if (tipo === 'lesion') {
-    r = await supabase.from('equipo').update({ solicitud_lesion_pendiente: false }).eq('username', yo).eq('solicitud_lesion_pendiente', true).select('username');
+        r = await supabase.from('equipo').update({ solicitud_lesion_pendiente: false, solicitud_estado: null }).eq('username', yo)
+      .or('solicitud_lesion_pendiente.eq.true,solicitud_estado.not.is.null').select('username');
   } else {
     return { exito: false, error: 'Esta solicitud no se puede cancelar.' };
   }
@@ -6053,10 +6064,17 @@ const ESTADOS_NUEVOS = ['Enfermedad', 'Situación personal', 'Otro'];
 const ESTADOS_MIEMBRO = ['Activx', 'Ausente', 'Lesionadx', ...ESTADOS_NUEVOS];
 
 /** Qué hace un estado: si congela el equipo y si exime de la cuota. */
-function _cfgEstado(reglas: Record<string, any>, estado: string): { activo: boolean; congela: boolean; exentaCuota: boolean } {
-  const base = (REGLAS_LIGA_BASE.estados ?? {})[estado] ?? { activo: true, congela: false, exentaCuota: false };
+function _cfgEstado(reglas: Record<string, any>, estado: string): { activo: boolean; congela: boolean; exentaCuota: boolean; aprobacion: boolean } {
+  const base = (REGLAS_LIGA_BASE.estados ?? {})[estado] ?? { activo: true, congela: false, exentaCuota: false, aprobacion: false };
   const c = { ...base, ...((reglas.estados ?? {})[estado] ?? {}) };
-  return { activo: c.activo !== false, congela: c.congela === true, exentaCuota: c.exentaCuota === true };
+  return { activo: c.activo !== false, congela: c.congela === true, exentaCuota: c.exentaCuota === true, aprobacion: c.aprobacion === true };
+}
+
+/** Campos al entrar a un estado pedido (Lesionadx o uno de los nuevos). */
+async function _camposEntradaEstado(fila: Record<string, any> | null, estado: string): Promise<Record<string, any>> {
+  if (estado === 'Lesionadx') return { ..._camposSalidaEstado(fila, estado), ..._camposEntradaLesion(fila), solicitud_estado: null };
+  const cfg = _cfgEstado(await _reglasLiga(), estado);
+  return { ..._camposSalidaEstado(fila, estado), estado_miembro: estado, exenta_cuota: cfg.exentaCuota, solicitud_estado: null };
 }
 
 // ─── Transiciones de estado_miembro (helpers compartidos) ────────────────────
@@ -6289,6 +6307,25 @@ async function autodeclararEstado(params: Record<string, any>): Promise<Record<s
   if (!fila) return { exito: false, error: 'Usuarix no encontradx.' };
   if (fila.estado_miembro === 'Técnico') return { exito: true, sinCambio: true, estado: 'Técnico' };
 
+    // Estados que aprueba un Pivot (Victor, 2026-11-16): queda el pedido y el
+  // estado cambia al aprobarlo. Un Pivot que pide algo para sí sigue la regla
+  // de Pivots y permisos.
+  if ((estado === 'Lesionadx' || ESTADOS_NUEVOS.includes(estado)) && fila.estado_miembro !== estado) {
+    const cfg = _cfgEstado(await _reglasLiga(), estado);
+    if (estado !== 'Lesionadx' && !cfg.activo) return { exito: false, error: 'Ese estado no está disponible.' };
+    if (cfg.aprobacion && !(await _pedidoDePivot(username)).auto) {
+      const { error: e1 } = await supabase.from('equipo').update({ solicitud_estado: estado, solicitud_estado_en: new Date().toISOString() }).eq('username', username);
+      if (e1) return { exito: false, error: e1.message };
+      const { data: f } = await supabase.from('equipo').select('nombre_derby').eq('username', username).maybeSingle();
+      await sendPush({
+        tipo: 'avisos_admin', include_external_user_ids: await _adminDestinatariosPush(undefined, 'salud', 'lesiones'),
+        headings: { es: 'Pedido de estado' },
+        contents: { es: `${f?.nombre_derby || username} pide pasar a ${estado === 'Lesionadx' ? 'Lesionadx' : 'otro estado por un tiempo'}. Revísalo en Notificaciones.` },
+        url: APP_URL + '/',
+      }).catch(() => {});
+      return { exito: true, pendiente: true, estado: fila.estado_miembro ?? 'Activx', pedido: estado };
+    }
+  }
   let update: Record<string, any>;
   if (estado === 'Lesionadx') update = { ..._camposSalidaEstado(fila, estado), ..._camposEntradaLesion(fila) };
     else if (estado === 'De viaje') update = { ..._camposSalidaEstado(fila, estado), estado_miembro: 'De viaje', viaje_desde: desde, viaje_hasta: hasta };
@@ -7106,10 +7143,18 @@ async function adminAprobarLesion(params: Record<string, any>): Promise<Record<s
   if (!nombre) return { exito: false, error: 'Parámetros inválidos.' };
   const { data: fila } = await supabase.from('equipo').select(SELECT_ESTADO_MIEMBRO).eq('username', nombre).maybeSingle();
   if (!fila) return { exito: false, error: 'No existe esa persona.' };
-  // Mismos campos que cualquier entrada a Lesionadx (antes no guardaba
-  // `categoria_pre_lesion`).
-  const { error } = await supabase.from('equipo').update({ ..._camposSalidaEstado(fila, 'Lesionadx'), ..._camposEntradaLesion(fila) }).eq('username', nombre);
+    // Pedido de estado (Lesionadx o uno de los nuevos, 2026-11-16) o la
+  // solicitud de lesión vieja.
+  const { data: ped } = await supabase.from('equipo').select('solicitud_estado').eq('username', nombre).maybeSingle();
+  const estado = String(ped?.solicitud_estado ?? 'Lesionadx');
+  const u = await _camposEntradaEstado(fila, estado);
+  const { error } = await supabase.from('equipo').update(u).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
+  await _notificarCambioEstadoMiembro(nombre, fila.estado_miembro, estado);
+  await sendPush({
+    tipo: 'solicitud_resuelta', include_external_user_ids: [nombre],
+    headings: { es: 'Pedido aprobado' }, contents: { es: `Ya estás como ${estado}. Si vienes a entrenar, vuelves a Activx.` }, url: APP_URL + '/',
+  }).catch(() => {});
   return { exito: true };
 }
 
@@ -7118,8 +7163,12 @@ async function adminRechazarLesion(params: Record<string, any>): Promise<Record<
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
   const { nombre } = params;
   if (!nombre) return { exito: false, error: 'Parámetros inválidos.' };
-  const { error } = await supabase.from('equipo').update({ solicitud_lesion_pendiente: false }).eq('username', nombre);
+    const { error } = await supabase.from('equipo').update({ solicitud_lesion_pendiente: false, solicitud_estado: null }).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
+  await sendPush({
+    tipo: 'solicitud_resuelta', include_external_user_ids: [nombre],
+    headings: { es: 'Pedido no aprobado' }, contents: { es: 'Un Pivot no aprobó tu cambio de estado. Si tienes dudas, escríbele.' }, url: APP_URL + '/',
+  }).catch(() => {});
   return { exito: true };
 }
 
@@ -8167,7 +8216,7 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
         supabase.from('solicitudes_excepcion').select('id, tipo, datos, estado, mes_aplicacion, nota_admin, created_at, vigente_hasta, indefinida, efecto').eq('nombre', yo).gte('created_at', desde),
     supabase.from('inventario_prestamos').select('id, detalle, motivo, estado, tipo, hasta, created_at, desde, devuelto_en').eq('username', yo).gte('created_at', desde),
     supabase.from('asignaciones_tareas').select('id, tarea_id, estado, nota_rechazo, fecha_envio, fecha_revision').eq('nombre_usuario', yo).not('fecha_envio', 'is', null).gte('fecha_envio', desde),
-    supabase.from('equipo').select('foto_perfil, fecha_nacimiento, emerg1_nombre, emerg1_telefono, necesita_patines, necesita_protecciones, push_notificaciones_activas, solicitud_lesion_pendiente').eq('username', yo).maybeSingle(),
+    supabase.from('equipo').select('foto_perfil, fecha_nacimiento, emerg1_nombre, emerg1_telefono, necesita_patines, necesita_protecciones, push_notificaciones_activas, solicitud_lesion_pendiente, solicitud_estado, solicitud_estado_en').eq('username', yo).maybeSingle(),
   ]);
   const idsEv = [...new Set((res.data ?? []).map((r: any) => r.id_evento).filter(Boolean))];
   const idsT = [...new Set((asig.data ?? []).map((a: any) => a.tarea_id))];
@@ -8231,7 +8280,9 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
       estado: a.estado === 'aprobada' ? 'aprobada' : a.estado === 'rechazada' ? 'rechazada' : 'pendiente', fecha: a.fecha_revision ?? a.fecha_envio,
     });
   }
-  if (fila?.solicitud_lesion_pendiente) items.push({ tipo: 'lesion', id: 'lesion', titulo: 'Pasar a Lesionadx', detalle: 'Un Pivot lo revisará.', estado: 'pendiente', fecha: new Date().toISOString() });
+    if (fila?.solicitud_lesion_pendiente || fila?.solicitud_estado) {
+    items.push({ tipo: 'lesion', id: 'lesion', titulo: `Pasar a ${fila.solicitud_estado ?? 'Lesionadx'}`, detalle: 'Un Pivot lo revisará.', estado: 'pendiente', fecha: fila.solicitud_estado_en ?? new Date().toISOString() });
+  }
   items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
   const recomendaciones = [

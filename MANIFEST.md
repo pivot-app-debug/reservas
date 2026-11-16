@@ -222,6 +222,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - `adminBorrarDatosPersona`: solo para archivadas por un Pivot (`eliminado_por` pasa a 'borrado'); vacía datos personales como `eliminarCuenta` pero conserva nombres.
 - `cronDiario` borra `avisos_programados` enviados o cancelados hace más de 30 días.
 
+## Bloque B, segunda parte (2026-11-16)
+- Reglas (`reglas_screen.dart`): grupos Pagos, Recompensas, Estados, Asistencia, Privacidad. Lo de cada equipo vive en `_EquipoScreen._reglasDelEquipo()` (categorias_screen).
+- `ReservasReglasScreen` (Reservas por clase) y `ClaseBienvenidaScreen` en cobro_equipo_screen; reglas nuevas `cuponBienvenida` y `cuponVuelve` (inscripciones y `cancelarReserva`).
+- Estados: `EstadosScreen` (reemplaza a EstadoScreen). Regla por estado `aprobacion` (Lesionadx y los nuevos: sí; De viaje: no). `autodeclararEstado` guarda `equipo.solicitud_estado` (+ `solicitud_estado_en`, migración 20261116200000) y avisa a Pivots del área salud; `adminAprobarLesion`/`adminRechazarLesion` resuelven cualquier pedido de estado (`_camposEntradaEstado`); la Bandeja los muestra como "Cambios de estado".
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

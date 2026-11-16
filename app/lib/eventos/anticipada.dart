@@ -441,6 +441,8 @@ class AnticipadaRepo {
     try {
       final res = await _api.post(accion, req);
       if (res['exito'] != true) return 'La asistencia anticipada se guardó, pero no se pudo actualizar tu estado: ${res['error'] ?? 'error desconocido'}';
+      // Estados que aprueba un Pivot (Victor, 2026-11-16).
+      if (res['pendiente'] == true) return 'Listo. Tu pedido de pasar a ${res['pedido']} le llegó a un Pivot; tu estado cambia cuando lo apruebe.';
     } catch (e) {
       return 'La asistencia anticipada se guardó, pero no se pudo actualizar tu estado: $e';
     }

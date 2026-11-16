@@ -240,7 +240,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     (TipoPedido.reserva, 'Pagos y reservas', Icons.receipt_long_rounded),
     (TipoPedido.rectificacion, 'Rectificaciones de asistencia', Icons.fact_check_outlined),
     (TipoPedido.excepcion, 'Excepciones de cuota', Icons.volunteer_activism_outlined),
-    (TipoPedido.lesion, 'Lesiones', Icons.healing_outlined),
+    (TipoPedido.lesion, 'Cambios de estado', Icons.healing_outlined),
     (TipoPedido.tarea, 'Tareas por validar', Icons.task_alt_rounded),
     (TipoPedido.prestamo, 'Equipamiento', Icons.content_paste_rounded),
     (TipoPedido.equipo, 'Cambios de equipo', Icons.swap_vert_rounded),
@@ -716,7 +716,10 @@ class _CuentaCorte extends StatelessWidget {
         v('motivo').isEmpty ? 'Al aprobarlo, se ve en Inventario.' : 'Motivo: ${v('motivo')}',
       );
     case TipoPedido.lesion:
-      return ('Pidió pasar a Lesionadx', 'Mientras dure no cuenta para la asistencia ni paga cuota.');
+      // Pedidos de estado (Victor, 2026-11-16): Lesionadx, Enfermedad,
+      // Situación personal u Otro. El motivo solo lo ven los Pivots.
+      final e = m['estado'] == null ? 'Lesionadx' : v('estado');
+      return ('Pidió pasar a $e', 'Al aprobarlo cambia su estado. Si viene a entrenar, vuelve a Activx.');
     case TipoPedido.equipo:
       return (
         m['sube'] == true ? 'Sube de ${v('de')} a ${v('a')}' : 'Baja de ${v('de')} a ${v('a')}',

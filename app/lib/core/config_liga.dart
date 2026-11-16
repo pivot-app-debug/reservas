@@ -97,6 +97,8 @@ class ConfigLiga extends ChangeNotifier {
   int get reservaClasesVisibles => (reglas['reservaClasesVisibles'] as num?)?.toInt() ?? 6;
   int get reservaCierraHoras => (reglas['reservaCierraHoras'] as num?)?.toInt() ?? 2;
   int get cuponCancelarMin => (reglas['cuponCancelarMin'] as num?)?.toInt() ?? 60;
+  bool get cuponBienvenida => reglas['cuponBienvenida'] != false;
+  bool get cuponVuelve => reglas['cuponVuelve'] != false;
   int get sinAprobarHoras => (reglas['sinAprobarHoras'] as num?)?.toInt() ?? 2;
 
   /// Cobro por equipo (Victor, 2026-11-15), mismo criterio que `_cobroEquipo` del servidor.
