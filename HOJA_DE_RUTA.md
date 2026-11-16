@@ -108,6 +108,11 @@ Reglas de siempre:
     - Los datos sensibles (emergencia) no estarán en la web.
 11. [ ] **Partidos entre dos ligas**. Después torneos, merch y cronogramas: no olvidar.
 
+## Revisión del 16 de noviembre (PENDIENTES sección S)
+- [x] Bloque A completo (2026-11-16).
+- [x] Bloque B: edad 18, Finanzas en la barra, monedas, eliminar persona, avisos 30 días, recargo, exentos, mensualidad, Reservas por clase, Clase de bienvenida, Estados con aprobación, reglas dentro de cada equipo, puntos y qué cuenta como clase por equipo, logos en tarjetas, equipamiento por reserva (2026-11-16).
+- Orden de Victor antes de la beta cerrada: todo lo pendiente de esta hoja (incluida la política revisada por abogado), luego dos versiones (prueba y producción), y recién ahí Play Store.
+
 ## Antes de publicar en Google Play
 - Pasar Supabase, GitHub, OneSignal y Firebase a la cuenta de Google de Pivot.
 - Política de privacidad revisada por abogado.
