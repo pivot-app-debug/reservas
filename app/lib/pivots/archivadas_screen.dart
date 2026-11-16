@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
+import '../core/esqueleto.dart';
 
 /// Personas archivadas por un Pivot (web "Usuarios"): se pueden restaurar.
 /// Quien borró su propia cuenta no aparece como restaurable.
@@ -75,7 +75,9 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: l == null
-            ? Center(key: const ValueKey('c'), child: _error == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error!))
+            ? _error == null
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
+                  : Center(key: const ValueKey('e'), child: Text(_error!))
             : ListView(
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),

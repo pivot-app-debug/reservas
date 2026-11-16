@@ -203,6 +203,18 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Revisión 2026-11-16 (bloque A y parte del B)
+- **Barras de arriba:** `Vidrio` (core/vidrio.dart) es del color de la página en reposo y pasa a vidrio recién cuando el contenido se desplaza por detrás (escucha `ScrollNotificationObserver`); antes el desenfoque tomaba el color de la tarjeta de abajo. `altoBarra()` usa `viewPaddingOf` (servía mal desde dentro del Scaffold: hueco en Reglas). Tema: `scrolledUnderElevation: 0` y `cardTheme` sin sombra. Emergencia ya no tiene barra roja.
+- **Esqueletos de carga:** `core/esqueleto.dart` (`Esqueleto` con formas lista/ajustes/tarjetas, `EsqueletoFilas`, `Brillo`); colores `esqueleto` y `esqueletoBrillo` en la paleta. `PivotCargando` queda solo para el inicio de la app y el recorte de foto.
+- **Logo de fondo:** `core/fondo_logo.dart` (`FondoLogo`), en la tarjeta "Mi equipo" de Estadísticas y en las tarjetas de equipo de Mi Liga (sin avatar si hay logo). `getEstadisticasPersona` manda `logo` en cada equipo.
+- **Estadísticas:** sin tour; selector Mes / Año en la barra (Año: asistencia, clases, horas patinadas y puntos del año; se quitó la tarjeta "Todo el año"). Desglose: "Tarde" y semanas "1 al 7"… según los días del mes.
+- **Notificaciones** (antes Bandeja): campana siempre (`IconoBandeja`), textos de la app y de los avisos del servidor.
+- **Mantenerse en el equipo:** asistente por pasos (`_MantenerAsistente` en categorias_screen) con ejemplo de fechas reales en "¿En cuánto tiempo?". Filas del equipo: Nombre del equipo, Mantenerse, Ascenso y Descenso del equipo. "Invita al equipo" dice el equipamiento propio que pide.
+- **Recargo por pagar tarde:** `cuotaRecargoTipo` ('fijo' | 'porcentaje' de la mensualidad) y `cuotaRecargoModo` ('unico' | 'mensual': se suma por cada mes de atraso). Sin tipo guardado = fijo y único (como antes). `_recargoCuota(mes, hoy, reglas, base)` y `Precios.recargoPara` hacen la misma cuenta.
+- **Cobros (por equipo):** "Igual que en la liga / Personalizado" en desplegable; lista "No pagan cuota" con "Cobrar" (adminSetExentaCuota). "Elige" pasó a "Por clase o por mes".
+- **Clases de gracia:** título fijo, selector de número 0–10, ejemplo en vivo; un equipo que no paga mensualidad lo explica en vez de mostrar el interruptor.
+- Pivots y permisos: "Aprobación de solicitudes" con interruptor optimista. Reglas → Privacidad: interruptor visible y optimista. Estados: "Pausado" en vez de "congela".
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

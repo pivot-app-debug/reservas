@@ -21,8 +21,8 @@ import 'video_screen.dart';
 import 'rectificacion.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Grupos de asistencia del detalle (mismo orden que la web).
 enum _Grupo { asisten, noAsisten, noJugador, sinRespuesta }
@@ -222,7 +222,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             appBar: AppBar(),
             body: Center(
               child: repo.cargando
-                  ? const PivotCargando()
+                  ? const Esqueleto(forma: FormaEsqueleto.tarjetas)
                   : const Padding(padding: EdgeInsets.all(32), child: Text('No encontramos este evento. Puede que lo hayan eliminado.')),
             ),
           );
@@ -871,10 +871,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
               child: KeyedSubtree(
                 key: ValueKey('${elegido.$1}-${personas?.length}'),
                 child: personas == null
-                    ? const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: PivotCargando()),
-                      )
+                    ? const Padding(padding: EdgeInsets.all(16), child: EsqueletoFilas())
                     : personas.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(16),

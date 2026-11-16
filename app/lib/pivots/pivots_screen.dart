@@ -6,7 +6,6 @@ import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/asistente.dart';
-import '../core/cargando.dart';
 import '../core/tema.dart';
 import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
@@ -14,6 +13,7 @@ import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../core/vidrio.dart';
 import 'editores_liga.dart';
+import '../core/esqueleto.dart';
 
 /// Áreas que puede tener un Pivot (Victor, 2026-11-13). El servidor bloquea
 /// cada acción según su área (`AREA_DE_ACCION`) y filtra la Bandeja y los avisos.
@@ -108,6 +108,16 @@ class PivotsScreen extends StatefulWidget {
 }
 
 class _PivotsScreenState extends State<PivotsScreen> {
+  /// El interruptor cambia al instante y se guarda por detrás (Victor,
+  /// 2026-11-16: se trababa esperando al servidor). Si falla, vuelve.
+  bool? _aprobacion;
+
+  Future<void> _cambiarAprobacion(ConfigLiga c, bool v) async {
+    setState(() => _aprobacion = v);
+    await guardarLiga(context, c, {'solicitudesPivots': v ? 'otro' : 'auto'});
+    if (mounted) setState(() => _aprobacion = null);
+  }
+
   late final repo = PivotsRepo(widget.sesion);
   List<PivotInfo>? _pivots;
   List<String> _misAreas = const [];
@@ -184,7 +194,7 @@ class _PivotsScreenState extends State<PivotsScreen> {
           context: context,
           builder: (d) => AlertDialog(
             title: Text('¿Quitar a ${x.nombre} como Pivot?'),
-            content: const Text('Deja de ver Mi Liga, la Bandeja de Pivots y los avisos de Pivot. Sus datos no cambian.'),
+            content: const Text('Deja de ver Mi Liga, las notificaciones de Pivots y los avisos de Pivot. Sus datos no cambian.'),
             actions: [
               TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
               FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Quitar')),
@@ -216,11 +226,11 @@ class _PivotsScreenState extends State<PivotsScreen> {
         title: const Text('Pivots y permisos', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: widget.persona != null && _error == null
-          ? const PivotCargando(centrarEnPantalla: true)
+          ? const Esqueleto(forma: FormaEsqueleto.lista)
           : AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               child: l == null
-                  ? (_error != null ? Center(child: Text(_error!)) : const PivotCargando(centrarEnPantalla: true))
+                  ? (_error != null ? Center(child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.lista))
                   : RefreshIndicator(
                       key: const ValueKey('l'),
                       onRefresh: _cargar,
@@ -251,14 +261,15 @@ class _PivotsScreenState extends State<PivotsScreen> {
                             listenable: ConfigLiga.de(widget.sesion),
                             builder: (context, _) {
                               final c = ConfigLiga.de(widget.sesion);
+                              final aprueba = _aprobacion ?? c.solicitudesPivots != 'auto';
                               return GrupoAjustes(
                                 filas: [
                                   // Interruptor con ⓘ en vez de hoja (Victor, 2026-11-15).
                                   FilaAjuste(
                                     icono: Icons.verified_user_outlined,
                                     seccion: 'roles',
-                                    titulo: 'Otro Pivot aprueba sus pedidos',
-                                    valor: c.solicitudesPivots == 'auto' ? 'Apagado: se aprueban solos' : 'Más seguro',
+                                    titulo: 'Aprobación de solicitudes',
+                                    valor: aprueba ? null : 'Apagado: se aprueban solos',
                                     derecha: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -277,13 +288,10 @@ class _PivotsScreenState extends State<PivotsScreen> {
                                             ),
                                           ),
                                         ),
-                                        Switch(
-                                          value: c.solicitudesPivots != 'auto',
-                                          onChanged: (v) => guardarLiga(context, c, {'solicitudesPivots': v ? 'otro' : 'auto'}),
-                                        ),
+                                        Switch(value: aprueba, onChanged: (v) => _cambiarAprobacion(c, v)),
                                       ],
                                     ),
-                                    alTocar: () => guardarLiga(context, c, {'solicitudesPivots': c.solicitudesPivots == 'auto' ? 'otro' : 'auto'}),
+                                    alTocar: () => _cambiarAprobacion(c, !aprueba),
                                   ),
                                 ],
                               );
@@ -380,8 +388,7 @@ class _NombrarPivotAsistenteState extends State<NombrarPivotAsistente> {
         _PasoPivot.confirmar => '¿Todo bien?',
       },
       ayuda: switch (_paso) {
-        _PasoPivot.persona =>
-          'Esta persona podrá gestionar opciones avanzadas, así que úsalo con cautela. Solo aparecen personas con correo: lo necesitan para entrar como Pivot.',
+        _PasoPivot.persona => 'Esta persona podrá gestionar opciones avanzadas, así que úsalo con cautela.',
         _PasoPivot.areas => 'Solo verá y recibirá avisos de estas áreas. Puedes cambiarlas cuando quieras.',
         _PasoPivot.confirmar => null,
       },
@@ -423,7 +430,7 @@ class _NombrarPivotAsistenteState extends State<NombrarPivotAsistente> {
         ),
         Expanded(
           child: equipo.personas == null
-              ? const PivotCargando()
+              ? const Esqueleto(forma: FormaEsqueleto.lista, arriba: 8)
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                   itemCount: gente.length,

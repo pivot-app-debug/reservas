@@ -183,10 +183,6 @@ class _SaludLigaScreenState extends State<SaludLigaScreen> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
-          Text(
-            'Las opciones que cada persona elige en su ficha de salud. El teléfono aparece en su ficha de emergencia.',
-            style: TextStyle(fontSize: 14, height: 1.4, color: p.texto),
-          ),
           _seccion(context, 'SISTEMAS DE ATENCIÓN', 'Salud pública o seguridad social del país.', _atencion, Icons.local_hospital_outlined),
           _seccion(context, 'SEGUROS PRIVADOS', 'Aparecen cuando alguien elige "Seguro Privado".', _seguros, Icons.shield_outlined),
           const SizedBox(height: 8),

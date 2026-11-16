@@ -8,8 +8,8 @@ import 'eventos_repo.dart';
 import 'modelos.dart';
 import 'nuevo_lugar_screen.dart';
 import 'selector_fechas.dart';
-import '../core/cargando.dart';
 import '../core/config_liga.dart';
+import '../core/esqueleto.dart';
 
 enum _Paso { tipo, lugar, detalles, frecuencia, fecha, hora, descanso }
 
@@ -436,7 +436,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
         ),
       );
     }
-    if (_venues == null) return const Center(child: PivotCargando());
+    if (_venues == null) return const EsqueletoFilas();
     // Un mismo lugar puede tener varias filas (una por horario): se muestra una vez.
     final vistos = <String>{};
     final q = _busqueda.trim().toLowerCase();

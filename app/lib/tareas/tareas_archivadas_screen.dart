@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import 'tareas_repo.dart';
+import '../core/esqueleto.dart';
 
 /// Tareas archivadas (Pivots): quién las hizo y cómo quedó. Se pueden
 /// borrar como último recurso; eso quita los puntos que dieron.
@@ -87,7 +87,10 @@ class _TareasArchivadasScreenState extends State<TareasArchivadasScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: l == null
-            ? Center(key: const ValueKey('c'), child: _error == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error!))
+            ? Center(
+                key: const ValueKey('c'),
+                child: _error == null ? const Esqueleto(forma: FormaEsqueleto.lista) : Text(_error!),
+              )
             : ListView(
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -11,6 +10,7 @@ import '../equipo/equipo_modelos.dart';
 import '../eventos/widgets_comunes.dart';
 import '../finanzas/tesoreria_screen.dart' show elegirPersona;
 import '../sesion/sesion.dart';
+import '../core/esqueleto.dart';
 
 /// Avisos de los Pivots al equipo (Victor, 2026-11-14; antes en Mi Liga web):
 /// ahora o programados, a todo el equipo o a algunas personas. Llegan por la
@@ -266,7 +266,9 @@ class _AvisosScreenState extends State<AvisosScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: prog == null || env == null
-            ? Center(key: const ValueKey('c'), child: _error == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error!))
+            ? _error == null
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
+                  : Center(key: const ValueKey('e'), child: Text(_error!))
             : RefreshIndicator(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
@@ -364,7 +366,9 @@ class _EstadoAvisosScreenState extends State<EstadoAvisosScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: ordenadas == null
-            ? Center(key: const ValueKey('c'), child: _error == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error!))
+            ? _error == null
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
+                  : Center(key: const ValueKey('e'), child: Text(_error!))
             : ListView(
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),

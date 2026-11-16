@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/asistente.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
+import '../core/esqueleto.dart';
 
 enum ModoTarea { crear, editar, duplicar, proponer }
 
@@ -685,7 +685,7 @@ class _ListaPersonasState extends State<_ListaPersonas> {
               ? Center(
                   child: Text(eq.error!, style: TextStyle(color: p.textoSecundario)),
                 )
-              : const Center(child: PivotCargando());
+              : const EsqueletoFilas();
         }
         final q = _q.trim().toLowerCase();
         final lista = [

@@ -9,7 +9,7 @@ import '../core/tema.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import 'componentes.dart';
-import '../core/cargando.dart';
+import '../core/esqueleto.dart';
 
 /// Excepción de cuota en pasos (`Asistente`, como Eventos). Textos y flujo de
 /// Victor (2026-11-08):
@@ -324,11 +324,7 @@ class _ExcepcionScreenState extends State<ExcepcionScreen> {
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: p.texto),
         ),
         const SizedBox(height: 10),
-        if (libres == null)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: PivotCargando()),
-          ),
+        if (libres == null) const Padding(padding: EdgeInsets.all(16), child: EsqueletoFilas(filas: 2)),
         if (libres != null && libres.isEmpty) Text('Ahora no hay tareas disponibles: crea la tuya.', style: TextStyle(color: p.textoSecundario)),
         for (final t in libres ?? const <Map<String, dynamic>>[])
           _TarjetaTarea(
@@ -434,10 +430,7 @@ class _SelectorAdmins extends StatelessWidget {
     final p = context.pivot;
     final l = admins;
     if (l == null) {
-      return const Padding(
-        padding: EdgeInsets.all(12),
-        child: Center(child: PivotCargando()),
-      );
+      return const Padding(padding: EdgeInsets.all(12), child: EsqueletoFilas(filas: 2));
     }
     if (l.isEmpty) return const SizedBox.shrink();
     return Column(

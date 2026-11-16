@@ -927,7 +927,13 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   // persona envía la solicitud; nunca cambia pagos ya hechos.
   cuotaVenceDia: 0,
   cuotaGraciaDias: 0,
-    cuotaRecargo: 0,
+        cuotaRecargo: 0,
+  // Recargo (Victor, 2026-11-16): 'fijo' (monto) o 'porcentaje' de la
+  // mensualidad; 'unico' o 'mensual' (se suma otra vez por cada mes de
+  // atraso, como una tarjeta de crédito). Sin tipo guardado = fijo y único,
+  // como antes.
+  cuotaRecargoTipo: 'fijo',
+  cuotaRecargoModo: 'unico',
   // Recompensas por pagar a tiempo (Victor, 2026-11-15): qué recibe quien
   // envía el pago de su cuota hasta la fecha límite. Se puede combinar.
   // Un cambio rige para los pagos que se aprueben desde ahora.
@@ -1073,8 +1079,11 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
         entero('cuotaVenceDia', 0, 28); entero('cuotaGraciaDias', 0, 27);
     if (reglasNuevas.cuotaRecargo !== undefined) {
       const n = Math.round(Number(reglasNuevas.cuotaRecargo) * 100) / 100;
-      if (Number.isFinite(n)) r.cuotaRecargo = Math.min(10000, Math.max(0, n));
+            if (Number.isFinite(n)) r.cuotaRecargo = Math.min(10000, Math.max(0, n));
     }
+    if (reglasNuevas.cuotaRecargoTipo !== undefined) r.cuotaRecargoTipo = reglasNuevas.cuotaRecargoTipo === 'porcentaje' ? 'porcentaje' : 'fijo';
+    if (reglasNuevas.cuotaRecargoModo !== undefined) r.cuotaRecargoModo = reglasNuevas.cuotaRecargoModo === 'mensual' ? 'mensual' : 'unico';
+    if (r.cuotaRecargoTipo === 'porcentaje' && Number(r.cuotaRecargo) > 100) r.cuotaRecargo = 100;
             const lista = (v: unknown) => Array.isArray(v)
       ? [...new Set(v.map((x) => String(x ?? '').trim().slice(0, 60)).filter(Boolean))].slice(0, 25)
       : null;
@@ -1238,8 +1247,8 @@ async function _cronCorteEquipos(): Promise<void> {
   const n = count ?? 0;
   if (!n) return;
   const manana = new Date(Date.parse(corte.fecha) - 86400000).toISOString().slice(0, 10);
-  if (hoy === manana) await aviso('Mañana se aplican los cambios de equipo', `Quedan ${n} sin revisar en la Bandeja. Lo que no revises se aplicará automáticamente.`);
-  else if (hoy === corte.llega) await aviso('Lista de cambios de equipo', `${n} ${n === 1 ? 'persona cambia' : 'personas cambian'} de equipo. Revísalo en la Bandeja antes del corte.`);
+  if (hoy === manana) await aviso('Mañana se aplican los cambios de equipo', `Quedan ${n} sin revisar en Notificaciones. Lo que no revises se aplicará automáticamente.`);
+  else if (hoy === corte.llega) await aviso('Lista de cambios de equipo', `${n} ${n === 1 ? 'persona cambia' : 'personas cambian'} de equipo. Revísalo en Notificaciones antes del corte.`);
 }
 
 // ─── Medios de pago (Cobros, Victor 2026-11-13) ───────────────────────────
@@ -1841,14 +1850,22 @@ async function adminBorrarEvento(params: Record<string, any>): Promise<Record<st
   return { exito: true };
 }
 
-/** Recargo de la cuota del mes 'aaaa-mm' si se paga el día `hoy` (aaaa-mm-dd). */
-function _recargoCuota(mes: string, hoy: string, reglas: Record<string, any>): number {
-  const dia = Number(reglas.cuotaVenceDia) || 0, monto = Number(reglas.cuotaRecargo) || 0;
-  if (dia <= 0 || monto <= 0) return 0;
+/** Recargo de la cuota del mes 'aaaa-mm' si se paga el día `hoy` (aaaa-mm-dd);
+ *  `base` = mensualidad (para el recargo en porcentaje). */
+function _recargoCuota(mes: string, hoy: string, reglas: Record<string, any>, base = 0): number {
+  const dia = Number(reglas.cuotaVenceDia) || 0, valor = Number(reglas.cuotaRecargo) || 0;
+  if (dia <= 0 || valor <= 0) return 0;
   const [y, m] = mes.split('-').map(Number);
   const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const limite = `${mes}-${String(Math.min(ultimo, dia + (Number(reglas.cuotaGraciaDias) || 0))).padStart(2, '0')}`;
-  return hoy > limite ? monto : 0;
+  const diaLimite = Math.min(ultimo, dia + (Number(reglas.cuotaGraciaDias) || 0));
+  const limite = `${mes}-${String(diaLimite).padStart(2, '0')}`;
+  if (hoy <= limite) return 0;
+  // Meses de atraso: 1 al pasar el límite y uno más cada vez que se pasa ese
+  // mismo día en los meses siguientes.
+  const [hy, hm, hd] = hoy.split('-').map(Number);
+  const veces = reglas.cuotaRecargoModo === 'mensual' ? 1 + Math.max(0, (hy * 12 + hm) - (y * 12 + m) - (hd <= diaLimite ? 1 : 0)) : 1;
+  const uno = reglas.cuotaRecargoTipo === 'porcentaje' ? (base * valor) / 100 : valor;
+  return Math.round(uno * veces * 100) / 100;
 }
 
 async function getPreciosClases(params: Record<string, any> = {}, equipo?: string | null): Promise<Record<string, any>> {
@@ -1866,7 +1883,7 @@ async function getPreciosClases(params: Record<string, any> = {}, equipo?: strin
   return {
     precioPorClase: cobro.precioClase ?? map['precio_por_clase'] ?? null, precioMensual: cobro.precioMensual ?? map['precio_mensual'] ?? null,
     modoCobro: cobro.modo,
-    cuota: { venceDia: Number(r.cuotaVenceDia) || 0, graciaDias: Number(r.cuotaGraciaDias) || 0, recargo: Number(r.cuotaRecargo) || 0 },
+    cuota: { venceDia: Number(r.cuotaVenceDia) || 0, graciaDias: Number(r.cuotaGraciaDias) || 0, recargo: Number(r.cuotaRecargo) || 0, recargoTipo: r.cuotaRecargoTipo === 'porcentaje' ? 'porcentaje' : 'fijo', recargoModo: r.cuotaRecargoModo === 'mensual' ? 'mensual' : 'unico' },
   };
 }
 
@@ -2996,7 +3013,7 @@ async function pedirPrestamo(params: Record<string, any>): Promise<Record<string
   await sendPush({
     tipo: 'avisos_admin', include_external_user_ids: await _adminDestinatariosPush(pivot.email ?? undefined, 'inventario', 'pedidos'),
     headings: { es: 'Equipamiento del equipo' },
-    contents: { es: tipo === 'uso' ? `${quien} pide usar ${r.fila!.detalle}. Decide en la Bandeja.` : `${quien} avisa que se llevó ${r.fila!.detalle}. Apruébalo en la Bandeja.` },
+    contents: { es: tipo === 'uso' ? `${quien} pide usar ${r.fila!.detalle}. Decide en Notificaciones.` : `${quien} avisa que se llevó ${r.fila!.detalle}. Apruébalo en Notificaciones.` },
     url: APP_URL + '/',
   });
   return { exito: true };
@@ -4855,7 +4872,7 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
   let saldoAplicado: number | null = null;
   if (esMensual) {
     const vig = _vigenciaMensualISO(fecha, new Date().toISOString().substring(0, 10), anioMes);
-    recargo = vig ? _recargoCuota(vig.slice(0, 7), _hoyEcuadorISO(), await _reglasLiga()) : 0;
+    recargo = vig ? _recargoCuota(vig.slice(0, 7), _hoyEcuadorISO(), await _reglasLiga(), montoFinal) : 0;
                 montoFinal += recargo;
   }
   // Saldo con el equipo (cuotas y clases). 'usar' descuenta el saldo a favor
@@ -5204,7 +5221,7 @@ async function subirComprobante(params: Record<string, any>): Promise<Record<str
   const quien = await _nombrePersona(yo);
   const pivots = await _adminDestinatariosPush(undefined, 'finanzas', 'pagos');
   await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivots, headings: { es: 'Comprobante recibido' },
-    contents: { es: `${quien} subió el comprobante de ${mias[0].tipo === 'mensual' ? `su mensualidad ${mias[0].mes_texto ?? ''}`.trim() : 'su reserva'}. Ya puedes revisarlo en la Bandeja.` }, url: APP_URL }).catch(() => {});
+    contents: { es: `${quien} subió el comprobante de ${mias[0].tipo === 'mensual' ? `su mensualidad ${mias[0].mes_texto ?? ''}`.trim() : 'su reserva'}. Ya puedes revisarlo en Notificaciones.` }, url: APP_URL }).catch(() => {});
   return { exito: true, reservas: mias.length };
 }
 
@@ -5214,7 +5231,7 @@ async function adminPedirComprobante(params: Record<string, any>): Promise<Recor
   const { data: r } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, comprobante_avisos').eq('id', String(params.id ?? '')).eq('estado', 'Pendiente').maybeSingle();
   if (!r) return { exito: false, error: 'Esa reserva ya no está pendiente.' };
   await sendPush({ tipo: 'comprobante_pendiente', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Falta tu comprobante' },
-    contents: { es: `Sube el comprobante de ${r.tipo === 'mensual' ? `tu mensualidad ${r.mes_texto ?? ''}`.trim() : 'tu reserva'} para que podamos confirmarla. Toma un minuto: abre la Bandeja.` }, url: APP_URL });
+    contents: { es: `Sube el comprobante de ${r.tipo === 'mensual' ? `tu mensualidad ${r.mes_texto ?? ''}`.trim() : 'tu reserva'} para que podamos confirmarla. Toma un minuto: abre Notificaciones.` }, url: APP_URL });
   await supabase.from('reservas').update({ comprobante_avisos: (Number(r.comprobante_avisos) || 0) + 1, comprobante_ultimo_aviso: new Date().toISOString() }).eq('id', r.id);
   return { exito: true };
 }
@@ -8014,7 +8031,7 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
         const c1 = clasesEn(periodos[i].curso), p1 = puntosEn(periodos[i].curso, soloTareas);
         const c0 = clasesEn(periodos[i].cerrado), p0 = puntosEn(periodos[i].cerrado, soloTareas);
         return {
-          nombre: t.nombre, orden: t.orden, esDefault: !!t.es_default, minClases: minC, minPuntos: minP, logica: t.logica === 'Y' ? 'Y' : 'O',
+          nombre: t.nombre, logo: t.logo ?? null, orden: t.orden, esDefault: !!t.es_default, minClases: minC, minPuntos: minP, logica: t.logica === 'Y' ? 'Y' : 'O',
           ventana: Number(t.ventana_meses) || 1, unidad: t.periodo_unidad ?? 'mes', puntosFuente: soloTareas ? 'tareas' : 'todos',
           desde: periodos[i].curso.desde, mesesAscenso: Number(t.meses_consecutivos_ascenso) || 3,
           gracia: Number(t.meses_gracia_demotion) || 0, graciaUnidad: t.gracia_unidad ?? 'mes',

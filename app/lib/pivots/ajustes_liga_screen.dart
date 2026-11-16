@@ -11,7 +11,6 @@ import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
-import '../core/cargando.dart';
 import '../finanzas/tesoreria_repo.dart';
 import '../finanzas/cobros_screen.dart';
 import 'reglas_screen.dart';
@@ -23,6 +22,9 @@ import 'salud_liga_screen.dart';
 import 'categorias_screen.dart';
 import 'pivots_screen.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
+import '../core/fondo_logo.dart';
+import 'cobro_equipo_screen.dart' show modosCobro;
 
 /// Mi perfil → Ajustes de la liga (solo Pivots, Victor 2026-11-13): un solo
 /// lugar para lo que configura la liga. Los roles se editan desde la hoja de
@@ -185,8 +187,9 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     final p = context.pivot;
     final l = _equipos;
     final gente = EquipoRepo.de(sesion);
-    Widget tarjeta({required Widget child, required VoidCallback alTocar, double ancho = 168, bool borde = false}) => Material(
+    Widget tarjeta({required Widget child, required VoidCallback alTocar, double ancho = 168, bool borde = false, String? logo}) => Material(
       color: borde ? Colors.transparent : p.tarjeta,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(PivotRadios.grande),
         side: borde ? BorderSide(color: p.bordeSuave, width: 1.5) : BorderSide.none,
@@ -194,7 +197,12 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(PivotRadios.grande),
         onTap: alTocar,
-        child: Container(width: ancho, padding: const EdgeInsets.all(14), child: child),
+        child: FondoLogo(
+          url: logo,
+          opacidad: 0.5,
+          ancho: 0.85,
+          child: Container(width: ancho, padding: const EdgeInsets.all(14), child: child),
+        ),
       ),
     );
     Widget etiqueta(String t) => Container(
@@ -208,7 +216,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     return SizedBox(
       height: 184,
       child: l == null
-          ? const Center(child: PivotCargando(tamano: 48, centrarEnPantalla: false))
+          ? Brillo(
+              child: Row(
+                children: [
+                  for (var i = 0; i < 2; i++)
+                    Container(
+                      width: 168,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(color: p.esqueleto, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+                    ),
+                ],
+              ),
+            )
           : ListenableBuilder(
               listenable: gente,
               builder: (context, _) => ListView.separated(
@@ -246,12 +265,16 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                   final cuantas = gente.personas?.where((x) => x.categoria == nombre).length;
                   final req = (t['requisitos'] as Map?) ?? const {};
                   final propio = req['patinesPropios'] == true || req['proteccionesPropias'] == true;
+                  final logo = '${t['logo'] ?? ''}';
+                  final cobro = modosCobro['${ConfigLiga.de(sesion).cobroEquipo(nombre)['modo']}']?.$1;
+                  // Con logo, va de fondo y no hace falta el avatar (Victor, 2026-11-16).
                   return tarjeta(
+                    logo: logo.isEmpty ? null : logo,
                     alTocar: () => _abrir(AjustesEquipoScreen(sesion: sesion, nombre: nombre)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        LogoEquipo(nombre: nombre, url: t['logo'] as String?, tamano: 44),
+                        if (logo.isEmpty) LogoEquipo(nombre: nombre, url: null, tamano: 44),
                         const Spacer(),
                         Text(
                           nombre,
@@ -264,7 +287,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                           style: TextStyle(fontSize: 13, color: p.textoSecundario),
                         ),
                         const SizedBox(height: 8),
-                        Wrap(spacing: 4, runSpacing: 4, children: [etiqueta(propio ? 'Mensual' : 'Por clase o mes'), if (propio) etiqueta('Equipo propio')]),
+                        Wrap(spacing: 4, runSpacing: 4, children: [if (cobro != null) etiqueta(cobro), if (propio) etiqueta('Equipo propio')]),
                       ],
                     ),
                   );

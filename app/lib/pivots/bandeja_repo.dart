@@ -208,7 +208,7 @@ class BandejaRepo extends ChangeNotifier {
       if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar.'}');
       _leer(r);
     } catch (e) {
-      error = e is ApiException ? e.message : 'No se pudo cargar la bandeja. Revisa tu conexión.';
+      error = e is ApiException ? e.message : 'No se pudieron cargar las notificaciones. Revisa tu conexión.';
     } finally {
       _cargando = false;
       notifyListeners();

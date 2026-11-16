@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../pivots/buscador_liga.dart';
@@ -20,6 +19,7 @@ import 'cobros_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
 
 IconData _iconoCuenta(String t) => switch (t) {
   'efectivo' => Icons.payments_outlined,
@@ -69,7 +69,7 @@ Future<Integrante?> elegirPersona(BuildContext context, Sesion s, {String titulo
                   ),
                   Expanded(
                     child: equipo.personas == null
-                        ? const PivotCargando()
+                        ? const Esqueleto(forma: FormaEsqueleto.lista, arriba: 8)
                         : ListView(
                             children: [
                               for (final x in gente)
@@ -694,7 +694,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: r == null
-            ? Center(key: const ValueKey('c'), child: _error_ == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error_!))
+            ? _error_ == null
+                  ? const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'))
+                  : Center(key: const ValueKey('e'), child: Text(_error_!))
             : RefreshIndicator(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
@@ -1473,7 +1475,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: movs == null
-                  ? const PivotCargando()
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, arriba: 8)
                   : movs.isEmpty
                   ? Center(
                       child: Text('Sin movimientos con estos filtros.', style: TextStyle(color: p.textoSecundario)),
@@ -1565,7 +1567,7 @@ class _SaldosScreenState extends State<SaldosScreen> {
         title: const Text('Saldos de personas', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: l == null
-          ? const PivotCargando(centrarEnPantalla: true)
+          ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
               children: [
@@ -1765,7 +1767,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
         title: Text(widget.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: r == null
-          ? const PivotCargando(centrarEnPantalla: true)
+          ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
               children: [
@@ -1920,7 +1922,7 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
               child: _error != null
                   ? Center(key: const ValueKey('e'), child: Text(_error!))
                   : r == null
-                  ? const PivotCargando(key: ValueKey('c'), centrarEnPantalla: true)
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
                   : RefreshIndicator(
                       key: ValueKey(_clave),
                       onRefresh: _cargar,
@@ -2074,7 +2076,7 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
         title: const Text('Viajes', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: l == null
-          ? const PivotCargando(centrarEnPantalla: true)
+          ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
               children: [

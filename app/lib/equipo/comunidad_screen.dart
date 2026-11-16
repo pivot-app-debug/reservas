@@ -9,9 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
 import '../core/iconos_marca.dart';
-import '../core/cargando.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
+import '../core/esqueleto.dart';
 
 /// Un enlace de la comunidad (grupo de WhatsApp, Instagram…).
 class EnlaceComunidad {
@@ -271,7 +271,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
         builder: (context, _) {
           final Widget cuerpo;
           if (!repo.cargado && repo.error == null) {
-            cuerpo = const Center(key: ValueKey('c'), child: PivotCargando());
+            cuerpo = const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'));
           } else if (!repo.cargado) {
             cuerpo = Center(key: const ValueKey('e'), child: Text(repo.error!));
           } else if (repo.enlaces.isEmpty) {

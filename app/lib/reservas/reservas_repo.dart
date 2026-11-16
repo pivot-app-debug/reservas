@@ -44,7 +44,15 @@ class MesReserva {
 }
 
 class Precios {
-  const Precios(this.porClase, this.mensual, {this.venceDia = 0, this.graciaDias = 0, this.recargo = 0});
+  const Precios(
+    this.porClase,
+    this.mensual, {
+    this.venceDia = 0,
+    this.graciaDias = 0,
+    this.recargo = 0,
+    this.recargoPorcentaje = false,
+    this.recargoMensual = false,
+  });
   final double porClase;
   final double mensual;
 
@@ -53,12 +61,24 @@ class Precios {
   final int graciaDias;
   final double recargo;
 
+  /// Recargo en % de la mensualidad (si no, monto fijo) y si se suma otra
+  /// vez por cada mes de atraso (Victor, 2026-11-16).
+  final bool recargoPorcentaje, recargoMensual;
+
   /// Recargo si la cuota de `mes` se paga hoy (mismo cálculo que `_recargoCuota` del servidor).
   double recargoPara(DateTime mes, DateTime hoy) {
     if (venceDia <= 0 || recargo <= 0) return 0;
     final ultimo = DateTime(mes.year, mes.month + 1, 0).day;
-    final limite = DateTime(mes.year, mes.month, (venceDia + graciaDias).clamp(1, ultimo));
-    return DateTime(hoy.year, hoy.month, hoy.day).isAfter(limite) ? recargo : 0;
+    final diaLimite = (venceDia + graciaDias).clamp(1, ultimo);
+    final limite = DateTime(mes.year, mes.month, diaLimite);
+    if (!DateTime(hoy.year, hoy.month, hoy.day).isAfter(limite)) return 0;
+    var veces = 1;
+    if (recargoMensual) {
+      final dif = (hoy.year * 12 + hoy.month) - (mes.year * 12 + mes.month) - (hoy.day <= diaLimite ? 1 : 0);
+      veces = 1 + (dif > 0 ? dif : 0);
+    }
+    final uno = recargoPorcentaje ? mensual * recargo / 100 : recargo;
+    return double.parse((uno * veces).toStringAsFixed(2));
   }
 }
 
@@ -256,6 +276,8 @@ class ReservasRepo {
       venceDia: (c['venceDia'] as num?)?.toInt() ?? 0,
       graciaDias: (c['graciaDias'] as num?)?.toInt() ?? 0,
       recargo: n(c['recargo']),
+      recargoPorcentaje: c['recargoTipo'] == 'porcentaje',
+      recargoMensual: c['recargoModo'] == 'mensual',
     );
   }
 

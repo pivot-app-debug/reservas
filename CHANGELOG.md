@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (revisión de Victor: bloque A)
+- **Barras de arriba iguales en toda la app:** en reposo son del color de la página (ya no se ven rojizas ni blancas) y el vidrio aparece al desplazar. Se quitó el hueco entre la barra y el contenido en Reglas y otras pantallas. Tarjetas sin sombra.
+- **Esqueletos de carga** en vez del loader en bucle en todas las pantallas y listas.
+- **Estadísticas:** sin tour guiado; Mes / Año en la barra (en Año se ven las horas patinadas); tarjeta "Mi equipo" con el logo de fondo. Desglose: "Tarde" y semanas "1 al 7", "8 al 14"…
+- **Notificaciones** reemplaza a "Bandeja", siempre con la campana.
+- **Equipos:** "Mantenerse" por pasos con ejemplos de fechas; nombres de las filas más claros; "Invita al equipo" dice qué equipamiento pide; logo de fondo en las tarjetas de Mi Liga.
+- **Reglas:** recargo por pagar tarde en porcentaje o monto fijo, una vez o cada mes de atraso; Fecha límite avisa si la recompensa está apagada; Cobros con desplegable de precio y lista de quienes no pagan cuota; Clases de gracia con selector y ejemplo en vivo; textos que se cortaban, más cortos; "Pausado" en estados; interruptor de privacidad visible.
+- Pivots y permisos: sin sombras, "Aprobación de solicitudes", interruptor sin trabarse, sin el texto del correo. Salud y Notificaciones sin subtítulos.
+
 ## 2026-11-16 (la web nueva pasa a la dirección principal)
 - **app.quindesvolcanicos.com ahora abre la app nueva (Flutter).** La web vieja queda congelada en /vieja/ como respaldo. /nueva/ redirige a la raíz. Las páginas de inscripción (inscripcion/, registro-express/, activar/) siguen igual.
 - **Pantalla "Instala la app"** en teléfonos, igual que en la web vieja: en Android pide Chrome y en iPhone Safari (con botón para copiar el enlace si se abrió en otro navegador), con los pasos para agregarla a la pantalla de inicio y, en Chrome, el botón "Instalar app". En computadora no aparece.

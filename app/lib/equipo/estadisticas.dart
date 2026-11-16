@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
-import '../core/tour.dart';
+import '../core/fondo_logo.dart';
+
 import 'desglose_screen.dart';
 import 'equipo_modelos.dart';
 import 'equipo_repo.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Un evento con asistencia tomada y cómo le fue a la persona.
 class _Ev {
@@ -79,22 +80,11 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     super.initState();
     repo.cargar();
     _cargar(_anio);
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      Tour.mostrarSiCorresponde(
-        context,
-        preferencia: 'tour.estadisticas.v1',
-        pasos: [
-          PasoTour(clave: _kProgreso, titulo: 'Tu equipo', texto: 'Qué pide tu equipo cada mes y cuánto te falta. Si no llegas, aquí ves el aviso con tiempo.'),
-          PasoTour(clave: _kMes, titulo: 'Elige el mes', texto: 'Toca aquí para ver cualquier mes. Tocar un número muestra de dónde sale.'),
-        ],
-      );
-    });
   }
 
-  // Tour de Estadísticas (Victor, 2026-11-15).
-  final _kMes = GlobalKey(debugLabel: 'tour-est-mes');
-  final _kProgreso = GlobalKey(debugLabel: 'tour-est-progreso');
+  /// Ver el mes elegido o todo el año (Victor, 2026-11-16: reemplaza la
+  /// tarjeta "Todo el año"; en Año se suman las horas patinadas).
+  bool _verAnio = false;
 
   Future<void> _cargar(int anio) async {
     if (_datos.containsKey(anio)) return;
@@ -245,7 +235,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     final d = _datos[_anio];
     final Widget cuerpo;
     if (d == null) {
-      cuerpo = Center(key: const ValueKey('c'), child: _error != null ? Text(_error!) : const PivotCargando());
+      cuerpo = _error != null ? Center(key: const ValueKey('e'), child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'));
     } else {
       cuerpo = ListView(
         key: const ValueKey('l'),
@@ -266,15 +256,23 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          _mesCaja(d),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            transitionBuilder: (c, a) => FadeTransition(
+              opacity: a,
+              child: SlideTransition(
+                position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(a),
+                child: c,
+              ),
+            ),
+            child: KeyedSubtree(key: ValueKey(_verAnio), child: _verAnio ? _anioCaja(d) : _mesCaja(d)),
+          ),
           const SizedBox(height: 12),
           _graficoCaja(d),
-          const SizedBox(height: 12),
           if (_anio == _hoy.year && d.progreso != null) ...[
-            _ProgresoCategoria(key: _kProgreso, progreso: d.progreso!, yo: _yo, verPrivado: _yo || repo.esAdmin),
             const SizedBox(height: 12),
+            _ProgresoCategoria(progreso: d.progreso!, yo: _yo, verPrivado: _yo || repo.esAdmin),
           ],
-          _anioCaja(d),
         ],
       );
     }
@@ -292,6 +290,21 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             Text(widget.nombre, style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
           ],
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              segments: const [
+                ButtonSegment(value: false, label: Text('Mes')),
+                ButtonSegment(value: true, label: Text('Año')),
+              ],
+              selected: {_verAnio},
+              onSelectionChanged: (s) => setState(() => _verAnio = s.first),
+            ),
+          ),
+        ],
       ),
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: cuerpo),
     );
@@ -306,7 +319,6 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
       titulo: Row(
         children: [
           Material(
-            key: _kMes,
             color: pal.suave,
             shape: const StadiumBorder(),
             child: InkWell(
@@ -416,7 +428,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             maximo: maximo,
             sufijo: _verPuntos ? '' : '%',
             elegido: DateTime(_anio, _mes),
-            alElegir: (m) => setState(() => _mes = m.month),
+            alElegir: (m) => setState(() => (_mes = m.month, _verAnio = false)),
           );
         },
       ),
@@ -428,20 +440,28 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     final fue = d.eventos.where((e) => e.fue).length;
     final pct = _pct(d.eventos);
     final p = repo.persona(widget.username);
-    final total = d.puntos.values.fold<num>(0, (s, x) => s + ((x['total'] as num?) ?? 0));
+    num suma(String k) => d.puntos.values.fold<num>(0, (s, x) => s + ((x[k] as num?) ?? 0));
     return _Caja(
       titulo: Text(
         'Todo $_anio',
         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: pal.texto),
       ),
-      hijo: _fila([
-        _Stat(valor: pct == null ? '—' : '$pct%', etiqueta: 'Asistencia'),
-        _Stat(valor: '$fue', etiqueta: 'Clases'),
-        if (_anio == _hoy.year && p != null)
-          _Stat(valor: numero(p.horasAnio), etiqueta: 'Horas patinadas')
-        else
-          _Stat(valor: numero(total), etiqueta: 'Puntos'),
-      ]),
+      hijo: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _fila([
+            _Stat(valor: pct == null ? '—' : '$pct%', etiqueta: 'Asistencia'),
+            _Stat(valor: d.eventos.isEmpty ? '—' : '$fue/${d.eventos.length}', etiqueta: 'Clases'),
+            if (_anio == _hoy.year && p != null) _Stat(valor: numero(p.horasAnio), etiqueta: 'Horas patinadas'),
+          ]),
+          const SizedBox(height: 10),
+          _fila([
+            _Stat(valor: numero(suma('asistencia')), etiqueta: 'Puntos por asistencia'),
+            _Stat(valor: numero(suma('tareas')), etiqueta: 'Puntos por tareas'),
+            _Stat(valor: numero(suma('racha')), etiqueta: 'Puntos por racha'),
+          ]),
+        ],
+      ),
     );
   }
 
@@ -463,7 +483,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 /// Tarjeta de Equipo (Victor, 2026-11-13): qué pide la actual,
 /// cuánto lleva, qué falta y cómo sumar, en tono amable.
 class _ProgresoCategoria extends StatelessWidget {
-  const _ProgresoCategoria({super.key, required this.progreso, required this.yo, required this.verPrivado});
+  const _ProgresoCategoria({required this.progreso, required this.yo, required this.verPrivado});
   final Map<String, dynamic> progreso;
   final bool yo;
   final bool verPrivado;
@@ -551,13 +571,14 @@ class _ProgresoCategoria extends StatelessWidget {
     }
 
     return _Caja(
+      logo: actual?['logo'] as String?,
       titulo: Row(
         children: [
           Icon(Icons.workspace_premium_outlined, size: 20, color: pal.marcaTexto),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Equipo: $cat',
+              yo ? 'Mi equipo' : 'Su equipo',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: pal.texto),
             ),
           ),
@@ -740,17 +761,24 @@ class _Stat extends StatelessWidget {
 }
 
 class _Caja extends StatelessWidget {
-  const _Caja({required this.titulo, required this.hijo});
+  const _Caja({required this.titulo, required this.hijo, this.logo});
   final Widget titulo;
   final Widget hijo;
+  final String? logo;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [titulo, const SizedBox(height: 12), hijo]),
+      child: FondoLogo(
+        url: logo,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [titulo, const SizedBox(height: 12), hijo]),
+        ),
+      ),
     );
   }
 }

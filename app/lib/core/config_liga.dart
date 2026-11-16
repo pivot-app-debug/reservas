@@ -54,6 +54,8 @@ class ConfigLiga extends ChangeNotifier {
   int get cuotaVenceDia => (reglas['cuotaVenceDia'] as num?)?.toInt() ?? 0;
   int get cuotaGraciaDias => (reglas['cuotaGraciaDias'] as num?)?.toInt() ?? 0;
   num get cuotaRecargo => (reglas['cuotaRecargo'] as num?) ?? 0;
+  bool get recargoPorcentaje => reglas['cuotaRecargoTipo'] == 'porcentaje';
+  bool get recargoMensual => reglas['cuotaRecargoModo'] == 'mensual';
 
   /// Día hasta el que se paga a tiempo (incluido); sin fecha guardada, el 15 (igual que el servidor).
   int get diaFechaLimite => cuotaVenceDia >= 1 && cuotaVenceDia <= 28 ? cuotaVenceDia : 15;

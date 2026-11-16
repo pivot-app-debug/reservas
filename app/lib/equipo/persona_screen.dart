@@ -13,9 +13,9 @@ import 'emergencia_screen.dart';
 import 'equipo_modelos.dart';
 import 'estadisticas.dart';
 import 'equipo_repo.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
 
 /// Ficha de una persona del equipo (web: `_eqRenderPerfil()`): encabezado,
 /// acciones (WhatsApp, llamar, favorito y, para admins, Emergencia), stats
@@ -44,7 +44,7 @@ class PersonaScreen extends StatelessWidget {
         if (per == null) {
           return Scaffold(
             appBar: AppBar(),
-            body: Center(child: repo.personas == null ? const PivotCargando() : const Text('No se encontró a esta persona.')),
+            body: repo.personas == null ? const Esqueleto(forma: FormaEsqueleto.ajustes) : const Center(child: Text('No se encontró a esta persona.')),
           );
         }
         return _Ficha(repo: repo, p: per);

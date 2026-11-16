@@ -5,8 +5,8 @@ import '../pivots/pivots_screen.dart' show areasPivot, avisosPivot;
 import '../core/api.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Ajustes → Notificaciones: interruptor general y uno por tipo, generados
 /// desde el catálogo del servidor (`getCatalogoNotificaciones`). Guardado
@@ -132,13 +132,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-          child: Text(
-            'Solo de tus áreas. Si nadie de un área tiene un aviso encendido, llega a todos los Pivots para que no se pierda.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
-        ),
+
         for (final a in areasPivot.entries)
           if (mias.contains(a.key) && avisosPivot[a.key] != null)
             _Categoria(
@@ -206,7 +200,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                 ),
               )
             : tipos == null
-            ? const Center(key: ValueKey('cargando'), child: PivotCargando())
+            ? const Esqueleto(forma: FormaEsqueleto.ajustes, key: ValueKey('cargando'))
             : ListView(
                 key: const ValueKey('lista'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),

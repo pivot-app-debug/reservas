@@ -24,7 +24,6 @@ import 'modelos.dart';
 import 'rectificacion.dart';
 import 'tomar_asistencia_screen.dart';
 import 'widgets_comunes.dart';
-import '../core/cargando.dart';
 import '../ajustes/componentes.dart';
 import '../tareas/crear_tarea_screen.dart';
 import '../tareas/tarea_screen.dart';
@@ -34,6 +33,7 @@ import '../tareas/tareas_screen.dart' hide PilaAvatares;
 import '../pivots/bandeja_repo.dart';
 import '../pivots/bandeja_screen.dart';
 import '../pivots/icono_bandeja.dart';
+import '../core/esqueleto.dart';
 
 /// Timeline de Eventos (maqueta aprobada + pedido 2026-11-06):
 /// - Barra: "Noviembre ⌄" despliega el calendario del mes hacia abajo (como
@@ -818,7 +818,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           // Bandeja para todas las personas (2026-11-13): campana con novedades.
           IconButton(
             key: _kBandeja,
-            tooltip: _bandeja.hayNovedades ? 'Bandeja (hay novedades)' : (_bandeja.total > 0 ? 'Bandeja (${_bandeja.total} por revisar)' : 'Bandeja'),
+            tooltip: _bandeja.hayNovedades
+                ? 'Notificaciones (hay novedades)'
+                : (_bandeja.total > 0 ? 'Notificaciones (${_bandeja.total} por revisar)' : 'Notificaciones'),
             icon: IconoBandeja(novedades: _bandeja.hayNovedades, pendientes: _bandeja.esPivot ? _bandeja.total : 0),
             onPressed: () {
               _cerrarCalendario();
@@ -1081,7 +1083,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   Widget _cuerpo(BuildContext context) {
     final p = context.pivot;
-    if (repo.cargando && repo.eventos.isEmpty) return const Center(child: PivotCargando());
+    if (repo.cargando && repo.eventos.isEmpty) return const Esqueleto(forma: FormaEsqueleto.tarjetas);
     if (repo.error != null && repo.eventos.isEmpty) {
       return Center(
         child: Padding(
@@ -1367,10 +1369,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Tu bandeja',
+          titulo: 'Notificaciones',
           texto: _esAdmin
               ? 'Aquí llega lo que hay que revisar: pagos, reservas, rectificaciones y pedidos. También ves tus propios pedidos y cómo quedaron.'
-              : 'Aquí ves tus pedidos (reservas, pagos, rectificaciones) y cómo quedaron. Si se mueve la campana, hay novedades.',
+              : 'Aquí ves tus pedidos (reservas, pagos, rectificaciones) y cómo quedaron. Si la campana se mueve, hay novedades.',
         ),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
         PasoTour(

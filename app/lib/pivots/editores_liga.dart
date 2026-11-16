@@ -196,47 +196,69 @@ Future<void> editarGracia(BuildContext context, Sesion sesion, ConfigLiga c, {St
   final v = <String, int?>{for (final e in equipos) e: c.graciaClases(e)};
   // Se guardan todos los equipos aunque se edite uno solo (si no, se borraban los demás).
   final visibles = soloEquipo == null ? equipos : equipos.where((e) => e == soloEquipo).toList();
+  // Equipos que pagan por clase o no pagan: no aplica (Victor, 2026-11-16).
+  bool porMes(String e) => const {'mes', 'elige', 'segun_equipamiento'}.contains('${c.cobroEquipo(e)['modo']}');
+  String ejemplo(String e) {
+    final n = v[e];
+    if (!porMes(e)) return '$e no paga mensualidad, así que no usa clases de gracia: cada clase se reserva y se paga.';
+    if (n == null) return '$e no usa clases de gracia: quien no ha pagado la cuota sigue su forma de pago.';
+    if (n == 0) return 'En $e, quien no ha pagado la cuota del mes debe pagar antes de marcar Asistiré.';
+    return 'En $e, quien no ha pagado la cuota puede venir a $n ${n == 1 ? 'clase' : 'clases'} del mes. Desde la clase ${n + 1}, al marcar Asistiré se le pide pagar.';
+  }
+
   // Subsección en vez de hoja (Victor, 2026-11-15).
   final ok = await abrirSubseccion(
     context,
-    titulo: soloEquipo == null ? 'Clases de gracia' : 'Clases de gracia de $soloEquipo',
+    titulo: 'Clases de gracia',
     contenido: (set) => [
-      Text(
-        'Cuántas clases del mes puede venir alguien sin haber pagado la cuota. Después, al marcar Asistiré, la app le pide pagar. '
-        'Con 0, paga antes de marcar Asistiré. Si un equipo no la usa, sigue su propia regla (por ejemplo, reservar y pagar cada clase).',
-        style: TextStyle(color: context.pivot.textoSecundario),
-      ),
+      Text('Clases del mes a las que se puede venir sin haber pagado la cuota.', style: TextStyle(color: context.pivot.textoSecundario)),
       for (final e in visibles) ...[
         const SizedBox(height: 14),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(v[e] == null ? 'No usa clases de gracia' : 'Usa clases de gracia'),
-          value: v[e] != null,
-          onChanged: (x) => set(() => v[e] = x ? 1 : null),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          child: v[e] == null
-              ? const SizedBox(width: double.infinity)
-              : Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final n in {0, 1, 2, 3, 4, 5, v[e]!}.toList()..sort())
-                        ChoiceChip(
-                          label: Text(n == 0 ? 'Paga antes' : '$n ${n == 1 ? 'clase' : 'clases'} al mes'),
-                          selected: v[e] == n,
-                          onSelected: (_) => set(() => v[e] = n),
-                        ),
-                    ],
+        if (!porMes(e))
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Paga por clase: no usa clases de gracia'),
+          )
+        else ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(e, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(v[e] == null ? 'No usa clases de gracia' : 'Usa clases de gracia'),
+            value: v[e] != null,
+            onChanged: (x) => set(() => v[e] = x ? 1 : null),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            child: v[e] == null
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: SelectorNumero(
+                      valor: v[e]!,
+                      min: 0,
+                      max: 10,
+                      etiqueta: v[e] == 0 ? 'clases: debe pagar antes' : (v[e] == 1 ? 'clase al mes' : 'clases al mes'),
+                      alCambiar: (x) => set(() => v[e] = x.toInt()),
+                    ),
                   ),
-                ),
-        ),
+          ),
+        ],
       ],
+      const SizedBox(height: 16),
+      for (final e in visibles)
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            key: ValueKey(ejemplo(e)),
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: context.pivot.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Text(ejemplo(e), style: TextStyle(height: 1.4, color: context.pivot.sobreSuave)),
+          ),
+        ),
     ],
   );
   if (ok != true || !context.mounted) return;
@@ -251,7 +273,8 @@ Future<void> editarGracia(BuildContext context, Sesion sesion, ConfigLiga c, {St
 String textoVencimiento(ConfigLiga c) {
   final d = c.cuotaVenceDia >= 1 && c.cuotaVenceDia <= 28 ? c.cuotaVenceDia : 15; // igual que el servidor
   final g = c.cuotaRecargo > 0 && c.cuotaGraciaDias > 0 ? ' (+${c.cuotaGraciaDias} ${c.cuotaGraciaDias == 1 ? 'día' : 'días'} de margen)' : '';
-  final r = c.cuotaRecargo > 0 ? ' · recargo ${plataLiga(c.cuotaRecargo)}$g' : ' · sin recargo';
+  final monto = c.recargoPorcentaje ? '${c.cuotaRecargo % 1 == 0 ? c.cuotaRecargo.toInt() : c.cuotaRecargo} %' : plataLiga(c.cuotaRecargo);
+  final r = c.cuotaRecargo > 0 ? ' · recargo $monto${c.recargoMensual ? ' por mes de atraso' : ''}$g' : ' · sin recargo';
   return 'Día $d de cada mes$r';
 }
 

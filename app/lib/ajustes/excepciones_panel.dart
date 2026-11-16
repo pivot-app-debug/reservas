@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
@@ -9,6 +8,7 @@ import 'componentes.dart';
 import 'excepcion_screen.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
 
 /// Panel "Excepción de cuota" (Victor, 2026-11-08): antes de pedir una, se ve
 /// lo que ya hay. Arriba, cómo queda la cuota de este mes; después lo vigente
@@ -147,7 +147,7 @@ class _ExcepcionesPanelScreenState extends State<ExcepcionesPanelScreen> {
                 ),
               )
             : !listo
-            ? const Center(key: ValueKey('cargando'), child: PivotCargando())
+            ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('cargando'))
             : _contenido(context, yaPidio),
       ),
     );

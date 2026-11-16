@@ -7,8 +7,8 @@ import 'anticipada.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
 import 'selector_fechas.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Asistencia anticipada: lista de reglas. Crear o editar abre el asistente
 /// por pasos (mismo marco que el resto de la app, pedido 2026-11-06).
@@ -127,7 +127,7 @@ class _AnticipadaScreenState extends State<AnticipadaScreen> {
         ),
       );
     } else if (_reglas == null) {
-      cuerpo = const Center(key: ValueKey('cargando'), child: PivotCargando());
+      cuerpo = const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('cargando'));
     } else if (visibles!.isEmpty) {
       cuerpo = Center(
         key: const ValueKey('vacio'),

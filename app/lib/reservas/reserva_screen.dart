@@ -11,8 +11,8 @@ import '../eventos/anticipada.dart';
 import '../eventos/eventos_repo.dart';
 import 'comprobante.dart';
 import 'reservas_repo.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 enum _Paso { elegir, pago }
 
@@ -170,7 +170,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
       cuerpo: _error != null
           ? _errorCarga(context)
           : !listo
-          ? const Center(child: PivotCargando())
+          ? const Esqueleto(forma: FormaEsqueleto.tarjetas)
           : switch (_paso) {
               _Paso.elegir => _esMes ? _pasoMeses(context) : _pasoClases(context),
               _Paso.pago => _pasoPago(context, total),
@@ -331,10 +331,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   child: !s.hasData
-                      ? const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(child: PivotCargando()),
-                        )
+                      ? const Padding(padding: EdgeInsets.all(16), child: EsqueletoFilas())
                       : s.data!.isEmpty
                       ? Text('No quedan patines libres para esta fecha.', style: TextStyle(color: p.textoSecundario))
                       : Wrap(
@@ -888,7 +885,7 @@ class _ReservaExitoScreenState extends State<ReservaExitoScreen> with WidgetsBin
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Si todavía no pagas, hazlo y vuelve: te lo pediremos al volver. También puedes subirlo después desde la Bandeja.',
+                        'Si todavía no pagas, hazlo y vuelve: te lo pediremos al volver. También puedes subirlo después desde Notificaciones.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
                       ),

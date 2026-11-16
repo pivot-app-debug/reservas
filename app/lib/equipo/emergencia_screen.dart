@@ -10,8 +10,8 @@ import '../core/paises.dart';
 import '../core/tema.dart';
 import 'equipo_modelos.dart';
 import 'equipo_repo.dart';
-import '../core/cargando.dart';
 import '../eventos/widgets_comunes.dart';
+import '../core/esqueleto.dart';
 
 /// Ficha de emergencia (solo admins, Victor 2026-11-07): de acceso rápido
 /// desde la fila de Equipo o la ficha de la persona. Arriba, a quién llamar
@@ -103,8 +103,6 @@ class _EmergenciaScreenState extends State<EmergenciaScreen> {
     return Scaffold(
       backgroundColor: p.fondo,
       appBar: AppBar(
-        backgroundColor: p.marca,
-        foregroundColor: p.sobreMarca,
         title: const Text('Emergencia', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: AnimatedSwitcher(
@@ -139,11 +137,7 @@ class _EmergenciaScreenState extends State<EmergenciaScreen> {
                   const SizedBox(height: 16),
                   // Siempre arriba y siempre visible, aunque la ficha todavía cargue.
                   _botonEmergencias(p, numeroPublico, paisNombre),
-                  if (_f == null)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: PivotCargando()),
-                    ),
+                  if (_f == null) const Padding(padding: EdgeInsets.all(16), child: EsqueletoFilas()),
                   if (_f != null) ..._ficha(p),
                 ],
               ),

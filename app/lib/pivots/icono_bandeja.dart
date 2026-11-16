@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../core/tema.dart';
 
-/// Ícono de la Bandeja (Victor, 2026-11-13): bandeja normal; con novedades
+/// Ícono de Notificaciones (antes Bandeja; Victor, 2026-11-16: siempre
+/// campana). Campana normal; con novedades
 /// pasa a una campana que se balancea con un punto rojo arriba a la derecha,
 /// y vuelve a bandeja solo cuando se abre y se ve. Para Pivots, el número de
 /// pedidos por revisar va en la bandeja.
@@ -89,7 +90,7 @@ class _IconoBandejaState extends State<IconoBandeja> with SingleTickerProviderSt
               isLabelVisible: widget.pendientes > 0,
               backgroundColor: p.marca,
               label: Text('${widget.pendientes}'),
-              child: const Icon(Icons.inbox_rounded),
+              child: const Icon(Icons.notifications_none_rounded),
             ),
     );
   }

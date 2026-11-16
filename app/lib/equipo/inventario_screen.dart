@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
 import '../core/menu_acciones.dart';
@@ -16,6 +15,7 @@ import 'equipo_repo.dart';
 import 'inventario_asistentes.dart';
 import 'inventario_modelos.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Inventario del equipo (Victor, 2026-11-13): listas personalizables
 /// (con tallas, sets de piezas, unidades o insumos), quién tiene qué
@@ -180,7 +180,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
     final p = context.pivot;
     Widget cuerpo;
     if (!_cargado) {
-      cuerpo = _error != null ? Center(key: const ValueKey('e'), child: Text(_error!)) : const Center(key: ValueKey('c'), child: PivotCargando());
+      cuerpo = _error != null ? Center(key: const ValueKey('e'), child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'));
     } else {
       final activos = repo.prestamos.where((x) => x.activo).toList();
       final misPendientes = repo.prestamos.where((x) => x.pendiente && x.mio).toList();
@@ -1094,7 +1094,7 @@ class _ReglasPrestamoScreenState extends State<ReglasPrestamoScreen> {
         body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: reglas == null
-              ? (_error != null ? Center(child: Text(_error!)) : const PivotCargando(centrarEnPantalla: true))
+              ? (_error != null ? Center(child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.ajustes))
               : ListView(
                   key: const ValueKey('l'),
                   padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),

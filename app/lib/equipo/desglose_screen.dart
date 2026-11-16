@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../ajustes/componentes.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import 'equipo_repo.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Desglose de puntos de un mes (Victor, 2026-11-12: antes era una hoja
 /// plana). Pantalla completa con: tarjeta en degradado con el total, cifras
@@ -85,7 +85,7 @@ class _DesgloseScreenState extends State<DesgloseScreen> {
               ),
             );
           } else if (!s.hasData) {
-            cuerpo = const Center(key: ValueKey('cargando'), child: PivotCargando());
+            cuerpo = const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('cargando'));
           } else {
             cuerpo = _contenido(context, s.data!);
           }
@@ -117,13 +117,16 @@ class _DesgloseScreenState extends State<DesgloseScreen> {
     }
 
     // Puntos por semana del mes (1–7, 8–14, …).
-    final semanas = List<double>.filled(5, 0);
+    final ultimo = DateTime(widget.mes.year, widget.mes.month + 1, 0).day;
+    final semanas = List<double>.filled(ultimo > 28 ? 5 : 4, 0);
     for (final f in filas) {
       final d = Fechas.desdeIso(f['fecha']);
       if (d == null || d.month != widget.mes.month) continue;
-      semanas[((d.day - 1) ~/ 7).clamp(0, 4)] += _pts(f);
+      semanas[((d.day - 1) ~/ 7).clamp(0, semanas.length - 1)] += _pts(f);
     }
     final maxSemana = semanas.fold<double>(0, (a, b) => b > a ? b : a);
+    // Etiquetas por días del mes (Victor, 2026-11-16: "S1" no se entendía).
+    String rango(int i) => i == 4 ? (ultimo == 29 ? '29' : '29 al $ultimo') : '${i * 7 + 1} al ${i * 7 + 7}';
 
     return ListView(
       key: const ValueKey('lista'),
@@ -219,7 +222,7 @@ class _DesgloseScreenState extends State<DesgloseScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Text('S${i + 1}', style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+                                Text(rango(i), maxLines: 1, softWrap: false, style: TextStyle(fontSize: 11, color: p.textoSecundario)),
                               ],
                             ),
                           ),
@@ -253,7 +256,7 @@ class _DesgloseScreenState extends State<DesgloseScreen> {
     final externa = f['externa'] == true;
     final (IconData icono, String seccion, String titulo) = switch (widget.concepto) {
       'asistencia' when externa => (Icons.place_rounded, 'identidad', 'Asistencia externa'),
-      'asistencia' when f['estado'] == 'Tarde' => (Icons.schedule_rounded, 'notificaciones', 'Llegó tarde'),
+      'asistencia' when f['estado'] == 'Tarde' => (Icons.schedule_rounded, 'notificaciones', 'Tarde'),
       'asistencia' => (Icons.check_rounded, 'reservas', 'A tiempo'),
       'tareas' => (Icons.task_alt_rounded, 'organizacion', '${f['titulo'] ?? 'Tarea'}'),
       _ => (Icons.local_fire_department_rounded, 'cuota', '${f['titulo'] ?? f['nombre'] ?? 'Racha'}'),

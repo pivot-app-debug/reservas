@@ -3,7 +3,6 @@ import '../equipo/equipo_repo.dart';
 import 'package:flutter/material.dart';
 
 import '../ajustes/componentes.dart';
-import '../core/cargando.dart';
 import '../core/tema.dart';
 import '../eventos/widgets_comunes.dart';
 import 'crear_tarea_screen.dart';
@@ -13,6 +12,7 @@ import 'tarea_screen.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// Pestaña Tareas (nativa, 2026-11-08). Mismo lenguaje que Ajustes: grupos
 /// en tarjeta, íconos con el degradado del área.
@@ -67,7 +67,9 @@ class _TareasScreenState extends State<TareasScreen> {
           if (!repo.cargado) {
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
-              child: repo.error == null ? const Center(child: PivotCargando()) : _Error(texto: repo.error!, alReintentar: () => repo.cargar(forzar: true)),
+              child: repo.error == null
+                  ? const Esqueleto(forma: FormaEsqueleto.tarjetas)
+                  : _Error(texto: repo.error!, alReintentar: () => repo.cargar(forzar: true)),
             );
           }
           return RefreshIndicator(

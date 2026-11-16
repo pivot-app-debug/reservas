@@ -6,8 +6,8 @@ import '../core/tema.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
-import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/esqueleto.dart';
 
 /// "Tomar asistencia" (solo admins, desde que el evento empieza). Mismo
 /// comportamiento que la subpantalla de la web (`_evAbrirMarcarAsistencia()`):
@@ -137,7 +137,7 @@ class _TomarAsistenciaScreenState extends State<TomarAsistenciaScreen> {
         ),
       );
     }
-    if (_roster == null) return const Center(child: PivotCargando());
+    if (_roster == null) return const Esqueleto(forma: FormaEsqueleto.lista);
     final q = _busqueda.trim().toLowerCase();
     bool coincide(MiembroRoster m) => q.isEmpty || m.persona.nombreMostrar.toLowerCase().contains(q) || m.persona.username.toLowerCase().contains(q);
     bool sugerido(MiembroRoster m) => _sugeridos.contains(m.persona.username.trim().toUpperCase());

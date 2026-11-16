@@ -93,6 +93,8 @@ class _ReglasScreenState extends State<ReglasScreen> {
     super.dispose();
   }
 
+  bool? _ranking;
+
   /// Regla escrita en la app: se explica en vez de editarse.
   void _fija(String titulo) => showDialog<void>(
     context: context,
@@ -104,7 +106,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
   );
 
   /// Una regla: título, qué hace, a quién aplica y qué pasa al tocarla.
-  Widget _regla(String id, IconData icono, String titulo, String texto, {String? equipo, VoidCallback? editar, String seccion = 'cuota'}) {
+  Widget _regla(String id, IconData icono, String titulo, String texto, {String? equipo, VoidCallback? editar, String seccion = 'cuota', bool? interruptor}) {
     if (_equipo != null && equipo != null && equipo != _equipo) return const SizedBox.shrink();
     return Resaltable(
       id: id,
@@ -117,7 +119,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
         derecha: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ChipAlcance(equipo: equipo),
+            if (interruptor != null) Switch(value: interruptor, onChanged: (_) => editar?.call()) else ChipAlcance(equipo: equipo),
             if (editar == null) ...[const SizedBox(width: 6), Icon(Icons.lock_outline_rounded, size: 16, color: context.pivot.textoSecundario)],
           ],
         ),
@@ -197,8 +199,8 @@ class _ReglasScreenState extends State<ReglasScreen> {
                     gracia[e] == null
                         ? 'No usa: sigue su regla de pago'
                         : (gracia[e] == 0
-                              ? 'Paga antes de marcar Asistiré'
-                              : '${gracia[e]} ${gracia[e] == 1 ? 'clase' : 'clases'} al mes sin haber pagado (cuenta al venir a horario o tarde); después pide pagar'),
+                              ? 'Debe pagar antes de marcar Asistiré'
+                              : '${gracia[e]} ${gracia[e] == 1 ? 'clase' : 'clases'} al mes sin haber pagado; después debe pagar'),
                     equipo: e,
                     editar: () => editarGracia(context, s, c, soloEquipo: e),
                   ),
@@ -299,7 +301,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'rectificaciones',
                   Icons.fact_check_outlined,
                   'Rectificaciones',
-                  'Pedidos para corregir una asistencia mal tomada. Se revisan en ${c.rectificacionDias} días. Siempre aplica a toda la liga',
+                  'Pedidos para corregir una asistencia mal tomada. Se revisan en ${c.rectificacionDias} días',
                   seccion: 'entrenamientos',
                   editar: () => numeroLiga(context, c, 'Días para revisar una rectificación', 'rectificacionDias', c.rectificacionDias, 1, 60, 'días'),
                 ),
@@ -323,7 +325,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'sinPago',
                   Icons.how_to_reg_outlined,
                   'Asistiré sin pago',
-                  'Quien paga por mes y no pagó, al marcar Asistiré va a pagar (después de sus clases de gracia)',
+                  'Si paga por mes y no ha pagado, al marcar Asistiré se le pide pagar',
                   seccion: 'entrenamientos',
                 ),
                 for (final e in estadosEditables.entries)
@@ -399,9 +401,16 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'ranking',
                   Icons.leaderboard_outlined,
                   'Puntos de otras personas',
-                  c.rankingVisible ? 'Todo el equipo ve los puntos de todas las personas' : 'Cada persona solo ve sus puntos',
+                  (_ranking ?? c.rankingVisible) ? 'Todo el equipo ve los puntos de todas las personas' : 'Cada persona solo ve sus puntos',
                   seccion: 'privacidad',
-                  editar: () => guardarReglaLiga(context, c, {'rankingVisible': !c.rankingVisible}),
+                  interruptor: _ranking ?? c.rankingVisible,
+                  editar: () async {
+                    // Cambia al instante y se guarda por detrás (Victor, 2026-11-16).
+                    final v = !(_ranking ?? c.rankingVisible);
+                    setState(() => _ranking = v);
+                    await guardarReglaLiga(context, c, {'rankingVisible': v});
+                    if (mounted) setState(() => _ranking = null);
+                  },
                 ),
               ],
             ),

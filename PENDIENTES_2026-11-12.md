@@ -550,3 +550,33 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] (2026-11-16, Victor dio el ok) Cambiar la dirección principal a Flutter web y dejar la vieja congelada unas semanas. Preparado (2026-11-16): botón para activar avisos en iPhone y enlaces `?evento=`. Falta elegir el momento con Victor, después de sus pruebas. Plan: (1) el workflow App Web compila con `--base-href /` y publica en la raíz; (2) la web vieja pasa a /vieja/ (usa rutas absolutas `/js`, `/icons`: hay que ajustarlas) y su service worker de OneSignal deja de registrarse; (3) `APP_URL` del servidor sigue siendo la raíz; (4) quien tenga la web vieja instalada en el iPhone abrirá la nueva al tocar el ícono.
 - [x] Tours guiados en cada sección (2026-11-15): Calendario v2, evento, Equipo, ficha, Estadísticas, Mi perfil, Mi Liga, Bandeja.
 - [x] Mi Liga reestructurada (2026-11-15): inicio con Equipos y Tesorería, ajustes por equipo, pantalla de Reglas, Cobros en Tesorería, Pedidos de Pivots en Pivots, canal en Comunidad. Falta: el asistente "+ Nueva regla" y que las reglas fijas se puedan editar (motor de reglas en el servidor), después de que Victor valide "Pivot — Reglas actuales".
+
+## S. Revisión de Victor (2026-11-16, 13:57) — todo aprobado
+**Bloque A (hacer ahora):**
+- Estadísticas: sin tour; detalle de asistencia "Tarde" con fecha debajo; semanas "1 al 7", "8 al 14"… (también en Racha); tarjeta "Mi equipo" con logo de fondo en fundido.
+- Barras de arriba: un solo estilo en toda la app (sin degradado rojizo ni blanco sólido). Detectadas: Puntos por asistencia, Puntos por tareas, Notificaciones (rojizas); Puntos por racha, Cuenta y acceso, Salud y emergencia (blancas).
+- Textos: Notificaciones sin subtítulo en "Avisos de Pivot"; equipo: "Nombre del equipo", "Mantenerse en el equipo", "Ascenso al equipo", "Descenso del equipo"; agregar Pivot sin "Solo aparecen personas con correo"; Salud y emergencia sin subtítulo; Reglas sin espacio en blanco; Fecha límite sin los títulos "FECHA LÍMITE (DÍA…)" y "Así se ve un mes"; "Cobros" (sin nombre del equipo en títulos), "Por clase o por mes"; Clase de gracia sin nombre del equipo; subtítulos de Rectificaciones y Asistiré sin pago que no se corten; "congela/congelado" → "Pausado".
+- Skeletons en vez de loaders en círculo en toda la app (empezar por Equipos de Mi liga).
+- Mantenerse: pantalla por pasos, "En cuánto tiempo" con ejemplo con números y consecuencia de cambiarlo; título "Mantenerse".
+- Invita al equipo (antes "Invita a jugar"): el texto dice el requisito concreto.
+- Pivots y permisos: sin sombra en tarjetas; "Aprobación de solicitudes" sin "más seguro"; interruptor sin trabarse.
+- Fecha límite: si las recompensas están apagadas, lo dice.
+- Clase de gracia: ejemplo en vivo abajo junto a Guardar; selector de número (0 = debe pagar antes); explicar por qué un equipo por clase no tiene interruptor.
+- Privacidad: interruptor de "Puntos de otras personas" visible.
+**Bloque B (aprobado):**
+- Estadísticas: selector Mes / Año en la barra; en Año aparecen horas patinadas; se quita la tarjeta anual.
+- Edad: la app es solo para mayores de 18; registro de menores imposible; quitar el texto de los 16 años.
+- Avisos del equipo enviados se borran a los 30 días (también los viejos).
+- Borrar personas archivadas: se borra todo menos pagos (con nombre) y asistencias.
+- Monedas: lista ISO completa con buscador.
+- Recargo por pagar tarde: porcentaje (por defecto) o monto fijo; el Pivot elige si es único o sube cada mes de atraso; tarjeta rehecha.
+- Cobros: lista de personas exentas / sin cuota, con quitar exención o pasar a "paga cuota".
+- Mensualidad por equipo: desplegable "Igual que en la liga / Personalizado" (exige monto).
+- Reservas por clase: una pantalla, arriba a qué equipos afecta; secciones con interruptor y ejemplo (clases visibles, clase gratis al cancelar, cierre de reservas apagado = hasta que empieza, reserva sin aprobar); Clase gratis de bienvenida aparte con ejemplo.
+- Estados: sección propia en Reglas (Lesionadx, De viaje, Enfermedad, Situación personal, Otro), desplegables; Enfermedad/Situación personal/Otro con solicitud que aprueba un Pivot; sin interruptor "Disponible".
+- Reglas por equipo dentro de cada equipo (mantenerse, ascenso/descenso, cobros, clase de gracia, puntos por asistencia, qué cuenta como clase, cuándo se aplican, historial, equipamiento propio, préstamo); desaparece "Puntos y equipos". Criterio de Victor: casi todo por equipo; lo de la liga, activable por equipo.
+- Tarjetas de equipo en Mi liga: logo de fondo con fundido a la izquierda, sin avatar (sin logo queda el avatar).
+- Reserva: montos sumados bien al elegir varias clases o meses (DeUna y banco internacional); al reservar poder cambiar lo que necesita (sin protecciones, solo muñequeras…) y preguntar si se guarda en su equipamiento, como la web vieja.
+- Tesorería pasa a llamarse Finanzas, va en la barra de abajo y se quita su tarjeta de Mi liga.
+**Antes de la beta cerrada (orden de Victor):** todo lo de la hoja de ruta: crear liga, varias ligas, planes/cursos/inscripción rápida/cupones manuales, partidos y torneos, cambios de categoría en la Bandeja, fotos y etiqueta en inventario, barra final, pasar cuentas a Google de Pivot (pasos manuales con Victor), política revisada por abogado. Después: dos versiones (prueba y producción) y recién ahí Play Store beta cerrada.
+- Preocupación de Victor: en crear liga son muchas reglas; el asistente debe ponerlas con valores por defecto y pocas preguntas.

@@ -16,7 +16,6 @@ import '../ajustes/recorte_foto.dart';
 import '../core/api.dart';
 import 'buscador_liga.dart';
 import '../core/asistente.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/selector_plazo.dart';
 import '../core/tema.dart';
@@ -25,6 +24,7 @@ import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
 
 /// Persona con clases y puntos por mes calendario (`adminDatosCategorias`):
 /// índice 0 = mes en curso, 1 = último mes cerrado… hasta 12.
@@ -337,7 +337,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
     if (modo == 'auto') {
       return 'Los cambios se aplicarán apenas alguien cumpla o deje de cumplir los requisitos, de forma automática.${ej.isEmpty ? '' : '\n\n$ej'}';
     }
-    return 'La lista llegará a la Bandeja el ${Fechas.corta(llega)}. Tendrás hasta el ${Fechas.corta(c)} para revisarla; lo que no revises se aplicará automáticamente ese día.${ej.isEmpty ? '' : '\n\n$ej'}';
+    return 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Tendrás hasta el ${Fechas.corta(c)} para revisarla; lo que no revises se aplicará automáticamente ese día.${ej.isEmpty ? '' : '\n\n$ej'}';
   }
 
   /// Ejemplo con los requisitos reales de los dos primeros equipos (Victor, 2026-11-14).
@@ -362,7 +362,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
           (
             'revisar',
             'Revisar antes',
-            'Los cambios llegan a la Bandeja antes del día de corte para aprobarlos o dejarlos como están.',
+            'Los cambios llegan a Notificaciones antes del día de corte para aprobarlos o dejarlos como están.',
             Icons.fact_check_outlined,
           ),
           ('auto', 'Automático', 'Se aplican solos, sin revisión.', Icons.bolt_rounded),
@@ -530,7 +530,9 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: l == null
-            ? Center(key: const ValueKey('c'), child: _error == null ? const PivotCargando(centrarEnPantalla: true) : Text(_error!))
+            ? _error == null
+                  ? const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'))
+                  : Center(key: const ValueKey('e'), child: Text(_error!))
             : RefreshIndicator(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
@@ -680,7 +682,7 @@ class _Fila extends StatelessWidget {
 }
 
 class _Nota extends StatelessWidget {
-  const _Nota({required this.texto});
+  const _Nota({super.key, required this.texto});
   final String texto;
   @override
   Widget build(BuildContext context) {
@@ -1004,7 +1006,7 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               child: l == null
-                  ? const PivotCargando()
+                  ? const Esqueleto(forma: FormaEsqueleto.lista, arriba: 8)
                   : l.isEmpty
                   ? Center(
                       child: Text(_error ?? 'Sin cambios con estos filtros.', style: TextStyle(color: p.textoSecundario)),
@@ -1101,6 +1103,17 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   }
 
   String get _nombreDebajo => '${_debajo?['nombre'] ?? 'el equipo inicial'}';
+
+  /// Lo que pide el equipo al inscribirse con su enlace, dicho con todas
+  /// las letras (Victor, 2026-11-16).
+  String get _textoInvitar {
+    final req = (t['requisitos'] as Map?) ?? const {};
+    final pide = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'];
+    if (_piso || pide.isEmpty) return 'Quien se inscribe con este enlace entra a $_nombre.';
+    return 'Quien se inscribe con este enlace entra a $_nombre si tiene ${pide.join(' y ')} propi${pide.length > 1 || pide.first == 'patines' ? 'os' : 'as'}; '
+        'si no, entra a $_nombreDebajo y se le explica por qué.';
+  }
+
   String get _inicial => '${widget.tiers.firstWhere((x) => x['es_default'] == true, orElse: () => widget.tiers.last)['nombre']}';
   List<_Persona> get _miembros => widget.gente.where((x) => x.categoria == _nombre && x.evaluable && !x.usaEquipo).toList();
   List<_Persona> get _candidatos => _debajo == null ? const [] : widget.gente.where((x) => x.categoria == _nombreDebajo && x.evaluable).toList();
@@ -1131,89 +1144,22 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   Future<bool?> _hoja(String titulo, List<Widget> Function(StateSetter set) contenido, {String boton = 'Guardar'}) =>
       abrirSubseccion(context, titulo: titulo, contenido: contenido, boton: boton);
 
-  Widget _impacto(_Regla antes, _Regla ahora) =>
-      _Impacto(antes: antes, ahora: ahora, miembros: _miembros, candidatos: _candidatos, nombre: _nombre, debajo: _nombreDebajo);
-
+  /// Mantenerse en el equipo, por pasos (Victor, 2026-11-16: la hoja con
+  /// todo junto daba miedo tocarla).
   Future<void> _mantener() async {
     final antes = _Regla.de(t);
-    final r = antes.copia();
-    void modo(String m) {
-      switch (m) {
-        case 'clases':
-          if (r.clases == 0) r.clases = antes.clases > 0 ? antes.clases : 3;
-          r.puntos = 0;
-          r.logica = 'Y';
-        case 'puntos':
-          if (r.puntos == 0) r.puntos = antes.puntos > 0 ? antes.puntos : 5;
-          r.clases = 0;
-          r.logica = 'Y';
-        default:
-          if (r.clases == 0) r.clases = antes.clases > 0 ? antes.clases : 3;
-          if (r.puntos == 0) r.puntos = antes.puntos > 0 ? antes.puntos : 5;
-          r.logica = m == 'y' ? 'Y' : 'O';
-      }
-    }
-
-    final ok = await _hoja('Para mantenerse en $_nombre', (set) {
-      final p = context.pivot;
-      return [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final (m, txt) in const [('clases', 'Solo clases'), ('puntos', 'Solo puntos'), ('o', 'Clases o puntos'), ('y', 'Clases y puntos')])
-              ChoiceChip(label: Text(txt), selected: r.modo == m, onSelected: (_) => set(() => modo(m))),
-          ],
-        ),
-        if (r.modo != 'puntos') ...[
-          const SizedBox(height: 14),
-          Text(
-            'Clases asistidas',
-            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-          ),
-          SelectorNumero(valor: r.clases, min: 1, max: 60, etiqueta: r.clases == 1 ? 'clase' : 'clases', alCambiar: (v) => set(() => r.clases = v.toInt())),
-        ],
-        if (r.modo != 'clases') ...[
-          const SizedBox(height: 14),
-          Text(
-            'Puntos',
-            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-          ),
-          SelectorNumero(valor: r.puntos, min: 1, max: 500, etiqueta: 'puntos', alCambiar: (v) => set(() => r.puntos = v.toInt())),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            children: [
-              ChoiceChip(label: const Text('Solo por tareas'), selected: r.fuente == 'tareas', onSelected: (_) => set(() => r.fuente = 'tareas')),
-              ChoiceChip(label: const Text('Todos los puntos'), selected: r.fuente == 'todos', onSelected: (_) => set(() => r.fuente = 'todos')),
-            ],
-          ),
-        ],
-        const SizedBox(height: 14),
-        Text(
-          'En cuánto tiempo',
-          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-        ),
-        SelectorPlazo(valor: r.ventana, unidad: r.unidad, max: 52, alCambiar: (v, u) => set(() => (r.ventana = v, r.unidad = u))),
-        const SizedBox(height: 8),
-        Text(
-          r.unidad == 'mes' ? 'Se cuentan meses completos: en diciembre se mira noviembre.' : 'Se cuenta hacia atrás desde hoy.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: p.textoSecundario),
-        ),
-        const SizedBox(height: 14),
-        _Nota(texto: 'Pedirá ${r.texto}.'),
-        const SizedBox(height: 12),
-        _impacto(antes, r),
-      ];
-    });
-    if (ok == true) await _guardar(const {}, regla: r);
+    final r = await Navigator.of(context).push<_Regla>(
+      MaterialPageRoute(
+        builder: (_) => _MantenerAsistente(antes: antes, miembros: _miembros, candidatos: _candidatos, nombre: _nombre, debajo: _nombreDebajo),
+      ),
+    );
+    if (r != null) await _guardar(const {}, regla: r);
   }
 
   Future<void> _subir() async {
     final antes = _Regla.de(t);
     final r = antes.copia();
-    final ok = await _hoja('Para subir a $_nombre', (set) {
+    final ok = await _hoja('Ascenso al equipo', (set) {
       return [
         SelectorNumero(valor: r.subir, min: 1, max: 12, etiqueta: r.subir == 1 ? 'mes' : 'meses seguidos', alCambiar: (v) => set(() => r.subir = v.toInt())),
         const SizedBox(height: 12),
@@ -1226,7 +1172,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   Future<void> _bajar() async {
     final antes = _Regla.de(t);
     final r = antes.copia();
-    final ok = await _hoja('Para bajar de $_nombre', (set) {
+    final ok = await _hoja('Descenso del equipo', (set) {
       return [
         SelectorPlazo(valor: r.gracia, unidad: r.graciaUnidad, min: 0, max: 52, alCambiar: (v, u) => set(() => (r.gracia = v, r.graciaUnidad = u))),
         const SizedBox(height: 12),
@@ -1374,11 +1320,11 @@ class _EquipoScreenState extends State<_EquipoScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _Fila(icono: Icons.badge_outlined, titulo: 'Nombre', texto: _nombre, alTocar: _renombrar),
+            _Fila(icono: Icons.badge_outlined, titulo: 'Nombre del equipo', texto: _nombre, alTocar: _renombrar),
             if (!_piso) ...[
-              _Fila(icono: Icons.verified_outlined, titulo: 'Para mantenerse', texto: 'Pide ${r.texto}.', alTocar: _mantener),
-              _Fila(icono: Icons.trending_up_rounded, titulo: 'Para subir', texto: 'Desde $_nombreDebajo: ${r.textoSubir}.', alTocar: _subir),
-              _Fila(icono: Icons.trending_down_rounded, titulo: 'Para bajar', texto: '${r.textoBajar}.', alTocar: _bajar),
+              _Fila(icono: Icons.verified_outlined, titulo: 'Mantenerse en el equipo', texto: 'Pide ${r.texto}.', alTocar: _mantener),
+              _Fila(icono: Icons.trending_up_rounded, titulo: 'Ascenso al equipo', texto: 'Desde $_nombreDebajo: ${r.textoSubir}.', alTocar: _subir),
+              _Fila(icono: Icons.trending_down_rounded, titulo: 'Descenso del equipo', texto: '${r.textoBajar}.', alTocar: _bajar),
               if (otros.length > 1)
                 _Fila(
                   icono: Icons.swap_vert_rounded,
@@ -1414,18 +1360,13 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                         Icon(Icons.person_add_alt_1_rounded, color: PivotPaleta.sobreSeccion),
                         SizedBox(width: 8),
                         Text(
-                          'Invita a jugar',
+                          'Invita al equipo',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      _piso
-                          ? 'Quien se inscribe con este enlace entra a $_nombre.'
-                          : 'Quien se inscribe con este enlace entra a $_nombre si cumple lo que pide; si no, a $_nombreDebajo, y se le explica por qué.',
-                      style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92)),
-                    ),
+                    Text(_textoInvitar, style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92))),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -1734,6 +1675,183 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
   }
 }
 
+enum _PasoM { que, clases, puntos, periodo, resumen }
+
+/// Qué pide un equipo para mantenerse, en pasos cortos con ejemplos.
+class _MantenerAsistente extends StatefulWidget {
+  const _MantenerAsistente({required this.antes, required this.miembros, required this.candidatos, required this.nombre, required this.debajo});
+  final _Regla antes;
+  final List<_Persona> miembros, candidatos;
+  final String nombre, debajo;
+
+  @override
+  State<_MantenerAsistente> createState() => _MantenerAsistenteState();
+}
+
+class _MantenerAsistenteState extends State<_MantenerAsistente> {
+  late final _Regla _r = widget.antes.copia();
+  _PasoM _paso = _PasoM.que;
+  bool _adelante = true;
+
+  List<_PasoM> get _pasos => [_PasoM.que, if (_r.modo != 'puntos') _PasoM.clases, if (_r.modo != 'clases') _PasoM.puntos, _PasoM.periodo, _PasoM.resumen];
+
+  void _ir(int d) {
+    final l = _pasos;
+    final i = l.indexOf(_paso) + d;
+    if (i < 0) return Navigator.of(context).pop();
+    if (i >= l.length) return;
+    setState(() => (_adelante = d > 0, _paso = l[i]));
+  }
+
+  void _modo(String m) => setState(() {
+    final a = widget.antes;
+    switch (m) {
+      case 'clases':
+        if (_r.clases == 0) _r.clases = a.clases > 0 ? a.clases : 3;
+        _r.puntos = 0;
+        _r.logica = 'Y';
+      case 'puntos':
+        if (_r.puntos == 0) _r.puntos = a.puntos > 0 ? a.puntos : 5;
+        _r.clases = 0;
+        _r.logica = 'Y';
+      default:
+        if (_r.clases == 0) _r.clases = a.clases > 0 ? a.clases : 3;
+        if (_r.puntos == 0) _r.puntos = a.puntos > 0 ? a.puntos : 5;
+        _r.logica = m == 'y' ? 'Y' : 'O';
+    }
+  });
+
+  /// Ejemplo con fechas reales de qué se mira y qué pasa si se cambia.
+  String get _ejemploPeriodo {
+    final hoy = Fechas.hoy();
+    final n = _r.ventana;
+    if (_r.unidad == 'mes' || _r.unidad == 'anio') {
+      final meses = _r.unidad == 'anio' ? n * 12 : n;
+      final hasta = DateTime(hoy.year, hoy.month - 1);
+      final desde = DateTime(hoy.year, hoy.month - meses);
+      final rango = meses == 1 ? 'todo ${Fechas.mes(hasta)}' : 'de ${Fechas.mes(desde)} a ${Fechas.mes(hasta)}';
+      return 'Se cuentan meses completos y el mes en curso no entra. Por ejemplo, en una revisión de ${Fechas.mes(hoy)} se mira $rango.';
+    }
+    final desde = hoy.subtract(Duration(days: _r.unidad == 'semana' ? n * 7 : n));
+    return 'Se cuenta hacia atrás desde el día de la revisión. Por ejemplo, hoy se miraría del ${Fechas.corta(desde)} al ${Fechas.corta(hoy)}.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = _pasos;
+    final p = context.pivot;
+    final impacto = _Impacto(
+      antes: widget.antes,
+      ahora: _r,
+      miembros: widget.miembros,
+      candidatos: widget.candidatos,
+      nombre: widget.nombre,
+      debajo: widget.debajo,
+    );
+    return Asistente(
+      titulo: 'Mantenerse',
+      indice: l.indexOf(_paso),
+      total: l.length,
+      clavePaso: _paso,
+      adelante: _adelante,
+      alAtras: () => _ir(-1),
+      tituloPaso: switch (_paso) {
+        _PasoM.que => '¿Qué se pide?',
+        _PasoM.clases => '¿Cuántas clases?',
+        _PasoM.puntos => '¿Cuántos puntos?',
+        _PasoM.periodo => '¿En cuánto tiempo?',
+        _PasoM.resumen => 'Revisa',
+      },
+      ayuda: switch (_paso) {
+        _PasoM.que => 'Lo que hay que cumplir para seguir en ${widget.nombre}.',
+        _PasoM.periodo => 'El tiempo en el que se suman las clases o los puntos.',
+        _PasoM.resumen => 'Así quedaría y a quién afecta hoy. Nada cambia hasta que guardes.',
+        _ => null,
+      },
+      cuerpo: switch (_paso) {
+        _PasoM.que => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final (m, icono, titulo, texto) in const [
+              ('clases', Icons.event_available_rounded, 'Solo clases', 'Un mínimo de clases asistidas.'),
+              ('puntos', Icons.star_outline_rounded, 'Solo puntos', 'Un mínimo de puntos.'),
+              ('o', Icons.alt_route_rounded, 'Clases o puntos', 'Basta con cumplir uno de los dos.'),
+              ('y', Icons.join_inner_rounded, 'Clases y puntos', 'Hay que cumplir los dos.'),
+            ])
+              OpcionAsistente(icono: icono, titulo: titulo, texto: texto, activa: _r.modo == m, alTocar: () => _modo(m)),
+          ],
+        ),
+        _PasoM.clases => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SelectorNumero(
+              valor: _r.clases,
+              min: 1,
+              max: 60,
+              etiqueta: _r.clases == 1 ? 'clase' : 'clases',
+              alCambiar: (v) => setState(() => _r.clases = v.toInt()),
+            ),
+            const SizedBox(height: 16),
+            impacto,
+          ],
+        ),
+        _PasoM.puntos => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SelectorNumero(valor: _r.puntos, min: 1, max: 500, etiqueta: 'puntos', alCambiar: (v) => setState(() => _r.puntos = v.toInt())),
+            const SizedBox(height: 8),
+            OpcionAsistente(
+              icono: Icons.task_alt_rounded,
+              titulo: 'Solo puntos por tareas',
+              texto: 'No cuentan los de asistencia ni racha.',
+              activa: _r.fuente == 'tareas',
+              alTocar: () => setState(() => _r.fuente = 'tareas'),
+            ),
+            OpcionAsistente(
+              icono: Icons.stars_rounded,
+              titulo: 'Todos los puntos',
+              texto: 'Asistencia, tareas y racha.',
+              activa: _r.fuente == 'todos',
+              alTocar: () => setState(() => _r.fuente = 'todos'),
+            ),
+            const SizedBox(height: 8),
+            impacto,
+          ],
+        ),
+        _PasoM.periodo => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SelectorPlazo(valor: _r.ventana, unidad: _r.unidad, max: 52, alCambiar: (v, u) => setState(() => (_r.ventana = v, _r.unidad = u))),
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _Nota(key: ValueKey(_ejemploPeriodo), texto: _ejemploPeriodo),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Más tiempo da margen a quien tuvo un mes flojo. Menos tiempo hace que el equipo refleje lo más reciente. '
+              'Quien no llega en ese tiempo pasa a ${widget.debajo}, después del margen que fijes en Descenso del equipo.',
+              style: TextStyle(fontSize: 13, height: 1.4, color: p.textoSecundario),
+            ),
+            const SizedBox(height: 14),
+            impacto,
+          ],
+        ),
+        _PasoM.resumen => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Nota(texto: '${widget.nombre} pedirá ${_r.texto}.'),
+            const SizedBox(height: 12),
+            impacto,
+          ],
+        ),
+      },
+      textoBoton: _paso == _PasoM.resumen ? 'Guardar' : 'Siguiente',
+      alContinuar: _paso == _PasoM.resumen ? () => Navigator.of(context).pop(_r) : () => _ir(1),
+    );
+  }
+}
+
 /// Efecto del cambio sobre el equipo de hoy, con nombres y un aviso amable
 /// si la regla queda muy por encima de lo que el equipo está haciendo.
 class _Impacto extends StatelessWidget {
@@ -1906,7 +2024,7 @@ class _AjustesEquipoScreenState extends State<AjustesEquipoScreen> {
       return Scaffold(
         appBar: AppBar(title: Text(widget.nombre)),
         body: Center(
-          child: _error != null ? Text(_error!) : (l == null ? const PivotCargando(centrarEnPantalla: true) : const Text('Ese equipo ya no existe.')),
+          child: _error != null ? Text(_error!) : (l == null ? const Esqueleto(forma: FormaEsqueleto.ajustes) : const Text('Ese equipo ya no existe.')),
         ),
       );
     }
@@ -1959,7 +2077,7 @@ class _NuevoEquipoScreenState extends State<NuevoEquipoScreen> {
     if (i == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Nuevo equipo')),
-        body: Center(child: _error != null ? Text(_error!) : const PivotCargando(centrarEnPantalla: true)),
+        body: _error != null ? Center(child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.ajustes),
       );
     }
     return _NuevoEquipoAsistente(sesion: widget.sesion, inicial: i, gente: _gente);
@@ -1975,7 +2093,7 @@ Future<bool> editarEquipamientoPropio(BuildContext context, Sesion s, Map<String
   var prot = req['proteccionesPropias'] == true;
   final ok = await abrirSubseccion(
     context,
-    titulo: 'Equipamiento propio en ${t['nombre']}',
+    titulo: 'Equipamiento propio',
     contenido: (set) => [
       Text(
         'Qué tiene que tener propio quien está en ${t['nombre']}. Quien se inscribe con su enlace sin cumplirlo entra al equipo inicial y se le explica por qué.',

@@ -7,13 +7,16 @@ import '../core/tema.dart';
 import '../core/vidrio.dart';
 import 'editores_liga.dart' show plataLiga;
 import '../core/moneda.dart';
+import '../equipo/equipo_modelos.dart';
+import '../equipo/equipo_repo.dart';
+import '../eventos/widgets_comunes.dart' show AvatarPersona;
 
 /// Cómo paga cada equipo (Victor, 2026-11-15): por mes, por clase, elige,
 /// según su equipamiento o sin cobro, y precio propio opcional.
 const modosCobro = <String, (String, String)>{
   'mes': ('Por mes', 'Paga la mensualidad. Puede tener clases de gracia.'),
   'clase': ('Por clase', 'Reserva y paga cada clase.'),
-  'elige': ('Elige', 'Cada persona elige pagar por clase o por mes.'),
+  'elige': ('Por clase o por mes', 'Cada persona elige pagar por clase o por mes.'),
   'segun_equipamiento': ('Según su equipamiento', 'Con equipamiento del club, solo por clase. Con equipamiento propio, elige por clase o por mes.'),
   'sin_cobro': ('Sin cobro', 'No paga: solo marca Asistiré.'),
 };
@@ -44,6 +47,34 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
   late final _mes = TextEditingController(text: _propioMes ? '${_orig['precioMensual']}' : '');
   late final _clase = TextEditingController(text: _propioClase ? '${_orig['precioClase']}' : '');
   bool _guardando = false;
+  late final EquipoRepo _equipo = EquipoRepo.de(widget.config.sesion)..cargar();
+  final _cambiando = <String>{};
+
+  /// Pasa a pagar cuota a alguien de la lista de quienes no pagan.
+  Future<void> _cobrarA(Integrante x) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text('¿${x.nombreMostrar} paga cuota?'),
+        content: const Text('Desde ahora se le pedirá la cuota como al resto del equipo.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Paga cuota')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final m = ScaffoldMessenger.of(context);
+    setState(() => _cambiando.add(x.username));
+    try {
+      await _equipo.cambiarPagaCuota(x, true);
+      m.showSnackBar(SnackBar(content: Text('${x.nombreMostrar} ahora paga cuota')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    } finally {
+      if (mounted) setState(() => _cambiando.remove(x.username));
+    }
+  }
 
   @override
   void dispose() {
@@ -73,19 +104,20 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
   }
 
   Widget _precio(String titulo, bool valor, ValueChanged<bool> alCambiar, TextEditingController t, num? deLaLiga) {
-    final p = context.pivot;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text(
-            valor ? 'Precio propio de ${widget.equipo}' : 'Igual que la liga (${plataLiga(deLaLiga)})',
-            style: TextStyle(color: p.textoSecundario),
+        Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 8),
+          child: DropdownButtonFormField<bool>(
+            initialValue: valor,
+            decoration: InputDecoration(labelText: titulo),
+            items: [
+              DropdownMenuItem(value: false, child: Text('Igual que en la liga (${plataLiga(deLaLiga)})')),
+              const DropdownMenuItem(value: true, child: Text('Personalizado')),
+            ],
+            onChanged: (v) => alCambiar(v ?? false),
           ),
-          value: valor,
-          onChanged: alCambiar,
         ),
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
@@ -96,10 +128,15 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: TextField(
                     controller: t,
+                    autofocus: true,
                     onChanged: (_) => setState(() {}),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                    decoration: InputDecoration(labelText: 'Precio', prefixText: '${Moneda.s} '),
+                    decoration: InputDecoration(
+                      labelText: 'Monto',
+                      prefixText: '${Moneda.s} ',
+                      errorText: _n(t) == null && t.text.isNotEmpty ? 'Escribe un monto' : null,
+                    ),
                   ),
                 )
               : const SizedBox(width: double.infinity),
@@ -121,12 +158,12 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text('Cobro de ${widget.equipo}', style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Cobros', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
-          Text('Cómo paga ${widget.equipo}. Las personas exentas no pagan, sea cual sea el modo.', style: TextStyle(fontSize: 15, height: 1.4, color: p.texto)),
+          Text('A las personas exentas de pago o sin cobro de cuota no se les exigirá pagar.', style: TextStyle(fontSize: 15, height: 1.4, color: p.texto)),
           const SizedBox(height: 16),
           for (final e in modosCobro.entries)
             Padding(
@@ -190,8 +227,66 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
           ),
           const SizedBox(height: 20),
           FilledButton(onPressed: !_guardando && valido ? _guardar : null, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
+          const SizedBox(height: 28),
+          _noPagan(context),
         ],
       ),
+    );
+  }
+
+  /// Quienes del equipo no pagan cuota (exentos), para revisarlos en un
+  /// solo lugar y pasarlos a pagar si algo está mal (Victor, 2026-11-16).
+  Widget _noPagan(BuildContext context) {
+    final p = context.pivot;
+    return ListenableBuilder(
+      listenable: _equipo,
+      builder: (context, _) {
+        final l = [
+          for (final x in _equipo.personas ?? const <Integrante>[])
+            if (x.categoria == widget.equipo && x.exentaCuota) x,
+        ]..sort((a, b) => a.nombreMostrar.toLowerCase().compareTo(b.nombreMostrar.toLowerCase()));
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+              child: Text(
+                'NO PAGAN CUOTA',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+              ),
+            ),
+            Material(
+              color: p.tarjeta,
+              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _equipo.personas == null
+                    ? const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator(minHeight: 2))
+                    : l.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('Todo el equipo paga cuota.', style: TextStyle(color: p.textoSecundario)),
+                      )
+                    : Column(
+                        children: [
+                          for (final x in l)
+                            ListTile(
+                              leading: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: 36),
+                              title: Text(x.nombreMostrar, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              subtitle: Text(x.estado.isEmpty || x.estado == 'Activx' ? 'Sin cobro de cuota' : 'Sin cobro de cuota · ${x.estado}'),
+                              trailing: _cambiando.contains(x.username)
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : TextButton(onPressed: () => _cobrarA(x), child: const Text('Cobrar')),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -333,7 +428,7 @@ Map<String, dynamic> cfgEstado(ConfigLiga c, String e) {
 String textoEstado(ConfigLiga c, String e) {
   final x = cfgEstado(c, e);
   if (x['activo'] == false) return 'Apagado';
-  return [x['congela'] == true ? 'Congela el equipo' : 'No congela el equipo', x['exentaCuota'] == true ? 'no paga cuota' : 'paga cuota'].join(' · ');
+  return [x['congela'] == true ? 'Pausado en su equipo' : 'Sigue la regla de su equipo', x['exentaCuota'] == true ? 'no paga cuota' : 'paga cuota'].join(' · ');
 }
 
 class EstadoScreen extends StatefulWidget {
@@ -408,7 +503,7 @@ class _EstadoScreenState extends State<EstadoScreen> {
                     ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Congela el equipo', style: TextStyle(fontWeight: FontWeight.w700)),
+                    title: const Text('Pausado', style: TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: const Text('Mientras dure, no sube ni baja de equipo por asistencia.'),
                     value: _congela,
                     onChanged: (v) => setState(() => _congela = v),

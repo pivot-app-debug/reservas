@@ -20,6 +20,8 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
     required this.textoSecundario,
     required this.borde,
     required this.bordeSuave,
+    required this.esqueleto,
+    required this.esqueletoBrillo,
     required this.lineaTimeline,
     required this.apagado,
     required this.apagadoFondo,
@@ -45,6 +47,10 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
   final Color textoSecundario;
   final Color borde;
   final Color bordeSuave;
+
+  /// Bloques de los esqueletos de carga y su brillo.
+  final Color esqueleto;
+  final Color esqueletoBrillo;
   final Color lineaTimeline;
   final Color apagado; // texto de eventos cancelados
   final Color apagadoFondo;
@@ -126,6 +132,8 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
     textoSecundario: Color(0xFF534341),
     borde: Color(0xFF857371),
     bordeSuave: Color(0xFFD8C2BF),
+    esqueleto: Color(0xFFF3E3E0),
+    esqueletoBrillo: Color(0xFFFFF8F7),
     lineaTimeline: Color(0xFFEAD5D1),
     apagado: Color(0xFF6E5A58),
     apagadoFondo: Color(0xFFF5EDEC),
@@ -154,6 +162,8 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
     textoSecundario: Color(0xFFBBAEAC),
     borde: Color(0xFF6B6260),
     bordeSuave: Color(0xFF3A3534),
+    esqueleto: Color(0xFF222020),
+    esqueletoBrillo: Color(0xFF332F2E),
     lineaTimeline: Color(0xFF3A3534),
     apagado: Color(0xFF8E8381),
     apagadoFondo: Color(0xFF151313),
@@ -267,11 +277,19 @@ ThemeData construirTema(Brightness brillo) {
     extensions: [p],
     scaffoldBackgroundColor: p.fondo,
     textTheme: textos,
+    // Tarjetas planas, sin sombra (Victor, 2026-11-16).
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: p.tarjeta,
+      surfaceTintColor: p.tarjeta,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: p.fondo,
       surfaceTintColor: p.fondo,
       foregroundColor: p.texto,
       elevation: 0,
+      scrolledUnderElevation: 0,
       // Íconos de la barra de estado (hora, batería) oscuros en modo claro y
       // claros en modo oscuro (Victor, 2026-11-14: en claro se veían blancos).
       systemOverlayStyle: estiloBarraSistema(brillo),

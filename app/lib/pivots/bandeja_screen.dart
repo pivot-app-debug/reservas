@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/config_liga.dart';
 import '../core/api.dart';
-import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../eventos/widgets_comunes.dart';
@@ -21,6 +20,7 @@ import '../reservas/comprobante.dart';
 import '../reservas/reservas_repo.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
+import '../core/esqueleto.dart';
 
 /// Bandeja de Pivots (etapa 3, Victor 2026-11-12): todo lo que espera una
 /// decisión, agrupado. Aprobar o rechazar quita la tarjeta con una
@@ -469,12 +469,12 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Bandeja', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {
-          if (!repo.cargado && repo.cargando) return const Center(child: PivotCargando());
+          if (!repo.cargado && repo.cargando) return const Esqueleto(forma: FormaEsqueleto.lista);
           if (!repo.cargado && repo.error != null) {
             return Center(
               child: Padding(
