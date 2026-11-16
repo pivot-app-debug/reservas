@@ -5,6 +5,7 @@ import '../core/api.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../sesion/sesion.dart';
+import '../core/moneda.dart';
 
 /// Recompensas automáticas (Victor, 2026-11-15): reglas que un Pivot arma
 /// para premiar la asistencia. Se otorgan solas y avisan a la persona.
@@ -125,7 +126,7 @@ class _RecompensaAsistenteScreenState extends State<RecompensaAsistenteScreen> {
       if (_conPuntos) _puntos == 1 ? 'un punto extra' : '$_puntos puntos extra',
       if (_clase) 'una clase gratis',
       if (_mensualidad) 'la mensualidad del mes siguiente gratis',
-      if (_conSaldo && _montoSaldo > 0) '\$${_montoSaldo % 1 == 0 ? _montoSaldo.toInt() : _montoSaldo} de saldo a favor',
+      if (_conSaldo && _montoSaldo > 0) '${Moneda.s}${_montoSaldo % 1 == 0 ? _montoSaldo.toInt() : _montoSaldo} de saldo a favor',
     ];
     return p.length > 1 ? '${p.sublist(0, p.length - 1).join(', ')} y ${p.last}' : (p.isEmpty ? '' : p.first);
   }
@@ -393,7 +394,7 @@ class _RecompensaAsistenteScreenState extends State<RecompensaAsistenteScreen> {
                 onChanged: (_) => setState(() {}),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$ '),
+                decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
               ),
             ),
           ],

@@ -10,6 +10,7 @@ import '../reservas/reservas_repo.dart';
 import 'componentes.dart';
 import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// "Mis pagos y reservas" (Victor, 2026-11-08): reemplaza a "Mis reservas".
 /// Solo aparece en Ajustes si la persona tiene algo que mostrar (reservas,
@@ -211,7 +212,7 @@ class _Estado extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(color: sobre.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(PivotRadios.chip)),
               child: Text(
-                '$cantidadRevision ${cantidadRevision == 1 ? 'pago' : 'pagos'} en revisión · \$${enRevision.toStringAsFixed(2)}',
+                '$cantidadRevision ${cantidadRevision == 1 ? 'pago' : 'pagos'} en revisión · ${Moneda.s}${enRevision.toStringAsFixed(2)}',
                 style: TextStyle(color: sobre, fontWeight: FontWeight.w700, fontSize: 13.5),
               ),
             ),
@@ -305,7 +306,7 @@ class _Recibo extends StatelessWidget {
 
   static String monto(Map<String, dynamic> r) {
     final m = (r['monto'] as num?)?.toDouble() ?? 0;
-    return m == 0 ? 'Sin costo' : '\$${m.toStringAsFixed(2)}';
+    return m == 0 ? 'Sin costo' : '${Moneda.s}${m.toStringAsFixed(2)}';
   }
 
   @override

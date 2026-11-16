@@ -35,6 +35,7 @@ const entradasLiga = [
   EntradaAjuste('salud', 'Salud y seguros', 'Mi Liga › Datos de la liga', 'seguro médico privado salud pública emergencia atención iess msp'),
   EntradaAjuste('pais', 'País', 'Mi Liga › Datos de la liga', 'país teléfono prefijo'),
   EntradaAjuste('zona', 'Zona horaria', 'Mi Liga › Datos de la liga', 'hora horario reloj'),
+  EntradaAjuste('moneda', 'Moneda', 'Mi Liga › Datos de la liga', 'dinero símbolo dólar sol euro peso divisa'),
   // Dentro de Reglas.
   EntradaAjuste(
     'vencimiento',

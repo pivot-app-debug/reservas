@@ -4,6 +4,7 @@ import '../core/api.dart';
 import '../core/fechas.dart';
 import '../eventos/anticipada.dart';
 import '../sesion/sesion.dart';
+import '../core/moneda.dart';
 
 /// Fase 3: reservas y pagos desde el "+", con la misma lógica que la web
 /// (js/reservas.js: `cargarFechas()`, `actualizarTotalS4()`,
@@ -391,7 +392,7 @@ class ReservasRepo {
     );
   }
 
-  static String dinero(double v) => '\$${v.toStringAsFixed(2)}';
+  static String dinero(double v) => '${Moneda.s}${v.toStringAsFixed(2)}';
 
   /// Reservas activas (clases que no pasaron y cuotas sin vencer), las más próximas primero.
   static List<ReservaActiva> activas(Cuota c) {

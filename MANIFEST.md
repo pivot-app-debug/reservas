@@ -203,6 +203,12 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Personalización: moneda, estados, temporadas, tipos de evento (2026-11-16)
+- Moneda: `config_app.moneda` (CLAVES_LIGA), `_monedaLiga` en el servidor (textos de avisos), `getConfigEquipo.moneda`; app `core/moneda.dart` (`Moneda.s`, cargado por `Sesion` y `ConfigLiga`), todos los montos lo usan.
+- Estados: `ESTADOS_NUEVOS` = Enfermedad, Situación personal, Otro (constraint ampliado, migración `20261116080000_estados_nuevos.sql`); `reglas_liga.estados[estado] = {activo, congela, exentaCuota}` (`_cfgEstado`); `recalcular-categorias` salta los estados que congelan. Al salir de un estado nuevo, `exenta_cuota` vuelve a false. App: `EstadoScreen`, `MotivoAusencia` con los nuevos, `Integrante.fueraConMotivo`.
+- Temporadas: `temporadas_descanso.reglas = {congela, sinCuota}` (migración `20261116090000_temporadas_reglas.sql`); `recalcular-categorias` estira la ventana los días de las que congelan; `_estadosCuotaMes` da 'al_dia' a todos en un mes completo dentro de una "sin cuota".
+- Tipos de evento: `reglas_liga.tiposEventoExtra`, `ConfigLiga.tiposEvento(base)`, `TiposEventoScreen`.
+
 ## Cobro por equipo y reglas de reservas (2026-11-16)
 - `reglas_liga.cobroEquipos[equipo] = {modo: mes|clase|elige|segun_equipamiento|sin_cobro, precioMensual, precioClase}`; sin entrada, `_cobroEquipo()` da 'mes' a Quindes o a un equipo con `graciaClases`, si no 'segun_equipamiento'. `getPreciosClases(params, equipo)` usa el precio propio (por token o equipo); lo usan `guardarReserva`, `_aplicarExcepcionCuota`, `_deudaVinoSinReserva` y la mensualidad gratis de recompensas. `getConfigEquipo` devuelve `modoCobro` → `Sesion.modoCobro` → `ReservasRepo.opciones`.
 - `reservaClasesVisibles` (6), `reservaCierraHoras` (2), `cuponCancelarMin` (60), `sinAprobarHoras` (2) en `reglas_liga`, usados por `_proximosEntrenamientos`, `cancelarReserva` y `_cerrarReservasVencidas`.

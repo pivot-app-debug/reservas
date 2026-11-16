@@ -5,6 +5,7 @@ import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// Fecha límite de pago de la cuota (Victor, 2026-11-15): se elige el día
 /// en un calendario (sin + y -), y el mes de ejemplo se arma con ese día:
@@ -34,7 +35,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
   }
 
   num get _monto => num.tryParse(_recargo.text.replaceAll(',', '.')) ?? 0;
-  String _plata(num v) => '\$${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
+  String _plata(num v) => '${Moneda.s}${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
   bool get _recargoActivo => _conRecargo && _monto > 0;
 
   bool get _cambio =>
@@ -144,7 +145,7 @@ class _VencimientoScreenState extends State<VencimientoScreen> {
                               onChanged: (_) => setState(() {}),
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                              decoration: const InputDecoration(labelText: 'Monto del recargo', prefixText: '\$ '),
+                              decoration: InputDecoration(labelText: 'Monto del recargo', prefixText: '${Moneda.s} '),
                             ),
                             const SizedBox(height: 14),
                             Text(

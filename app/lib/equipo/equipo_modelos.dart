@@ -67,7 +67,7 @@ class Integrante {
   /// o lesionadx (mismo criterio que la web `_eqEsInactivo()`; el servidor no
   /// guarda un estado "Inactivx").
   bool get inactivx {
-    if (deViaje || lesionadx) return false;
+    if (deViaje || lesionadx || fueraConMotivo) return false;
     if (estado == 'Inactivx') return true;
     final u = ultimaAsistencia;
     return u == null || Fechas.diasEntre(u, Fechas.hoy()) >= ConfigLiga.diasInactividad;
@@ -77,6 +77,10 @@ class Integrante {
   bool get presenteHoy => m['presenteHoy'] == true;
   bool get deViaje => estado == 'De viaje';
   bool get lesionadx => estado == 'Lesionadx';
+
+  /// Estados nuevos (Victor, 2026-11-15). Al equipo no se le muestra el motivo.
+  static const estadosConMotivo = ['Enfermedad', 'Situación personal', 'Otro'];
+  bool get fueraConMotivo => estadosConMotivo.contains(estado);
 
   /// Grupo de la home: 'Quindes', 'Mirlxs' o 'Inactivxs'.
   String get grupo => inactivx ? 'Inactivxs' : (categoria == 'Quindes' ? 'Quindes' : 'Mirlxs');
@@ -130,6 +134,7 @@ List<DatoFila> datosRelevantes(Integrante p, DateTime hoy, {String periodo = 'es
     return [DatoFila(Icons.flight_takeoff_rounded, h == null ? 'De viaje' : 'De viaje hasta el ${h.day}/${h.month}', fijo: true)];
   }
   if (p.lesionadx) return const [DatoFila(Icons.healing_rounded, 'Lesionadx', fijo: true)];
+  if (p.fueraConMotivo) return const [DatoFila(Icons.event_busy_rounded, 'Fuera por un tiempo', fijo: true)];
   final res = <DatoFila>[];
   String enDias(int d) => d == 0 ? 'hoy' : (d == 1 ? 'mañana' : 'en $d días');
   final c = p.proximoCumple(hoy);

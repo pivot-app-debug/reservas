@@ -15,6 +15,7 @@ import 'estadisticas.dart';
 import 'equipo_repo.dart';
 import '../core/cargando.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// Ficha de una persona del equipo (web: `_eqRenderPerfil()`): encabezado,
 /// acciones (WhatsApp, llamar, favorito y, para admins, Emergencia), stats
@@ -346,7 +347,7 @@ class _AdministracionState extends State<_Administracion> {
                 TextField(
                   controller: monto,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$ '),
+                  decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
                   onChanged: (_) => refrescar(() {}),
                 ),
                 const SizedBox(height: 12),
@@ -358,7 +359,7 @@ class _AdministracionState extends State<_Administracion> {
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: valor <= 0 ? null : () => Navigator.of(hoja).pop(true),
-                  child: Text('Registrar \$${valor.toStringAsFixed(2)} de ${Fechas.mes(mes)}'),
+                  child: Text('Registrar ${Moneda.s}${valor.toStringAsFixed(2)} de ${Fechas.mes(mes)}'),
                 ),
               ],
             ),
@@ -507,6 +508,9 @@ class _AdministracionState extends State<_Administracion> {
     'Activx': (Icons.directions_run_rounded, 'Entrena con normalidad.'),
     'Ausente': (Icons.event_busy_rounded, 'Fuera por un tiempo, avisado.'),
     'Lesionadx': (Icons.healing_rounded, 'En recuperación de una lesión.'),
+    'Enfermedad': (Icons.sick_outlined, 'Fuera por enfermedad. El equipo solo ve "Fuera por un tiempo".'),
+    'Situación personal': (Icons.support_outlined, 'Situación personal o fuerza mayor. El equipo no ve el motivo.'),
+    'Otro': (Icons.more_horiz_rounded, 'Fuera por otro motivo. El equipo no ve el motivo.'),
   };
 
   Future<void> _elegirEstado() async {

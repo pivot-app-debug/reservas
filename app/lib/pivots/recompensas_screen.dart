@@ -6,6 +6,7 @@ import '../core/config_liga.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import 'editores_liga.dart' show plataLiga;
+import '../core/moneda.dart';
 
 /// "a" y "b" / "a, b y c".
 String _unir(List<String> p) => p.length > 1 ? '${p.sublist(0, p.length - 1).join(', ')} y ${p.last}' : (p.isEmpty ? '' : p.first);
@@ -176,7 +177,7 @@ class _RecompensasPagoScreenState extends State<RecompensasPagoScreen> {
                                 onChanged: (_) => setState(() {}),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                                decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$ '),
+                                decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
                               ),
                             ),
                           ],

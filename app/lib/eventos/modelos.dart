@@ -194,17 +194,30 @@ class Evento {
 /// Temporada de descanso (`temporadas_descanso`): sin entrenamientos entre
 /// esas fechas.
 class Temporada {
-  const Temporada({required this.id, required this.nombre, required this.desde, required this.hasta});
+  const Temporada({required this.id, required this.nombre, required this.desde, required this.hasta, this.congela = false, this.sinCuota = false});
   final String id;
   final String nombre;
   final DateTime desde;
   final DateTime hasta;
 
+  /// Reglas de la temporada (Victor, 2026-11-15): no cuenta para subir o
+  /// bajar de equipo, y los meses completos dentro no se cobran.
+  final bool congela;
+  final bool sinCuota;
+
   static Temporada? desdeFila(Map<String, dynamic> f) {
     final d = DateTime.tryParse((f['fecha_inicio'] ?? '').toString());
     final h = DateTime.tryParse((f['fecha_fin'] ?? '').toString());
     if (d == null || h == null) return null;
-    return Temporada(id: f['id'].toString(), nombre: (f['nombre'] ?? 'Temporada de descanso').toString(), desde: d, hasta: h);
+    final r = f['reglas'] is Map ? f['reglas'] as Map : const {};
+    return Temporada(
+      id: f['id'].toString(),
+      nombre: (f['nombre'] ?? 'Temporada de descanso').toString(),
+      desde: d,
+      hasta: h,
+      congela: r['congela'] == true,
+      sinCuota: r['sinCuota'] == true,
+    );
   }
 }
 

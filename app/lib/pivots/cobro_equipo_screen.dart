@@ -6,6 +6,7 @@ import '../core/config_liga.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import 'editores_liga.dart' show plataLiga;
+import '../core/moneda.dart';
 
 /// Cómo paga cada equipo (Victor, 2026-11-15): por mes, por clase, elige,
 /// según su equipamiento o sin cobro, y precio propio opcional.
@@ -98,7 +99,7 @@ class _CobroEquipoScreenState extends State<CobroEquipoScreen> {
                     onChanged: (_) => setState(() {}),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                    decoration: const InputDecoration(labelText: 'Precio', prefixText: '\$ '),
+                    decoration: InputDecoration(labelText: 'Precio', prefixText: '${Moneda.s} '),
                   ),
                 )
               : const SizedBox(width: double.infinity),
@@ -299,6 +300,236 @@ class _ReservasReglasScreenState extends State<ReservasReglasScreen> {
             (n) => _sinAprobar = n,
           ),
           const SizedBox(height: 8),
+          FilledButton(onPressed: cambio && !_guardando ? _guardar : null, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
+        ],
+      ),
+    );
+  }
+}
+
+/// Estados (Victor, 2026-11-15): qué hace cada uno. Lesionadx siempre exime
+/// de la cuota; Ausente nunca congela. Los nuevos se pueden apagar.
+const estadosEditables = <String, (IconData, String)>{
+  'Lesionadx': (Icons.healing_rounded, 'Lesión. Necesita aprobación de un Pivot.'),
+  'De viaje': (Icons.flight_takeoff_rounded, 'Con fecha de salida y de regreso.'),
+  'Enfermedad': (Icons.sick_outlined, 'El equipo solo ve "Fuera por un tiempo".'),
+  'Situación personal': (Icons.support_outlined, 'Situación personal o fuerza mayor. El equipo no ve el motivo.'),
+  'Otro': (Icons.more_horiz_rounded, 'Otro motivo. El equipo no ve el motivo.'),
+};
+const _estadosNuevos = ['Enfermedad', 'Situación personal', 'Otro'];
+
+Map<String, dynamic> cfgEstado(ConfigLiga c, String e) {
+  const base = {
+    'Lesionadx': {'congela': true, 'exentaCuota': true},
+    'De viaje': {'congela': true, 'exentaCuota': false},
+    'Enfermedad': {'activo': true, 'congela': true, 'exentaCuota': true},
+    'Situación personal': {'activo': true, 'congela': true, 'exentaCuota': true},
+    'Otro': {'activo': true, 'congela': false, 'exentaCuota': false},
+  };
+  final x = (c.reglas['estados'] as Map?)?[e];
+  return {...?base[e], if (x is Map) ...Map<String, dynamic>.from(x)};
+}
+
+String textoEstado(ConfigLiga c, String e) {
+  final x = cfgEstado(c, e);
+  if (x['activo'] == false) return 'Apagado';
+  return [x['congela'] == true ? 'Congela el equipo' : 'No congela el equipo', x['exentaCuota'] == true ? 'no paga cuota' : 'paga cuota'].join(' · ');
+}
+
+class EstadoScreen extends StatefulWidget {
+  const EstadoScreen({super.key, required this.config, required this.estado});
+  final ConfigLiga config;
+  final String estado;
+
+  @override
+  State<EstadoScreen> createState() => _EstadoScreenState();
+}
+
+class _EstadoScreenState extends State<EstadoScreen> {
+  late final Map<String, dynamic> _o = cfgEstado(widget.config, widget.estado);
+  late bool _activo = _o['activo'] != false, _congela = _o['congela'] == true, _exenta = _o['exentaCuota'] == true;
+  bool _guardando = false;
+
+  bool get _nuevo => _estadosNuevos.contains(widget.estado);
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      await widget.config.guardarReglas({
+        'estados': {
+          widget.estado: {'congela': _congela, if (_nuevo) 'exentaCuota': _exenta, if (_nuevo) 'activo': _activo},
+        },
+      });
+      m.showSnackBar(const SnackBar(content: Text('Guardado. Rige desde ahora.')));
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final cambio = _activo != (_o['activo'] != false) || _congela != (_o['congela'] == true) || _exenta != (_o['exentaCuota'] == true);
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.estado, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          Text(
+            '${estadosEditables[widget.estado]?.$2 ?? ''} Al venir a entrenar (a horario o tarde), la persona vuelve a Activx.',
+            style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
+          ),
+          const SizedBox(height: 16),
+          Material(
+            color: p.tarjeta,
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Column(
+                children: [
+                  if (_nuevo)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Disponible', style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Las personas pueden elegirlo en Asistencia anticipada y un Pivot en su ficha.'),
+                      value: _activo,
+                      onChanged: (v) => setState(() => _activo = v),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Congela el equipo', style: TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: const Text('Mientras dure, no sube ni baja de equipo por asistencia.'),
+                    value: _congela,
+                    onChanged: (v) => setState(() => _congela = v),
+                  ),
+                  if (_nuevo)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('No paga cuota', style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Mientras dure, queda exentx de la cuota.'),
+                      value: _exenta,
+                      onChanged: (v) => setState(() => _exenta = v),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Rige para quienes entren a este estado desde ahora y para el próximo cálculo de equipos.',
+            style: TextStyle(fontSize: 12.5, height: 1.4, color: p.textoSecundario),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(onPressed: cambio && !_guardando ? _guardar : null, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tipos de evento que agrega la liga (Victor, 2026-11-15). Los de siempre
+/// (Entrenamiento, Partido, Evento, Otro…) no se quitan.
+class TiposEventoScreen extends StatefulWidget {
+  const TiposEventoScreen({super.key, required this.config});
+  final ConfigLiga config;
+
+  @override
+  State<TiposEventoScreen> createState() => _TiposEventoScreenState();
+}
+
+class _TiposEventoScreenState extends State<TiposEventoScreen> {
+  static const _base = ['Entrenamiento', 'Partido', 'Torneo', 'Asamblea', 'Evento social', 'Evento', 'Otro'];
+  late List<String> _extra = [...widget.config.tiposEventoExtra];
+  final _nuevo = TextEditingController();
+  bool _guardando = false;
+
+  @override
+  void dispose() {
+    _nuevo.dispose();
+    super.dispose();
+  }
+
+  void _agregar() {
+    final t = _nuevo.text.trim();
+    if (t.isEmpty || _base.contains(t) || _extra.contains(t)) return;
+    setState(() {
+      _extra = [..._extra, t];
+      _nuevo.clear();
+    });
+  }
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      await widget.config.guardarReglas({'tiposEventoExtra': _extra});
+      m.showSnackBar(const SnackBar(content: Text('Guardado.')));
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final cambio = _extra.join('|') != widget.config.tiposEventoExtra.join('|');
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('Tipos de evento', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          Text(
+            'Se eligen al crear un evento o un lugar. Qué tipos cuentan como clase se elige en Requisitos de cada equipo.',
+            style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in _base) Chip(label: Text(t)),
+              for (final t in _extra) InputChip(label: Text(t), onDeleted: () => setState(() => _extra = [..._extra]..remove(t))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _nuevo,
+                  maxLength: 30,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Nuevo tipo (ej. Clínica)'),
+                  onSubmitted: (_) => _agregar(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(onPressed: _agregar, icon: const Icon(Icons.add_rounded)),
+            ],
+          ),
+          Text('Quitar un tipo no cambia los eventos que ya lo usan.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+          const SizedBox(height: 20),
           FilledButton(onPressed: cambio && !_guardando ? _guardar : null, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
         ],
       ),

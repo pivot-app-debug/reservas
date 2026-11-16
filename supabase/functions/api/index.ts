@@ -883,8 +883,11 @@ async function cambiarUsuario(params: Record<string, any>): Promise<Record<strin
 // Canal de comunicación: con qué app se escribe a las personas del equipo.
 const CANALES_LIGA = ['whatsapp', 'telegram', 'signal', 'telefono'];
 const CLAVES_LIGA: Record<string, string> = {
-  solicitudesPivots: 'solicitudes_pivots', canal: 'canal_comunicacion', pais: 'pais_equipo', zonaHoraria: 'zona_horaria',
+    solicitudesPivots: 'solicitudes_pivots', canal: 'canal_comunicacion', pais: 'pais_equipo', zonaHoraria: 'zona_horaria', moneda: 'moneda',
 };
+
+/** Símbolo de la moneda de la liga (Mi Liga → Datos), para los textos de avisos. Se refresca al leer las reglas. */
+let _monedaLiga = '$';
 
 async function _configLiga(): Promise<Record<string, string>> {
   const { data } = await supabase.from('config_app').select('key, value').in('key', Object.values(CLAVES_LIGA));
@@ -894,7 +897,8 @@ async function _configLiga(): Promise<Record<string, string>> {
     solicitudesPivots: m.solicitudes_pivots === 'auto' ? 'auto' : 'otro',
     canal: CANALES_LIGA.includes(m.canal_comunicacion) ? m.canal_comunicacion : 'whatsapp',
     pais: m.pais_equipo || 'EC',
-    zonaHoraria: m.zona_horaria || 'America/Guayaquil',
+        zonaHoraria: m.zona_horaria || 'America/Guayaquil',
+    moneda: (_monedaLiga = m.moneda || '$'),
   };
 }
 
@@ -933,7 +937,17 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   //   modo: 'mes' | 'clase' | 'elige' | 'segun_equipamiento' | 'sin_cobro'
     cobroEquipos: {},
   // Reparto por defecto de los fondos de viaje (con lo que empieza cada viaje).
-  repartoViaje: [{ min: 90, pct: 50 }, { min: 35, pct: 50 }],
+    repartoViaje: [{ min: 90, pct: 50 }, { min: 35, pct: 50 }],
+  // Estados (Victor, 2026-11-15): si congelan el equipo y si eximen de la
+  // cuota. Lesionadx siempre exime; Ausente nunca congela.
+  estados: {
+    'Lesionadx': { congela: true, exentaCuota: true },
+    'De viaje': { congela: true, exentaCuota: false },
+    'Ausente': { congela: false, exentaCuota: false },
+    'Enfermedad': { activo: true, congela: true, exentaCuota: true },
+    'Situación personal': { activo: true, congela: true, exentaCuota: true },
+    'Otro': { activo: true, congela: false, exentaCuota: false },
+  },
   // Reservas (antes fijas en el código).
   reservaClasesVisibles: 6,   // próximas clases que se pueden reservar
   reservaCierraHoras: 2,      // se deja de reservar N horas antes de empezar
@@ -961,7 +975,9 @@ function _cobroEquipo(reglas: Record<string, any>, equipo: string | null | undef
 }
 
 async function _reglasLiga(): Promise<Record<string, any>> {
-  const { data } = await supabase.from('config_app').select('value').eq('key', 'reglas_liga').maybeSingle();
+  const { data: filas } = await supabase.from('config_app').select('key, value').in('key', ['reglas_liga', 'moneda']);
+  const data = (filas ?? []).find((x: any) => x.key === 'reglas_liga');
+  _monedaLiga = (filas ?? []).find((x: any) => x.key === 'moneda')?.value || '$';
   let r: Record<string, any> = {};
   try { r = JSON.parse(String(data?.value ?? '{}')) ?? {}; } catch { r = {}; }
   return { ...REGLAS_LIGA_BASE, ...r };
@@ -1018,7 +1034,24 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
       const n = Math.round(Number(reglasNuevas[k]));
       if (Number.isFinite(n)) r[k] = Math.min(max, Math.max(min, n));
     };
-            if (Array.isArray(reglasNuevas.repartoViaje)) {
+                if (reglasNuevas.estados && typeof reglasNuevas.estados === 'object') {
+      const e: Record<string, any> = { ...(antes.estados ?? {}) };
+      for (const [k, v] of Object.entries(reglasNuevas.estados as Record<string, any>)) {
+        if (!['Lesionadx', 'De viaje', ...ESTADOS_NUEVOS].includes(k) || !v || typeof v !== 'object') continue;
+        const si = (x: unknown) => x === true || x === 'true';
+        e[k] = {
+          ...(e[k] ?? {}),
+          ...(v.congela !== undefined ? { congela: si(v.congela) } : {}),
+          ...(ESTADOS_NUEVOS.includes(k) && v.exentaCuota !== undefined ? { exentaCuota: si(v.exentaCuota) } : {}),
+          ...(ESTADOS_NUEVOS.includes(k) && v.activo !== undefined ? { activo: si(v.activo) } : {}),
+        };
+      }
+      r.estados = e;
+    }
+        if (Array.isArray(reglasNuevas.tiposEventoExtra)) {
+      r.tiposEventoExtra = [...new Set(reglasNuevas.tiposEventoExtra.map((x: unknown) => String(x ?? '').trim().slice(0, 30)).filter(Boolean))].slice(0, 20);
+    }
+    if (Array.isArray(reglasNuevas.repartoViaje)) {
       const t = reglasNuevas.repartoViaje.slice(0, 6).map((x: any) => ({ min: Math.max(0, Math.min(100, Math.round(Number(x?.min) || 0))), pct: Math.max(0, Math.min(100, Math.round(Number(x?.pct) || 0))) }))
         .sort((a: any, b: any) => b.min - a.min);
       if (t.length && t.reduce((s: number, x: any) => s + x.pct, 0) <= 100) r.repartoViaje = t;
@@ -1268,6 +1301,11 @@ async function adminGuardarConfigLiga(params: Record<string, any>): Promise<Reco
     if (!/^[A-Z]{2}$/.test(String(params.pais))) return { exito: false, error: 'País inválido.' };
     filas.push({ key: 'pais_equipo', value: String(params.pais) });
   }
+    if (params.moneda != null) {
+    const mon = String(params.moneda).trim().slice(0, 5);
+    if (!mon) return { exito: false, error: 'Moneda inválida.' };
+    filas.push({ key: 'moneda', value: mon });
+  }
   if (params.zonaHoraria != null) {
     try { new Intl.DateTimeFormat('es', { timeZone: String(params.zonaHoraria) }); } catch { return { exito: false, error: 'Zona horaria inválida.' }; }
     filas.push({ key: 'zona_horaria', value: String(params.zonaHoraria) });
@@ -1316,7 +1354,7 @@ async function getConfigEquipo(params: Record<string, any>): Promise<Record<stri
     supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle(),
     _reglasLiga(),
   ]);
-  return { exito: true, paisEquipo: pais?.value ?? 'EC', modoCobro: _cobroEquipo(reglas, p?.categoria).modo };
+    return { exito: true, paisEquipo: pais?.value ?? 'EC', modoCobro: _cobroEquipo(reglas, p?.categoria).modo, moneda: _monedaLiga };
 }
 
 async function actualizarPin(params: Record<string, any>): Promise<Record<string, any>> {
@@ -5423,7 +5461,7 @@ async function _deudaVinoSinReserva(nombre: string, idEvento: string): Promise<v
     monto, fecha_pago: e.fecha, saldo_movimiento_id: mov?.id ?? null,
   });
   await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Quedó una deuda' },
-    contents: { es: `Viniste a la ${que.toLowerCase()} sin reserva, así que quedó una deuda de ${'$'}${monto}. Se cobra junto con tu próximo pago.` }, url: APP_URL }).catch(() => {});
+    contents: { es: `Viniste a la ${que.toLowerCase()} sin reserva, así que quedó una deuda de ${_monedaLiga}${monto}. Se cobra junto con tu próximo pago.` }, url: APP_URL }).catch(() => {});
 }
 
 /** Si se corrige la asistencia (ya no vino), se anula la deuda de "vino sin reserva". */
@@ -5975,7 +6013,17 @@ async function adminToggleCupon(params: Record<string, any>): Promise<Record<str
 }
 
 // 'Técnico' se quitó como estado (Victor, 2026-11-14; nadie lo tenía).
-const ESTADOS_MIEMBRO = ['Activx', 'Ausente', 'Lesionadx'];
+// Estados nuevos (Victor, 2026-11-15): sin el motivo a la vista del equipo
+// (la salud es privada). Qué hace cada uno se edita en Reglas → Estados.
+const ESTADOS_NUEVOS = ['Enfermedad', 'Situación personal', 'Otro'];
+const ESTADOS_MIEMBRO = ['Activx', 'Ausente', 'Lesionadx', ...ESTADOS_NUEVOS];
+
+/** Qué hace un estado: si congela el equipo y si exime de la cuota. */
+function _cfgEstado(reglas: Record<string, any>, estado: string): { activo: boolean; congela: boolean; exentaCuota: boolean } {
+  const base = (REGLAS_LIGA_BASE.estados ?? {})[estado] ?? { activo: true, congela: false, exentaCuota: false };
+  const c = { ...base, ...((reglas.estados ?? {})[estado] ?? {}) };
+  return { activo: c.activo !== false, congela: c.congela === true, exentaCuota: c.exentaCuota === true };
+}
 
 // ─── Transiciones de estado_miembro (helpers compartidos) ────────────────────
 // Modelo de autodeclaración (ver MANIFEST.md): la persona declara su propio
@@ -5986,7 +6034,7 @@ const ESTADOS_MIEMBRO = ['Activx', 'Ausente', 'Lesionadx'];
 // terminarMiViaje(), adminAprobarLesion() y la reactivación por asistencia.
 const SELECT_ESTADO_MIEMBRO = 'estado_miembro, categoria, categoria_pre_lesion';
 // Estados de los que una marca real de presente saca a la persona.
-const ESTADOS_REACTIVABLES = ['Ausente', 'Lesionadx', 'De viaje'];
+const ESTADOS_REACTIVABLES = ['Ausente', 'Lesionadx', 'De viaje', ...ESTADOS_NUEVOS];
 
 // Campos a limpiar al SALIR de `fila.estado_miembro` hacia `estadoNuevo`
 // (vacío si no cambia de estado).
@@ -5999,7 +6047,8 @@ function _camposSalidaEstado(fila: Record<string, any> | null, estadoNuevo: stri
   const previo = fila?.estado_miembro ?? null;
   const u: Record<string, any> = {};
   if (!previo || previo === estadoNuevo) return u;
-  if (previo === 'De viaje') { u.viaje_desde = null; u.viaje_hasta = null; }
+    if (previo === 'De viaje') { u.viaje_desde = null; u.viaje_hasta = null; }
+  if (ESTADOS_NUEVOS.includes(previo)) u.exenta_cuota = false;
   if (previo === 'Lesionadx') {
     if (fila?.categoria_pre_lesion) u.categoria = fila.categoria_pre_lesion;
     u.categoria_pre_lesion = null;
@@ -6112,7 +6161,7 @@ async function _cerrarReglasNoAsistireVigentes(nombre: string): Promise<void> {
 async function _notificarCambioEstadoMiembro(
   username: string,
   estadoPrevio: string | null | undefined,
-  estadoNuevo: 'De viaje' | 'Lesionadx' | 'Ausente',
+    estadoNuevo: string,
   fechas?: { desde?: string | null; hasta?: string | null },
 ): Promise<void> {
   if (estadoPrevio === estadoNuevo) return;
@@ -6125,8 +6174,10 @@ async function _notificarCambioEstadoMiembro(
     mensaje = desdeTxt && hastaTxt
       ? `${nombreMostrar} estará de viaje del ${desdeTxt} al ${hastaTxt}.`
       : `${nombreMostrar} estará de viaje por un tiempo.`;
-  } else if (estadoNuevo === 'Lesionadx') {
+    } else if (estadoNuevo === 'Lesionadx') {
     mensaje = `${nombreMostrar} está lesionadx y no participará de los entrenamientos por un tiempo.`;
+  } else if (ESTADOS_NUEVOS.includes(estadoNuevo)) {
+    mensaje = `${nombreMostrar} no vendrá a los entrenamientos por un tiempo.`; // sin el motivo
   } else {
     mensaje = `${nombreMostrar} estará ausente por un tiempo.`;
   }
@@ -6156,12 +6207,13 @@ async function adminSetEstadoMiembro(params: Record<string, any>): Promise<Recor
   if (estadoMiembro === 'Activx') {
     return await _reactivarMiembro(nombre, actual, { extra: { exenta_cuota: false } });
   }
+    const exentaNuevo = ESTADOS_NUEVOS.includes(estadoMiembro) && _cfgEstado(await _reglasLiga(), estadoMiembro).exentaCuota;
   const update: Record<string, any> = estadoMiembro === 'Lesionadx'
     ? { ..._camposSalidaEstado(actual, 'Lesionadx'), ..._camposEntradaLesion(actual) }
-    : { ..._camposSalidaEstado(actual, estadoMiembro), estado_miembro: estadoMiembro, exenta_cuota: false };
+    : { ..._camposSalidaEstado(actual, estadoMiembro), estado_miembro: estadoMiembro, exenta_cuota: exentaNuevo };
   const { error } = await supabase.from('equipo').update(update).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
-  if (estadoMiembro === 'Lesionadx' || estadoMiembro === 'Ausente') {
+  if (estadoMiembro !== 'Activx') {
     await _notificarCambioEstadoMiembro(nombre, actual.estado_miembro, estadoMiembro);
   }
   return { exito: true };
@@ -6182,7 +6234,7 @@ async function adminSetEstadoMiembro(params: Record<string, any>): Promise<Recor
 //  · Ausente ("Inactivx" en la UI): solo el estado.
 // 'Técnico' no se pisa (categoría de membresía propia): responde
 // `sinCambio:true` y la regla sigue aplicando solo los RSVPs.
-const ESTADOS_AUTODECLARABLES = ['De viaje', 'Lesionadx', 'Ausente'];
+const ESTADOS_AUTODECLARABLES = ['De viaje', 'Lesionadx', 'Ausente', ...ESTADOS_NUEVOS];
 async function autodeclararEstado(params: Record<string, any>): Promise<Record<string, any>> {
   const username = await _validarToken(params.token);
   if (!username) return { exito: false, error: 'Sesión inválida.' };
@@ -6205,16 +6257,20 @@ async function autodeclararEstado(params: Record<string, any>): Promise<Record<s
 
   let update: Record<string, any>;
   if (estado === 'Lesionadx') update = { ..._camposSalidaEstado(fila, estado), ..._camposEntradaLesion(fila) };
-  else if (estado === 'De viaje') update = { ..._camposSalidaEstado(fila, estado), estado_miembro: 'De viaje', viaje_desde: desde, viaje_hasta: hasta };
-  else update = { ..._camposSalidaEstado(fila, estado), estado_miembro: 'Ausente' };
+    else if (estado === 'De viaje') update = { ..._camposSalidaEstado(fila, estado), estado_miembro: 'De viaje', viaje_desde: desde, viaje_hasta: hasta };
+  else if (ESTADOS_NUEVOS.includes(estado)) {
+    const cfg = _cfgEstado(await _reglasLiga(), estado);
+    if (!cfg.activo) return { exito: false, error: 'Ese estado no está disponible.' };
+    update = { ..._camposSalidaEstado(fila, estado), estado_miembro: estado, exenta_cuota: cfg.exentaCuota };
+  } else update = { ..._camposSalidaEstado(fila, estado), estado_miembro: 'Ausente' };
   const { error } = await supabase.from('equipo').update(update).eq('username', username);
   if (error) return { exito: false, error: error.message };
-  await _notificarCambioEstadoMiembro(username, fila.estado_miembro, estado as 'De viaje' | 'Lesionadx' | 'Ausente', { desde, hasta });
+    await _notificarCambioEstadoMiembro(username, fila.estado_miembro, estado, { desde, hasta });
   return {
     exito: true,
     estado,
     categoria: update.categoria ?? fila.categoria ?? null,
-    exentaCuota: estado === 'Lesionadx' ? true : (update.exenta_cuota ?? null),
+        exentaCuota: estado === 'Lesionadx' ? true : (update.exenta_cuota ?? null),
     viajeDesde: estado === 'De viaje' ? desde : null,
     viajeHasta: estado === 'De viaje' ? hasta : null,
   };
@@ -9595,14 +9651,16 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || hasta < desde) {
     return { exito: false, error: 'Fechas inválidas.' };
   }
-  let id = params.id ? String(params.id) : '';
+    let id = params.id ? String(params.id) : '';
+  const si = (v: unknown) => v === true || v === 'true';
+  const reglas = { congela: si(params.congela), sinCuota: si(params.sinCuota) };
   if (id) {
-    const { error } = await supabase.from('temporadas_descanso').update({ nombre, fecha_inicio: desde, fecha_fin: hasta }).eq('id', id);
+    const { error } = await supabase.from('temporadas_descanso').update({ nombre, fecha_inicio: desde, fecha_fin: hasta, reglas }).eq('id', id);
     if (error) return { exito: false, error: error.message };
     // Lo que quedó fuera del rango nuevo vuelve a estar como antes.
     await _restaurarEventosDescanso(id, { desde, hasta });
   } else {
-    const { data, error } = await supabase.from('temporadas_descanso').insert({ nombre, fecha_inicio: desde, fecha_fin: hasta }).select('id').single();
+        const { data, error } = await supabase.from('temporadas_descanso').insert({ nombre, fecha_inicio: desde, fecha_fin: hasta, reglas }).select('id').single();
     if (error || !data) return { exito: false, error: error?.message ?? 'No se pudo crear la temporada.' };
     id = (data as any).id;
   }
@@ -9772,6 +9830,13 @@ async function _estadosCuotaMes(usernames: string[], mes: string): Promise<Recor
   const [y, m] = mes.split('-').map(Number);
   const desde = `${mes}-01`, hasta = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
     const hastaHolgura = new Date(Date.parse(hasta) + 40 * 86400000).toISOString().slice(0, 10);
+    // Temporada de descanso "sin cuota" que cubre el mes completo: nadie debe ese mes.
+  const ultimoDia = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const { data: tSin } = await supabase.from('temporadas_descanso').select('reglas').lte('fecha_inicio', desde).gte('fecha_fin', ultimoDia);
+  if ((tSin ?? []).some((t: any) => t.reglas?.sinCuota === true)) {
+    usernames.forEach((u) => { out[u] = 'al_dia'; });
+    return out;
+  }
   const [{ data: resTodas }, { data: exc }, { data: pag }] = await Promise.all([
     supabase.from('reservas').select('nombre_usuario, estado, mes_texto, validez_hasta').eq('tipo', 'mensual').in('estado', ['Confirmada', 'Pendiente'])
       .in('nombre_usuario', usernames).gte('validez_hasta', desde).lt('validez_hasta', hastaHolgura),
@@ -9802,7 +9867,7 @@ function _textoRecompensa(x: { puntos: number; claseGratis: boolean; saldo: numb
     ...(x.mensualidadGratis ? ['tu próxima mensualidad gratis'] : []),
     ...(x.puntos > 0 ? [x.puntos === 1 ? 'un punto extra' : `${x.puntos} puntos extra`] : []),
     ...(x.claseGratis ? ['una clase gratis'] : []),
-    ...(x.saldo > 0 ? [`$${x.saldo % 1 === 0 ? x.saldo : x.saldo.toFixed(2)} de saldo a favor`] : []),
+        ...(x.saldo > 0 ? [`${_monedaLiga}${x.saldo % 1 === 0 ? x.saldo : x.saldo.toFixed(2)} de saldo a favor`] : []),
   ];
   return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : (partes[0] ?? '');
 }

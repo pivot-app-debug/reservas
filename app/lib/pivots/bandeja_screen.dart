@@ -20,6 +20,7 @@ import 'bandeja_repo.dart';
 import '../reservas/comprobante.dart';
 import '../reservas/reservas_repo.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// Bandeja de Pivots (etapa 3, Victor 2026-11-12): todo lo que espera una
 /// decisión, agrupado. Aprobar o rechazar quita la tarjeta con una
@@ -659,7 +660,7 @@ class _CuentaCorte extends StatelessWidget {
   final f = x.fechaEvento;
   final cuando = f == null ? '' : Fechas.corta(f);
   String v(String k) => '${m[k] ?? ''}'.trim();
-  String plata(Object? v) => '\$${((v as num?) ?? 0).toStringAsFixed(2)}';
+  String plata(Object? v) => '${Moneda.s}${((v as num?) ?? 0).toStringAsFixed(2)}';
   switch (x.tipo) {
     case TipoPedido.reserva:
       final equipo = [

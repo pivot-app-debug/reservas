@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (personalización de la liga)
+- **Moneda** (Mi Liga → Datos de la liga): el símbolo de todos los montos de la app y de los avisos ($, S/, €, Bs, Q, ₡, R$ u otro).
+- **Estados nuevos:** Enfermedad, Situación personal o fuerza mayor, y Otro. Se pueden elegir en Asistencia anticipada y en la ficha. Al equipo solo le llega "no vendrá por un tiempo" y en la lista se ve "Fuera por un tiempo", nunca el motivo.
+- **Estados editables** (Reglas → Asistencia): si congelan el equipo y si eximen de la cuota; los nuevos se pueden apagar. Al venir a entrenar, cualquier estado vuelve a Activx.
+- **Temporadas de descanso con reglas:** "No cuenta para los equipos" (la ventana se estira esos días) y "Sin cuota" (los meses completos del descanso no se cobran). Las temporadas ya creadas no cambian.
+- **Tipos de evento** (Reglas → Asistencia): la liga puede agregar los suyos.
+- Clases de gracia ya no usan + y −.
+
 ## 2026-11-16 (cobro por equipo y reglas editables)
 - **Cómo paga cada equipo** (Reglas → Cobros → Cómo paga): por mes, por clase, elige, según su equipamiento (como Mirlxs hoy) o sin cobro, con precio propio opcional de mensualidad y de clase. La app ofrece las reservas según eso, y el precio de cada reserva es el del equipo de la persona. Al crear un equipo se elige cómo paga.
 - **Reglas de reservas editables** (antes fijas): cuántas clases se ven para reservar, hasta cuántas horas antes se puede reservar, con cuánta anticipación vuelve la clase gratis al cancelar y cuándo se cierra una reserva sin aprobar.

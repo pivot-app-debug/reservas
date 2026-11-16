@@ -8,6 +8,7 @@ import '../sesion/sesion.dart';
 import 'componentes.dart';
 import 'excepcion_screen.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// Panel "Excepción de cuota" (Victor, 2026-11-08): antes de pedir una, se ve
 /// lo que ya hay. Arriba, cómo queda la cuota de este mes; después lo vigente
@@ -230,7 +231,7 @@ class _ExcepcionesPanelScreenState extends State<ExcepcionesPanelScreen> {
 }
 
 String _textoExcepcion(_Excepcion e) {
-  if (e.tipo == 'pago' && e.monto != null) return e.monto == 0 ? 'No pagas cuota' : 'Pagas \$${e.monto!.toStringAsFixed(2)}';
+  if (e.tipo == 'pago' && e.monto != null) return e.monto == 0 ? 'No pagas cuota' : 'Pagas ${Moneda.s}${e.monto!.toStringAsFixed(2)}';
   return 'No pagas cuota';
 }
 

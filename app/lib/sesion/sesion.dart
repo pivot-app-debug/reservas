@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../core/api.dart';
 import '../push/push.dart';
+import '../core/moneda.dart';
 
 /// Resultado de un intento de inicio de sesión que no terminó en sesión.
 class LoginFallido implements Exception {
@@ -304,6 +305,7 @@ class Sesion extends ChangeNotifier {
       if (r['exito'] == true) {
         paisEquipo = '${r['paisEquipo'] ?? 'EC'}';
         modoCobro = r['modoCobro'] as String?;
+        if (r['moneda'] is String) Moneda.s = r['moneda'] as String;
       }
       _paisCargado = true;
       notifyListeners();

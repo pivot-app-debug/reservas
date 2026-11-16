@@ -7,6 +7,7 @@ import '../sesion/sesion.dart';
 import 'api.dart';
 import 'iconos_marca.dart';
 import 'pagos.dart';
+import 'moneda.dart';
 
 /// Ajustes de la liga (`getConfigLiga`, Victor 2026-11-13): canal para
 /// escribir a las personas, cómo se resuelven los pedidos de Pivots, país,
@@ -24,6 +25,7 @@ class ConfigLiga extends ChangeNotifier {
   String solicitudesPivots = 'otro';
   String pais = 'EC';
   String zonaHoraria = 'America/Guayaquil';
+  String moneda = r'$';
   num? precioPorClase;
   num? precioMensual;
   String logo = '';
@@ -63,6 +65,12 @@ class ConfigLiga extends ChangeNotifier {
   }
 
   bool get rankingVisible => reglas['rankingVisible'] != false;
+
+  /// Tipos de evento que agregó la liga (Mi Liga → Reglas → Tipos de evento).
+  List<String> get tiposEventoExtra => [for (final x in (reglas['tiposEventoExtra'] as List? ?? const [])) '$x'];
+
+  /// Lista de siempre + los de la liga, sin repetir.
+  List<String> tiposEvento(List<String> base) => [...base, ...tiposEventoExtra.where((t) => !base.contains(t))];
 
   /// Reparto por defecto de los fondos de viaje: [{min: % asistencia, pct: % del fondo}].
   List<Map<String, dynamic>> get repartoViaje {
@@ -123,6 +131,7 @@ class ConfigLiga extends ChangeNotifier {
     solicitudesPivots = '${r['solicitudesPivots'] ?? solicitudesPivots}';
     pais = '${r['pais'] ?? pais}';
     zonaHoraria = '${r['zonaHoraria'] ?? zonaHoraria}';
+    moneda = Moneda.s = '${r['moneda'] ?? moneda}';
     precioPorClase = num.tryParse('${r['precioPorClase']}');
     precioMensual = num.tryParse('${r['precioMensual']}');
     logo = '${r['logo'] ?? ''}';

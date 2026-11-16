@@ -19,6 +19,7 @@ import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
 import 'cobros_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 IconData _iconoCuenta(String t) => switch (t) {
   'efectivo' => Icons.payments_outlined,
@@ -216,9 +217,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                   controller: saldo,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]'))],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Saldo inicial',
-                    prefixText: '\$ ',
+                    prefixText: '${Moneda.s} ',
                     helperText: 'Lo que la liga ya tenía en esta cuenta antes de usar Pivot.',
                     helperMaxLines: 3,
                   ),
@@ -274,7 +275,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
               controller: ctl,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-              decoration: const InputDecoration(prefixText: '\$ '),
+              decoration: InputDecoration(prefixText: '${Moneda.s} '),
             ),
           ],
         ),
@@ -484,7 +485,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                     onChanged: (_) => set(() {}),
                     decoration: InputDecoration(
                       labelText: 'Monto total',
-                      prefixText: '\$ ',
+                      prefixText: '${Moneda.s} ',
                       helperText: gente.length > 1 && total > 0 ? '${plata(total / gente.length)} cada persona' : null,
                     ),
                   ),
@@ -1147,7 +1148,7 @@ Future<bool?> abrirFormularioMovimiento(
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-                  decoration: const InputDecoration(prefixText: '\$ ', hintText: '0,00'),
+                  decoration: InputDecoration(prefixText: '${Moneda.s} ', hintText: '0,00'),
                 ),
                 etiqueta(tipo == 'transferencia' ? 'Desde' : (tipo == 'ingreso' ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?')),
                 Wrap(
@@ -1636,7 +1637,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
     'cargo': ('Debe al equipo', 'Ej. merch que se llevó sin pagar.', Icons.call_made_rounded),
     'prestamo': ('Préstamo del equipo', 'El equipo le prestó dinero: sale de una cuenta.', Icons.handshake_outlined),
     'abono': ('Paga lo que debe', 'Entra a una cuenta y baja su deuda.', Icons.call_received_rounded),
-    'a_favor': ('Tiene a favor', 'Ej. pagó \$50 de más o puso dinero por el equipo.', Icons.savings_outlined),
+    'a_favor': ('Tiene a favor', 'Ej. pagó de más o puso dinero por el equipo.', Icons.savings_outlined),
   };
 
   Future<void> _registrar() async {
@@ -1673,7 +1674,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
                   TextField(
                     controller: monto,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$ '),
+                    decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -1718,7 +1719,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
                       TextField(
                         controller: porCuota,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Monto por mes', prefixText: '\$ '),
+                        decoration: InputDecoration(labelText: 'Monto por mes', prefixText: '${Moneda.s} '),
                       ),
                   ],
                   const SizedBox(height: 16),
@@ -2243,7 +2244,7 @@ class _FondoScreenState extends State<_FondoScreen> {
           TextField(
             controller: _monto,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Monto a repartir', prefixText: '\$ '),
+            decoration: InputDecoration(labelText: 'Monto a repartir', prefixText: '${Moneda.s} '),
             onSubmitted: (_) => _previsualizar(),
           ),
           ListTile(

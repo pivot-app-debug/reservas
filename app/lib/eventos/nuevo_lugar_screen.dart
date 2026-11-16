@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../core/asistente.dart';
 import '../core/selector_ubicacion.dart';
 import 'eventos_repo.dart';
+import '../core/config_liga.dart';
 
 enum _Paso { ubicacion, tipo, video }
 
@@ -31,7 +32,7 @@ class _NuevoLugarScreenState extends State<NuevoLugarScreen> {
   String? _tipo;
   bool _guardando = false;
 
-  static const _tipos = ['Entrenamiento', 'Torneo', 'Partido', 'Asamblea', 'Evento social', 'Otro'];
+  List<String> get _tipos => ConfigLiga.de(widget.repo.sesion).tiposEvento(const ['Entrenamiento', 'Torneo', 'Partido', 'Asamblea', 'Evento social', 'Otro']);
 
   @override
   void dispose() {

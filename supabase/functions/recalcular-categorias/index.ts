@@ -153,7 +153,18 @@ Deno.serve(async (req: Request) => {
       .order('orden', { ascending: true });
     if (tiersError) return json({ ok: false, error: tiersError.message }, 500);
 
-    const tiers = tiersData ?? [];
+        const tiers = tiersData ?? [];
+
+    // Estados que congelan el equipo (Reglas → Estados, Victor 2026-11-15).
+    // Sin configurar: Lesionadx, De viaje, Enfermedad y Situación personal.
+    const congelan = new Set(['Lesionadx', 'De viaje', 'Enfermedad', 'Situación personal']);
+    try {
+      const { data: rl } = await supabase.from('config_app').select('value').eq('key', 'reglas_liga').maybeSingle();
+      const est = JSON.parse(String(rl?.value ?? '{}'))?.estados ?? {};
+      for (const [k, v] of Object.entries(est as Record<string, any>)) {
+        if (v && typeof v === 'object' && 'congela' in v) { if (v.congela === true) congelan.add(k); else congelan.delete(k); }
+      }
+    } catch { /* sin reglas: los de siempre */ }
     const tierDefault = tiers.find((t: any) => t.es_default === true);
     if (!tierDefault) {
       return json({ ok: false, error: 'No hay ningún tier marcado como es_default=true en config_tiers.' }, 500);
@@ -207,7 +218,12 @@ Deno.serve(async (req: Request) => {
     // 2026-11-14): una asistencia real ya devuelve a Activx.
     const exclusiones: Record<string, [string, string]> = {};
     if (hayExclusion && soloUsuario) exclusiones[soloUsuario] = [excluirDesde!, excluirHasta!];
-    const diasExclusionMax = Math.max(diasExclusion, ...Object.values(exclusiones).map(([a, b]) => Math.round((Date.parse(b) - Date.parse(a)) / DIA_MS) + 1));
+        // Temporadas de descanso que congelan (Victor, 2026-11-15): sus días
+    // se le devuelven a la ventana de todos, igual que un viaje.
+    const { data: tempCongelan } = await supabase.from('temporadas_descanso').select('fecha_inicio, fecha_fin, reglas');
+    const descansos = (tempCongelan ?? []).filter((t: any) => t.reglas?.congela === true).map((t: any) => [String(t.fecha_inicio), String(t.fecha_fin)]);
+    const diasDescansos = Math.min(366, descansos.reduce((s, [a, b]) => s + Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / DIA_MS) + 1), 0));
+    const diasExclusionMax = diasDescansos + Math.max(diasExclusion, ...Object.values(exclusiones).map(([a, b]) => Math.round((Date.parse(b) - Date.parse(a)) / DIA_MS) + 1));
 
 
         // El período más largo de todos los Equipos, en meses aproximados, para traer historial suficiente.
@@ -270,14 +286,19 @@ Deno.serve(async (req: Request) => {
     // Días de viaje (exclusión, solo en modo `soloUsuario`) que caen dentro
     // de la ventana normal [inicio de la ventana, ayer] -- 0 para cualquier
     // otra persona o sin exclusión. Es lo que se le devuelve a la ventana.
-    function diasExtraVentana(username: string, ventanaMeses: number): number {
-            const ex = exclusiones[username];
-      if (!ex) return 0;
+            function diasExtraVentana(username: string, ventanaMeses: number): number {
       const inicioVentana = primerDiaMesesAtras(ventanaMeses).getTime();
       const ayer = Date.parse(fechaISO(new Date())) - DIA_MS;
+      let extraDescanso = 0;
+      for (const [a, b] of descansos) {
+        const d0 = Math.max(Date.parse(a), inicioVentana), d1 = Math.min(Date.parse(b), ayer);
+        if (d1 >= d0) extraDescanso += Math.round((d1 - d0) / DIA_MS) + 1;
+      }
+            const ex = exclusiones[username];
+      if (!ex) return extraDescanso;
       const desdeSolape = Math.max(Date.parse(ex[0]), inicioVentana);
       const hastaSolape = Math.min(Date.parse(ex[1]), ayer);
-      return hastaSolape >= desdeSolape ? Math.round((hastaSolape - desdeSolape) / DIA_MS) + 1 : 0;
+            return extraDescanso + (hastaSolape >= desdeSolape ? Math.round((hastaSolape - desdeSolape) / DIA_MS) + 1 : 0);
     }
 
         // Clases y puntos en el período del Equipo (`periodoTier`). Con viaje
@@ -425,12 +446,14 @@ Deno.serve(async (req: Request) => {
       // del recálculo -- ver MANIFEST.md "estado_miembro"). Tampoco
       // registra historial_tier este mes -- no hubo una evaluación real que
       // registrar.
-            if (estadoMiembro === 'Lesionadx') continue;
+                        if (estadoMiembro === 'Lesionadx' && congelan.has('Lesionadx')) continue;
+      // Estados nuevos que congelan (Enfermedad, Situación personal, Otro según Reglas).
+      if (estadoMiembro && !['Lesionadx', 'De viaje', 'Activx', 'Ausente', 'Técnico'].includes(estadoMiembro) && congelan.has(estadoMiembro)) continue;
       // De viaje (feat nueva, ver MANIFEST.md): mismo criterio que Lesionadx
       // -- tier congelado mientras dura el viaje. Excepción: el modo
       // `soloUsuario` (viaje ya terminado registrado a posteriori) SÍ la
       // evalúa, con la ventana compensada.
-            if (estadoMiembro === 'De viaje' && username !== soloUsuario) continue;
+                        if (estadoMiembro === 'De viaje' && congelan.has('De viaje') && username !== soloUsuario) continue;
       // tier_modo fijado a mano (Cambio 55, control Quindes/Auto/Mirlxs del
       // perfil de Equipo, ver adminSetTierModo()/supabase/functions/api/index.ts)
       // -- mismo criterio que Lesionadx: la categoría queda como esté,

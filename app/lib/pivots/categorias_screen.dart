@@ -24,6 +24,7 @@ import '../equipo/equipo_modelos.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../core/vidrio.dart';
+import '../core/moneda.dart';
 
 /// Persona con clases y puntos por mes calendario (`adminDatosCategorias`):
 /// índice 0 = mes en curso, 1 = último mes cerrado… hasta 12.
@@ -44,7 +45,7 @@ class _Persona {
   final List<num> clasesMes, tareasMes, puntosMes;
 
   /// Entra en el cálculo automático (no fijada a mano, no congelada).
-  bool get evaluable => auto && !const ['Lesionadx', 'De viaje', 'Técnico'].contains(estado);
+  bool get evaluable => auto && !const ['Lesionadx', 'De viaje', 'Técnico', 'Enfermedad', 'Situación personal'].contains(estado);
   static num _suma(List<num> l, int meses) {
     num t = 0;
     for (var i = 1; i <= meses && i < l.length; i++) {
@@ -455,7 +456,10 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
   }
 
   // ─── Qué cuenta como clase ──────────────────────────────────────────────
-  static const _tiposEvento = ['Entrenamiento', 'Partido', 'Evento', 'Otro', 'Externa'];
+  List<String> get _tiposEvento => [
+    ...ConfigLiga.de(s).tiposEvento(const ['Entrenamiento', 'Partido', 'Evento', 'Otro']),
+    'Externa',
+  ];
   Map<String, dynamic> get _reglasLiga => (_reglas['reglas'] as Map<String, dynamic>?) ?? const {};
 
   String get _textoQueCuenta {
@@ -895,11 +899,11 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
         if (despues == null) return 'Borró la cuenta $n de Tesorería.';
         if (antes == null) {
           final s0 = despues is Map ? despues['saldo_inicial'] : null;
-          return 'Creó la cuenta $n en Tesorería${s0 is num && s0 != 0 ? ' con \$${_v(s0)} de saldo inicial' : ''}.';
+          return 'Creó la cuenta $n en Tesorería${s0 is num && s0 != 0 ? ' con ${Moneda.s}${_v(s0)} de saldo inicial' : ''}.';
         }
         if (despues is Map && despues['archivada'] == true) return 'Archivó la cuenta $n de Tesorería.';
         if (antes is Map && despues is Map && '${antes['saldo_inicial']}' != '${despues['saldo_inicial']}') {
-          return 'Cambió el saldo inicial de $n: \$${_v(despues['saldo_inicial'])} (antes \$${_v(antes['saldo_inicial'])}).';
+          return 'Cambió el saldo inicial de $n: ${Moneda.s}${_v(despues['saldo_inicial'])} (antes ${Moneda.s}${_v(antes['saldo_inicial'])}).';
         }
         return 'Editó la cuenta $n de Tesorería.';
       case 'transparencia':

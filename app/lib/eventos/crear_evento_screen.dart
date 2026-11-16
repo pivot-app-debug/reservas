@@ -9,6 +9,7 @@ import 'modelos.dart';
 import 'nuevo_lugar_screen.dart';
 import 'selector_fechas.dart';
 import '../core/cargando.dart';
+import '../core/config_liga.dart';
 
 enum _Paso { tipo, lugar, detalles, frecuencia, fecha, hora, descanso }
 
@@ -33,6 +34,9 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
 
   bool? _recurrente;
   bool _descanso = false;
+
+  /// Reglas de la temporada de descanso (Victor, 2026-11-15).
+  bool _descCongela = true, _descSinCuota = false;
   final _nombreDescanso = TextEditingController();
   DateTime? _descDesde;
   DateTime? _descHasta;
@@ -51,7 +55,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   TimeOfDay? _fin;
   bool _guardando = false;
 
-  static const _categorias = ['Entrenamiento', 'Partido', 'Evento', 'Otro'];
+  List<String> get _categorias => ConfigLiga.de(widget.repo.sesion).tiposEvento(const ['Entrenamiento', 'Partido', 'Evento', 'Otro']);
   static const _diasCortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   static const _diasPlural = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
 
@@ -65,6 +69,8 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
       _nombreDescanso.text = t.nombre;
       _descDesde = t.desde;
       _descHasta = t.hasta;
+      _descCongela = t.congela;
+      _descSinCuota = t.sinCuota;
       return;
     }
     _cargarVenues();
@@ -203,7 +209,14 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   Future<void> _guardarDescanso() async {
     setState(() => _guardando = true);
     try {
-      final n = await widget.repo.guardarDescanso(id: widget.temporada?.id, nombre: _nombreDescanso.text, desde: _descDesde!, hasta: _descHasta!);
+      final n = await widget.repo.guardarDescanso(
+        id: widget.temporada?.id,
+        nombre: _nombreDescanso.text,
+        desde: _descDesde!,
+        hasta: _descHasta!,
+        congela: _descCongela,
+        sinCuota: _descSinCuota,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -325,6 +338,32 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
             key: ValueKey('$_descDesde$_descHasta'),
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w600, color: p.marcaTexto),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Material(
+          color: p.tarjeta,
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('No cuenta para los equipos', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Nadie sube ni baja de equipo por no venir en el descanso.'),
+                  value: _descCongela,
+                  onChanged: (v) => setState(() => _descCongela = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Sin cuota', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Los meses completos dentro del descanso no se cobran.'),
+                  value: _descSinCuota,
+                  onChanged: (v) => setState(() => _descSinCuota = v),
+                ),
+              ],
+            ),
           ),
         ),
       ],

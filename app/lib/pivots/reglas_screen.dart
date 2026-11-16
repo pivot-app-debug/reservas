@@ -278,6 +278,16 @@ class _ReglasScreenState extends State<ReglasScreen> {
               titulo: 'Asistencia',
               filas: [
                 _regla(
+                  'tiposEvento',
+                  Icons.category_outlined,
+                  'Tipos de evento',
+                  c.tiposEventoExtra.isEmpty
+                      ? 'Entrenamiento, Partido, Torneo, Asamblea, Evento social y Otro'
+                      : 'Los de siempre y ${c.tiposEventoExtra.join(', ')}',
+                  seccion: 'entrenamientos',
+                  editar: () => SubAjustes.abrir(context, TiposEventoScreen(config: c)),
+                ),
+                _regla(
                   'tolerancia',
                   Icons.timer_outlined,
                   'Tolerancia para llegadas tarde',
@@ -316,11 +326,20 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'Quien paga por mes y no pagó, al marcar Asistiré va a pagar (después de sus clases de gracia)',
                   seccion: 'entrenamientos',
                 ),
+                for (final e in estadosEditables.entries)
+                  _regla(
+                    'estado_${e.key}',
+                    e.value.$1,
+                    e.key,
+                    textoEstado(c, e.key),
+                    seccion: 'entrenamientos',
+                    editar: () => SubAjustes.abrir(context, EstadoScreen(config: c, estado: e.key)),
+                  ),
                 _regla(
                   'reactivar',
                   Icons.directions_run_rounded,
                   'Volver a Activx',
-                  'Si viene a un evento estando Ausente, Lesionadx o De viaje, vuelve a Activx',
+                  'Si viene a entrenar (a horario o tarde) estando en otro estado, vuelve a Activx y usa su clase de gracia o queda con deuda si no pagó',
                   seccion: 'entrenamientos',
                 ),
               ],

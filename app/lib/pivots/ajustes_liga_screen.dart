@@ -22,6 +22,7 @@ import '../equipo/equipo_repo.dart';
 import 'salud_liga_screen.dart';
 import 'categorias_screen.dart';
 import 'pivots_screen.dart';
+import '../core/moneda.dart';
 
 /// Mi perfil → Ajustes de la liga (solo Pivots, Victor 2026-11-13): un solo
 /// lugar para lo que configura la liga. Los roles se editan desde la hoja de
@@ -503,6 +504,17 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                         titulo: 'Zona horaria',
                         valor: zonasHorarias[c.zonaHoraria] ?? zonas[c.zonaHoraria] ?? c.zonaHoraria,
                         alTocar: () => elegirZonaLiga(context, c),
+                      ),
+                    ),
+                    Resaltable(
+                      id: 'moneda',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.payments_outlined,
+                        seccion: 'identidad',
+                        titulo: 'Moneda',
+                        valor: Moneda.comunes[c.moneda] ?? c.moneda,
+                        alTocar: () => elegirMonedaLiga(context, c),
                       ),
                     ),
                   ],

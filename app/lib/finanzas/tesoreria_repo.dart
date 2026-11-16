@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../core/api.dart';
 import '../sesion/sesion.dart';
+import '../core/moneda.dart';
 
 /// Tesorería (HOJA_DE_RUTA etapa 5, Victor 2026-11-13). Todo pasa por
 /// `adminTesoreria`; nada se guarda en el teléfono.
@@ -36,7 +37,7 @@ const tiposCuenta = {'efectivo': 'Efectivo', 'deuna': 'Billetera virtual', 'banc
 String plata(num v) {
   final neg = v < 0;
   final t = v.abs().toStringAsFixed(2).replaceAll('.', ',');
-  return '${neg ? '−' : ''}\$$t';
+  return '${neg ? '−' : ''}${Moneda.s}$t';
 }
 
 String isoFecha(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

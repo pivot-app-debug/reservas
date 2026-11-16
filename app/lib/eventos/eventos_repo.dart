@@ -277,7 +277,7 @@ class EventosRepo extends ChangeNotifier {
         _api.get('getEventosRango', {'desde': d, 'hasta': h}),
         _api.get('getCumpleañosRango', {'desde': d, 'hasta': h}).catchError((_) => <String, dynamic>{}),
         _api
-            .restGet('temporadas_descanso?select=id,nombre,fecha_inicio,fecha_fin&fecha_fin=gte.$d&fecha_inicio=lte.$h&order=fecha_inicio.asc')
+            .restGet('temporadas_descanso?select=id,nombre,fecha_inicio,fecha_fin,reglas&fecha_fin=gte.$d&fecha_inicio=lte.$h&order=fecha_inicio.asc')
             .then((l) => <String, dynamic>{'temporadas': l})
             .catchError((_) => <String, dynamic>{}),
       ]);
@@ -622,13 +622,22 @@ class EventosRepo extends ChangeNotifier {
 
   /// Crea o edita una temporada: el servidor elimina los eventos de esas
   /// fechas y avisa al equipo. Devuelve cuántos eventos se eliminaron.
-  Future<int> guardarDescanso({String? id, required String nombre, required DateTime desde, required DateTime hasta}) async {
+  Future<int> guardarDescanso({
+    String? id,
+    required String nombre,
+    required DateTime desde,
+    required DateTime hasta,
+    bool congela = false,
+    bool sinCuota = false,
+  }) async {
     final res = await _api.post('adminGuardarTemporadaDescanso', {
       'adminToken': _adminToken,
       'id': id ?? '',
       'nombre': nombre,
       'desde': Fechas.iso(desde),
       'hasta': Fechas.iso(hasta),
+      'congela': congela,
+      'sinCuota': sinCuota,
     });
     if (res['exito'] != true) throw ApiException((res['error'] ?? 'No se pudo guardar la temporada.').toString());
     await cargar(forzar: true);

@@ -7,10 +7,11 @@ import '../core/selector_plazo.dart';
 import '../core/tema.dart';
 import '../core/zonas_horarias.dart';
 import '../sesion/sesion.dart';
+import '../core/moneda.dart';
 
 /// Editores de los ajustes de la liga, compartidos por Mi Liga, Reglas,
 /// Cobros y los ajustes de cada equipo (Victor, 2026-11-14).
-String plataLiga(num? v) => v == null ? 'Sin definir' : '\$${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
+String plataLiga(num? v) => v == null ? 'Sin definir' : '${Moneda.s}${v % 1 == 0 ? v.toInt() : v.toStringAsFixed(2)}';
 
 Future<void> guardarLiga(BuildContext context, ConfigLiga c, Map<String, Object?> cambios) async {
   final m = ScaffoldMessenger.of(context);
@@ -118,7 +119,7 @@ Future<void> precioLiga(BuildContext context, ConfigLiga c, String titulo, num? 
         autofocus: true,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-        decoration: const InputDecoration(prefixText: '\$ '),
+        decoration: InputDecoration(prefixText: '${Moneda.s} '),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
@@ -219,12 +220,20 @@ Future<void> editarGracia(BuildContext context, Sesion sesion, ConfigLiga c, {St
           curve: Curves.easeOutCubic,
           child: v[e] == null
               ? const SizedBox(width: double.infinity)
-              : SelectorNumero(
-                  valor: v[e]!,
-                  min: 0,
-                  max: 10,
-                  etiqueta: v[e] == 0 ? 'paga antes' : 'clases al mes',
-                  alCambiar: (n) => set(() => v[e] = n.toInt()),
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final n in {0, 1, 2, 3, 4, 5, v[e]!}.toList()..sort())
+                        ChoiceChip(
+                          label: Text(n == 0 ? 'Paga antes' : '$n ${n == 1 ? 'clase' : 'clases'} al mes'),
+                          selected: v[e] == n,
+                          onSelected: (_) => set(() => v[e] = n),
+                        ),
+                    ],
+                  ),
                 ),
         ),
       ],
@@ -270,6 +279,44 @@ class ChipAlcance extends StatelessWidget {
 
 /// Subsección para editar algo con "Guardar" (Victor, 2026-11-15: nada de
 /// hojas inferiores enormes). Devuelve true si se guarda.
+/// Moneda de la liga (Mi Liga → Datos de la liga): símbolo de todos los montos.
+Future<void> elegirMonedaLiga(BuildContext context, ConfigLiga c) async {
+  var elegida = c.moneda;
+  final otra = TextEditingController(text: Moneda.comunes.containsKey(c.moneda) ? '' : c.moneda);
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Moneda',
+    contenido: (set) => [
+      Text('El símbolo que se usa en precios, cobros y Tesorería. Los montos no cambian.', style: TextStyle(color: context.pivot.textoSecundario)),
+      const SizedBox(height: 12),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final e in Moneda.comunes.entries)
+            ChoiceChip(
+              label: Text(e.value),
+              selected: elegida == e.key,
+              onSelected: (_) => set(() {
+                elegida = e.key;
+                otra.clear();
+              }),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        controller: otra,
+        maxLength: 5,
+        decoration: const InputDecoration(labelText: 'Otra (símbolo)'),
+        onChanged: (x) => set(() => elegida = x.trim().isEmpty ? r'$' : x.trim()),
+      ),
+    ],
+  );
+  otra.dispose();
+  if (ok == true && elegida != c.moneda && context.mounted) await guardarLiga(context, c, {'moneda': elegida});
+}
+
 Future<bool?> abrirSubseccion(
   BuildContext context, {
   required String titulo,
