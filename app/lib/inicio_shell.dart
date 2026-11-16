@@ -17,6 +17,7 @@ import 'eventos/timeline_screen.dart';
 import 'pivots/ajustes_liga_screen.dart';
 import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
+import 'finanzas/tesoreria_screen.dart';
 import 'eventos/widgets_comunes.dart';
 
 /// Estructura principal con la barra de navegación inferior. En esta
@@ -64,7 +65,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       () => _indice = switch (p) {
         Pestana.calendario => 0,
         Pestana.equipo => 1,
-        Pestana.perfil => widget.sesion.esAdmin ? 3 : 2,
+        Pestana.perfil => 1 + (widget.sesion.tieneArea('finanzas') ? 1 : 0) + (widget.sesion.esAdmin && widget.sesion.adminToken != null ? 1 : 0) + 1,
       },
     );
   }
@@ -104,6 +105,13 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
         const NavigationDestination(icon: Icon(Icons.group_outlined), selectedIcon: Icon(Icons.group), label: 'Equipo'),
         EquipoScreen(repo: EquipoRepo.de(widget.sesion)),
       ),
+      // Finanzas (antes Tesorería en Mi Liga; Victor, 2026-11-16): en la
+      // barra para quien gestiona finanzas.
+      if (widget.sesion.tieneArea('finanzas'))
+        (
+          const NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Finanzas'),
+          TesoreriaScreen(sesion: widget.sesion),
+        ),
       // Mi Liga (Victor, 2026-11-13): pestaña de Pivots con los ajustes de
       // la liga, Tesorería y Pivots y permisos (salieron de Mi perfil).
       if (widget.sesion.esAdmin && widget.sesion.adminToken != null)

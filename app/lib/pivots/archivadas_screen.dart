@@ -59,6 +59,56 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
     }
   }
 
+  /// Último recurso (Victor, 2026-11-16): se borra todo menos su nombre,
+  /// sus pagos y sus asistencias. Pide escribir BORRAR para confirmar.
+  Future<void> _borrar(Map<String, dynamic> x) async {
+    final m = ScaffoldMessenger.of(context);
+    final ctl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text('¿Eliminar a ${x['nombreDerby']}?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Se borran sus datos personales, de salud y emergencia, su contacto, su foto y su acceso. '
+                'Quedan su nombre, sus pagos y sus asistencias. No se puede deshacer.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(labelText: 'Escribe BORRAR para confirmar'),
+                onChanged: (_) => set(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: d.pivot.marca),
+              onPressed: ctl.text.trim().toUpperCase() == 'BORRAR' ? () => Navigator.of(d).pop(true) : null,
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctl.dispose();
+    if (ok != true) return;
+    try {
+      await widget.repo.borrarDatos('${x['nombre']}');
+      m.showSnackBar(SnackBar(content: Text('Se borraron los datos de ${x['nombreDerby']}')));
+      await _cargar();
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo eliminar.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -82,7 +132,10 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),
                 children: [
-                  Text('Quienes salieron de Equipo. Su historial se conserva.', style: TextStyle(color: p.textoSecundario)),
+                  Text(
+                    'Quienes salieron de Equipo. Su historial se conserva. Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.',
+                    style: TextStyle(color: p.textoSecundario),
+                  ),
                   const SizedBox(height: 8),
                   if (l.isEmpty)
                     Padding(
@@ -94,8 +147,21 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: AvatarPersona(nombre: '${x['nombreDerby']}', tamano: 40),
                       title: Text('${x['nombreDerby']}'),
-                      subtitle: Text(x['eliminadoPor'] == 'admin' ? 'Archivadx por un Pivot' : 'Borró su cuenta'),
-                      trailing: x['eliminadoPor'] == 'admin' ? TextButton(onPressed: () => _restaurar(x), child: const Text('Restaurar')) : null,
+                      subtitle: Text(switch (x['eliminadoPor']) {
+                        'admin' => 'Archivadx por un Pivot',
+                        'borrado' => 'Datos eliminados',
+                        _ => 'Borró su cuenta',
+                      }),
+                      trailing: x['eliminadoPor'] == 'admin'
+                          ? PopupMenuButton<String>(
+                              tooltip: 'Opciones',
+                              onSelected: (v) => v == 'r' ? _restaurar(x) : _borrar(x),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'r', child: Text('Restaurar')),
+                                PopupMenuItem(value: 'b', child: Text('Eliminar persona')),
+                              ],
+                            )
+                          : null,
                     ),
                 ],
               ),

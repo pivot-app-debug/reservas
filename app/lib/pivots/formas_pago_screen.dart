@@ -402,7 +402,7 @@ class _MedioScreenState extends State<_MedioScreen> {
             decoration: const InputDecoration(hintText: 'Ej. Entrégalo a un Pivot antes de la clase'),
           ),
           if (_cuentas.isNotEmpty) ...[
-            _titulo('¿A qué cuenta de Tesorería entra?'),
+            _titulo('¿A qué cuenta de Finanzas entra?'),
             Wrap(
               spacing: 8,
               runSpacing: 8,

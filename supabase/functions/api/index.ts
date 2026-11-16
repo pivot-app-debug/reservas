@@ -203,7 +203,7 @@ for (const [area, acciones] of Object.entries({
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
     'adminCancelarEvento', 'adminRegenerarVentanaAsistencias', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue'],
   equipo: ['adminSetCategoria', 'adminSetTierModo', 'upsertTier', 'deleteTier', 'adminDatosCategorias', 'adminSetEstadoMiembro', 'adminActualizarEstadoViaje',
-    'adminCancelarViaje', 'adminEliminarUsuario', 'adminRestaurarUsuario', 'adminRolesEquipo', 'adminGuardarTemporadaDescanso', 'adminEliminarTemporadaDescanso',
+    'adminCancelarViaje', 'adminEliminarUsuario', 'adminRestaurarUsuario', 'adminBorrarDatosPersona', 'adminRolesEquipo', 'adminGuardarTemporadaDescanso', 'adminEliminarTemporadaDescanso',
         'adminBackfillHistorialTier', 'adminRecalcularStats', 'adminReglasLiga', 'adminCambiosEquipo', 'adminRecompensas'],
   salud: ['adminFichaEmergencia', 'adminAprobarLesion', 'adminRechazarLesion', 'adminGetSolicitudesLesion'],
   inventario: ['adminInventarioLista', 'adminPrestamo', 'adminReglaPrestamo', 'adminGuardarEquipamiento'],
@@ -883,7 +883,7 @@ async function cambiarUsuario(params: Record<string, any>): Promise<Record<strin
 // Canal de comunicación: con qué app se escribe a las personas del equipo.
 const CANALES_LIGA = ['whatsapp', 'telegram', 'signal', 'telefono'];
 const CLAVES_LIGA: Record<string, string> = {
-    solicitudesPivots: 'solicitudes_pivots', canal: 'canal_comunicacion', pais: 'pais_equipo', zonaHoraria: 'zona_horaria', moneda: 'moneda',
+    solicitudesPivots: 'solicitudes_pivots', canal: 'canal_comunicacion', pais: 'pais_equipo', zonaHoraria: 'zona_horaria', moneda: 'moneda', monedaCodigo: 'moneda_codigo',
 };
 
 /** Símbolo de la moneda de la liga (Mi Liga → Datos), para los textos de avisos. Se refresca al leer las reglas. */
@@ -898,7 +898,8 @@ async function _configLiga(): Promise<Record<string, string>> {
     canal: CANALES_LIGA.includes(m.canal_comunicacion) ? m.canal_comunicacion : 'whatsapp',
     pais: m.pais_equipo || 'EC',
         zonaHoraria: m.zona_horaria || 'America/Guayaquil',
-    moneda: (_monedaLiga = m.moneda || '$'),
+        moneda: (_monedaLiga = m.moneda || '$'),
+    monedaCodigo: /^[A-Z]{3}$/.test(m.moneda_codigo ?? '') ? m.moneda_codigo : '',
   };
 }
 
@@ -1313,7 +1314,13 @@ async function adminGuardarConfigLiga(params: Record<string, any>): Promise<Reco
     if (params.moneda != null) {
     const mon = String(params.moneda).trim().slice(0, 5);
     if (!mon) return { exito: false, error: 'Moneda inválida.' };
-    filas.push({ key: 'moneda', value: mon });
+        filas.push({ key: 'moneda', value: mon });
+  }
+  // Código ISO 4217 de la lista completa (Victor, 2026-11-16); '' = símbolo escrito a mano.
+  if (params.monedaCodigo != null) {
+    const cod = String(params.monedaCodigo).trim().toUpperCase();
+    if (cod && !/^[A-Z]{3}$/.test(cod)) return { exito: false, error: 'Moneda inválida.' };
+    filas.push({ key: 'moneda_codigo', value: cod });
   }
   if (params.zonaHoraria != null) {
     try { new Intl.DateTimeFormat('es', { timeZone: String(params.zonaHoraria) }); } catch { return { exito: false, error: 'Zona horaria inválida.' }; }
@@ -1524,7 +1531,9 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
   const pinHash      = params.pinHash ?? '';
   const idToken      = params.idToken ?? '';
 
-  if (!nombre) return { exito: false, error: 'El nombre es obligatorio.' };
+    if (!nombre) return { exito: false, error: 'El nombre es obligatorio.' };
+  // Pivot es solo para mayores de 18 (Victor, 2026-11-16).
+  if (_esMenorDeEdad(fechaNac)) return { exito: false, error: 'Pivot es solo para mayores de 18 años.' };
   if (!email || !email.includes('@')) return { exito: false, error: 'Email inválido.' };
   if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$/.test(nombre)) return { exito: false, error: 'El nombre solo puede contener letras y espacios.' };
 
@@ -1716,6 +1725,7 @@ async function actualizarPerfilGoogle(params: Record<string, any>): Promise<Reco
   if (!username) return { exito: false, error: 'Sesión inválida.' };
   const update: Record<string, any> = { permisos_configurados: true };
   if (params.foto && params.foto.toString().startsWith('http')) update.foto_perfil = params.foto;
+    if (_esMenorDeEdad(params.fechaNac)) return { exito: false, error: 'Pivot es solo para mayores de 18 años.' };
   if (_normalizarFechaNac(params.fechaNac) && params.guardarFecha === 'si') {
     update.fecha_nacimiento = _normalizarFechaNac(params.fechaNac);
     update.fecha_publica    = params.fechaPublica === 'Sí' ? 'Sí' : 'No';
@@ -3895,6 +3905,13 @@ function _normalizarFechaNac(v: unknown): string | null {
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
   if (y < 1920 || s > _hoyEcuadorISO()) return null;
   return s;
+}
+/** Fecha válida de alguien que todavía no cumple 18. */
+function _esMenorDeEdad(v: unknown): boolean {
+  const s = _normalizarFechaNac(v);
+  if (!s) return false;
+  const h = _hoyEcuadorISO();
+  return `${Number(s.slice(0, 4)) + 18}${s.slice(4)}` > h;
 }
 function _esPublico(v: unknown): boolean { return v === 'Sí' || v === 'Si'; }
 // 'MM-DD' del cumpleaños en un año dado -- un 29 de febrero cae el 28 en
@@ -7201,6 +7218,39 @@ async function adminRestaurarUsuario(params: Record<string, any>): Promise<Recor
   return { exito: true };
 }
 
+// Borrar a una persona archivada (Victor, 2026-11-16): último recurso. Se
+// borran sus datos personales, de salud, emergencia y contacto, su foto y
+// su acceso; quedan su nombre, sus pagos y sus asistencias (las tablas con
+// historial no se tocan). No se puede deshacer ni restaurar.
+async function adminBorrarDatosPersona(params: Record<string, any>): Promise<Record<string, any>> {
+  const adminEmail = await _validarAdminToken(params.adminToken);
+  if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
+  const nombre = String(params.nombre ?? '').trim();
+  if (!nombre) return { exito: false, error: 'Parámetros inválidos.' };
+  const { data: fila } = await supabase.from('equipo').select('eliminado_en, eliminado_por').eq('username', nombre).maybeSingle();
+  if (!fila) return { exito: false, error: 'Usuario no encontrado.' };
+  if (!fila.eliminado_en || fila.eliminado_por !== 'admin') return { exito: false, error: 'Primero hay que archivar a la persona.' };
+  const { data, error } = await supabase.from('equipo').update({
+    eliminado_por: 'borrado',
+    email: '', prefijo: '', telefono: '',
+    fecha_nacimiento: null, fecha_publica: null, edad_publica: null,
+    tipo_documento: '', pais_expedicion: '', numero_documento: '',
+    calle_principal: '', calle_secundaria: '', numeracion: '', sector: '', canton: '',
+    emerg1_nombre: '', emerg1_relacion: '', emerg1_prefijo: '', emerg1_telefono: '',
+    emerg2_nombre: '', emerg2_relacion: '', emerg2_prefijo: '', emerg2_telefono: '',
+    enfermedad: '', alergias: '', alergias_desc: '', dieta: '', antecedentes: '',
+    medicamentos: '', medicamentos_desc: '', atencion_medica: '', seguro: '', seguro_contacto: '',
+    foto_perfil: '', pin_hash: null,
+  }).eq('username', nombre).select('username');
+  if (error) return { exito: false, error: error.message };
+  if (!data?.length) return { exito: false, error: 'No se pudo borrar.' };
+  await supabase.from('sessions').delete().eq('username', nombre);
+  await supabase.from('pin_attempts').delete().eq('username', nombre);
+  await supabase.from('invite_tokens').update({ usado: true }).eq('username', nombre).eq('usado', false);
+  await supabase.storage.from('fotos-perfil').remove(['avatars/' + nombre + '.jpg']);
+  return { exito: true };
+}
+
 async function adminGetAdmins(): Promise<any[]> {
   const { data } = await supabase.from('admins').select('email, invitado_por, fecha').order('email');
   const out: any[] = [{ email: ADMIN_PRINCIPAL, principal: true }];
@@ -9722,7 +9772,14 @@ async function cronDiario(): Promise<Record<string, any>> {
     await recalcularPuntosAsistencia(m, a);
   } catch (e) { console.error('[puntos] cron:', e); }
         try { await _avisarPrestamosLargos(); } catch (e) { console.error('[inventario] avisos:', e); }
-  try { await _cronCorteEquipos(); } catch (e) { console.error('[equipos] corte:', e); }
+    try { await _cronCorteEquipos(); } catch (e) { console.error('[equipos] corte:', e); }
+  // Avisos del equipo ya enviados o cancelados: se borran a los 30 días para
+  // no ocupar la base (Victor, 2026-11-16). Los programados no se tocan.
+  try {
+    const hace30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    await supabase.from('avisos_programados').delete().lt('enviado_en', hace30);
+    await supabase.from('avisos_programados').delete().lt('cancelado_en', hace30);
+  } catch (e) { console.error('[avisos] limpiar:', e); }
   const hoyIso = _hoyEcuadorISO();
   const diaMes = hoyIso.substring(5);              // 'MM-DD'
   const diaDelMes = Number(hoyIso.substring(8, 10));
@@ -10564,7 +10621,8 @@ Deno.serve(async (req: Request) => {
       case 'adminAprobarLesion':             return json(await adminAprobarLesion(params));
       case 'adminRechazarLesion':            return json(await adminRechazarLesion(params));
       case 'adminEliminarUsuario':           return json(await adminEliminarUsuario(params));
-      case 'adminRestaurarUsuario':          return json(await adminRestaurarUsuario(params));
+            case 'adminRestaurarUsuario':          return json(await adminRestaurarUsuario(params));
+      case 'adminBorrarDatosPersona':        return json(await adminBorrarDatosPersona(params));
       case 'adminGetAdmins':                 return json(await adminGetAdmins());
       case 'adminAgregarAdmin':              return json(await adminAgregarAdmin(params));
       case 'adminQuitarAdmin':               return json(await adminQuitarAdmin(params));

@@ -689,7 +689,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Tesorería', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Finanzas', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
@@ -701,7 +701,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: _cuentas.isEmpty ? _vacio(context) : _contenido(context, r, p),
                 ),
               ),
@@ -894,7 +894,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
             title: const Text('Transparencia', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: const Text('El equipo ve totales y en qué se gasta. Nunca pagos ni deudas de otras personas.'),
             value: r['transparencia'] == true,
-            onChanged: (v) => _hacer(() => repo.accion('transparencia', {'activa': v}), v ? 'El equipo ya ve los totales' : 'Solo Pivots ven la Tesorería'),
+            onChanged: (v) => _hacer(() => repo.accion('transparencia', {'activa': v}), v ? 'El equipo ya ve los totales' : 'Solo Pivots ven Finanzas'),
           ),
         ),
       ),
@@ -1311,7 +1311,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
         ShareParams(
           files: [XFile.fromData(bytes, mimeType: 'text/csv', name: 'tesoreria.csv')],
           fileNameOverrides: ['tesoreria-${isoFecha(Fechas.hoy())}.csv'],
-          subject: 'Movimientos de Tesorería',
+          subject: 'Movimientos de Finanzas',
         ),
       );
     } catch (e) {

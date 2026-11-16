@@ -215,6 +215,13 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Clases de gracia:** título fijo, selector de número 0–10, ejemplo en vivo; un equipo que no paga mensualidad lo explica en vez de mostrar el interruptor.
 - Pivots y permisos: "Aprobación de solicitudes" con interruptor optimista. Reglas → Privacidad: interruptor visible y optimista. Estados: "Pausado" en vez de "congela".
 
+## Bloque B, primera parte (2026-11-16)
+- Edad: `_esMenorDeEdad()` en `inscribirPersona` y `actualizarPerfilGoogle`; `PrivacidadScreen.edadMinima = 18`; inscripcion.js bloquea < 18.
+- Finanzas: pestaña en `inicio_shell.dart` si `sesion.tieneArea('finanzas')` (TesoreriaScreen); Mi Liga ya no muestra la tarjeta. El buscador abre Finanzas.
+- Moneda: `core/monedas_mundo.dart` (ISO 4217); se guardan `moneda` (símbolo) y `monedaCodigo` (`config_app.moneda_codigo`).
+- `adminBorrarDatosPersona`: solo para archivadas por un Pivot (`eliminado_por` pasa a 'borrado'); vacía datos personales como `eliminarCuenta` pero conserva nombres.
+- `cronDiario` borra `avisos_programados` enviados o cancelados hace más de 30 días.
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

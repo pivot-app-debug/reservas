@@ -12,7 +12,7 @@ class PrivacidadScreen extends StatelessWidget {
   const PrivacidadScreen({super.key, required this.sesion});
   final Sesion sesion;
 
-  static const edadMinima = 16;
+  static const edadMinima = 18; // Pivot es solo para mayores (Victor, 2026-11-16)
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +60,6 @@ class PrivacidadScreen extends StatelessWidget {
                 },
               ),
             ],
-            pie: 'Debes tener al menos $edadMinima años para usar la app.',
           ),
           GrupoAjustes(
             filas: [

@@ -325,7 +325,7 @@ function inscContinuar2() {
   var edad = hoy.getFullYear() - fn.getFullYear();
   var dm = hoy.getMonth() - fn.getMonth();
   if (dm < 0 || (dm === 0 && hoy.getDate() < fn.getDate())) edad--;
-  if (edad < 16) { mostrarModalEdadBloqueo(); return; }
+  if (edad < 18) { mostrarModalEdadBloqueo(); return; }
   G.fechaNac = fnac;
   G.mayorEdad = edad >= 18;
   G.fechaPublica = document.getElementById('tog-fecha-pub').classList.contains('toggle-on') ? 'Sí' : 'No';

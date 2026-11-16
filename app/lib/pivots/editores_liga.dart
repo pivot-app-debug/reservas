@@ -8,6 +8,7 @@ import '../core/tema.dart';
 import '../core/zonas_horarias.dart';
 import '../sesion/sesion.dart';
 import '../core/moneda.dart';
+import '../core/monedas_mundo.dart';
 
 /// Editores de los ajustes de la liga, compartidos por Mi Liga, Reglas,
 /// Cobros y los ajustes de cada equipo (Victor, 2026-11-14).
@@ -300,46 +301,93 @@ class ChipAlcance extends StatelessWidget {
   }
 }
 
-/// Subsección para editar algo con "Guardar" (Victor, 2026-11-15: nada de
-/// hojas inferiores enormes). Devuelve true si se guarda.
-/// Moneda de la liga (Mi Liga → Datos de la liga): símbolo de todos los montos.
+/// Moneda de la liga (Mi Liga → Datos de la liga): símbolo de todos los
+/// montos. Lista completa de monedas del mundo con buscador (Victor,
+/// 2026-11-16) o un símbolo escrito a mano.
 Future<void> elegirMonedaLiga(BuildContext context, ConfigLiga c) async {
-  var elegida = c.moneda;
-  final otra = TextEditingController(text: Moneda.comunes.containsKey(c.moneda) ? '' : c.moneda);
-  final ok = await abrirSubseccion(
-    context,
-    titulo: 'Moneda',
-    contenido: (set) => [
-      Text('El símbolo que se usa en precios, cobros y Tesorería. Los montos no cambian.', style: TextStyle(color: context.pivot.textoSecundario)),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final e in Moneda.comunes.entries)
-            ChoiceChip(
-              label: Text(e.value),
-              selected: elegida == e.key,
-              onSelected: (_) => set(() {
-                elegida = e.key;
-                otra.clear();
-              }),
-            ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      TextField(
-        controller: otra,
-        maxLength: 5,
-        decoration: const InputDecoration(labelText: 'Otra (símbolo)'),
-        onChanged: (x) => set(() => elegida = x.trim().isEmpty ? r'$' : x.trim()),
-      ),
-    ],
+  var q = '';
+  String sinTildes(String s) => s
+      .toLowerCase()
+      .replaceAll(RegExp('[áà]'), 'a')
+      .replaceAll(RegExp('[éè]'), 'e')
+      .replaceAll(RegExp('[íì]'), 'i')
+      .replaceAll(RegExp('[óò]'), 'o')
+      .replaceAll(RegExp('[úü]'), 'u');
+  final v = await showModalBottomSheet<(String, String)>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (h) => StatefulBuilder(
+      builder: (h, set) {
+        final l = [
+          for (final m in monedasMundo)
+            if (q.isEmpty || sinTildes('${m.$1} ${m.$2} ${m.$3}').contains(sinTildes(q))) m,
+        ];
+        final propio = q.isNotEmpty && q.length <= 5;
+        return SizedBox(
+          height: MediaQuery.sizeOf(h).height * 0.85,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (x) => set(() => q = x.trim()),
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'País, moneda o código'),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.only(bottom: 16 + MediaQuery.viewInsetsOf(h).bottom),
+                  itemCount: l.length + (propio ? 1 : 0),
+                  itemBuilder: (_, i) {
+                    if (i == l.length) {
+                      return ListTile(
+                        leading: const Icon(Icons.edit_outlined),
+                        title: Text('Usar "$q" como símbolo'),
+                        onTap: () => Navigator.of(h).pop((q, '')),
+                      );
+                    }
+                    final (cod, nombre, simbolo) = l[i];
+                    final elegida = cod == c.monedaCodigo || (c.monedaCodigo.isEmpty && cod == 'USD' && c.moneda == r'$');
+                    return ListTile(
+                      leading: SizedBox(
+                        width: 44,
+                        child: Text(
+                          simbolo,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w800, color: h.pivot.marcaTexto),
+                        ),
+                      ),
+                      title: Text(nombre),
+                      subtitle: Text(cod),
+                      trailing: elegida ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                      onTap: () => Navigator.of(h).pop((simbolo, cod)),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
   );
-  otra.dispose();
-  if (ok == true && elegida != c.moneda && context.mounted) await guardarLiga(context, c, {'moneda': elegida});
+  if (v == null || !context.mounted) return;
+  if (v.$1 == c.moneda && v.$2 == c.monedaCodigo) return;
+  await guardarLiga(context, c, {'moneda': v.$1, 'monedaCodigo': v.$2});
 }
 
+/// Nombre de la moneda para la fila de Datos de la liga.
+String textoMonedaLiga(ConfigLiga c) {
+  for (final m in monedasMundo) {
+    if (m.$1 == c.monedaCodigo) return '${m.$2} (${m.$3})';
+  }
+  return c.moneda == r'$' && c.monedaCodigo.isEmpty ? r'Dólar estadounidense ($)' : c.moneda;
+}
+
+/// Subsección para editar algo con "Guardar" (Victor, 2026-11-15: nada de
+/// hojas inferiores enormes). Devuelve true si se guarda.
 Future<bool?> abrirSubseccion(
   BuildContext context, {
   required String titulo,

@@ -18,7 +18,7 @@ import '../core/esqueleto.dart';
 /// Áreas que puede tener un Pivot (Victor, 2026-11-13). El servidor bloquea
 /// cada acción según su área (`AREA_DE_ACCION`) y filtra la Bandeja y los avisos.
 const areasPivot = {
-  'finanzas': ('Finanzas', 'Pagos, cuotas, excepciones de cuota, reservas y Tesorería.', Icons.account_balance_wallet_outlined),
+  'finanzas': ('Finanzas', 'Pagos, cuotas, excepciones de cuota, reservas y la sección Finanzas.', Icons.account_balance_wallet_outlined),
   'asistencia': ('Asistencia y eventos', 'Tomar lista, rectificaciones, cancelar eventos y lugares.', Icons.event_available_outlined),
   'equipo': ('Personas y equipos', 'Estados, equipos y puntos, roles, viajes y temporadas de descanso.', Icons.groups_outlined),
   'salud': ('Salud y emergencias', 'Ficha de emergencia y lesiones. Información confidencial.', Icons.health_and_safety_outlined),

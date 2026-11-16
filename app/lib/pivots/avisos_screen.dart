@@ -296,6 +296,10 @@ class _AvisosScreenState extends State<AvisosScreen> {
                     ),
                     if (prog.isNotEmpty) ...[_titulo(context, 'PROGRAMADOS'), for (final a in prog) _tarjeta(context, a, programado: true)],
                     _titulo(context, 'ENVIADOS'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text('Los enviados se borran solos a los 30 días.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                    ),
                     if (env.isEmpty) Text('Todavía no se envió ningún aviso desde la app.', style: TextStyle(color: p.textoSecundario)),
                     for (final a in env) _tarjeta(context, a, programado: false),
                   ],

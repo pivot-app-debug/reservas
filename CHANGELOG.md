@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (revisión de Victor: bloque B, primera parte)
+- **Solo mayores de 18:** la app y la inscripción no permiten registrarse a menores (también lo valida el servidor). Se quitó el aviso de los 16 años.
+- **Finanzas** (antes Tesorería) pasa a la barra de abajo para quien gestiona finanzas; se quitó su tarjeta de Mi Liga.
+- **Monedas:** lista completa de monedas del mundo con buscador (o un símbolo propio).
+- **Eliminar persona** (Personas archivadas): borra sus datos personales, de salud, emergencia y contacto, su foto y su acceso; quedan su nombre, pagos y asistencias. Pide escribir BORRAR.
+- **Avisos del equipo:** los enviados se borran solos a los 30 días.
+
 ## 2026-11-16 (revisión de Victor: bloque A)
 - **Barras de arriba iguales en toda la app:** en reposo son del color de la página (ya no se ven rojizas ni blancas) y el vidrio aparece al desplazar. Se quitó el hueco entre la barra y el contenido en Reglas y otras pantallas. Tarjetas sin sombra.
 - **Esqueletos de carga** en vez del loader en bucle en todas las pantallas y listas.

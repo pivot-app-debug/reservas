@@ -726,7 +726,7 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
   static const _grupos = {
     'equipos': ('Equipos', Icons.groups_outlined),
     'puntos': ('Puntos y reglas', Icons.rule_rounded),
-    'tesoreria': ('Tesorería', Icons.account_balance_wallet_outlined),
+    'tesoreria': ('Finanzas', Icons.account_balance_wallet_outlined),
     'liga': ('Liga', Icons.stadium_outlined),
   };
 
@@ -748,8 +748,8 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
     'inactividadDias': 'Inactividad',
     'equipo': 'Equipos',
     'logo': 'Logo',
-    'cuenta': 'Cuenta de Tesorería',
-    'transparencia': 'Transparencia de Tesorería',
+    'cuenta': 'Cuenta de Finanzas',
+    'transparencia': 'Transparencia de Finanzas',
   };
 
   @override
@@ -898,16 +898,16 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
             : ('$d'.startsWith('medio-') ? 'Cambió el logo de un medio de pago.' : 'Cambió el logo de un equipo.');
       case 'cuenta':
         final n = despues is Map ? despues['nombre'] : (antes is Map ? antes['nombre'] : 'una cuenta');
-        if (despues == null) return 'Borró la cuenta $n de Tesorería.';
+        if (despues == null) return 'Borró la cuenta $n de Finanzas.';
         if (antes == null) {
           final s0 = despues is Map ? despues['saldo_inicial'] : null;
-          return 'Creó la cuenta $n en Tesorería${s0 is num && s0 != 0 ? ' con ${Moneda.s}${_v(s0)} de saldo inicial' : ''}.';
+          return 'Creó la cuenta $n en Finanzas${s0 is num && s0 != 0 ? ' con ${Moneda.s}${_v(s0)} de saldo inicial' : ''}.';
         }
-        if (despues is Map && despues['archivada'] == true) return 'Archivó la cuenta $n de Tesorería.';
+        if (despues is Map && despues['archivada'] == true) return 'Archivó la cuenta $n de Finanzas.';
         if (antes is Map && despues is Map && '${antes['saldo_inicial']}' != '${despues['saldo_inicial']}') {
           return 'Cambió el saldo inicial de $n: ${Moneda.s}${_v(despues['saldo_inicial'])} (antes ${Moneda.s}${_v(antes['saldo_inicial'])}).';
         }
-        return 'Editó la cuenta $n de Tesorería.';
+        return 'Editó la cuenta $n de Finanzas.';
       case 'transparencia':
         return despues == true ? 'Activó la transparencia: el equipo ve los totales.' : 'Desactivó la transparencia.';
     }

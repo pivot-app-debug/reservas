@@ -3,14 +3,5 @@
 class Moneda {
   static String s = r'$';
 
-  /// Opciones comunes; la liga puede escribir otra.
-  static const comunes = <String, String>{
-    r'$': 'Dólar o peso (\$)',
-    'S/': 'Sol (S/)',
-    '€': 'Euro (€)',
-    'Bs': 'Boliviano (Bs)',
-    'Q': 'Quetzal (Q)',
-    '₡': 'Colón (₡)',
-    'R\$': 'Real (R\$)',
-  };
+  // La lista completa de monedas está en monedas_mundo.dart.
 }

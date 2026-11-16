@@ -21,7 +21,6 @@ import '../equipo/equipo_repo.dart';
 import 'salud_liga_screen.dart';
 import 'categorias_screen.dart';
 import 'pivots_screen.dart';
-import '../core/moneda.dart';
 import '../core/esqueleto.dart';
 import '../core/fondo_logo.dart';
 import 'cobro_equipo_screen.dart' show modosCobro;
@@ -76,6 +75,11 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   Future<void> _buscar() async {
     final e = await Navigator.of(context).push<EntradaAjuste>(MaterialPageRoute(builder: (_) => BuscadorLigaScreen(tesoreria: sesion.tieneArea('finanzas'))));
     if (e == null || !mounted) return;
+    // Finanzas está en la barra de abajo (Victor, 2026-11-16).
+    if (e.id == 'tesoreria') {
+      SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion));
+      return;
+    }
     switch (e.dentro) {
       case 'equipos':
         SubAjustes.abrir(context, CategoriasScreen(sesion: sesion, resaltar: e.id));
@@ -96,7 +100,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   // ─── Inicio de Mi Liga (Victor, 2026-11-14): Equipos, Tesorería, Pivots,
   // Reglas, Comunicación y Datos de la liga.
   List<Map<String, dynamic>>? _equipos;
-  Map<String, dynamic>? _tesoreria;
   late final _tesRepo = TesoreriaRepo(sesion);
 
   @override
@@ -115,11 +118,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
             titulo: 'Tus equipos',
             texto: 'Toca un equipo para ver y cambiar todo lo suyo: requisitos, cobro, clases de gracia y fondos. Con "+" creas otro.',
           ),
-          PasoTour(
-            clave: _kTesoreria,
-            titulo: 'Tesorería',
-            texto: 'Cuánto hay en las cuentas. Registra un ingreso o un egreso desde aquí; toca la tarjeta para ver todo.',
-          ),
+
           PasoTour(clave: _kReglas, titulo: 'Reglas', texto: 'Cómo funciona la liga: cobros, asistencia, puntos y equipamiento, y a quién aplica cada regla.'),
           PasoTour(clave: _kLupa, titulo: 'Busca un ajuste', texto: 'Escribe lo que quieres cambiar (por ejemplo "tarde" o "precio") y te lleva directo.'),
         ],
@@ -128,7 +127,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   }
 
   final _kEquipos = GlobalKey(debugLabel: 'tour-liga-equipos');
-  final _kTesoreria = GlobalKey(debugLabel: 'tour-liga-tesoreria');
   final _kReglas = GlobalKey(debugLabel: 'tour-liga-reglas');
   final _kLupa = GlobalKey(debugLabel: 'tour-liga-lupa');
 
@@ -147,32 +145,11 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     } catch (_) {
       if (mounted) setState(() => _equipos = const []);
     }
-    if (!sesion.tieneArea('finanzas')) return;
-    try {
-      final t = await _tesRepo.accion('resumen');
-      if (mounted) setState(() => _tesoreria = t);
-    } catch (_) {}
   }
 
   Future<void> _abrir(Widget w) async {
     await SubAjustes.abrir(context, w);
     if (mounted) _cargarInicio();
-  }
-
-  Future<void> _movimiento(String tipo) async {
-    final cuentas = [
-      for (final c in (_tesoreria?['cuentas'] as List? ?? const []))
-        if (c is Map<String, dynamic> && c['archivada'] != true) c,
-    ];
-    if (cuentas.isEmpty) {
-      await _abrir(TesoreriaScreen(sesion: sesion));
-      return;
-    }
-    final ok = await abrirFormularioMovimiento(context, repo: _tesRepo, cuentas: cuentas, tipo: tipo);
-    if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrado')));
-      _cargarInicio();
-    }
   }
 
   Widget _titulo(BuildContext context, String t) => Padding(
@@ -297,87 +274,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     );
   }
 
-  Widget _tarjetaTesoreria(BuildContext context) {
-    final r = _tesoreria;
-    final mes = (r?['mes'] as Map?) ?? const {};
-    final saldos = (r?['saldos'] as Map?) ?? const {};
-    final deben = (saldos['personasDeben'] as num?) ?? 0;
-    const blanco = PivotPaleta.sobreSeccion;
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(PivotRadios.grande),
-          onTap: () => _abrir(TesoreriaScreen(sesion: sesion)),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Total en cuentas', style: TextStyle(color: blanco.withValues(alpha: 0.85))),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: blanco),
-                  ],
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: Text(
-                    r == null ? '…' : plata((r['total'] as num?) ?? 0),
-                    key: ValueKey(r == null),
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: blanco),
-                  ),
-                ),
-                if (r != null) ...[
-                  Text(
-                    'Este mes: +${plata((mes['ingresos'] as num?) ?? 0)} · −${plata((mes['egresos'] as num?) ?? 0)}',
-                    style: TextStyle(color: blanco.withValues(alpha: 0.9)),
-                  ),
-                  if (deben > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        '$deben ${deben == 1 ? 'persona debe' : 'personas deben'} ${plata((saldos['totalDeben'] as num?) ?? 0)}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: blanco),
-                      ),
-                    ),
-                ],
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: blanco, foregroundColor: context.pivot.marcaTexto),
-                        onPressed: () => _movimiento('ingreso'),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Ingreso'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: blanco,
-                          side: BorderSide(color: blanco.withValues(alpha: 0.7)),
-                        ),
-                        onPressed: () => _movimiento('egreso'),
-                        icon: const Icon(Icons.remove_rounded),
-                        label: const Text('Egreso'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = ConfigLiga.de(sesion);
@@ -417,14 +313,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                   resaltado: _resaltado,
                   child: KeyedSubtree(key: _kEquipos, child: _tarjetasEquipos(context)),
                 ),
-                if (sesion.tieneArea('finanzas')) ...[
-                  _titulo(context, 'TESORERÍA'),
-                  Resaltable(
-                    id: 'tesoreria',
-                    resaltado: _resaltado,
-                    child: KeyedSubtree(key: _kTesoreria, child: _tarjetaTesoreria(context)),
-                  ),
-                ],
+
                 _titulo(context, 'ADMINISTRAR'),
                 GrupoAjustes(
                   filas: [
@@ -536,7 +425,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                         icono: Icons.payments_outlined,
                         seccion: 'identidad',
                         titulo: 'Moneda',
-                        valor: Moneda.comunes[c.moneda] ?? c.moneda,
+                        valor: textoMonedaLiga(c),
                         alTocar: () => elegirMonedaLiga(context, c),
                       ),
                     ),

@@ -248,6 +248,9 @@ class EquipoRepo extends ChangeNotifier {
 
   Future<void> restaurar(String username) => _admin('adminRestaurarUsuario', {'nombre': username});
 
+  /// Borra los datos de una persona archivada; quedan su nombre, pagos y asistencias.
+  Future<void> borrarDatos(String username) => _admin('adminBorrarDatosPersona', {'nombre': username});
+
   Future<void> registrarAsistenciaExterna(Integrante p, DateTime fecha, String lugar) =>
       _admin('adminRegistrarAsistenciaExterna', {'idJugadora': p.username, 'fecha': Fechas.iso(fecha), 'lugar': lugar.trim()});
 

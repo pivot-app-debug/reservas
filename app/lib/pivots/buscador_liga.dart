@@ -26,7 +26,7 @@ class EntradaAjuste {
 
 const entradasLiga = [
   EntradaAjuste('equipos', 'Equipos', 'Mi Liga', 'categorías quindes mirlxs equipo ajustes de un equipo'),
-  EntradaAjuste('tesoreria', 'Tesorería', 'Mi Liga', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
+  EntradaAjuste('tesoreria', 'Finanzas', 'Barra de abajo', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
   EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Administrar', 'administradores admins áreas acceso permisos roles'),
   EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
   EntradaAjuste('reglas', 'Reglas', 'Mi Liga › Administrar', 'reglas cobros asistencia puntos equipamiento privacidad'),
@@ -77,21 +77,21 @@ const entradasLiga = [
   EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos y puntos', 'quién cambió registro auditoría', dentro: 'equipos'),
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería → Cobros.
-  EntradaAjuste('mensualidad', 'Mensualidad', 'Mi Liga › Tesorería › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
-  EntradaAjuste('clase', 'Valor por clase', 'Mi Liga › Tesorería › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
+  EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
+  EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
   EntradaAjuste(
     'formas',
     'Formas de pago',
-    'Mi Liga › Tesorería › Cobros',
+    'Finanzas › Cobros',
     'medios cuentas billetera virtual banco transferencia efectivo enlace comprobante logo color',
     dentro: 'cobros',
   ),
   // Dentro de Tesorería.
-  EntradaAjuste('cuotas', 'Cuotas del mes', 'Mi Liga › Tesorería', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
-  EntradaAjuste('saldos', 'Saldos de personas', 'Mi Liga › Tesorería', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
+  EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
+  EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
   EntradaAjuste('viajes', 'Viajes', 'Mi Liga › Administrar', 'fondos de viaje torneo reparto asistencia'),
-  EntradaAjuste('movimientos', 'Todos los movimientos', 'Mi Liga › Tesorería', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
-  EntradaAjuste('transparencia', 'Transparencia', 'Mi Liga › Tesorería', 'equipo ve totales público', dentro: 'tesoreria'),
+  EntradaAjuste('movimientos', 'Todos los movimientos', 'Finanzas', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
+  EntradaAjuste('transparencia', 'Transparencia', 'Finanzas', 'equipo ve totales público', dentro: 'tesoreria'),
 ];
 
 String _sinTildes(String s) => s

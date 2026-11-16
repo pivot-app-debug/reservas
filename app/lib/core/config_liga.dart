@@ -26,6 +26,9 @@ class ConfigLiga extends ChangeNotifier {
   String pais = 'EC';
   String zonaHoraria = 'America/Guayaquil';
   String moneda = r'$';
+
+  /// Código ISO de la moneda elegida de la lista ('' = símbolo escrito a mano).
+  String monedaCodigo = '';
   num? precioPorClase;
   num? precioMensual;
   String logo = '';
@@ -134,6 +137,7 @@ class ConfigLiga extends ChangeNotifier {
     pais = '${r['pais'] ?? pais}';
     zonaHoraria = '${r['zonaHoraria'] ?? zonaHoraria}';
     moneda = Moneda.s = '${r['moneda'] ?? moneda}';
+    monedaCodigo = '${r['monedaCodigo'] ?? monedaCodigo}';
     precioPorClase = num.tryParse('${r['precioPorClase']}');
     precioMensual = num.tryParse('${r['precioMensual']}');
     logo = '${r['logo'] ?? ''}';
