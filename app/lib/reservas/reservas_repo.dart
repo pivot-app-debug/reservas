@@ -193,7 +193,7 @@ class ReservaActiva {
     final estado = (r['estado'] ?? '').toString();
     if (estado == 'Cancelada' || estado == 'Crédito usado') return null;
     final hoy = Fechas.hoy();
-    if (r['tipo'] == 'plan') return null; // compra de un plan, no una clase
+    if (r['tipo'] == 'plan' || r['tipo'] == 'curso') return null; // compra de un plan o curso, no una clase
     if (r['tipo'] == 'mensual') {
       final v = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch('${r['validezHasta'] ?? ''}');
       final nombre = (r['fecha'] ?? r['mes_texto'] ?? '').toString();

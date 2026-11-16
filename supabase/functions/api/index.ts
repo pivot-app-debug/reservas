@@ -200,7 +200,7 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminCursos', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
@@ -7650,6 +7650,136 @@ async function adminPlanes(params: Record<string, any>): Promise<Record<string, 
   };
 }
 
+// ─── Cursos con try out (Victor, 2026-11-16) ───────────────────────────────
+// Varias fechas (cada una es un evento "Curso" del calendario; la última es
+// el try out), precio propio y cupo. La inscripción se paga como una reserva
+// (tipo 'curso') y se confirma al aprobar el pago. En el try out el Pivot
+// elige a qué equipo pasa cada persona.
+function _cursoJson(c: any, inscritos: any[], yo?: string) {
+  const activos = inscritos.filter((i: any) => i.curso_id === c.id && i.estado !== 'cancelada');
+  const mia = yo ? activos.find((i: any) => i.username === yo) : null;
+  return {
+    id: c.id, nombre: c.nombre, descripcion: c.descripcion ?? '', precio: Number(c.precio) || 0, cupo: c.cupo ?? null,
+    fechas: Array.isArray(c.fechas) ? c.fechas : [], equipoDestino: c.equipo_destino ?? null, estado: c.estado,
+    inscritos: activos.length, libres: c.cupo == null ? null : Math.max(0, Number(c.cupo) - activos.length),
+    ...(mia ? { miInscripcion: { estado: mia.estado, resultado: mia.resultado ?? null } } : {}),
+  };
+}
+
+async function getCursos(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const [{ data: cursos }, { data: ins }] = await Promise.all([
+    supabase.from('cursos').select('*').in('estado', ['abierto', 'cerrado']).order('created_at'),
+    supabase.from('curso_inscripciones').select('curso_id, username, estado, resultado'),
+  ]);
+  return { exito: true, cursos: (cursos ?? []).map((c: any) => _cursoJson(c, ins ?? [], yo)).filter((c: any) => c.estado === 'abierto' || c.miInscripcion) };
+}
+
+async function inscribirseCurso(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const { data: c } = await supabase.from('cursos').select('*').eq('id', String(params.cursoId ?? '')).eq('estado', 'abierto').maybeSingle();
+  if (!c) return { exito: false, error: 'Las inscripciones de este curso están cerradas.' };
+  const { data: ins } = await supabase.from('curso_inscripciones').select('username, estado').eq('curso_id', c.id).neq('estado', 'cancelada');
+  if ((ins ?? []).some((i: any) => i.username === yo)) return { exito: false, error: 'Ya estás inscritx en este curso.' };
+  if (c.cupo != null && (ins ?? []).length >= Number(c.cupo)) return { exito: false, error: 'El curso ya no tiene cupo.' };
+  const gratis = !(Number(c.precio) > 0);
+  const { data: r } = await supabase.from('reservas').insert({
+    nombre_usuario: yo, tipo: 'curso', mes_texto: c.nombre, estado: gratis ? 'Confirmada' : 'Pendiente', monto: Number(c.precio) || 0,
+    fecha_pago: _hoyEcuadorISO(), curso_id: c.id,
+    medio_pago: /^[a-z0-9_-]{1,40}$/.test(String(params.medio ?? '')) ? String(params.medio) : null,
+    medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
+    }).select('id').maybeSingle();
+  if (!r) return { exito: false, error: 'No se pudo guardar.' };
+  await supabase.from('curso_inscripciones').upsert({ curso_id: c.id, username: yo, estado: gratis ? 'confirmada' : 'pendiente', reserva_id: r?.id ?? null, resultado: null }, { onConflict: 'curso_id,username' });
+  return { exito: true, id: gratis ? null : (r?.id ?? null), monto: Number(c.precio) || 0 };
+}
+
+async function adminCursos(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const accion = String(params.accion ?? 'listar');
+  if (accion === 'guardar') {
+    let c: any = params.curso;
+    if (typeof c === 'string') { try { c = JSON.parse(c); } catch { c = null; } }
+    if (!c || typeof c !== 'object') return { exito: false, error: 'Curso inválido.' };
+    const nombre = String(c.nombre ?? '').trim().slice(0, 60);
+    if (!nombre) return { exito: false, error: 'Ponle un nombre.' };
+    const fechas = (Array.isArray(c.fechas) ? c.fechas : []).map((x: any) => ({
+            fecha: String(x?.fecha ?? '').slice(0, 10), hora: String(x?.hora ?? '').slice(0, 5), lugar: String(x?.lugar ?? '').slice(0, 80),
+    } as any)).filter((x: any) => /^\d{4}-\d{2}-\d{2}$/.test(x.fecha)).sort((a: any, b: any) => a.fecha.localeCompare(b.fecha)).slice(0, 60);
+    if (!fechas.length) return { exito: false, error: 'Agrega al menos una fecha.' };
+        const fila: Record<string, any> = {
+      nombre, descripcion: String(c.descripcion ?? '').trim().slice(0, 500) || null, precio: Math.max(0, _num2(Number(c.precio) || 0)),
+      cupo: c.cupo == null || c.cupo === '' ? null : Math.max(1, Math.round(Number(c.cupo))), fechas,
+      equipo_destino: String(c.equipoDestino ?? '').trim().slice(0, 60) || null,
+    };
+        // Cada fecha es un evento "Curso" del calendario. Las fechas que no
+    // cambian conservan su evento (y su asistencia); las quitadas se borran.
+    const { data: antes } = c.id ? await supabase.from('cursos').select('fechas').eq('id', String(c.id)).maybeSingle() : { data: null };
+    const clave = (x: any) => `${x.fecha}|${x.hora}|${x.lugar}`;
+    const previas = new Map<string, any>(((antes?.fechas as any[]) ?? []).map((x: any) => [clave(x), x.venueId]));
+    const usados = new Set<string>();
+    const { data: lugares } = await supabase.from('venues').select('lugar, google_maps, video_instructivo').not('google_maps', 'is', null);
+    for (const x of fechas) {
+      const previo = previas.get(clave(x));
+      if (previo) { x.venueId = previo; usados.add(String(previo)); continue; }
+      const ref = (lugares ?? []).find((l: any) => l.lugar === x.lugar);
+      const { data: v } = await supabase.from('venues').insert({
+        lugar: x.lugar || 'Por definir', google_maps: ref?.google_maps ?? null, video_instructivo: ref?.video_instructivo ?? null,
+        tipo_icono: 'Curso', requiere_reserva: false, info_adicional: nombre, tipo: 'unico', fecha_referencia: x.fecha, inicia: x.hora || '09:00',
+      }).select('id').maybeSingle();
+      if (v?.id) x.venueId = v.id;
+    }
+        // Solo se borran fechas por venir: las pasadas guardan su asistencia.
+    const hoyC = _hoyEcuadorISO();
+    const quitados = ((antes?.fechas as any[]) ?? []).filter((x: any) => x.venueId && !usados.has(String(x.venueId)) && String(x.fecha) >= hoyC).map((x: any) => x.venueId);
+    if (quitados.length) await supabase.from('venues').delete().in('id', quitados);
+    await supabase.rpc('regenerar_ventana_asistencias');
+    const r = c.id ? await supabase.from('cursos').update(fila).eq('id', String(c.id)).select('id').single() : await supabase.from('cursos').insert(fila).select('id').single();
+    if (r.error) return { exito: false, error: r.error.message };
+    await _registrarAjuste('curso', null, fila, email);
+  } else if (accion === 'estado') {
+    const estado = ['abierto', 'cerrado', 'terminado'].includes(String(params.estado)) ? String(params.estado) : 'cerrado';
+    await supabase.from('cursos').update({ estado }).eq('id', String(params.id ?? ''));
+  } else if (accion === 'resultado') {
+    // Try out: aprobado pasa al equipo elegido (queda en su historial y le llega la ventana de celebración).
+    const { data: i } = await supabase.from('curso_inscripciones').select('*').eq('id', String(params.inscripcionId ?? '')).maybeSingle();
+    if (!i) return { exito: false, error: 'Inscripción no encontrada.' };
+    const aprobado = params.aprobado === true || params.aprobado === 'true';
+    const equipo = String(params.equipo ?? '').trim();
+    await supabase.from('curso_inscripciones').update({ resultado: aprobado ? 'aprobado' : 'no_aprobado', equipo_final: aprobado ? equipo || null : null }).eq('id', i.id);
+    if (aprobado && equipo) {
+      const { data: f } = await supabase.from('equipo').select('categoria').eq('username', i.username).maybeSingle();
+      if (f && f.categoria !== equipo) {
+        await supabase.from('equipo').update({ categoria: equipo }).eq('username', i.username);
+        await supabase.from('historial_tier').upsert({ username: i.username, mes: _hoyEcuadorISO().slice(0, 7), tier_nombre: equipo }, { onConflict: 'username,mes' });
+        await _avisarCambioEquipo(i.username, f.categoria, equipo);
+      }
+    }
+    await sendPush({
+      tipo: 'solicitud_resuelta', include_external_user_ids: [i.username], headings: { es: aprobado ? '¡Aprobaste el try out!' : 'Resultado del try out' },
+      contents: { es: aprobado ? (equipo ? `Desde ahora estás en ${equipo}. ¡Bienvenidx!` : '¡Felicitaciones!') : 'Esta vez no fue. Un Pivot te contará cómo seguir.' }, url: APP_URL + '/',
+    }).catch(() => {});
+  }
+  const [{ data: cursos }, { data: ins }] = await Promise.all([
+    supabase.from('cursos').select('*').order('created_at', { ascending: false }),
+    supabase.from('curso_inscripciones').select('*'),
+  ]);
+  const quien = await _mapaEquipoPorNombre();
+  return {
+    exito: true,
+    cursos: (cursos ?? []).map((c: any) => ({
+      ..._cursoJson(c, ins ?? []),
+      personas: (ins ?? []).filter((i: any) => i.curso_id === c.id && i.estado !== 'cancelada').map((i: any) => {
+        const e = quien[String(i.username).trim().toUpperCase()] ?? {};
+        return { id: i.id, nombre: i.username, nombreMostrar: e.nombreDerby || i.username, foto: e.fotoPerfil ?? '', estado: i.estado, resultado: i.resultado ?? null, equipo: i.equipo_final ?? null };
+      }),
+    })),
+  };
+}
+
 async function adminGetAdmins(): Promise<any[]> {
   const { data } = await supabase.from('admins').select('email, invitado_por, fecha').order('email');
   const out: any[] = [{ email: ADMIN_PRINCIPAL, principal: true }];
@@ -10654,7 +10784,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
     if (cuenta) {
       await _registrarMovimiento({
                 tipo: 'ingreso', monto: Number(reservaAntes.monto), cuenta_id: cuenta, categoria: reservaAntes.tipo === 'mensual' ? 'cuota' : 'clase',
-        descripcion: reservaAntes.tipo === 'mensual' ? `Mensualidad ${reservaAntes.mes_texto ?? ''}`.trim() : (reservaAntes.tipo === 'plan' ? `Plan ${reservaAntes.mes_texto ?? ''}`.trim() : 'Clase'), persona: reservaAntes.nombre_usuario,
+        descripcion: reservaAntes.tipo === 'mensual' ? `Mensualidad ${reservaAntes.mes_texto ?? ''}`.trim() : (reservaAntes.tipo === 'plan' ? `Plan ${reservaAntes.mes_texto ?? ''}`.trim() : reservaAntes.tipo === 'curso' ? `Curso ${reservaAntes.mes_texto ?? ''}`.trim() : 'Clase'), persona: reservaAntes.nombre_usuario,
                 origen: 'reserva', origen_id: String(id), registrado_por: adminEmail, medio_nombre: reservaAntes.medio_nombre ?? null,
       });
     }
@@ -10708,7 +10838,12 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
     if (dado.saldoMov) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: adminEmail }).eq('id', dado.saldoMov);
     await supabase.from('reservas').update({ punto_extra_en: null, recompensa: null }).eq('id', id);
   }
-    // Plan de clases: al aprobar el pago se dan sus clases; al cancelar se
+      // Curso: al aprobar el pago queda inscritx; al cancelar, se libera el cupo.
+  if (reservaAntes?.tipo === 'curso') {
+    if (estado === 'Confirmada') await supabase.from('curso_inscripciones').update({ estado: 'confirmada' }).eq('reserva_id', id);
+    else if (estado === 'Cancelada') await supabase.from('curso_inscripciones').update({ estado: 'cancelada' }).eq('reserva_id', id);
+  }
+  // Plan de clases: al aprobar el pago se dan sus clases; al cancelar se
   // quitan las que no se usaron (Victor, 2026-11-16).
   if (reservaAntes?.tipo === 'plan') {
     if (estado === 'Confirmada' && reservaAntes.estado === 'Pendiente') {
@@ -10730,7 +10865,10 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
         const texto = reservaAntes.tipo === 'mensual'
       ? `Recibimos tu pago de ${mesTxt}, ¡gracias!${premio ? ` Por pagar a tiempo recibes ${premio}.` : ''}`
       : reservaAntes.tipo === 'plan'
-      ? `Tu plan ${reservaAntes.mes_texto ?? ''} está activo. Ya puedes reservar tus clases sin pagar cada una.`
+            ? `Tu plan ${reservaAntes.mes_texto ?? ''} está activo. Ya puedes reservar tus clases sin pagar cada una.`
+      : reservaAntes.tipo === 'curso'
+      ? `Ya estás inscritx en ${reservaAntes.mes_texto ?? 'el curso'}. Las fechas están en tu calendario.`
+
       : 'Tu reserva fue confirmada. ¡Nos vemos en la pista!';
     await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario], headings: { es: reservaAntes.tipo === 'mensual' ? 'Pago confirmado' : 'Reserva confirmada' }, contents: { es: texto }, url: APP_URL }).catch(() => {});
   }
@@ -10897,7 +11035,10 @@ Deno.serve(async (req: Request) => {
             case 'adminCuponDescuento':             return json(await adminCuponDescuento(params));
       case 'adminPlanes':                     return json(await adminPlanes(params));
       case 'getMisPlanes':                    return json(await getMisPlanes(params));
-      case 'comprarPlan':                     return json(await comprarPlan(params));
+            case 'comprarPlan':                     return json(await comprarPlan(params));
+      case 'getCursos':                       return json(await getCursos(params));
+      case 'inscribirseCurso':                return json(await inscribirseCurso(params));
+      case 'adminCursos':                     return json(await adminCursos(params));
       case 'responderCambioEquipo':           return json(await responderCambioEquipo(params));
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));

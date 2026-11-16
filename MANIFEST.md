@@ -246,6 +246,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Cursos con try out (2026-11-16)
+- Tablas `cursos` (fechas jsonb `[{fecha,hora,lugar,venueId}]`, la última es el try out; estado abierto/cerrado/terminado; equipo_destino) y `curso_inscripciones` (pendiente/confirmada/cancelada, resultado aprobado/no_aprobado, equipo_final); `reservas.curso_id`. Migración `20261117010000_cursos.sql`.
+- API: `adminCursos` (finanzas; listar/guardar/estado/resultado). Guardar crea un venue `tipo 'unico'`, `tipo_icono 'Curso'` por fecha nueva, conserva los que no cambian y borra solo los quitados por venir; luego `regenerar_ventana_asistencias`. Resultado aprobado: `equipo.categoria`, `historial_tier` del mes y `_avisarCambioEquipo`. `getCursos` (abiertos + los míos), `inscribirseCurso` (reserva tipo 'curso'; `adminSetEstadoReserva` confirma o cancela la inscripción).
+- App: `cursos/cursos_screen.dart` (`CursosAbiertosScreen` desde el "+" del timeline cuando `hayCursos`; `CursosScreen` Pivot desde Cobros; pago con `ReservaExitoScreen`).
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

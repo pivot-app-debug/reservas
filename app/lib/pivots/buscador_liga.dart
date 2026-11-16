@@ -87,7 +87,7 @@ const entradasLiga = [
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería → Cobros.
   EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
-    EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
+  EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
   EntradaAjuste('planes', 'Planes de pago', 'Finanzas › Cobros', 'paquete pack trimestral semestral meses clases descuento', dentro: 'cobros'),
   EntradaAjuste(
     'formas',

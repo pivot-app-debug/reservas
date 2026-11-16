@@ -33,6 +33,7 @@ import '../pivots/bandeja_repo.dart';
 import '../pivots/bandeja_screen.dart';
 import '../pivots/icono_bandeja.dart';
 import '../core/esqueleto.dart';
+import '../cursos/cursos_screen.dart';
 
 /// Timeline de Eventos (maqueta aprobada + pedido 2026-11-06):
 /// - Barra: "Noviembre ⌄" despliega el calendario del mes hacia abajo (como
@@ -188,6 +189,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     _bandeja.addListener(_alPasarMinuto);
     _bandeja.cargar(forzar: true);
     _bandeja.cargarMia();
+    hayCursos(repo.sesion).then((v) {
+      if (mounted && v != _hayCursos) setState(() => _hayCursos = v);
+    });
   }
 
   // ─── Búsqueda y filtros guardados (pedido 2026-11-06: siempre) ─────────
@@ -1435,6 +1439,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   // ─── Botón "+": menú de acciones (pedido 2026-11-06, como la web) ───────
 
+  /// Hay cursos abiertos (o en los que estoy inscritx): se ofrecen en el "+".
+  bool _hayCursos = false;
+
   List<_Accion> get _acciones => [
     // Fase 3: reservas según el tipo de persona (`ReservasRepo.opciones`).
     for (final t in ReservasRepo(repo.sesion).opciones)
@@ -1443,6 +1450,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
+    if (_hayCursos)
+      _Accion(Icons.school_outlined, 'Cursos', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosAbiertosScreen(sesion: repo.sesion)))),
 
     if (repo.anticipada.disponible)
       _Accion(

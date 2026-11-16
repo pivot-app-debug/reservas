@@ -87,9 +87,7 @@ Reglas de siempre:
    - [x] Hecho 2026-11-15: revisión de 15 puntos de Victor (PENDIENTES sección R). Fecha límite de pago con calendario; punto extra y avisos siguen la fecha límite; Viajes como sección propia; reglas del equipo en Reglas. Falta: sección Recompensas y motor de reglas.
 6. [ ] **Planes de pago, cursos e inscripción rápida**:
    - [x] **Planes** (2026-11-16): 1 a 12 meses o N clases, por equipos (personas puntuales: el campo existe, falta elegirlas en la pantalla).
-   - **Cursos**:
-     - Fechas de inicio rígidas o flexibles, clases a mano o por CSV.
-     - Curso de principiantes (freshmeat) con **try out** al final para pasar a un equipo.
+      - [x] **Cursos** (2026-11-16): varias fechas a mano, precio, cupo, inscripción con pago y try out al final que pasa a la persona a un equipo. Falta: cargar fechas por CSV.
    - **Inscripción rápida**:
      - [x] Con nombre y teléfono; un cupón por teléfono (2026-11-16). El contacto por WhatsApp está en su ficha.
      - Botón de WhatsApp para contactar a quien se inscribió.
