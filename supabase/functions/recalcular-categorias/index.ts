@@ -308,11 +308,18 @@ Deno.serve(async (req: Request) => {
     const { data: reglasFila } = await supabase.from('config_app').select('value').eq('key', 'reglas_liga').maybeSingle();
     let reglasLiga: Record<string, any> = {};
     try { reglasLiga = JSON.parse(String(reglasFila?.value ?? '{}')) ?? {}; } catch { reglasLiga = {}; }
-    const tiposCuentan: string[] | null = Array.isArray(reglasLiga.tiposCuentan) ? reglasLiga.tiposCuentan.map(String) : null;
-    const tardeCuentaClase = reglasLiga.tardeCuentaClase !== false;
-    const cuentaTipo = (t: unknown) => !tiposCuentan || tiposCuentan.includes(String(t || 'Entrenamiento'));
+        // Por equipo (Victor, 2026-11-16): cada equipo puede tener su regla; sin
+    // la suya, usa la general.
+    function reglaClase(equipo: string) {
+      const x = (reglasLiga.queCuentaEquipos ?? {})[equipo];
+      const t = x ? x.tiposCuentan : reglasLiga.tiposCuentan;
+      const tipos: string[] | null = Array.isArray(t) && t.length ? t.map(String) : null;
+      return { tipos, tarde: (x ? x.tardeCuentaClase : reglasLiga.tardeCuentaClase) !== false };
+    }
 
     function contarClases(username: string, tier: any): number {
+      const { tipos: tiposCuentan, tarde: tardeCuentaClase } = reglaClase(String(tier.nombre ?? ''));
+      const cuentaTipo = (t: unknown) => !tiposCuentan || tiposCuentan.includes(String(t || 'Entrenamiento'));
       const p = periodoTier(tier);
       const extra = diasExtraVentana(username, Number(tier.ventana_meses) || 1);
       const desde = extra ? fechaISO(new Date(Date.parse(p.desde) - extra * DIA_MS)) : p.desde;

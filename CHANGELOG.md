@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (puntos y clases por equipo)
+- **Puntos por asistencia y Qué cuenta como clase, por equipo:** cada equipo tiene los suyos (dentro del equipo, sección "Puntos y clases"). Todos empiezan con los valores de hoy. Un cambio de puntos empieza desde mañana o después y nunca toca puntos ya ganados; para cada asistencia se usa el equipo en que estaba la persona ese mes.
+- Estadísticas cuenta las clases con la regla del equipo, igual que el cálculo de equipos.
+- Al renombrar un equipo, sus reglas (cobros, clases de gracia, qué cuenta como clase, puntos) lo siguen.
+
 ## 2026-11-16 (revisión de Victor: bloque B, segunda parte)
 - **Reglas reordenadas:** la pantalla de Reglas tiene solo lo de toda la liga (Pagos, Recompensas, Estados, Asistencia, Privacidad). Cobros, clases de gracia, equipamiento propio y préstamo están dentro de cada equipo, junto con lo de toda la liga que lo afecta. Ya no hay filtro por equipo ni "Puntos y equipos".
 - **Reservas por clase:** una pantalla con a qué equipos afecta, y cada regla con su ejemplo (clases que se pueden reservar, cierre con interruptor, reserva sin aprobar).

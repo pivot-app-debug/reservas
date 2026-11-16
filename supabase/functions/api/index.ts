@@ -918,7 +918,10 @@ async function _pedidoDePivot(username: string): Promise<{ auto: boolean; email:
 // (versiones con fecha de inicio: regla de oro, nunca tocan puntos ya ganados).
 const REGLAS_LIGA_BASE: Record<string, any> = {
   tiposCuentan: null,        // null = todo suma; si no, tipos de evento que cuentan como clase ('Externa' incluido)
-  tardeCuentaClase: true,    // llegar tarde cuenta como clase
+    tardeCuentaClase: true,    // llegar tarde cuenta como clase
+  // Qué cuenta como clase por equipo (Victor, 2026-11-16): { equipo: {
+  // tiposCuentan, tardeCuentaClase } }. Sin entrada, el equipo usa lo de arriba.
+  queCuentaEquipos: {},
   toleranciaMin: 15,         // minutos: al tomar lista después de esto se sugiere "Tarde" (nunca se fuerza)
   rectificacionDias: 7,      // días para pedir una rectificación de asistencia
   eventosMinPersonas: 5,     // con menos confirmadas, el aviso de 1 hora antes sugiere cancelar (0 = nunca)
@@ -1018,17 +1021,28 @@ async function _registrarAjuste(clave: string, antes: unknown, despues: unknown,
 async function getReglasLiga(params: Record<string, any>): Promise<Record<string, any>> {
   if (!(await _validarAdminToken(String(params.adminToken ?? '')))) return { exito: false, error: 'Sesión de Pivot inválida.' };
   const hoy = _hoyEcuadorISO();
-  const [reglas, corte, versiones, { data: hist }, pivots] = await Promise.all([
+    const [reglas, corte, versiones, { data: hist }, pivots, { data: tiersNom }] = await Promise.all([
     _reglasLiga(), _corteEquipos(), _versionesPuntos(),
     supabase.from('historial_ajustes_liga').select('clave, antes, despues, por, created_at')
-      .gte('created_at', new Date(Date.now() - 183 * 86400000).toISOString()).order('created_at', { ascending: false }).limit(200),
+            .gte('created_at', new Date(Date.now() - 183 * 86400000).toISOString()).order('created_at', { ascending: false }).limit(200),
     _administradorxs(),
+    supabase.from('config_tiers').select('nombre'),
   ]);
   const nombre: Record<string, string> = {};
+  // Puntos por asistencia de cada equipo (Victor, 2026-11-16).
+  const puntosEquipos: Record<string, any> = {};
+  for (const t of tiersNom ?? []) {
+    const eq = String(t.nombre);
+    puntosEquipos[eq] = {
+      actual: _versionEn(hoy, versiones, eq),
+      proxima: versiones.find((v) => v.desde > hoy && v.equipo === eq) ?? versiones.find((v) => v.desde > hoy && !v.equipo) ?? null,
+    };
+  }
   pivots.forEach((p) => { nombre[p.email] = p.nombre; });
   return {
     exito: true, reglas, corte,
-    puntos: { actual: _versionEn(hoy, versiones), proxima: versiones.find((v) => v.desde > hoy) ?? null },
+        puntos: { actual: _versionEn(hoy, versiones), proxima: versiones.find((v) => v.desde > hoy && !v.equipo) ?? null },
+    puntosEquipos,
     historial: (hist ?? []).map((h: any) => ({ clave: h.clave, antes: h.antes, despues: h.despues, por: nombre[String(h.por ?? '').toLowerCase()] ?? (h.por === _EMAIL_SISTEMA ? 'Automático' : 'Un Pivot'), fecha: h.created_at })),
   };
 }
@@ -1129,8 +1143,19 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
     }
     if (reglasNuevas.rankingVisible !== undefined) r.rankingVisible = reglasNuevas.rankingVisible !== false && reglasNuevas.rankingVisible !== 'false';
     if (reglasNuevas.tardeCuentaClase !== undefined) r.tardeCuentaClase = reglasNuevas.tardeCuentaClase !== false && reglasNuevas.tardeCuentaClase !== 'false';
-    if (reglasNuevas.tiposCuentan !== undefined) {
+        if (reglasNuevas.tiposCuentan !== undefined) {
       r.tiposCuentan = Array.isArray(reglasNuevas.tiposCuentan) && reglasNuevas.tiposCuentan.length ? reglasNuevas.tiposCuentan.map(String).slice(0, 20) : null;
+    }
+    const qe = reglasNuevas.queCuentaEquipo;
+    if (qe && typeof qe === 'object' && String(qe.equipo ?? '').trim()) {
+      const eq = String(qe.equipo).trim().slice(0, 60);
+      r.queCuentaEquipos = {
+        ...(antes.queCuentaEquipos ?? {}),
+        [eq]: {
+          tiposCuentan: Array.isArray(qe.tiposCuentan) && qe.tiposCuentan.length ? qe.tiposCuentan.map(String).slice(0, 20) : null,
+          tardeCuentaClase: qe.tardeCuentaClase !== false && qe.tardeCuentaClase !== 'false',
+        },
+      };
     }
     await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'key' });
     for (const k of Object.keys(r)) if (JSON.stringify(antes[k]) !== JSON.stringify(r[k])) await _registrarAjuste(k, antes[k], r[k], email);
@@ -1152,15 +1177,17 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
     const desde = String(puntosNuevos.desde ?? '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || desde <= hoy) return { exito: false, error: 'El cambio de puntos empieza desde mañana o después: nunca cambia puntos ya ganados.' };
     const num = (v: unknown, def: number) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : def; };
-    const v: VersionPuntos = { desde, aTiempo: num(puntosNuevos.aTiempo, 1), tarde: num(puntosNuevos.tarde, 0.5), tardeCuenta: puntosNuevos.tardeCuenta !== false };
+        const equipo = String(puntosNuevos.equipo ?? '').trim().slice(0, 60) || null;
+    const v: VersionPuntos = { desde, aTiempo: num(puntosNuevos.aTiempo, 1), tarde: num(puntosNuevos.tarde, 0.5), tardeCuenta: puntosNuevos.tardeCuenta !== false, ...(equipo ? { equipo } : {}) };
     const { data } = await supabase.from('config_app').select('value').eq('key', 'valores_puntos').maybeSingle();
     let l: VersionPuntos[] = [];
     try { l = JSON.parse(String(data?.value ?? '[]')); } catch { l = []; }
-    // Las versiones futuras se reemplazan; las que ya empezaron nunca se tocan.
-    l = (Array.isArray(l) ? l : []).filter((x) => x && String(x.desde) <= hoy);
+        // Las versiones futuras del mismo equipo se reemplazan; las que ya
+    // empezaron nunca se tocan.
+    l = (Array.isArray(l) ? l : []).filter((x) => x && (String(x.desde) <= hoy || (x.equipo ?? null) !== equipo));
     l.push(v);
     await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l) }, { onConflict: 'key' });
-    await _registrarAjuste('puntos', _versionEn(hoy, await _versionesPuntos()), v, email);
+    await _registrarAjuste('puntos', _versionEn(hoy, await _versionesPuntos(), equipo), v, email);
   }
   return getReglasLiga(params);
 }
@@ -4307,8 +4334,9 @@ async function _recalcularPuntosAsistenciaPersona(nombre: string, mes: number, a
     const marca = l.marca_temporal ? new Date(l.marca_temporal).getTime() : 0;
     if (!ultima[l.id_evento] || marca >= ultima[l.id_evento].marca) ultima[l.id_evento] = { estado: l.estado, marca, fecha: String(l.fecha_entrenamiento ?? '').slice(0, 10) };
   }
-  const versiones = await _versionesPuntos();
-  const puntos = Object.values(ultima).reduce((s, x) => s + _valorMarca(x.estado, x.fecha, versiones), 0);
+    const versiones = await _versionesPuntos();
+  const eqDe = await _equipoEnMes(versiones, [nombre]);
+  const puntos = Object.values(ultima).reduce((s, x) => s + _valorMarca(x.estado, x.fecha, versiones, eqDe(nombre, x.fecha)), 0);
   await supabase.from('puntos_mensuales').upsert({ nombre_usuario: nombre, anio, mes, puntos_asistencia: puntos }, { onConflict: 'nombre_usuario,anio,mes' });
 }
 
@@ -4317,7 +4345,11 @@ async function _recalcularPuntosAsistenciaPersona(nombre: string, mes: number, a
  * `valores_puntos`, Mi Liga). Regla de oro (Victor, 2026-11-13): un cambio
  * empieza siempre después de hoy, así nunca altera puntos ya ganados.
  */
-type VersionPuntos = { desde: string; aTiempo: number; tarde: number; tardeCuenta: boolean };
+// Por equipo (Victor, 2026-11-16): una versión con `equipo` vale solo para
+// ese equipo; sin `equipo`, para todos. Para cada marca se usa el equipo en
+// que estaba la persona ese mes (historial_tier), así un cambio de equipo
+// nunca recalcula distinto lo ya ganado.
+type VersionPuntos = { desde: string; aTiempo: number; tarde: number; tardeCuenta: boolean; equipo?: string | null };
 const VERSION_PUNTOS_BASE: VersionPuntos = { desde: '2000-01-01', aTiempo: 1, tarde: 0.5, tardeCuenta: true };
 async function _versionesPuntos(): Promise<VersionPuntos[]> {
   const { data } = await supabase.from('config_app').select('value').eq('key', 'valores_puntos').maybeSingle();
@@ -4327,16 +4359,61 @@ async function _versionesPuntos(): Promise<VersionPuntos[]> {
     .filter((v) => v && /^\d{4}-\d{2}-\d{2}$/.test(String(v.desde)))
     .sort((a, b) => a.desde.localeCompare(b.desde));
 }
-function _versionEn(fecha: string, versiones: VersionPuntos[]): VersionPuntos {
+function _versionEn(fecha: string, versiones: VersionPuntos[], equipo?: string | null): VersionPuntos {
   let v = versiones[0] ?? VERSION_PUNTOS_BASE;
-  for (const x of versiones) if (x.desde <= fecha) v = x;
+  for (const x of versiones) if (x.desde <= fecha && (!x.equipo || x.equipo === equipo)) v = x;
   return v;
 }
-function _valorMarca(estado: string, fecha: string, versiones: VersionPuntos[]): number {
-  const v = _versionEn(fecha || '2000-01-01', versiones);
+function _valorMarca(estado: string, fecha: string, versiones: VersionPuntos[], equipo?: string | null): number {
+  const v = _versionEn(fecha || '2000-01-01', versiones, equipo);
   if (estado === 'A tiempo') return Number(v.aTiempo) || 0;
   if (estado === 'Tarde') return v.tardeCuenta === false ? 0 : (Number(v.tarde) || 0);
   return 0;
+}
+
+/** Equipo de cada persona en un mes ('aaaa-mm'): el del historial de ese mes
+ *  o, si no hay, el actual. Solo hace consultas si algún equipo tiene puntos
+ *  propios (si no, todos usan los mismos valores). */
+async function _equipoEnMes(versiones: VersionPuntos[], usernames?: string[]): Promise<(u: string, fecha: string) => string | null> {
+  if (!versiones.some((v) => v.equipo)) return () => null;
+  let qh = supabase.from('historial_tier').select('username, mes, tier_nombre');
+  let qe = supabase.from('equipo').select('username, categoria');
+  if (usernames?.length) { qh = qh.in('username', usernames); qe = qe.in('username', usernames); }
+  const [{ data: h }, { data: e }] = await Promise.all([qh, qe]);
+  const porMes: Record<string, string> = {}, actual: Record<string, string> = {};
+  (h ?? []).forEach((r: any) => { porMes[`${r.username}|${r.mes}`] = r.tier_nombre; });
+  (e ?? []).forEach((r: any) => { actual[r.username] = r.categoria; });
+  return (u, fecha) => porMes[`${u}|${String(fecha).slice(0, 7)}`] ?? actual[u] ?? null;
+}
+
+/** Las reglas guardadas con el nombre de un equipo lo siguen al renombrarlo
+ *  (Victor, 2026-11-16): cobros, clases de gracia, qué cuenta como clase,
+ *  puntos por asistencia y su historial mensual. */
+async function _renombrarEquipoEnReglas(viejo: string, nuevo: string): Promise<void> {
+    const { data: fila } = await supabase.from('config_app').select('value').eq('key', 'reglas_liga').maybeSingle();
+  let r: Record<string, any> = {};
+  try { r = JSON.parse(String(fila?.value ?? '{}')) ?? {}; } catch { r = {}; }
+  let cambio = false;
+  for (const k of ['cobroEquipos', 'graciaClases', 'queCuentaEquipos']) {
+    const m = r[k];
+    if (m && typeof m === 'object' && viejo in m) { m[nuevo] = m[viejo]; delete m[viejo]; cambio = true; }
+  }
+  if (cambio) await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'key' });
+  const { data } = await supabase.from('config_app').select('value').eq('key', 'valores_puntos').maybeSingle();
+  try {
+    const l = JSON.parse(String(data?.value ?? '[]'));
+    if (Array.isArray(l) && l.some((v: any) => v?.equipo === viejo)) {
+      await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l.map((v: any) => (v?.equipo === viejo ? { ...v, equipo: nuevo } : v))) }, { onConflict: 'key' });
+    }
+  } catch { /* sin cambio */ }
+  await supabase.from('historial_tier').update({ tier_nombre: nuevo }).eq('tier_nombre', viejo);
+}
+
+/** Qué cuenta como clase para un equipo (o la regla general). */
+function _reglaClase(reglas: Record<string, any>, equipo?: string | null): { tipos: string[] | null; tarde: boolean } {
+  const x = equipo ? (reglas.queCuentaEquipos ?? {})[equipo] : null;
+  const tipos = x ? x.tiposCuentan : reglas.tiposCuentan;
+  return { tipos: Array.isArray(tipos) && tipos.length ? tipos.map(String) : null, tarde: (x ? x.tardeCuentaClase : reglas.tardeCuentaClase) !== false };
 }
 
 // Asistencia externa (feat nueva, ver MANIFEST.md) -- una jugadora entrenó
@@ -6720,11 +6797,12 @@ async function recalcularPuntosAsistencia(mes: number, anio: number): Promise<{ 
   });
 
   // Valores por fecha (regla de oro, Victor 2026-11-13: un cambio nunca toca puntos ya ganados).
-  const versiones = await _versionesPuntos();
+    const versiones = await _versionesPuntos();
+  const eqDe = await _equipoEnMes(versiones);
   const puntosPorUsuario: Record<string, number> = {};
   Object.keys(ultimaPorClave).forEach((clave) => {
     const l = ultimaPorClave[clave];
-    const v = _valorMarca(l.estado, l.fecha, versiones);
+    const v = _valorMarca(l.estado, l.fecha, versiones, eqDe(l.nombre_usuario, l.fecha));
     if (v) puntosPorUsuario[l.nombre_usuario] = (puntosPorUsuario[l.nombre_usuario] || 0) + v;
   });
 
@@ -7578,7 +7656,8 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   });
   const presentesHoy = new Set(Object.keys(ultimaHoy).filter((k) => ultimaHoy[k].estado === 'A tiempo' || ultimaHoy[k].estado === 'Tarde').map((k) => k.split('|').slice(1).join('|')));
   const puntosAsistenciaLivePorUsuario: Record<string, number> = {};
-  const versionesLive = await _versionesPuntos();
+    const versionesLive = await _versionesPuntos();
+  const eqLive = await _equipoEnMes(versionesLive);
   // Asistencia del período (app, dato de la fila de Equipo, 2026-11-07):
   // veces que vino (a tiempo o tarde) sobre los eventos con asistencia tomada.
   const asistenciasPeriodoPorUsuario: Record<string, number> = {};
@@ -7586,7 +7665,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   Object.keys(ultimaPorClaveAsistencia).forEach((clave) => {
     const l = ultimaPorClaveAsistencia[clave];
     if (l.estado === 'A tiempo' || l.estado === 'Tarde') asistenciasPeriodoPorUsuario[l.nombre_usuario] = (asistenciasPeriodoPorUsuario[l.nombre_usuario] || 0) + 1;
-    const vm = _valorMarca(l.estado, l.fecha, versionesLive);
+        const vm = _valorMarca(l.estado, l.fecha, versionesLive, eqLive(l.nombre_usuario, l.fecha));
     if (vm) puntosAsistenciaLivePorUsuario[l.nombre_usuario] = (puntosAsistenciaLivePorUsuario[l.nombre_usuario] || 0) + vm;
   });
 
@@ -8083,7 +8162,7 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
   const periodos = tiers.map((t: any) => ({ cerrado: _periodoTier(t, false), curso: _periodoTier(t, true) }));
   const inicio = periodos.reduce((m: string, p: any) => (p.cerrado.desde < m ? p.cerrado.desde : m), hoyISO);
   const [asis, { data: ext }, { data: pts }] = await Promise.all([
-    _paginado((a, b) => supabase.from('asistencias').select('fecha, a_horario, tarde')
+        _paginado((a, b) => supabase.from('asistencias').select('fecha, a_horario, tarde, tipo_evento')
       .not('estado', 'in', '("Evento Cancelado","No se entrena")').gte('fecha', inicio).lt('fecha', hoyISO)
       .order('fecha', { ascending: true }).range(a, b)),
     supabase.from('log_asistencias').select('fecha_entrenamiento').eq('origen', 'Externa').eq('nombre_usuario', username)
@@ -8091,9 +8170,15 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
     supabase.from('puntos_mensuales').select('anio, mes, puntos_total, puntos_tareas').eq('nombre_usuario', username).gte('anio', Number(inicio.slice(0, 4))),
   ]);
   const esta = (s: unknown) => String(s ?? '').split(',').map((n) => n.trim().toUpperCase()).includes(U);
-  const clasesEn = (p: { desde: string; hasta: string }) =>
-    asis.filter((r: any) => r.fecha >= p.desde && r.fecha < p.hasta && (esta(r.a_horario) || esta(r.tarde))).length
-    + (ext ?? []).filter((r: any) => { const f = String(r.fecha_entrenamiento).slice(0, 10); return f >= p.desde && f < p.hasta; }).length;
+    // Con la regla de "qué cuenta como clase" de cada equipo (2026-11-16),
+  // igual que recalcular-categorias.
+  const reglasClase = await _reglasLiga();
+  const clasesEn = (p: { desde: string; hasta: string }, equipo?: string) => {
+    const r0 = _reglaClase(reglasClase, equipo);
+    const cuenta = (t: unknown) => !r0.tipos || r0.tipos.includes(String(t || 'Entrenamiento'));
+    return asis.filter((r: any) => r.fecha >= p.desde && r.fecha < p.hasta && cuenta(r.tipo_evento) && (esta(r.a_horario) || (r0.tarde && esta(r.tarde)))).length
+      + (!r0.tipos || r0.tipos.includes('Externa') ? (ext ?? []).filter((r: any) => { const f = String(r.fecha_entrenamiento).slice(0, 10); return f >= p.desde && f < p.hasta; }).length : 0);
+  };
   const puntosEn = (p: { mesDesde: number; mesHasta: number }, soloTareas: boolean) => (pts ?? []).reduce((s: number, r: any) => {
     const i = Number(r.anio) * 12 + Number(r.mes) - 1;
     return i >= p.mesDesde && i <= p.mesHasta ? s + (Number(soloTareas ? r.puntos_tareas : r.puntos_total) || 0) : s;
@@ -8127,8 +8212,8 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
         const soloTareas = (t.puntos_fuente ?? 'tareas') === 'tareas';
         const minC = Number(t.min_clases) || 0, minP = Number(t.min_puntos) || 0;
         const ok = (c: number, p: number) => t.logica === 'Y' ? c >= minC && p >= minP : c >= minC || p >= minP;
-        const c1 = clasesEn(periodos[i].curso), p1 = puntosEn(periodos[i].curso, soloTareas);
-        const c0 = clasesEn(periodos[i].cerrado), p0 = puntosEn(periodos[i].cerrado, soloTareas);
+                const c1 = clasesEn(periodos[i].curso, t.nombre), p1 = puntosEn(periodos[i].curso, soloTareas);
+        const c0 = clasesEn(periodos[i].cerrado, t.nombre), p0 = puntosEn(periodos[i].cerrado, soloTareas);
         return {
           nombre: t.nombre, logo: t.logo ?? null, orden: t.orden, esDefault: !!t.es_default, minClases: minC, minPuntos: minP, logica: t.logica === 'Y' ? 'Y' : 'O',
           ventana: Number(t.ventana_meses) || 1, unidad: t.periodo_unidad ?? 'mes', puntosFuente: soloTareas ? 'tareas' : 'todos',
@@ -8156,9 +8241,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
   const y = Number(hoyISO.slice(0, 4)), mo = Number(hoyISO.slice(5, 7)) - 1;
   const idxHoy = y * 12 + mo;
   const inicio = new Date(Date.UTC(y, mo - 12, 1)).toISOString().slice(0, 10);
-  const reglas = await _reglasLiga();
-  const tipos: string[] | null = Array.isArray(reglas.tiposCuentan) ? reglas.tiposCuentan : null;
-  const cuentaTipo = (t: unknown) => !tipos || tipos.includes(String(t || 'Entrenamiento'));
+    const reglas = await _reglasLiga();
   const [{ data: gente }, asis, { data: ext }, { data: pts }] = await Promise.all([
     supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, tier_modo, estado_miembro, necesita_patines, necesita_protecciones, meses_consecutivos_cumplidos')
       .is('eliminado_en', null),
@@ -8170,18 +8253,28 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
     supabase.from('puntos_mensuales').select('nombre_usuario, anio, mes, puntos_total, puntos_tareas').gte('anio', y - 1),
   ]);
   const idxDe = (f: string) => idxHoy - (Number(f.slice(0, 4)) * 12 + Number(f.slice(5, 7)) - 1);
-  const clases: Record<string, number[]> = {}, tareas: Record<string, number[]> = {}, total: Record<string, number[]> = {};
-  const sumarClase = (u: string, f: string) => {
-    const i = idxDe(f);
-    if (i < 0 || i > 12) return;
-    (clases[u.trim().toUpperCase()] ??= Array(13).fill(0))[i]++;
+    const tareas: Record<string, number[]> = {}, total: Record<string, number[]> = {};
+  // Clases contadas con una regla de "qué cuenta como clase" (la general o la
+  // de un equipo, Victor 2026-11-16).
+  const contar = (regla: { tipos: string[] | null; tarde: boolean }) => {
+    const clases: Record<string, number[]> = {};
+    const cuentaTipo = (t: unknown) => !regla.tipos || regla.tipos.includes(String(t || 'Entrenamiento'));
+    const sumarClase = (u: string, f: string) => {
+      const i = idxDe(f);
+      if (i < 0 || i > 12) return;
+      (clases[u.trim().toUpperCase()] ??= Array(13).fill(0))[i]++;
+    };
+    for (const r of asis) {
+      if (!cuentaTipo(r.tipo_evento)) continue;
+      const nombres = new Set([...String(r.a_horario ?? '').split(','), ...(regla.tarde ? String(r.tarde ?? '').split(',') : [])].map((n) => n.trim()).filter(Boolean));
+      for (const n of nombres) sumarClase(n, r.fecha);
+    }
+    if (!regla.tipos || regla.tipos.includes('Externa')) for (const e of ext ?? []) sumarClase(String(e.nombre_usuario ?? ''), String(e.fecha_entrenamiento).slice(0, 10));
+    return clases;
   };
-  for (const r of asis) {
-    if (!cuentaTipo(r.tipo_evento)) continue;
-    const nombres = new Set([...String(r.a_horario ?? '').split(','), ...(reglas.tardeCuentaClase !== false ? String(r.tarde ?? '').split(',') : [])].map((n) => n.trim()).filter(Boolean));
-    for (const n of nombres) sumarClase(n, r.fecha);
-  }
-  if (!tipos || tipos.includes('Externa')) for (const e of ext ?? []) sumarClase(String(e.nombre_usuario ?? ''), String(e.fecha_entrenamiento).slice(0, 10));
+  const clases = contar(_reglaClase(reglas));
+  const clasesEquipos: Record<string, Record<string, number[]>> = {};
+  for (const eq of Object.keys(reglas.queCuentaEquipos ?? {})) clasesEquipos[eq] = contar(_reglaClase(reglas, eq));
   for (const r of pts ?? []) {
     const i = idxHoy - (Number(r.anio) * 12 + Number(r.mes) - 1);
     if (i < 0 || i > 12) continue;
@@ -8194,7 +8287,9 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
     nombre: p.username, nombreMostrar: p.nombre_derby || p.username, foto: p.foto_perfil || '',
     categoria: p.categoria ?? null, modo: p.tier_modo ?? 'auto', estado: p.estado_miembro ?? null,
     usaEquipo: usa(p.necesita_patines) || usa(p.necesita_protecciones), mesesSeguidos: Number(p.meses_consecutivos_cumplidos) || 0,
-    clasesMes: clases[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0),
+        clasesMes: clases[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0),
+    // Con regla propia de un equipo: sus clases contadas con esa regla.
+    clasesEquipos: Object.fromEntries(Object.entries(clasesEquipos).map(([eq, c]) => [eq, c[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0)])),
     tareasMes: r1(tareas[p.username] ?? Array(13).fill(0)),
     puntosMes: r1(total[p.username] ?? Array(13).fill(0)),
   }));
@@ -8326,7 +8421,8 @@ async function getDesglosePuntos(params: Record<string, any>): Promise<Record<st
       const actual = ultimaPorEventoDesglose[l.id_evento];
       if (!actual || marca >= actual.marca) ultimaPorEventoDesglose[l.id_evento] = { estado: l.estado, fecha: l.fecha_entrenamiento, marca, externa: l.origen === 'Externa', lugar: l.lugar_externo ?? '' };
     });
-    const versionesDesglose = await _versionesPuntos();
+        const versionesDesglose = await _versionesPuntos();
+    const eqDesglose = await _equipoEnMes(versionesDesglose, [nombreUsuario]);
     const filas = Object.keys(ultimaPorEventoDesglose)
       .map((idEvento) => ultimaPorEventoDesglose[idEvento])
       .filter((f) => f.estado === 'A tiempo' || f.estado === 'Tarde')
@@ -8334,7 +8430,7 @@ async function getDesglosePuntos(params: Record<string, any>): Promise<Record<st
       .map((l: any) => ({
         fecha: String(l.fecha).slice(0, 10),
         estado: l.estado,
-        puntos: _valorMarca(l.estado, String(l.fecha).slice(0, 10), versionesDesglose),
+                puntos: _valorMarca(l.estado, String(l.fecha).slice(0, 10), versionesDesglose, eqDesglose(nombreUsuario, String(l.fecha).slice(0, 10))),
         // Asistencia externa (adminRegistrarAsistenciaExterna()) -- el
         // frontend la distingue con un badge "Externa" + el lugar, si hay.
         ...(l.externa ? { externa: true, lugar: l.lugar } : {}),
@@ -10784,8 +10880,9 @@ Deno.serve(async (req: Request) => {
           : await supabase.from('config_tiers').insert(row).select().single();
                 if (error) return json({ error: error.message }, 500);
         // Si cambia el nombre, las personas de ese equipo lo siguen.
-        if (antesTier && antesTier.nombre !== data.nombre) {
+                if (antesTier && antesTier.nombre !== data.nombre) {
           await supabase.from('equipo').update({ categoria: data.nombre }).eq('categoria', antesTier.nombre);
+          await _renombrarEquipoEnReglas(String(antesTier.nombre), String(data.nombre));
         }
         await _registrarAjuste('equipo', antesTier, data, adminEmail);
         return json({ tier: data });

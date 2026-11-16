@@ -227,6 +227,12 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - `ReservasReglasScreen` (Reservas por clase) y `ClaseBienvenidaScreen` en cobro_equipo_screen; reglas nuevas `cuponBienvenida` y `cuponVuelve` (inscripciones y `cancelarReserva`).
 - Estados: `EstadosScreen` (reemplaza a EstadoScreen). Regla por estado `aprobacion` (Lesionadx y los nuevos: sí; De viaje: no). `autodeclararEstado` guarda `equipo.solicitud_estado` (+ `solicitud_estado_en`, migración 20261116200000) y avisa a Pivots del área salud; `adminAprobarLesion`/`adminRechazarLesion` resuelven cualquier pedido de estado (`_camposEntradaEstado`); la Bandeja los muestra como "Cambios de estado".
 
+## Puntos y clases por equipo (2026-11-16)
+- `valores_puntos`: versiones con `equipo` opcional (sin equipo = todos). `_versionEn(fecha, versiones, equipo)`; `_equipoEnMes()` da el equipo de la persona en el mes de la marca (historial_tier o el actual; solo consulta si hay versiones por equipo). Usado en los 4 lectores de puntos de asistencia. `getReglasLiga` devuelve `puntosEquipos`.
+- `reglas_liga.queCuentaEquipos` { equipo: { tiposCuentan, tardeCuentaClase } } (se guarda con `queCuentaEquipo` en adminReglasLiga); `_reglaClase()`. Lo usan recalcular-categorias (`reglaClase(tier.nombre)`), `adminDatosCategorias` (`clasesEquipos` por persona) y `getEstadisticasPersona`.
+- App: `editarPuntosEquipo` / `editarQueCuentaEquipo` (categorias_screen); `_Regla.equipo` y `_Persona.c(meses, equipo)`.
+- `_renombrarEquipoEnReglas()` al renombrar en `upsertTier`.
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

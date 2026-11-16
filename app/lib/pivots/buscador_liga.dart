@@ -81,8 +81,8 @@ const entradasLiga = [
     'corte revisar antes automático día cambio de equipo',
     dentro: 'equipos',
   ),
-  EntradaAjuste('puntos', 'Puntos por asistencia', 'Mi Liga › Equipos y puntos', 'valor a tiempo tarde puntos fecha', dentro: 'equipos'),
-  EntradaAjuste('queCuenta', 'Qué cuenta como clase', 'Mi Liga › Equipos y puntos', 'clase tipos de evento partido llegadas tarde suman', dentro: 'equipos'),
+  EntradaAjuste('equipos', 'Puntos por asistencia', 'Mi Liga › Equipos › cada equipo', 'valor a tiempo tarde puntos fecha'),
+  EntradaAjuste('equipos', 'Qué cuenta como clase', 'Mi Liga › Equipos › cada equipo', 'clase tipos de evento partido llegadas tarde suman'),
   EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos y puntos', 'quién cambió registro auditoría', dentro: 'equipos'),
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería → Cobros.

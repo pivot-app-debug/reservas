@@ -41,11 +41,17 @@ class _Persona {
       estado = '${m['estado'] ?? ''}',
       usaEquipo = m['usaEquipo'] == true,
       clasesMes = [for (final x in (m['clasesMes'] as List? ?? const [])) (x as num)],
+      clasesEquipos = {
+        for (final e in ((m['clasesEquipos'] as Map?) ?? const {}).entries) '${e.key}': [for (final x in (e.value as List? ?? const [])) (x as num)],
+      },
       tareasMes = [for (final x in (m['tareasMes'] as List? ?? const [])) (x as num)],
       puntosMes = [for (final x in (m['puntosMes'] as List? ?? const [])) (x as num)];
   final String nombre, nombreMostrar, foto, categoria, estado;
   final bool auto, usaEquipo;
   final List<num> clasesMes, tareasMes, puntosMes;
+
+  /// Clases contadas con la regla propia de un equipo (si tiene).
+  final Map<String, List<num>> clasesEquipos;
 
   /// Entra en el cálculo automático (no fijada a mano, no congelada).
   bool get evaluable => auto && !const ['Lesionadx', 'De viaje', 'Técnico', 'Enfermedad', 'Situación personal'].contains(estado);
@@ -58,7 +64,7 @@ class _Persona {
   }
 
   /// Meses cerrados (como el servidor: en noviembre se mira octubre).
-  num c(int meses) => _suma(clasesMes, meses);
+  num c(int meses, [String? equipo]) => _suma(clasesEquipos[equipo] ?? clasesMes, meses);
   num p(int meses, String fuente) => _suma(fuente == 'todos' ? puntosMes : tareasMes, meses);
 }
 
@@ -74,6 +80,7 @@ class _Regla {
     required this.subir,
     required this.gracia,
     required this.graciaUnidad,
+    this.equipo,
   });
   factory _Regla.de(Map<String, dynamic> t) {
     int n(Object? v) => (v as num?)?.toInt() ?? int.tryParse('$v') ?? 0;
@@ -87,10 +94,14 @@ class _Regla {
       subir: n(t['meses_consecutivos_ascenso']).clamp(1, 24),
       gracia: n(t['meses_gracia_demotion']).clamp(0, 99),
       graciaUnidad: '${t['gracia_unidad'] ?? 'mes'}',
+      equipo: t['nombre'] == null ? null : '${t['nombre']}',
     );
   }
   int clases, puntos, ventana, subir, gracia;
   String logica, unidad, fuente, graciaUnidad;
+
+  /// Equipo de la regla: sus clases se cuentan con su "qué cuenta como clase".
+  final String? equipo;
 
   _Regla copia() => _Regla(
     clases: clases,
@@ -102,6 +113,7 @@ class _Regla {
     subir: subir,
     gracia: gracia,
     graciaUnidad: graciaUnidad,
+    equipo: equipo,
   );
 
   int get meses => mesesDePlazo(ventana, unidad);
@@ -111,7 +123,7 @@ class _Regla {
 
   /// Igual que el servidor: un mínimo en 0 siempre se cumple.
   bool cumple(_Persona x) {
-    final c = x.c(meses) >= clases, p = x.p(meses, fuente) >= puntos;
+    final c = x.c(meses, equipo) >= clases, p = x.p(meses, fuente) >= puntos;
     return logica == 'Y' ? c && p : c || p;
   }
 
@@ -210,11 +222,6 @@ class LogoEquipo extends StatelessWidget {
       style: TextStyle(fontSize: tamano * 0.42, fontWeight: FontWeight.w900, color: p.sobreSuave),
     ),
   );
-}
-
-String _fechaLarga(String iso) {
-  final d = DateTime.tryParse(iso);
-  return d == null ? iso : Fechas.corta(d);
 }
 
 /// Ajustes de la liga → Equipos y puntos (Victor, 2026-11-13). Cada equipo
@@ -398,122 +405,6 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
     }
   }
 
-  // ─── Puntos por asistencia (con fecha de inicio: regla de oro) ─────────
-  Map<String, dynamic> get _puntosActual =>
-      ((_reglas['puntos'] as Map?)?['actual'] as Map<String, dynamic>?) ?? const {'aTiempo': 1, 'tarde': 0.5, 'tardeCuenta': true};
-  Map<String, dynamic>? get _puntosProxima => (_reglas['puntos'] as Map?)?['proxima'] as Map<String, dynamic>?;
-
-  static String _n(num v) => numero(v).replaceAll('.', ',');
-
-  String _textoPuntos(Map<String, dynamic> v) {
-    final tarde = v['tardeCuenta'] == false ? 'llegar tarde no suma' : 'tarde ${_n((v['tarde'] as num?) ?? 0.5)}';
-    return 'A tiempo ${_n((v['aTiempo'] as num?) ?? 1)} · $tarde';
-  }
-
-  Future<void> _editarPuntos() async {
-    final base = _puntosProxima ?? _puntosActual;
-    num aTiempo = (base['aTiempo'] as num?) ?? 1;
-    num tarde = (base['tarde'] as num?) ?? 0.5;
-    var tardeCuenta = base['tardeCuenta'] != false;
-    final manana = Fechas.hoy().add(const Duration(days: 1));
-    final h = Fechas.hoy();
-    var desde = DateTime.tryParse('${_puntosProxima?['desde'] ?? ''}') ?? DateTime(h.year, h.month + 1, 1);
-    if (desde.isBefore(manana)) desde = manana;
-    final ok = await _hoja(
-      titulo: 'Puntos por asistencia',
-      contenido: (set) => [
-        Text(
-          'Por clase a tiempo',
-          style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
-        ),
-        SelectorNumero(valor: aTiempo, min: 0, max: 10, paso: 0.5, decimales: true, etiqueta: 'puntos', alCambiar: (v) => set(() => aTiempo = v)),
-        const SizedBox(height: 8),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Llegar tarde suma puntos'),
-          value: tardeCuenta,
-          onChanged: (v) => set(() => tardeCuenta = v),
-        ),
-        if (tardeCuenta) SelectorNumero(valor: tarde, min: 0, max: 10, paso: 0.5, decimales: true, etiqueta: 'puntos', alCambiar: (v) => set(() => tarde = v)),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event_rounded),
-          title: Text('Empieza el ${Fechas.corta(desde)}'),
-          subtitle: const Text('Desde mañana o después.'),
-          trailing: const Icon(Icons.edit_calendar_outlined),
-          onTap: () async {
-            final f = await showDatePicker(context: context, firstDate: manana, lastDate: manana.add(const Duration(days: 730)), initialDate: desde);
-            if (f != null) set(() => desde = f);
-          },
-        ),
-        const _Nota(texto: 'Los puntos ya ganados nunca cambian.'),
-      ],
-    );
-    if (ok == true) {
-      final iso = '${desde.year}-${desde.month.toString().padLeft(2, '0')}-${desde.day.toString().padLeft(2, '0')}';
-      await _guardarReglas({
-        'puntos': jsonEncode({'desde': iso, 'aTiempo': aTiempo, 'tarde': tarde, 'tardeCuenta': tardeCuenta}),
-      }, ok: 'Guardado. Empieza el ${Fechas.corta(desde)}.');
-    }
-  }
-
-  // ─── Qué cuenta como clase ──────────────────────────────────────────────
-  List<String> get _tiposEvento => [
-    ...ConfigLiga.de(s).tiposEvento(const ['Entrenamiento', 'Partido', 'Evento', 'Otro']),
-    'Externa',
-  ];
-  Map<String, dynamic> get _reglasLiga => (_reglas['reglas'] as Map<String, dynamic>?) ?? const {};
-
-  String get _textoQueCuenta {
-    final t = _reglasLiga['tiposCuentan'];
-    final base = t is List && t.isNotEmpty ? t.map((x) => x == 'Externa' ? 'con otros equipos' : '$x'.toLowerCase()).join(', ') : 'Todo suma';
-    return '${base[0].toUpperCase()}${base.substring(1)}${_reglasLiga['tardeCuentaClase'] == false ? ' · llegar tarde no suma' : ''}';
-  }
-
-  Future<void> _editarQueCuenta() async {
-    final t = _reglasLiga['tiposCuentan'];
-    var todo = t is! List || t.isEmpty;
-    final sel = <String>{if (t is List) ...t.map((x) => '$x')};
-    var tarde = _reglasLiga['tardeCuentaClase'] != false;
-    final ok = await _hoja(
-      titulo: 'Qué cuenta como clase',
-      contenido: (set) => [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Todo suma'),
-          subtitle: const Text('Cualquier evento con asistencia tomada.'),
-          value: todo,
-          onChanged: (v) => set(() => todo = v),
-        ),
-        if (!todo)
-          for (final x in _tiposEvento)
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(x == 'Externa' ? 'Entrenar con otros equipos' : x),
-              value: sel.contains(x),
-              onChanged: (v) => set(() => v == true ? sel.add(x) : sel.remove(x)),
-            ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Las llegadas tarde suman para el equipo'),
-          subtitle: Text(
-            tarde
-                ? 'Si alguien llega tarde a un evento puntual, ese evento se tomará en cuenta de todas formas para el puntaje total y los requisitos mínimos.'
-                : 'Si alguien llega tarde a un evento puntual, ese evento no se toma en cuenta para los requisitos mínimos. Los puntos por llegar tarde no cambian.',
-          ),
-          value: tarde,
-          onChanged: (v) => set(() => tarde = v),
-        ),
-      ],
-    );
-    if (ok == true) {
-      await _guardarReglas({
-        'reglas': jsonEncode({'tiposCuentan': todo || sel.isEmpty ? null : sel.toList(), 'tardeCuentaClase': tarde}),
-      });
-    }
-  }
-
   /// Hoja corta con contenido y "Guardar". Devuelve true si se guarda.
   Future<bool?> _hoja({required String titulo, required List<Widget> Function(StateSetter set) contenido}) =>
       abrirSubseccion(context, titulo: titulo, contenido: contenido);
@@ -557,24 +448,6 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                             : 'Revisar antes · se aplican el ${Fechas.corta(_fechasCorte((_corte['dia'] as num?)?.toInt() ?? 1, 0).$1)}',
                         alTocar: _editarCorte,
                       ),
-                    ),
-                    Resaltable(
-                      id: 'puntos',
-                      resaltado: _resaltado,
-                      child: _Fila(
-                        icono: Icons.star_outline_rounded,
-                        titulo: 'Puntos por asistencia',
-                        texto: [
-                          _textoPuntos(_puntosActual),
-                          if (_puntosProxima != null) 'Desde el ${_fechaLarga('${_puntosProxima!['desde']}')}: ${_textoPuntos(_puntosProxima!)}',
-                        ].join('\n'),
-                        alTocar: _editarPuntos,
-                      ),
-                    ),
-                    Resaltable(
-                      id: 'queCuenta',
-                      resaltado: _resaltado,
-                      child: _Fila(icono: Icons.event_available_outlined, titulo: 'Qué cuenta como clase', texto: _textoQueCuenta, alTocar: _editarQueCuenta),
                     ),
                     Resaltable(
                       id: 'historial',
@@ -1097,6 +970,22 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   late Map<String, dynamic> t = Map.of(widget.tiers[widget.indice]);
   bool _ocupado = false;
 
+  /// Reglas de la liga (puntos y qué cuenta como clase de este equipo).
+  Map<String, dynamic>? _rl;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarReglas();
+  }
+
+  Future<void> _cargarReglas() async {
+    try {
+      final r = await _reglasDeLiga(s);
+      if (mounted) setState(() => _rl = r);
+    } catch (_) {}
+  }
+
   Sesion get s => widget.sesion;
   bool get _piso => t['es_default'] == true;
   String get _nombre => '${t['nombre']}';
@@ -1173,10 +1062,36 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         alTocar: () => abrir(ReglasPrestamoScreen(repo: InventarioRepo(s))),
       ),
       const SizedBox(height: 8),
+      const _Seccion('PUNTOS Y CLASES'),
+      _Fila(
+        icono: Icons.star_outline_rounded,
+        titulo: 'Puntos por asistencia',
+        texto: () {
+          final pe = (_rl?['puntosEquipos'] as Map?)?[_nombre] as Map?;
+          if (pe == null) return 'Cuántos puntos da venir a horario o tarde';
+          final prox = pe['proxima'] as Map?;
+          return [
+            textoPuntosVersion((pe['actual'] as Map?) ?? const {}),
+            if (prox != null) 'Desde el ${Fechas.corta(DateTime.parse('${prox['desde']}'))}: ${textoPuntosVersion(prox)}',
+          ].join('\n');
+        }(),
+        alTocar: () async {
+          if (await editarPuntosEquipo(context, s, _nombre)) _cargarReglas();
+        },
+      ),
+      _Fila(
+        icono: Icons.event_available_outlined,
+        titulo: 'Qué cuenta como clase',
+        texto: _rl == null
+            ? 'Qué eventos suman para los requisitos'
+            : textoQueCuenta(reglaClaseEquipo((_rl!['reglas'] as Map<String, dynamic>?) ?? const {}, _nombre)),
+        alTocar: () async {
+          if (await editarQueCuentaEquipo(context, s, _nombre)) _cargarReglas();
+        },
+      ),
+      const SizedBox(height: 8),
       const _Seccion('DE TODA LA LIGA'),
       for (final (id, icono, titulo, texto) in const [
-        ('puntos', Icons.star_outline_rounded, 'Puntos por asistencia', 'Cuántos puntos da venir a horario o tarde'),
-        ('queCuenta', Icons.event_available_outlined, 'Qué cuenta como clase', 'Qué eventos suman para los requisitos'),
         ('corte', Icons.event_repeat_rounded, 'Cuándo se aplican los cambios', 'Cuándo se sube o baja de equipo'),
         ('historial', Icons.history_rounded, 'Historial de cambios', 'Últimos 6 meses'),
       ])
@@ -2194,4 +2109,164 @@ Future<void> cambiarFondosViaje(Sesion s, Map<String, dynamic> t, bool recibe) a
   final cambios = {'califica_fondos_viaje': recibe ? 'true' : ''};
   final base = _Regla.de(t).params({...t, ...cambios});
   await _guardarTier(s, {...base, ...cambios});
+}
+
+// ─── Puntos por asistencia y qué cuenta como clase, por equipo ────────────
+// (Victor, 2026-11-16). Todos los equipos empiezan con los mismos valores;
+// un cambio empieza desde mañana o después y nunca toca puntos ya ganados.
+
+String textoPuntosVersion(Map v) {
+  String n(Object? x) => x is num && x == x.roundToDouble() ? x.toInt().toString() : '${x ?? 0}';
+  return v['tardeCuenta'] == false ? '${n(v['aTiempo'])} a tiempo · tarde no suma' : '${n(v['aTiempo'])} a tiempo · ${n(v['tarde'])} tarde';
+}
+
+/// Regla de "qué cuenta como clase" de un equipo (o la general).
+Map<String, dynamic> reglaClaseEquipo(Map<String, dynamic> reglas, String equipo) {
+  final x = (reglas['queCuentaEquipos'] as Map?)?[equipo];
+  if (x is Map) return Map<String, dynamic>.from(x);
+  return {'tiposCuentan': reglas['tiposCuentan'], 'tardeCuentaClase': reglas['tardeCuentaClase']};
+}
+
+String textoQueCuenta(Map<String, dynamic> r) {
+  final t = r['tiposCuentan'];
+  final base = t is List && t.isNotEmpty ? t.map((x) => x == 'Externa' ? 'con otros equipos' : '$x'.toLowerCase()).join(', ') : 'todo suma';
+  return '${base[0].toUpperCase()}${base.substring(1)}${r['tardeCuentaClase'] == false ? ' · llegar tarde no suma' : ''}';
+}
+
+Future<Map<String, dynamic>> _reglasDeLiga(Sesion s) async {
+  final r = await s.api.get('getReglasLiga', {'adminToken': s.adminToken});
+  if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar.'}');
+  return r;
+}
+
+Future<bool> _guardarReglasLiga(BuildContext context, Sesion s, Map<String, Object?> cambios, String ok) async {
+  final m = ScaffoldMessenger.of(context);
+  try {
+    final r = await s.api.post('adminReglasLiga', {'adminToken': s.adminToken, ...cambios});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar.'}');
+    m.showSnackBar(SnackBar(content: Text(ok)));
+    return true;
+  } catch (e) {
+    m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    return false;
+  }
+}
+
+Future<bool> editarPuntosEquipo(BuildContext context, Sesion s, String equipo) async {
+  final Map<String, dynamic> datos;
+  try {
+    datos = await _reglasDeLiga(s);
+  } catch (_) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo cargar. Revisa tu conexión.')));
+    return false;
+  }
+  if (!context.mounted) return false;
+  final pe = ((datos['puntosEquipos'] as Map?)?[equipo] as Map?) ?? (datos['puntos'] as Map?) ?? const {};
+  final actual = (pe['actual'] as Map?) ?? const {'aTiempo': 1, 'tarde': 0.5, 'tardeCuenta': true};
+  final proxima = pe['proxima'] as Map?;
+  final base = proxima ?? actual;
+  num aTiempo = (base['aTiempo'] as num?) ?? 1;
+  num tarde = (base['tarde'] as num?) ?? 0.5;
+  var tardeCuenta = base['tardeCuenta'] != false;
+  final manana = Fechas.hoy().add(const Duration(days: 1));
+  final h = Fechas.hoy();
+  var desde = DateTime.tryParse('${proxima?['desde'] ?? ''}') ?? DateTime(h.year, h.month + 1, 1);
+  if (desde.isBefore(manana)) desde = manana;
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Puntos por asistencia',
+    contenido: (set) => [
+      Text('Hoy: ${textoPuntosVersion(actual)}.', style: TextStyle(color: context.pivot.textoSecundario)),
+      const SizedBox(height: 12),
+      Text(
+        'Por clase a tiempo',
+        style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
+      ),
+      SelectorNumero(valor: aTiempo, min: 0, max: 10, paso: 0.5, decimales: true, etiqueta: 'puntos', alCambiar: (v) => set(() => aTiempo = v)),
+      const SizedBox(height: 8),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Llegar tarde suma puntos'),
+        value: tardeCuenta,
+        onChanged: (v) => set(() => tardeCuenta = v),
+      ),
+      if (tardeCuenta) SelectorNumero(valor: tarde, min: 0, max: 10, paso: 0.5, decimales: true, etiqueta: 'puntos', alCambiar: (v) => set(() => tarde = v)),
+      const SizedBox(height: 12),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.event_rounded),
+        title: Text('Empieza el ${Fechas.corta(desde)}'),
+        subtitle: const Text('Desde mañana o después.'),
+        trailing: const Icon(Icons.edit_calendar_outlined),
+        onTap: () async {
+          final f = await showDatePicker(context: context, firstDate: manana, lastDate: manana.add(const Duration(days: 730)), initialDate: desde);
+          if (f != null) set(() => desde = f);
+        },
+      ),
+      _Nota(texto: 'Solo para $equipo. Los puntos ya ganados nunca cambian.'),
+    ],
+  );
+  if (ok != true || !context.mounted) return false;
+  return _guardarReglasLiga(context, s, {
+    'puntos': jsonEncode({'desde': Fechas.iso(desde), 'aTiempo': aTiempo, 'tarde': tarde, 'tardeCuenta': tardeCuenta, 'equipo': equipo}),
+  }, 'Guardado. Empieza el ${Fechas.corta(desde)}.');
+}
+
+Future<bool> editarQueCuentaEquipo(BuildContext context, Sesion s, String equipo) async {
+  final Map<String, dynamic> datos;
+  try {
+    datos = await _reglasDeLiga(s);
+  } catch (_) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo cargar. Revisa tu conexión.')));
+    return false;
+  }
+  if (!context.mounted) return false;
+  final r = reglaClaseEquipo((datos['reglas'] as Map<String, dynamic>?) ?? const {}, equipo);
+  final tiposEvento = [
+    ...ConfigLiga.de(s).tiposEvento(const ['Entrenamiento', 'Partido', 'Evento', 'Otro']),
+    'Externa',
+  ];
+  final t = r['tiposCuentan'];
+  var todo = t is! List || t.isEmpty;
+  final sel = <String>{if (t is List) ...t.map((x) => '$x')};
+  var tarde = r['tardeCuentaClase'] != false;
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Qué cuenta como clase',
+    contenido: (set) => [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Todo suma'),
+        subtitle: const Text('Cualquier evento con asistencia tomada.'),
+        value: todo,
+        onChanged: (v) => set(() => todo = v),
+      ),
+      if (!todo)
+        for (final x in tiposEvento)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(x == 'Externa' ? 'Entrenar con otros equipos' : x),
+            value: sel.contains(x),
+            onChanged: (v) => set(() => v == true ? sel.add(x) : sel.remove(x)),
+          ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Las llegadas tarde suman para el equipo'),
+        subtitle: Text(
+          tarde
+              ? 'Si alguien llega tarde, ese evento cuenta igual para los requisitos mínimos.'
+              : 'Si alguien llega tarde, ese evento no cuenta para los requisitos mínimos. Los puntos por llegar tarde no cambian.',
+        ),
+        value: tarde,
+        onChanged: (v) => set(() => tarde = v),
+      ),
+      _Nota(texto: 'Solo para $equipo. Rige para el próximo cálculo de equipos.'),
+    ],
+  );
+  if (ok != true || !context.mounted) return false;
+  return _guardarReglasLiga(context, s, {
+    'reglas': jsonEncode({
+      'queCuentaEquipo': {'equipo': equipo, 'tiposCuentan': todo || sel.isEmpty ? null : sel.toList(), 'tardeCuentaClase': tarde},
+    }),
+  }, 'Guardado');
 }
