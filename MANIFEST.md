@@ -236,6 +236,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - App: `editarPuntosEquipo` / `editarQueCuentaEquipo` (categorias_screen); `_Regla.equipo` y `_Persona.c(meses, equipo)`.
 - `_renombrarEquipoEnReglas()` al renombrar en `upsertTier`.
 
+## Cambios de equipo: aviso y revisión (2026-11-16)
+- `equipos_corte.autoAprobar` (por defecto true): `_cronCorteEquipos` no aplica lo pendiente si es false; la Bandeja muestra pendientes de cortes anteriores; recalcular-categorias deja un solo pendiente por persona.
+- `equipo.aviso_cambio_equipo` (lo ponen `_aplicarCambioEquipo`→`_avisarCambioEquipo` y recalcular-categorias al aplicar directo), `equipo.revision_cambio` (pedido de la persona, `responderCambioEquipo`), `equipo.equipo_fijo_hasta` (al devolver; recalcular-categorias lo saltea). Pivots: `adminResolverRevisionEquipo` (mantener/devolver), Bandeja `revisionesEquipo` (área equipo). App: `core/aviso_cambio_equipo.dart`, desde `inicio_shell._recordarDatos`.
+- `getTareasApp.terminadas`: asignaciones aprobadas del último año; el timeline las muestra con `MiTarea.terminada`.
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

@@ -192,7 +192,7 @@ Deno.serve(async (req: Request) => {
       .eq('tipo', 'uso').eq('estado', 'activo').or(`hasta.is.null,hasta.gte.${new Date().toISOString().slice(0, 10)}`);
     const conPermisoEquipo = new Set((usosData ?? []).map((u: any) => u.username));
     const { data: equipoData, error: equipoError } = await supabase.from('equipo')
-            .select('username, estado_miembro, estado_desde, tier_modo, categoria, necesita_patines, necesita_protecciones, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, meses_consecutivos_cumplidos, meses_consecutivos_ultimo_mes')
+                        .select('username, estado_miembro, estado_desde, tier_modo, categoria, necesita_patines, necesita_protecciones, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, meses_consecutivos_cumplidos, meses_consecutivos_ultimo_mes, equipo_fijo_hasta')
       .is('eliminado_en', null);
     if (equipoError) return json({ ok: false, error: equipoError.message }, 500);
     const miembros: {
@@ -202,7 +202,9 @@ Deno.serve(async (req: Request) => {
       tierRiesgoDesde: string | null; tierRiesgoHasta: string | null; tierRiesgoObjetivo: string | null;
       mesesConsecutivosCumplidos: number; mesesUltimoMes: string | null;
     }[] = (equipoData ?? [])
-      .filter((r: any) => r.username && (!soloUsuario || r.username === soloUsuario))
+            .filter((r: any) => r.username && (!soloUsuario || r.username === soloUsuario))
+      // Devuelto por un Pivot tras pedir revisión: queda fijo hasta el próximo corte (2026-11-16).
+      .filter((r: any) => !r.equipo_fijo_hasta || String(r.equipo_fijo_hasta) <= new Date().toISOString().slice(0, 10))
       .map((r: any) => ({
                 username: r.username, estadoMiembro: r.estado_miembro ?? null, estadoDesde: r.estado_desde ?? null, tierModo: r.tier_modo ?? 'auto',
         categoria: r.categoria ?? null,
@@ -611,10 +613,13 @@ Deno.serve(async (req: Request) => {
         if (nuevoUltimoMes !== undefined) update.meses_consecutivos_ultimo_mes = nuevoUltimoMes;
         // Rechazado este mes con el mismo destino: no se vuelve a proponer.
         if (!(ya && ya.a === categoriaAsignada && ya.estado !== 'pendiente')) {
-          await supabase.from('cambios_equipo').upsert({
+                    await supabase.from('cambios_equipo').upsert({
             username, de: categoriaPrevia, a: categoriaAsignada, mes: mesCorte, actualizacion: update,
             estado: 'pendiente', updated_at: new Date().toISOString(),
           }, { onConflict: 'username,mes' });
+          // Con aprobación manual pueden quedar pedidos de cortes anteriores:
+          // vale el más nuevo (Victor, 2026-11-16).
+          await supabase.from('cambios_equipo').delete().eq('username', username).lt('mes', mesCorte).eq('estado', 'pendiente');
         }
         await supabase.from('equipo').update({ termometro_pct: termometroPct }).eq('username', username);
         await supabase.from('historial_tier').upsert({ username, mes: mesActualStr, tier_nombre: categoriaPrevia }, { onConflict: 'username,mes' });
@@ -622,14 +627,20 @@ Deno.serve(async (req: Request) => {
         continue;
       }
       // Ya no cambia (volvió a cumplir): se descarta la propuesta pendiente.
-      if (revisar && propuestas[username]?.estado === 'pendiente') {
-        await supabase.from('cambios_equipo').delete().eq('username', username).eq('mes', mesCorte).eq('estado', 'pendiente');
+      if (revisar) {
+                await supabase.from('cambios_equipo').delete().eq('username', username).lte('mes', mesCorte).eq('estado', 'pendiente');
       }
       if (nuevoRiesgoDesde !== undefined) update.tier_riesgo_desde = nuevoRiesgoDesde;
       if (nuevoRiesgoHasta !== undefined) update.tier_riesgo_hasta = nuevoRiesgoHasta;
       if (nuevoRiesgoObjetivo !== undefined) update.tier_riesgo_objetivo = nuevoRiesgoObjetivo;
       if (nuevosMesesConsecutivos !== undefined) update.meses_consecutivos_cumplidos = nuevosMesesConsecutivos;
-      if (nuevoUltimoMes !== undefined) update.meses_consecutivos_ultimo_mes = nuevoUltimoMes;
+            if (nuevoUltimoMes !== undefined) update.meses_consecutivos_ultimo_mes = nuevoUltimoMes;
+      // Cambio aplicado: la persona lo verá en una ventana al abrir la app.
+      if (categoriaAsignada !== categoriaPrevia && !soloUsuario) {
+        const ord = (n: string) => tiers.find((t: any) => t.nombre === n)?.orden ?? 99;
+        update.aviso_cambio_equipo = { de: categoriaPrevia, a: categoriaAsignada, sube: ord(categoriaAsignada) < ord(categoriaPrevia), fecha: hoy.toISOString().slice(0, 10) };
+        update.revision_cambio = null;
+      }
       await supabase.from('equipo').update(update).eq('username', username);
 
       // Historial de tier (Parte 3, ver MANIFEST.md) -- una fila por persona

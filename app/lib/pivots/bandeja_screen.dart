@@ -244,6 +244,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     (TipoPedido.tarea, 'Tareas por validar', Icons.task_alt_rounded),
     (TipoPedido.prestamo, 'Equipamiento', Icons.content_paste_rounded),
     (TipoPedido.equipo, 'Cambios de equipo', Icons.swap_vert_rounded),
+    (TipoPedido.revisionEquipo, 'Revisión de cambios de equipo', Icons.rate_review_outlined),
   ];
 
   Future<void> _resolver(Pedido p, bool aprobar) async {
@@ -290,7 +291,15 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
       await repo.resolver(p, aprobar: aprobar, nota: nota, extra: extra);
       m
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(aprobar ? 'Aprobado' : (p.tipo == TipoPedido.equipo ? 'Se queda en su equipo este mes' : 'Rechazado'))));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              p.tipo == TipoPedido.revisionEquipo
+                  ? (aprobar ? 'Se mantiene el cambio' : 'Vuelve a su equipo anterior')
+                  : (aprobar ? 'Aprobado' : (p.tipo == TipoPedido.equipo ? 'Se queda en su equipo este mes' : 'Rechazado')),
+            ),
+          ),
+        );
     } catch (e) {
       m
         ..hideCurrentSnackBar()
@@ -725,6 +734,11 @@ class _CuentaCorte extends StatelessWidget {
         m['sube'] == true ? 'Sube de ${v('de')} a ${v('a')}' : 'Baja de ${v('de')} a ${v('a')}',
         'Aprobar lo aplica ahora. "Dejar como está" lo mantiene este mes.',
       );
+    case TipoPedido.revisionEquipo:
+      return (
+        'Pide revisar su cambio de ${v('de')} a ${v('a')}',
+        v('mensaje').isEmpty ? 'Mantener deja el cambio. Devolver lo regresa y queda fijo hasta el próximo corte.' : 'Mensaje: ${v('mensaje')}',
+      );
     case TipoPedido.tarea:
       final t = x.tarea;
       return (
@@ -802,10 +816,17 @@ class _TarjetaPedido extends StatelessWidget {
                     if (_puedeDeuda) ...[TextButton(onPressed: alResolver == null ? null : alDeuda, child: const Text('Pasar a deuda')), const Spacer()],
                     TextButton(
                       onPressed: alResolver == null ? null : () => alResolver!(false),
-                      child: Text(pedido.tipo == TipoPedido.equipo ? 'Dejar como está' : 'Rechazar'),
+                      child: Text(switch (pedido.tipo) {
+                        TipoPedido.equipo => 'Dejar como está',
+                        TipoPedido.revisionEquipo => 'Devolver a ${pedido.m['de'] ?? 'su equipo'}',
+                        _ => 'Rechazar',
+                      }),
                     ),
                     const SizedBox(width: 8),
-                    FilledButton(onPressed: alResolver == null ? null : () => alResolver!(true), child: const Text('Aprobar')),
+                    FilledButton(
+                      onPressed: alResolver == null ? null : () => alResolver!(true),
+                      child: Text(pedido.tipo == TipoPedido.revisionEquipo ? 'Mantener' : 'Aprobar'),
+                    ),
                   ],
                 ),
               ],

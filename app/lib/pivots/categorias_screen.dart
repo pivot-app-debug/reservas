@@ -332,7 +332,7 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
   }
 
   // ─── Cuándo se aplican los cambios de equipo ───────────────────────────
-  Map<String, dynamic> get _corte => (_reglas['corte'] as Map<String, dynamic>?) ?? const {'modo': 'revisar', 'dia': 1, 'avisoDias': 3};
+  Map<String, dynamic> get _corte => (_reglas['corte'] as Map<String, dynamic>?) ?? const {'modo': 'revisar', 'dia': 1, 'avisoDias': 7, 'autoAprobar': true};
 
   /// Fechas reales del próximo corte para un modo/día/aviso dados.
   (DateTime, DateTime) _fechasCorte(int dia, int aviso) {
@@ -341,13 +341,15 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
     return (c, c.subtract(Duration(days: aviso)));
   }
 
-  String _textoCorte(String modo, int dia, int aviso) {
+  String _textoCorte(String modo, int dia, int aviso, [bool autoAprobar = true]) {
     final (c, llega) = _fechasCorte(dia, aviso);
     final ej = _ejemploCorte(modo, c);
     if (modo == 'auto') {
       return 'Los cambios se aplicarán apenas alguien cumpla o deje de cumplir los requisitos, de forma automática.${ej.isEmpty ? '' : '\n\n$ej'}';
     }
-    return 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Tendrás hasta el ${Fechas.corta(c)} para revisarla; lo que no revises se aplicará automáticamente ese día.${ej.isEmpty ? '' : '\n\n$ej'}';
+    return autoAprobar
+        ? 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Tendrás $aviso ${aviso == 1 ? 'día' : 'días'}, hasta el ${Fechas.corta(c)}, para revisarla; lo que no revises se aplicará solo ese día.${ej.isEmpty ? '' : '\n\n$ej'}'
+        : 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Ningún cambio se aplica hasta que un Pivot lo apruebe.${ej.isEmpty ? '' : '\n\n$ej'}';
   }
 
   /// Ejemplo con los requisitos reales de los dos primeros equipos (Victor, 2026-11-14).
@@ -364,7 +366,8 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
   Future<void> _editarCorte() async {
     var modo = '${_corte['modo'] ?? 'revisar'}';
     var dia = (_corte['dia'] as num?)?.toInt() ?? 1;
-    var aviso = (_corte['avisoDias'] as num?)?.toInt() ?? 3;
+    var aviso = (_corte['avisoDias'] as num?)?.toInt() ?? 7;
+    var auto = _corte['autoAprobar'] != false;
     final ok = await _hoja(
       titulo: 'Cuándo se aplican los cambios',
       contenido: (set) => [
@@ -388,19 +391,33 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
           SelectorNumero(valor: dia, min: 1, max: 28, etiqueta: 'día', alCambiar: (v) => set(() => dia = v.toInt())),
           const SizedBox(height: 12),
           Text(
-            'La lista llega antes',
+            'Días para revisar la lista',
             style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
           ),
           const SizedBox(height: 6),
-          SelectorNumero(valor: aviso, min: 1, max: 20, etiqueta: aviso == 1 ? 'día antes' : 'días antes', alCambiar: (v) => set(() => aviso = v.toInt())),
+          SelectorNumero(
+            valor: aviso,
+            min: 1,
+            max: 20,
+            etiqueta: aviso == 1 ? 'día antes del corte' : 'días antes del corte',
+            alCambiar: (v) => set(() => aviso = v.toInt()),
+          ),
+          // Aprobar solo si nadie revisa (Victor, 2026-11-16).
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Si nadie la revisa, se aplica sola'),
+            subtitle: Text(auto ? 'El día de corte se aplica lo que no se revisó.' : 'Manual: cada cambio espera a que un Pivot lo apruebe.'),
+            value: auto,
+            onChanged: (v) => set(() => auto = v),
+          ),
         ],
         const SizedBox(height: 12),
-        _Nota(texto: _textoCorte(modo, dia, aviso)),
+        _Nota(texto: _textoCorte(modo, dia, aviso, auto)),
       ],
     );
     if (ok == true) {
       await _guardarReglas({
-        'corte': jsonEncode({'modo': modo, 'dia': dia, 'avisoDias': aviso}),
+        'corte': jsonEncode({'modo': modo, 'dia': dia, 'avisoDias': aviso, 'autoAprobar': auto}),
       });
     }
   }
@@ -445,7 +462,9 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                         titulo: 'Cuándo se aplican los cambios',
                         texto: _corte['modo'] == 'auto'
                             ? 'Automático'
-                            : 'Revisar antes · se aplican el ${Fechas.corta(_fechasCorte((_corte['dia'] as num?)?.toInt() ?? 1, 0).$1)}',
+                            : (_corte['autoAprobar'] == false
+                                  ? 'Revisar antes · manual, cada cambio espera a un Pivot'
+                                  : 'Revisar antes · lo no revisado se aplica el ${Fechas.corta(_fechasCorte((_corte['dia'] as num?)?.toInt() ?? 1, 0).$1)}'),
                         alTocar: _editarCorte,
                       ),
                     ),

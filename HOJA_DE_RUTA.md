@@ -46,7 +46,7 @@ Reglas de siempre:
    - [x] Roles del equipo editables por Pivots (catálogo por liga, renombrar cambia todas las fichas, borrar en uso pide confirmar) (2026-11-12). Falta sumarlo al asistente de crear liga (etapa 9).
    - [ ] Mi Liga se reparte (sigue en la web por ahora, pestaña solo para Pivots):
      - [x] Bandeja de Pivots en Calendario: pagos y reservas, rectificaciones, excepciones, lesiones y tareas por validar (2026-11-12).
-     - [ ] Cambios de categoría en la Bandeja ("Pedir revisión" del cambio de categoría): todavía no existe el pedido; se hace junto con el modal de cambio de categoría.
+     - [x] Cambios de categoría: ventana al abrir la app y "Pedir revisión" en Notificaciones; lista de corte que se aprueba sola en N días o manual (2026-11-16).
      - [x] Funciones de personas en la ficha: registrar pago, "No paga (mes)" y acceso de Pivot (2026-11-12).
      - [x] Comunidad (grupos y redes) e Inventario (patines por talla, protecciones, lo reservado) en Equipo (2026-11-12).
      - [x] Inventario personalizable: listas propias (tallas, sets, unidades, insumos), quién lo tiene (temporal con aviso cada 7 días a Pivots y a la persona, o permanente) y pedidos de uso sin bajar de Categoría/Equipo (2026-11-13). Fotos por lista y etiqueta por talla o pieza (2026-11-16). Falta sumarlo al asistente de crear liga (etapa 9).

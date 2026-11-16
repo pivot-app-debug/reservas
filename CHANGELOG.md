@@ -6,6 +6,11 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - Al alejarse de hoy en el timeline, el ícono del Calendario en la barra de abajo pasa a una flecha hacia hoy (arriba o abajo) con un puntito rojo. Al tocarlo vuelve a hoy y regresa el número del día, con una transición suave.
 - Nueva guía `MIGRACION_CUENTAS.md` para pasar GitHub, Supabase, Firebase y OneSignal a pivot.app.suppor@gmail.com.
 
+## 2026-11-16 (cambios de equipo y tareas terminadas)
+- **Cuándo se aplican los cambios de equipo:** con "Revisar antes", la lista llega N días antes del corte (por defecto 7) y, si nadie la revisa, se aplica sola ese día. Se puede apagar ("manual": cada cambio espera a un Pivot). La liga quedó en "Revisar antes", 7 días, aplicación automática.
+- **Ventana al abrir la app tras un cambio de equipo:** con sus números del período. Si sube, en tono de celebración; si baja, "Entiendo" o "Pedir revisión" con mensaje. El pedido llega a Notificaciones y un Pivot elige Mantener o Devolver (devuelto, queda fijo hasta el próximo corte).
+- **Timeline:** tus tareas terminadas aparecen el día en que se aprobaron, apagadas y con sus puntos.
+
 ## 2026-11-16 (inventario: fotos y etiquetas)
 - Cada lista del inventario puede tener una foto (menú ⋮ → Agregar foto): se ve en la tarjeta y arriba de la lista.
 - Cada talla o pieza puede tener una etiqueta (número, caja o marca para encontrarla): un Pivot la toca para escribirla.

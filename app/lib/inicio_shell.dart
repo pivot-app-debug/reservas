@@ -18,6 +18,8 @@ import 'pivots/ajustes_liga_screen.dart';
 import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
 import 'finanzas/tesoreria_screen.dart';
+import 'core/aviso_cambio_equipo.dart';
+
 import 'eventos/widgets_comunes.dart';
 
 /// Estructura principal con la barra de navegación inferior. En esta
@@ -52,6 +54,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     if (!mounted || Tour.activo) return;
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('tour.calendario.v2') != true || !mounted) return;
+    // Cambio de equipo por ver (Victor, 2026-11-16).
+    await mostrarAvisoCambioEquipo(context, widget.sesion);
+    if (!mounted) return;
     await DatosPendientes.recordarSiCorresponde(context, widget.sesion, abrir: (clave) => abrirPendiente(context, widget.sesion, clave));
   }
 
