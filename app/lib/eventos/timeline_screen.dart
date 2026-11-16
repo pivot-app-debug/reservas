@@ -45,6 +45,17 @@ import '../core/esqueleto.dart';
 /// Eventos estando en Eventos, como el ícono con la fecha de Google Calendar).
 class SenalHoy extends ChangeNotifier {
   void disparar() => notifyListeners();
+
+  /// Dónde quedó hoy respecto de lo que se ve (opción A, Victor
+  /// 2026-11-16): 0 si hoy se ve, -1 si quedó arriba, 1 si quedó abajo. El
+  /// ícono del Calendario de la barra de abajo pasa a una flecha hacia hoy.
+  final lejos = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    lejos.dispose();
+    super.dispose();
+  }
 }
 
 class TimelineScreen extends StatefulWidget {
@@ -266,12 +277,28 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     final i = pos.first.index.clamp(0, _filas.length - 1);
     final d = _filas[i].dia;
     if (_scrollDelUsuario || _diaArriba == null) _diaArriba = d;
+    _avisarLejosDeHoy(pos);
     if (d.month != _mesVisible.month || d.year != _mesVisible.year) {
       _mesVisible = d;
       if (!_calAbierto) _tituloMes.value = d;
       // Con el calendario abierto, el mes del panel acompaña al timeline.
       if (_calAbierto && _scrollDelUsuario && !_desplazandoProgramado && !_colapsandoPorScroll) _panel.currentState?.irAMes(d);
     }
+  }
+
+  /// Avisa a la barra de abajo si hoy dejó de verse y hacia dónde quedó.
+  void _avisarLejosDeHoy(List<ItemPosition> pos) {
+    final senal = widget.irAHoy;
+    if (senal == null) return;
+    final hoy = Fechas.hoy();
+    final dias = [for (final p in pos.where((p) => p.itemLeadingEdge < 1)) _filas[p.index.clamp(0, _filas.length - 1)].dia];
+    if (dias.isEmpty) return;
+    final dir = dias.any((d) => d == hoy) ? 0 : (dias.every((d) => d.isAfter(hoy)) ? -1 : 1);
+    if (dir == senal.lejos.value) return;
+    // Fuera del cuadro en curso: las posiciones cambian durante el layout.
+    Future.microtask(() {
+      if (mounted) senal.lejos.value = dir;
+    });
   }
 
   // ─── Filtros ────────────────────────────────────────────────────────────

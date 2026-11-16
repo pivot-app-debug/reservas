@@ -90,12 +90,29 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final indiceActual = _indice;
     final destinos = <(NavigationDestination, Widget)>[
       (
         // Ícono con la fecha de hoy (como Google Calendar); tocarlo estando
         // en Eventos lleva a hoy.
         NavigationDestination(
-          icon: _IconoHoy(dia: Fechas.hoy().day),
+          // Lejos de hoy en el timeline: flecha hacia hoy con un puntito
+          // rojo; al volver, regresa el número del día (opción A, 2026-11-16).
+          icon: ValueListenableBuilder<int>(
+            valueListenable: _irAHoy.lejos,
+            builder: (context, lejos, _) => AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (hijo, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(anim), child: hijo),
+              ),
+              child: lejos == 0 || indiceActual != 0
+                  ? _IconoHoy(key: const ValueKey('dia'), dia: Fechas.hoy().day)
+                  : _IconoFlechaHoy(key: ValueKey(lejos), arriba: lejos < 0),
+            ),
+          ),
           label: 'Calendario',
           tooltip: 'Calendario · tócalo de nuevo para ir a hoy',
         ),
@@ -170,6 +187,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                   if (i == 0 && indice == 0) {
                     _irAHoy.disparar();
                   } else {
+                    // Al volver al Calendario el timeline abre en hoy.
+                    if (i != 0) _irAHoy.lejos.value = 0;
                     setState(() => _indice = i);
                   }
                 },
@@ -183,11 +202,46 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   }
 }
 
+/// Flecha hacia hoy (arriba o abajo) con un puntito rojo: aparece en lugar
+/// del número del día cuando el timeline se aleja de hoy.
+class _IconoFlechaHoy extends StatelessWidget {
+  const _IconoFlechaHoy({super.key, required this.arriba});
+  final bool arriba;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: Icon(arriba ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded)),
+          Positioned(
+            top: -2,
+            right: -3,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: p.marca,
+                shape: BoxShape.circle,
+                border: Border.all(color: p.fondo, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Ícono de Eventos: cuadrado redondeado con el número del día adentro
 /// (como el de Google Calendar). Siempre en contorno: la selección ya la marca el fondo
 /// de la pestaña (un ícono lleno se veía como un cuadrado sin forma).
 class _IconoHoy extends StatelessWidget {
-  const _IconoHoy({required this.dia});
+  const _IconoHoy({super.key, required this.dia});
   final int dia;
 
   @override
