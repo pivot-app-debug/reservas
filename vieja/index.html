@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<!-- Web vieja congelada como respaldo (2026-11-16): la app nueva está en la raíz. Las rutas relativas se resuelven desde la raíz. -->
-<base href="/">
+<!-- Web vieja congelada como respaldo (2026-11-16): la app nueva está en la raíz; los archivos de esta página se cargan desde la raíz. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Pivot</title>
@@ -17,7 +16,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
 
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/vieja/manifest.json">
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <meta name="theme-color" content="#FFFFFF">
@@ -29,25 +28,25 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/colors.css?v=a0f076ae">
+<link rel="stylesheet" href="/css/colors.css?v=a0f076ae">
 <!-- Motor de color de énfasis (Tanda 1/2, ver MANIFEST.md) — recalcula en
      runtime las variables de colors.css derivadas de la marca. Va apenas
      después del <link> de colors.css para pisar el fallback estático antes
      del primer paint real (ambos coinciden hoy, el valor de entrada es el
      mismo naranja de siempre — sin flash). -->
-<script src="js/color-enfasis.js?v=52ba4a4c"></script>
-<link rel="stylesheet" href="css/global.css?v=edbdd92c">
-<link rel="stylesheet" href="css/estilos.css?v=7e3d0e54">
-<link rel="stylesheet" href="css/ui.css?v=81a926bc">
-<link rel="stylesheet" href="css/login.css">
-<link rel="stylesheet" href="css/home.css">
-<link rel="stylesheet" href="css/reservas.css?v=3f9fd2fc">
-<link rel="stylesheet" href="css/nav.css?v=f9a04f6b">
-<link rel="stylesheet" href="css/eventos.css?v=fccb69e8">
-<link rel="stylesheet" href="css/tareas.css">
-<link rel="stylesheet" href="css/equipo.css?v=e6f40c10">
-<link rel="stylesheet" href="css/perfil.css?v=c83f5230">
-<link rel="stylesheet" href="css/admin.css">
+<script src="/js/color-enfasis.js?v=52ba4a4c"></script>
+<link rel="stylesheet" href="/css/global.css?v=edbdd92c">
+<link rel="stylesheet" href="/css/estilos.css?v=7e3d0e54">
+<link rel="stylesheet" href="/css/ui.css?v=81a926bc">
+<link rel="stylesheet" href="/css/login.css">
+<link rel="stylesheet" href="/css/home.css">
+<link rel="stylesheet" href="/css/reservas.css?v=3f9fd2fc">
+<link rel="stylesheet" href="/css/nav.css?v=f9a04f6b">
+<link rel="stylesheet" href="/css/eventos.css?v=fccb69e8">
+<link rel="stylesheet" href="/css/tareas.css">
+<link rel="stylesheet" href="/css/equipo.css?v=e6f40c10">
+<link rel="stylesheet" href="/css/perfil.css?v=c83f5230">
+<link rel="stylesheet" href="/css/admin.css">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" rel="stylesheet">
 <!-- Chrome default de Cropper.js apagado por completo — a propósito acá,
      después del <link> de cropper.min.css (gana en orden de cascada además
@@ -73,7 +72,7 @@
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="js/foto.js?v=4cfbd3d5"></script>
+<script src="/js/foto.js?v=4cfbd3d5"></script>
 </head>
 <body>
 
@@ -2495,11 +2494,11 @@ style="display:flex;align-items:center;justify-content:center;padding:11px 18px;
       </div>
 
       <button type="button" onclick="_registrarYPagar('https://pagar.deuna.app/H92p/person/payment?id=34699738dd140ab641e3993377662e6a210132d2')" class="btn btn-deuna" style="display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;margin-bottom:14px;">
-        <img src="assets/deuna-logo-white.svg" alt="" style="height:22px;width:auto;" aria-hidden="true">
+        <img src="/assets/deuna-logo-white.svg" alt="" style="height:22px;width:auto;" aria-hidden="true">
         Paga con DeUna
       </button>
       <div class="pago-metodo" style="padding:0;overflow:hidden;">
-        <div class="pago-header" onclick="togglePagoMetodo(this)" style="cursor:pointer;padding:16px;justify-content:center;position:relative;background:var(--banco-internacional);"><div style="display:flex;align-items:center;gap:10px;"><img src="assets/banco-internacional-logo.png" alt="Banco Internacional" style="height:20px;width:auto;"></div><span class="material-symbols-outlined" style="position:absolute;top:0;bottom:0;right:16px;display:flex;align-items:center;font-size:1.1rem;color:var(--white);transition:transform 0.3s;">expand_more</span></div>
+        <div class="pago-header" onclick="togglePagoMetodo(this)" style="cursor:pointer;padding:16px;justify-content:center;position:relative;background:var(--banco-internacional);"><div style="display:flex;align-items:center;gap:10px;"><img src="/assets/banco-internacional-logo.png" alt="Banco Internacional" style="height:20px;width:auto;"></div><span class="material-symbols-outlined" style="position:absolute;top:0;bottom:0;right:16px;display:flex;align-items:center;font-size:1.1rem;color:var(--white);transition:transform 0.3s;">expand_more</span></div>
         <div class="pago-metodo-body" style="max-height:0;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.16,1,0.3,1);padding:0 16px 0;">
           <div class="pago-fila"><span class="pago-label">Tipo</span><span class="pago-valor">Cuenta de ahorros</span></div>
           <div class="pago-fila"><span class="pago-label">N° de cuenta</span><span class="pago-valor">398027628</span></div>
@@ -3634,22 +3633,22 @@ style="display:flex;align-items:center;justify-content:center;padding:11px 18px;
   }, 8000);
 })();
 </script>
-<script src="js/config.js?v=8b188eab"></script>
-<script src="shared/bsheet.js"></script>
-<script src="shared/axis-transicion.js"></script>
-<script src="shared/mapa-interactivo.js?v=fafc3b3a"></script>
-<script src="js/api.js?v=8e63a98b"></script>
-<script src="js/ui.js?v=d4715e10"></script>
-<script src="js/eventos.js?v=3811973e"></script>
-<script src="js/offline.js?v=35b214a2"></script>
-<script src="js/tareas.js?v=1be47ceb"></script>
-<script src="js/equipo.js?v=8a23dfe8"></script>
-<script src="js/home.js?v=af30171f"></script>
-<script src="js/reservas.js?v=4dd03414"></script>
-<script src="js/perfil.js?v=2d43b23b"></script>
-<script src="js/admin.js?v=32e45d35"></script>
-<script src="js/pwa.js?v=f257413a"></script>
-<script src="js/auth.js?v=5b99eac4"></script>
+<script src="/js/config.js?v=8b188eab"></script>
+<script src="/shared/bsheet.js"></script>
+<script src="/shared/axis-transicion.js"></script>
+<script src="/shared/mapa-interactivo.js?v=fafc3b3a"></script>
+<script src="/js/api.js?v=8e63a98b"></script>
+<script src="/js/ui.js?v=d4715e10"></script>
+<script src="/js/eventos.js?v=3811973e"></script>
+<script src="/js/offline.js?v=35b214a2"></script>
+<script src="/js/tareas.js?v=1be47ceb"></script>
+<script src="/js/equipo.js?v=8a23dfe8"></script>
+<script src="/js/home.js?v=af30171f"></script>
+<script src="/js/reservas.js?v=4dd03414"></script>
+<script src="/js/perfil.js?v=2d43b23b"></script>
+<script src="/js/admin.js?v=32e45d35"></script>
+<script src="/js/pwa.js?v=f257413a"></script>
+<script src="/js/auth.js?v=5b99eac4"></script>
 
   <!-- Modal primer login: permisos Google -->
   <div id="modal-permisos" style="display:none;position:fixed;inset:0;z-index:9600;background:var(--overlay-dark);align-items:center;justify-content:center;padding:16px;transition:opacity 0.25s ease;">
