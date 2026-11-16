@@ -57,8 +57,12 @@ class StockFila {
       enUso = (m['enUso'] as num?)?.toInt() ?? 0,
       libres = (m['libres'] as num?)?.toInt() ?? 0,
       vence = DateTime.tryParse('${m['vence'] ?? ''}'),
-      minimo = (m['minimo'] as num?)?.toInt();
+      minimo = (m['minimo'] as num?)?.toInt(),
+      etiqueta = '${m['etiqueta'] ?? ''}';
   final String variante;
+
+  /// Número, caja o marca para encontrarlo (Victor, 2026-11-16).
+  final String etiqueta;
   final int cantidad, enUso, libres;
   final DateTime? vence;
   final int? minimo;
@@ -91,10 +95,11 @@ class ListaInventario {
           if (s is Map) StockFila(s),
       ],
       seccion = '${m['seccion'] ?? 'equipamiento'}',
+      foto = '${m['foto'] ?? ''}',
       activa = m['activa'] != false,
       setsCompletos = (m['sets']?['completos'] as num?)?.toInt() ?? 0,
       setsLibres = (m['sets']?['libres'] as num?)?.toInt() ?? 0;
-  final String id, nombre, tipo, seccion;
+  final String id, nombre, tipo, seccion, foto;
   final bool activa;
   final String? icono, unidad, sistema;
   final List<Pieza> piezas;
@@ -329,7 +334,15 @@ class InventarioRepo {
 
   Future<void> borrarRegla(ReglaPrestamo r) => _ok(_api.post('adminReglaPrestamo', {..._admin, 'accion': 'borrar', 'id': r.id}));
 
-  Future<void> editarLista(ListaInventario l, {String? nombre, String? icono, String? unidad, List<Pieza>? piezas, List<(String, int)>? stock}) => _ok(
+  Future<void> editarLista(
+    ListaInventario l, {
+    String? nombre,
+    String? icono,
+    String? unidad,
+    List<Pieza>? piezas,
+    List<(String, int)>? stock,
+    Map<String, String>? etiquetas,
+  }) => _ok(
     _api.post('adminInventarioLista', {
       ..._admin,
       'accion': 'editar',
@@ -340,7 +353,7 @@ class InventarioRepo {
       if (piezas != null) 'piezas': jsonEncode([for (final p in piezas) p.json]),
       if (stock != null)
         'stock': jsonEncode([
-          for (final (v, n) in stock) {'variante': v, 'cantidad': n},
+          for (final (v, n) in stock) {'variante': v, 'cantidad': n, if (etiquetas != null && etiquetas.containsKey(v)) 'etiqueta': etiquetas[v]},
         ]),
     }),
   );

@@ -16,6 +16,7 @@ import 'inventario_asistentes.dart';
 import 'inventario_modelos.dart';
 import '../core/vidrio.dart';
 import '../core/esqueleto.dart';
+import '../pivots/categorias_screen.dart' show elegirYSubirLogo;
 
 /// Inventario del equipo (Victor, 2026-11-13): listas personalizables
 /// (con tallas, sets de piezas, unidades o insumos), quién tiene qué
@@ -437,7 +438,19 @@ class _TarjetaLista extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(l.iconoData, color: p.marcaTexto),
+                    if (l.foto.isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(PivotRadios.chip + 2),
+                        child: Image.network(
+                          l.foto,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(l.iconoData, color: p.marcaTexto),
+                        ),
+                      )
+                    else
+                      Icon(l.iconoData, color: p.marcaTexto),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -490,6 +503,8 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
   // Cantidades editadas (variante → cantidad); se guardan con "Guardar".
   late final Map<String, int> _stock = {for (final f in l.stock) f.variante: f.cantidad};
   late int _sets = l.setsCompletos;
+  // Etiquetas editadas (variante → texto), Victor 2026-11-16.
+  final Map<String, String> _etiquetas = {};
   // Botiquín e insumos: un renglón por cosa (Victor, 2026-11-13).
   late final List<RenglonInventario> _renglones = [
     for (final f in l.stock) RenglonInventario(nombre: f.variante, cantidad: f.cantidad, vence: f.vence, minimo: f.minimo),
@@ -505,7 +520,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
         await repo.guardarRenglones(l, [for (final r in _renglones.where((r) => r.nombre.trim().isNotEmpty)) r.json]);
       } else {
         final stock = l.esSet ? [for (final pz in l.piezas) (pz.nombre, _stock[pz.nombre] ?? 0)] : [for (final e in _stock.entries) (e.key, e.value)];
-        await repo.editarLista(l, stock: stock);
+        await repo.editarLista(l, stock: stock, etiquetas: _etiquetas);
       }
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -535,6 +550,37 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar.')));
     }
+  }
+
+  Future<void> _foto() async {
+    final url = await elegirYSubirLogo(context, repo.sesion, 'inv-${l.id}');
+    if (url != null && mounted) Navigator.of(context).pop(true);
+  }
+
+  /// Etiqueta de una talla o pieza: número, caja o marca.
+  Future<void> _etiqueta(String clave, String titulo) async {
+    final c = TextEditingController(text: _etiquetas[clave] ?? l.fila(clave)?.etiqueta ?? '');
+    final t = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text('Etiqueta · $titulo'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          maxLength: 60,
+          decoration: const InputDecoration(hintText: 'Ej. caja 2, números 10 al 14'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(c.text.trim()), child: const Text('Listo')),
+        ],
+      ),
+    );
+    if (t == null) return;
+    setState(() {
+      _etiquetas[clave] = t;
+      _cambio = true;
+    });
   }
 
   Future<void> _borrar() async {
@@ -657,9 +703,16 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     Widget fila(String titulo, String? sub, String clave) {
       final f = l.fila(clave);
       final n = _stock[clave] ?? 0;
+      final etiqueta = _etiquetas[clave] ?? f?.etiqueta ?? '';
       return ListTile(
+        onTap: pivot ? () => _etiqueta(clave, titulo) : null,
         title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(sub ?? '${f?.libres ?? n} libres${(f?.enUso ?? 0) > 0 ? ' · ${f!.enUso} en uso' : ''}'),
+        subtitle: Text(
+          [
+            sub ?? '${f?.libres ?? n} libres${(f?.enUso ?? 0) > 0 ? ' · ${f!.enUso} en uso' : ''}',
+            if (etiqueta.isNotEmpty) etiqueta else if (pivot) 'Toca para agregar una etiqueta',
+          ].join('\n'),
+        ),
         trailing: pivot
             ? Contador(
                 valor: n,
@@ -689,9 +742,14 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
           if (pivot)
             PopupMenuButton<String>(
               tooltip: 'Opciones',
-              onSelected: (a) => a == 'nombre' ? _renombrar() : _borrar(),
+              onSelected: (a) => switch (a) {
+                'nombre' => _renombrar(),
+                'foto' => _foto(),
+                _ => _borrar(),
+              },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'nombre', child: Text('Cambiar nombre')),
+                PopupMenuItem(value: 'foto', child: Text(l.foto.isEmpty ? 'Agregar foto' : 'Cambiar foto')),
                 if (l.sistema == null) const PopupMenuItem(value: 'borrar', child: Text('Borrar lista')),
               ],
             ),
@@ -700,6 +758,18 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
         children: [
+          // Foto de la lista (Victor, 2026-11-16).
+          if (l.foto.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(l.foto, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                ),
+              ),
+            ),
           if (l.sistema != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),

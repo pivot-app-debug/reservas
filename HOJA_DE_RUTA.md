@@ -49,7 +49,7 @@ Reglas de siempre:
      - [ ] Cambios de categoría en la Bandeja ("Pedir revisión" del cambio de categoría): todavía no existe el pedido; se hace junto con el modal de cambio de categoría.
      - [x] Funciones de personas en la ficha: registrar pago, "No paga (mes)" y acceso de Pivot (2026-11-12).
      - [x] Comunidad (grupos y redes) e Inventario (patines por talla, protecciones, lo reservado) en Equipo (2026-11-12).
-     - [x] Inventario personalizable: listas propias (tallas, sets, unidades, insumos), quién lo tiene (temporal con aviso cada 7 días a Pivots y a la persona, o permanente) y pedidos de uso sin bajar de Categoría/Equipo (2026-11-13). Faltan fotos y etiqueta, y sumarlo al asistente de crear liga (etapa 9).
+     - [x] Inventario personalizable: listas propias (tallas, sets, unidades, insumos), quién lo tiene (temporal con aviso cada 7 días a Pivots y a la persona, o permanente) y pedidos de uso sin bajar de Categoría/Equipo (2026-11-13). Fotos por lista y etiqueta por talla o pieza (2026-11-16). Falta sumarlo al asistente de crear liga (etapa 9).
      - [x] Ajustes de la liga en Mi perfil: roles, comunidad, inventario (2026-11-12). El resto de Mi Liga (precios, categorías, tareas recurrentes, finanzas) se mueve en las etapas 4–6.
      - [x] Rectificaciones: "¿Es correcto?" en la tarjeta y el detalle, "Revisión pendiente" con días restantes, se descarta a los 7 días (2026-11-12).
      - [x] Qué llevar: pill con lo reservado junto a cada persona en el detalle del evento (Pivots) (2026-11-12).

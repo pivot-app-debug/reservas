@@ -1814,13 +1814,17 @@ async function adminSubirLogo(params: Record<string, any>): Promise<Record<strin
   if (base64Data) {
     const parsed = await _base64ToBuffer(base64Data);
     if (!parsed) return { exito: false, error: 'Formato de imagen inválido.' };
-        const path = `logos/${destino === 'liga' ? 'liga' : destino.startsWith('medio-') ? destino.replace(/[^a-z0-9_-]/gi, '') : 'equipo-' + destino.replace(/[^a-z0-9-]/gi, '')}.png`;
+                const path = `logos/${destino === 'liga' ? 'liga' : destino.startsWith('medio-') || destino.startsWith('inv-') ? destino.replace(/[^a-z0-9_-]/gi, '') : 'equipo-' + destino.replace(/[^a-z0-9-]/gi, '')}.png`;
     const { error } = await supabase.storage.from('fotos-perfil').upload(path, parsed.buffer, { contentType: parsed.mimeType, upsert: true });
     if (error) return { exito: false, error: 'Error al subir imagen: ' + error.message };
     url = `${supabase.storage.from('fotos-perfil').getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
   }
-    if (destino.startsWith('medio-')) {
+        if (destino.startsWith('medio-')) {
     // Logo de un medio de pago: se guarda con el medio en Formas de pago.
+  } else if (destino.startsWith('inv-')) {
+    // Foto de una lista del inventario (Victor, 2026-11-16).
+    const { error } = await supabase.from('inventario_listas').update({ foto: url || null }).eq('id', destino.slice(4));
+    if (error) return { exito: false, error: error.message };
   } else if (destino === 'liga') {
     await supabase.from('config_app').upsert({ key: 'logo_liga', value: url }, { onConflict: 'key' });
   } else {
@@ -2866,7 +2870,7 @@ type ListaInv = { id: string; nombre: string; tipo: string; icono: string | null
 async function _listasInventario(): Promise<{ listas: ListaInv[]; stock: any[] }> {
   const [{ data: listas }, { data: stock }] = await Promise.all([
     supabase.from('inventario_listas').select('*').order('orden').order('created_at'),
-    supabase.from('inventario_stock').select('lista_id, variante, cantidad, vence, minimo'),
+        supabase.from('inventario_stock').select('lista_id, variante, cantidad, vence, minimo, etiqueta'),
   ]);
   return {
     listas: (listas ?? []).map((l: any) => ({ ...l, piezas: Array.isArray(l.piezas) ? l.piezas.map((p: any) => ({ nombre: String(p.nombre), cantidad: Number(p.cantidad) || 1 })) : [] })),
@@ -2958,14 +2962,14 @@ async function getInventario(params: Record<string, any>): Promise<Record<string
         const total = Number(st.find((x: any) => x.variante === v)?.cantidad) || 0;
         const uso = enUso[l.id + '|' + v] ?? 0;
                 const f = st.find((x: any) => x.variante === v);
-        return { variante: v, cantidad: total, enUso: uso, libres: Math.max(0, total - uso), vence: f?.vence ?? null, minimo: f?.minimo == null ? null : Number(f.minimo) };
+                return { variante: v, cantidad: total, enUso: uso, libres: Math.max(0, total - uso), vence: f?.vence ?? null, minimo: f?.minimo == null ? null : Number(f.minimo), etiqueta: f?.etiqueta ?? null };
       });
             if (l.seccion === 'botiquin' || l.tipo === 'insumo') {
         // El botiquín y los insumos tienen un renglón por cosa (variante = nombre).
         filas.length = 0;
         for (const x of st) {
           const uso = enUso[l.id + '|' + x.variante] ?? 0;
-          filas.push({ variante: x.variante, cantidad: Number(x.cantidad) || 0, enUso: uso, libres: Math.max(0, (Number(x.cantidad) || 0) - uso), vence: x.vence ?? null, minimo: x.minimo == null ? null : Number(x.minimo) });
+                    filas.push({ variante: x.variante, cantidad: Number(x.cantidad) || 0, enUso: uso, libres: Math.max(0, (Number(x.cantidad) || 0) - uso), vence: x.vence ?? null, minimo: x.minimo == null ? null : Number(x.minimo), etiqueta: x.etiqueta ?? null });
         }
         filas.sort((a: any, b: any) => String(a.variante).localeCompare(String(b.variante)));
       }
@@ -2976,7 +2980,7 @@ async function getInventario(params: Record<string, any>): Promise<Record<string
           libres: Math.min(...l.piezas.map((p) => Math.floor((filas.find((f: any) => f.variante === p.nombre)?.libres ?? 0) / p.cantidad))),
         }
         : null;
-            return { id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, unidad: l.unidad, sistema: l.sistema, piezas: l.piezas, stock: filas, sets, seccion: l.seccion ?? 'equipamiento', activa: l.activa !== false };
+                        return { id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, unidad: l.unidad, sistema: l.sistema, piezas: l.piezas, stock: filas, sets, seccion: l.seccion ?? 'equipamiento', activa: l.activa !== false, foto: (l as any).foto ?? null };
     }),
     prestamos: visibles.map((p: any) => {
       const l = p.lista_id ? porId[p.lista_id] : undefined;
@@ -3243,10 +3247,16 @@ async function adminInventarioLista(params: Record<string, any>): Promise<Record
     .filter((p: any) => p.nombre).slice(0, 12);
   const guardarStock = async (listaId: string) => {
     if (!Array.isArray(stock)) return;
-        const fecha = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : null;
+                const fecha = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : null;
+    // Sin 'etiqueta' en el pedido, se conserva la que tenía.
+    const { data: previas } = await supabase.from('inventario_stock').select('variante, etiqueta').eq('lista_id', listaId);
+    const etiq: Record<string, string | null> = {};
+    (previas ?? []).forEach((r: any) => { etiq[r.variante] = r.etiqueta ?? null; });
     const filas = stock.map((x: any) => ({
       lista_id: listaId, variante: String(x.variante ?? '').trim().slice(0, 60), cantidad: Math.max(0, Math.min(100000, Number(x.cantidad) || 0)),
-      vence: fecha(x.vence), minimo: x.minimo == null || x.minimo === '' ? null : Math.max(0, Number(x.minimo) || 0),
+            vence: fecha(x.vence), minimo: x.minimo == null || x.minimo === '' ? null : Math.max(0, Number(x.minimo) || 0),
+      // Etiqueta física (Victor, 2026-11-16): número, caja o marca para encontrarlo.
+            etiqueta: 'etiqueta' in x ? (String(x.etiqueta ?? '').trim().slice(0, 60) || null) : (etiq[String(x.variante ?? '').trim().slice(0, 60)] ?? null),
     }));
     const vistas = new Set<string>();
     for (const f of filas) { if (vistas.has(f.variante)) return; vistas.add(f.variante); }

@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (inventario: fotos y etiquetas)
+- Cada lista del inventario puede tener una foto (menú ⋮ → Agregar foto): se ve en la tarjeta y arriba de la lista.
+- Cada talla o pieza puede tener una etiqueta (número, caja o marca para encontrarla): un Pivot la toca para escribirla.
+
 ## 2026-11-16 (revisión de Victor, 15:21)
 - Detalle del evento: sin tour guiado y sin "Cambiar respuesta" junto a tu propio nombre (se cambia arriba).
 - Tareas: "Mis tareas" solo aparece si tienes; sin disponibles, tarjeta con "Crear una tarea"; el botón flotante aparece solo si hay disponibles; "Archivadas" pasó a la barra de arriba.
