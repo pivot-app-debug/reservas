@@ -93,7 +93,7 @@ class _TareasArchivadasScreenState extends State<TareasArchivadasScreen> {
               )
             : ListView(
                 key: const ValueKey('l'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   if (l.isEmpty)
                     Padding(

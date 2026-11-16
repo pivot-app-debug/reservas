@@ -246,6 +246,14 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Revisión 18:02 (2026-11-16)
+- `core/sincroniza.dart` (`Sincroniza`): reemplaza a `RefreshIndicator` en toda la app; vuelve a pedir los datos al volver a la app (más de 30 s) y, con `alAbrir`, al abrirse. No usar `RefreshIndicator` en pantallas nuevas.
+- Listas horizontales dentro de un padding: `clipBehavior: Clip.none` para que lleguen al borde.
+- Toda lista con `altoBarra(context)` arriba suma `MediaQuery.paddingOf(context).bottom` abajo.
+- `Vidrio`: BackdropFilter siempre, con el color de la página encima que se desvanece (TweenAnimationBuilder), sin AnimatedSwitcher.
+- `editarCorteEquipos(context, sesion, tiers, {corte})` y `fechasCorteEquipos` son funciones de primer nivel en `categorias_screen.dart`; `HistorialAjustesScreen(grupo:)`.
+- `LupaSeccion` y `BuscadorLigaScreen(solo:, donde:)` en `buscador_liga.dart`; el equipo filtra sus `_Fila` con `_filtrar`.
+
 ## Cursos con try out (2026-11-16)
 - Tablas `cursos` (fechas jsonb `[{fecha,hora,lugar,venueId}]`, la última es el try out; estado abierto/cerrado/terminado; equipo_destino) y `curso_inscripciones` (pendiente/confirmada/cancelada, resultado aprobado/no_aprobado, equipo_final); `reservas.curso_id`. Migración `20261117010000_cursos.sql`.
 - API: `adminCursos` (finanzas; listar/guardar/estado/resultado). Guardar crea un venue `tipo 'unico'`, `tipo_icono 'Curso'` por fecha nueva, conserva los que no cambian y borra solo los quitados por venir; luego `regenerar_ventana_asistencias`. Resultado aprobado: `equipo.categoria`, `historial_tier` del mes y `_avisarCambioEquipo`. `getCursos` (abiertos + los míos), `inscribirseCurso` (reserva tipo 'curso'; `adminSetEstadoReserva` confirma o cancela la inscripción).

@@ -267,7 +267,7 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
         title: const Text('Mi equipamiento', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 120),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 120 + MediaQuery.paddingOf(context).bottom),
         children: [
           titulo('PATINES'),
           SegmentedButton<bool>(

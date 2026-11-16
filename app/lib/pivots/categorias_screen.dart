@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../core/sincroniza.dart';
+
 import 'package:share_plus/share_plus.dart';
 
 import 'cobro_equipo_screen.dart' show modosCobro, CobroEquipoScreen, textoCobroEquipo;
@@ -320,111 +323,15 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
     }
   }
 
-  Future<void> _guardarReglas(Map<String, Object?> cambios, {String ok = 'Guardado'}) async {
-    try {
-      final r = await s.api.post('adminReglasLiga', {'adminToken': s.adminToken, ...cambios});
-      if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar.'}');
-      if (mounted) setState(() => _reglas = r);
-      _aviso(ok);
-    } catch (e) {
-      _aviso(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.');
-    }
-  }
-
   // ─── Cuándo se aplican los cambios de equipo ───────────────────────────
   Map<String, dynamic> get _corte => (_reglas['corte'] as Map<String, dynamic>?) ?? const {'modo': 'revisar', 'dia': 1, 'avisoDias': 7, 'autoAprobar': true};
 
-  /// Fechas reales del próximo corte para un modo/día/aviso dados.
-  (DateTime, DateTime) _fechasCorte(int dia, int aviso) {
-    final h = Fechas.hoy();
-    final c = h.day < dia ? DateTime(h.year, h.month, dia) : DateTime(h.year, h.month + 1, dia);
-    return (c, c.subtract(Duration(days: aviso)));
-  }
-
-  String _textoCorte(String modo, int dia, int aviso, [bool autoAprobar = true]) {
-    final (c, llega) = _fechasCorte(dia, aviso);
-    final ej = _ejemploCorte(modo, c);
-    if (modo == 'auto') {
-      return 'Los cambios se aplicarán apenas alguien cumpla o deje de cumplir los requisitos, de forma automática.${ej.isEmpty ? '' : '\n\n$ej'}';
-    }
-    return autoAprobar
-        ? 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Tendrás $aviso ${aviso == 1 ? 'día' : 'días'}, hasta el ${Fechas.corta(c)}, para revisarla; lo que no revises se aplicará solo ese día.${ej.isEmpty ? '' : '\n\n$ej'}'
-        : 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Ningún cambio se aplica hasta que un Pivot lo apruebe.${ej.isEmpty ? '' : '\n\n$ej'}';
-  }
-
-  /// Ejemplo con los requisitos reales de los dos primeros equipos (Victor, 2026-11-14).
-  String _ejemploCorte(String modo, DateTime corte) {
-    final l = _tiers;
-    if (l == null || l.length < 2) return '';
-    final arriba = '${l[0]['nombre']}', abajo = '${l[1]['nombre']}';
-    final r = _Regla.de(l[0]);
-    if (r.clases == 0 && r.puntos == 0) return '';
-    final cuando = modo == 'auto' ? 'pasa a $arriba ese mismo día' : 'aparece en la lista y, si no la revisas, pasa a $arriba el ${Fechas.corta(corte)}';
-    return 'Ejemplo: si alguien de $abajo logra ${r.texto} durante ${r.subir} ${r.subir == 1 ? 'mes' : 'meses seguidos'}, $cuando.';
-  }
+  (DateTime, DateTime) _fechasCorte(int dia, int aviso) => fechasCorteEquipos(dia, aviso);
 
   Future<void> _editarCorte() async {
-    var modo = '${_corte['modo'] ?? 'revisar'}';
-    var dia = (_corte['dia'] as num?)?.toInt() ?? 1;
-    var aviso = (_corte['avisoDias'] as num?)?.toInt() ?? 7;
-    var auto = _corte['autoAprobar'] != false;
-    final ok = await _hoja(
-      titulo: 'Cuándo se aplican los cambios',
-      contenido: (set) => [
-        for (final (k, t, d, i) in const [
-          (
-            'revisar',
-            'Revisar antes',
-            'Los cambios llegan a Notificaciones antes del día de corte para aprobarlos o dejarlos como están.',
-            Icons.fact_check_outlined,
-          ),
-          ('auto', 'Automático', 'Se aplican solos, sin revisión.', Icons.bolt_rounded),
-        ])
-          OpcionAsistente(icono: i, titulo: t, texto: d, activa: modo == k, alTocar: () => set(() => modo = k)),
-        if (modo == 'revisar') ...[
-          const SizedBox(height: 8),
-          Text(
-            'Día de corte (de cada mes)',
-            style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
-          ),
-          const SizedBox(height: 6),
-          SelectorNumero(valor: dia, min: 1, max: 28, etiqueta: 'día', alCambiar: (v) => set(() => dia = v.toInt())),
-          const SizedBox(height: 12),
-          Text(
-            'Días para revisar la lista',
-            style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
-          ),
-          const SizedBox(height: 6),
-          SelectorNumero(
-            valor: aviso,
-            min: 1,
-            max: 20,
-            etiqueta: aviso == 1 ? 'día antes del corte' : 'días antes del corte',
-            alCambiar: (v) => set(() => aviso = v.toInt()),
-          ),
-          // Aprobar solo si nadie revisa (Victor, 2026-11-16).
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Si nadie la revisa, se aplica sola'),
-            subtitle: Text(auto ? 'El día de corte se aplica lo que no se revisó.' : 'Manual: cada cambio espera a que un Pivot lo apruebe.'),
-            value: auto,
-            onChanged: (v) => set(() => auto = v),
-          ),
-        ],
-        const SizedBox(height: 12),
-        _Nota(texto: _textoCorte(modo, dia, aviso, auto)),
-      ],
-    );
-    if (ok == true) {
-      await _guardarReglas({
-        'corte': jsonEncode({'modo': modo, 'dia': dia, 'avisoDias': aviso, 'autoAprobar': auto}),
-      });
-    }
+    final r = await editarCorteEquipos(context, s, _tiers, corte: _corte);
+    if (r != null && mounted) setState(() => _reglas = {..._reglas, 'corte': r});
   }
-
-  /// Hoja corta con contenido y "Guardar". Devuelve true si se guarda.
-  Future<bool?> _hoja({required String titulo, required List<Widget> Function(StateSetter set) contenido}) =>
-      abrirSubseccion(context, titulo: titulo, contenido: contenido);
 
   @override
   Widget build(BuildContext context) {
@@ -444,11 +351,11 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
             ? _error == null
                   ? const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'))
                   : Center(key: const ValueKey('e'), child: Text(_error!))
-            : RefreshIndicator(
+            : Sincroniza(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
                     _Seccion('EQUIPOS'),
                     for (final (i, t) in l.indexed) _tarjeta(context, i, t),
@@ -602,8 +509,11 @@ class _Nota extends StatelessWidget {
 /// Historial de cambios en los ajustes de la liga (Victor, 2026-11-13):
 /// tarjetas con quién lo hizo, qué cambió en palabras, buscador y filtros.
 class HistorialAjustesScreen extends StatefulWidget {
-  const HistorialAjustesScreen({super.key, required this.sesion});
+  const HistorialAjustesScreen({super.key, required this.sesion, this.grupo = ''});
   final Sesion sesion;
+
+  /// Filtro con el que abre: desde un equipo, 'equipos' (Victor, 2026-11-16).
+  final String grupo;
 
   @override
   State<HistorialAjustesScreen> createState() => _HistorialAjustesScreenState();
@@ -614,7 +524,7 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
   int _desdeAnio = DateTime.now().year;
   String _periodo = '6m'; // '6m' | 'mes' | 'anio:<n>' | 'todo' | 'rango'
   DateTimeRange? _rango;
-  String _grupo = '';
+  late String _grupo = widget.grupo;
   String _q = '';
   String? _error;
 
@@ -1119,8 +1029,12 @@ class _EquipoScreenState extends State<_EquipoScreen> {
           titulo: titulo,
           texto: '$texto · cambia para todos los equipos',
           alTocar: () => id == 'historial'
-              ? Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => HistorialAjustesScreen(sesion: s)))
-              : abrir(CategoriasScreen(sesion: s, resaltar: id)),
+              ? Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HistorialAjustesScreen(sesion: s, grupo: 'equipos'),
+                  ),
+                )
+              : editarCorteEquipos(context, s, widget.tiers),
         ),
     ];
   }
@@ -1278,6 +1192,39 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     _aviso('$_nombre borrado');
   }
 
+  /// Texto del buscador; null = cerrado.
+  String? _q;
+
+  static String _plano(String x) => x
+      .toLowerCase()
+      .replaceAll(RegExp('[áà]'), 'a')
+      .replaceAll(RegExp('[éè]'), 'e')
+      .replaceAll(RegExp('[íì]'), 'i')
+      .replaceAll(RegExp('[óò]'), 'o')
+      .replaceAll(RegExp('[úùü]'), 'u');
+
+  /// Con algo escrito, solo las filas que lo contienen (título o valor).
+  List<Widget> _filtrar(BuildContext context, List<Widget> hijos) {
+    final q = _plano(_q?.trim() ?? '');
+    if (q.isEmpty) return hijos;
+    final palabras = q.split(RegExp(r'\s+'));
+    final l = [
+      for (final h in hijos)
+        if (h is _Fila && palabras.every(_plano('${h.titulo} ${h.texto}').contains)) h,
+    ];
+    if (l.isNotEmpty) return l;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 40),
+        child: Text(
+          'No hay ajustes con "${_q!.trim()}" en este equipo.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: context.pivot.textoSecundario),
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -1293,14 +1240,36 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text(_nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+        // Buscador dentro del equipo (Victor, 2026-11-16), como el de Mi Liga.
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: _q == null
+              ? Text(
+                  _nombre,
+                  key: const ValueKey('t'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                )
+              : TextField(
+                  key: const ValueKey('b'),
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _q = v),
+                  decoration: InputDecoration(hintText: 'Buscar en $_nombre', border: InputBorder.none, filled: false),
+                ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: _q == null ? 'Buscar' : 'Cerrar búsqueda',
+            icon: Icon(_q == null ? Icons.search_rounded : Icons.close_rounded),
+            onPressed: () => setState(() => _q = _q == null ? '' : null),
+          ),
+        ],
         bottom: _ocupado ? const PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2)) : null,
       ),
       body: AbsorbPointer(
         absorbing: _ocupado,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
-          children: [
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
+          children: _filtrar(context, [
             Center(
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -1419,7 +1388,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                 child: TextButton.icon(onPressed: _borrar, icon: const Icon(Icons.delete_outline_rounded), label: Text('Borrar $_nombre')),
               ),
             ],
-          ],
+          ]),
         ),
       ),
     );
@@ -2150,6 +2119,107 @@ String textoQueCuenta(Map<String, dynamic> r) {
   final t = r['tiposCuentan'];
   final base = t is List && t.isNotEmpty ? t.map((x) => x == 'Externa' ? 'con otros equipos' : '$x'.toLowerCase()).join(', ') : 'todo suma';
   return '${base[0].toUpperCase()}${base.substring(1)}${r['tardeCuentaClase'] == false ? ' · llegar tarde no suma' : ''}';
+}
+
+/// Fechas reales del próximo corte para un modo/día/aviso dados.
+(DateTime, DateTime) fechasCorteEquipos(int dia, int aviso) {
+  final h = Fechas.hoy();
+  final c = h.day < dia ? DateTime(h.year, h.month, dia) : DateTime(h.year, h.month + 1, dia);
+  return (c, c.subtract(Duration(days: aviso)));
+}
+
+String _textoCorte(List<Map<String, dynamic>>? tiers, String modo, int dia, int aviso, [bool autoAprobar = true]) {
+  final (c, llega) = fechasCorteEquipos(dia, aviso);
+  final ej = _ejemploCorte(tiers, modo, c);
+  if (modo == 'auto') {
+    return 'Los cambios se aplicarán apenas alguien cumpla o deje de cumplir los requisitos, de forma automática.${ej.isEmpty ? '' : '\n\n$ej'}';
+  }
+  return autoAprobar
+      ? 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Tendrás $aviso ${aviso == 1 ? 'día' : 'días'}, hasta el ${Fechas.corta(c)}, para revisarla; lo que no revises se aplicará solo ese día.${ej.isEmpty ? '' : '\n\n$ej'}'
+      : 'La lista llegará a Notificaciones el ${Fechas.corta(llega)}. Ningún cambio se aplica hasta que un Pivot lo apruebe.${ej.isEmpty ? '' : '\n\n$ej'}';
+}
+
+/// Ejemplo con los requisitos reales de los dos primeros equipos (Victor, 2026-11-14).
+String _ejemploCorte(List<Map<String, dynamic>>? tiers, String modo, DateTime corte) {
+  final l = tiers;
+  if (l == null || l.length < 2) return '';
+  final arriba = '${l[0]['nombre']}', abajo = '${l[1]['nombre']}';
+  final r = _Regla.de(l[0]);
+  if (r.clases == 0 && r.puntos == 0) return '';
+  final cuando = modo == 'auto' ? 'pasa a $arriba ese mismo día' : 'aparece en la lista y, si no la revisas, pasa a $arriba el ${Fechas.corta(corte)}';
+  return 'Ejemplo: si alguien de $abajo logra ${r.texto} durante ${r.subir} ${r.subir == 1 ? 'mes' : 'meses seguidos'}, $cuando.';
+}
+
+/// Editor de "Cuándo se aplican los cambios" (de toda la liga). Se abre desde
+/// Equipos y desde los ajustes de cada equipo (Victor, 2026-11-16: antes este
+/// llevaba a la pantalla vieja). Devuelve el corte guardado, o null.
+Future<Map<String, dynamic>?> editarCorteEquipos(BuildContext context, Sesion s, List<Map<String, dynamic>>? tiers, {Map<String, dynamic>? corte}) async {
+  var c0 = corte;
+  if (c0 == null) {
+    try {
+      c0 = ((await _reglasDeLiga(s))['corte'] as Map?)?.cast<String, dynamic>() ?? const {};
+    } catch (_) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo cargar. Revisa tu conexión.')));
+      return null;
+    }
+    if (!context.mounted) return null;
+  }
+  final Map<String, dynamic> corteActual = c0;
+  var modo = '${corteActual['modo'] ?? 'revisar'}';
+  var dia = (corteActual['dia'] as num?)?.toInt() ?? 1;
+  var aviso = (corteActual['avisoDias'] as num?)?.toInt() ?? 7;
+  var auto = corteActual['autoAprobar'] != false;
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Cuándo se aplican los cambios',
+    contenido: (set) => [
+      for (final (k, t, d, i) in const [
+        (
+          'revisar',
+          'Revisar antes',
+          'Los cambios llegan a Notificaciones antes del día de corte para aprobarlos o dejarlos como están.',
+          Icons.fact_check_outlined,
+        ),
+        ('auto', 'Automático', 'Se aplican solos, sin revisión.', Icons.bolt_rounded),
+      ])
+        OpcionAsistente(icono: i, titulo: t, texto: d, activa: modo == k, alTocar: () => set(() => modo = k)),
+      if (modo == 'revisar') ...[
+        const SizedBox(height: 8),
+        Text(
+          'Día de corte (de cada mes)',
+          style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
+        ),
+        const SizedBox(height: 6),
+        SelectorNumero(valor: dia, min: 1, max: 28, etiqueta: 'día', alCambiar: (v) => set(() => dia = v.toInt())),
+        const SizedBox(height: 12),
+        Text(
+          'Días para revisar la lista',
+          style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
+        ),
+        const SizedBox(height: 6),
+        SelectorNumero(
+          valor: aviso,
+          min: 1,
+          max: 20,
+          etiqueta: aviso == 1 ? 'día antes del corte' : 'días antes del corte',
+          alCambiar: (v) => set(() => aviso = v.toInt()),
+        ),
+        // Aprobar solo si nadie revisa (Victor, 2026-11-16).
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Si nadie la revisa, se aplica sola'),
+          subtitle: Text(auto ? 'El día de corte se aplica lo que no se revisó.' : 'Manual: cada cambio espera a que un Pivot lo apruebe.'),
+          value: auto,
+          onChanged: (v) => set(() => auto = v),
+        ),
+      ],
+      const SizedBox(height: 12),
+      _Nota(texto: _textoCorte(tiers, modo, dia, aviso, auto)),
+    ],
+  );
+  if (ok != true || !context.mounted) return null;
+  final nuevo = <String, dynamic>{'modo': modo, 'dia': dia, 'avisoDias': aviso, 'autoAprobar': auto};
+  return await _guardarReglasLiga(context, s, {'corte': jsonEncode(nuevo)}, 'Guardado') ? nuevo : null;
 }
 
 Future<Map<String, dynamic>> _reglasDeLiga(Sesion s) async {

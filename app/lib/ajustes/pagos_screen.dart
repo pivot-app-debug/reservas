@@ -74,7 +74,7 @@ class _PagosScreenState extends State<PagosScreen> {
     }
     return ListView(
       key: const ValueKey('lista'),
-      padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+      padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
       children: [
         _Estado(cuota: c, enRevision: enRevision, cantidadRevision: pendientes.length, alPagar: () => _pagarCuota(context)),
         if (activas.isNotEmpty) ...[

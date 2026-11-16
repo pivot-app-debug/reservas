@@ -356,7 +356,7 @@ class _MapaDireccionState extends State<_MapaDireccion> {
         title: const Text('Tu dirección', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: Padding(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 0),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 0 + MediaQuery.paddingOf(context).bottom),
         child: SelectorUbicacion(
           inicial: widget.inicial,
           pais: widget.pais,

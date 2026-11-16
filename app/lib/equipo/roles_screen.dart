@@ -126,7 +126,7 @@ class _RolesScreenState extends State<RolesScreen> {
         builder: (context, _) {
           final roles = repo.roles;
           return ReorderableListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+            padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
             header: Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
               child: Text(

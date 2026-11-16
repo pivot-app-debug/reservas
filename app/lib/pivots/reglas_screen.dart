@@ -137,11 +137,12 @@ class _ReglasScreenState extends State<ReglasScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Reglas', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [LupaSeccion(seccion: 'reglas', donde: 'Reglas', resaltado: _resaltado)],
       ),
       body: ListenableBuilder(
         listenable: c,
         builder: (context, _) => ListView(
-          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
           children: [
             Text(
               'Las reglas de toda la liga. Lo de cada equipo (cobros, clases de gracia, equipamiento, puntos y requisitos) está dentro de cada equipo en Mi Liga. Un cambio rige desde que lo guardas; lo anterior no cambia.',

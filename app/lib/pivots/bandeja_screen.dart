@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../core/config_liga.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
@@ -572,14 +574,14 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               ),
             );
           }
-          return RefreshIndicator(
+          return Sincroniza(
             onRefresh: _recargar,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
               child: vacia
                   ? ListView(
                       key: const ValueKey('vacia'),
-                      padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40),
+                      padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
                       children: [
                         const SizedBox(height: 120),
                         Icon(Icons.inbox_rounded, size: 56, color: p.textoSecundario),
@@ -601,7 +603,11 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                         ...hijos,
                       ],
                     )
-                  : ListView(key: const ValueKey('lista'), padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 40), children: hijos),
+                  : ListView(
+                      key: const ValueKey('lista'),
+                      padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
+                      children: hijos,
+                    ),
             ),
           );
         },
@@ -934,6 +940,8 @@ Future<Map<String, Object?>?> elegirDuracionExcepcion(BuildContext context, Pedi
                             height: 40,
                             child: ListView(
                               scrollDirection: Axis.horizontal,
+                              // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+                              clipBehavior: Clip.none,
                               children: [
                                 for (final m in meses)
                                   Padding(

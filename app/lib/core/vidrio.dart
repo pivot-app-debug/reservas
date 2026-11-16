@@ -53,17 +53,25 @@ class _VidrioState extends State<Vidrio> {
     // abajo): solo el desenfoque con el fondo translúcido, sin tinte,
     // degradado, reflejo ni borde.
     final vidrio = widget.abajo || _obs == null || _debajo;
+    // El desenfoque está siempre debajo y encima se desvanece el color de
+    // la página (Victor, 2026-11-16: al cruzar dos capas a medias, por un
+    // instante el contenido se veía nítido sobre la barra). Así lo que pasa
+    // por detrás siempre queda desenfocado.
     return ClipRect(
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        layoutBuilder: (actual, previos) => Stack(fit: StackFit.passthrough, children: [...previos, ?actual]),
-        child: vidrio
-            ? BackdropFilter(
-                key: const ValueKey('v'),
-                filter: ImageFilter.blur(sigmaX: PivotVidrio.desenfoque, sigmaY: PivotVidrio.desenfoque, tileMode: TileMode.mirror),
-                child: ColoredBox(color: PivotVidrio.plano(p), child: widget.child),
-              )
-            : ColoredBox(key: const ValueKey('p'), color: p.fondo, child: widget.child),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: PivotVidrio.desenfoque, sigmaY: PivotVidrio.desenfoque, tileMode: TileMode.mirror),
+        child: ColoredBox(
+          color: PivotVidrio.plano(p),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: vidrio ? 0 : 1),
+            duration: const Duration(milliseconds: 180),
+            child: widget.child,
+            builder: (context, a, hijo) => ColoredBox(
+              color: p.fondo.withValues(alpha: a),
+              child: hijo,
+            ),
+          ),
+        ),
       ),
     );
   }

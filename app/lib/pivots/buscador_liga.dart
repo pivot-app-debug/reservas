@@ -73,21 +73,16 @@ const entradasLiga = [
   EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
   EntradaAjuste('equipos', 'Préstamo de equipamiento', 'Mi Liga › Equipos › cada equipo', 'prestar patines protecciones excepcional emergencia'),
   EntradaAjuste('equipos', 'Cobros de un equipo', 'Mi Liga › Equipos › cada equipo', 'cómo paga mensualidad por clase precio propio exentos no pagan cuota'),
-  // Dentro de Equipos y puntos.
-  EntradaAjuste(
-    'corte',
-    'Cuándo se aplican los cambios',
-    'Mi Liga › Equipos y puntos',
-    'corte revisar antes automático día cambio de equipo',
-    dentro: 'equipos',
-  ),
+  // Dentro de Equipos: se abren directo (Victor, 2026-11-16).
+  EntradaAjuste('corte', 'Cuándo se aplican los cambios', 'Mi Liga › Equipos', 'corte revisar antes automático día cambio de equipo', dentro: 'equipos'),
   EntradaAjuste('equipos', 'Puntos por asistencia', 'Mi Liga › Equipos › cada equipo', 'valor a tiempo tarde puntos fecha'),
   EntradaAjuste('equipos', 'Qué cuenta como clase', 'Mi Liga › Equipos › cada equipo', 'clase tipos de evento partido llegadas tarde suman'),
-  EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos y puntos', 'quién cambió registro auditoría', dentro: 'equipos'),
+  EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos', 'quién cambió registro auditoría', dentro: 'equipos'),
   EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería → Cobros.
   EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
   EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
+  EntradaAjuste('cursos', 'Cursos', 'Finanzas › Cobros', 'freshmeat try out principiantes curso inscripción cupo', dentro: 'cobros'),
   EntradaAjuste('planes', 'Planes de pago', 'Finanzas › Cobros', 'paquete pack trimestral semestral meses clases descuento', dentro: 'cobros'),
   EntradaAjuste(
     'formas',
@@ -112,11 +107,12 @@ String _sinTildes(String s) => s
     .replaceAll(RegExp('[óò]'), 'o')
     .replaceAll(RegExp('[úùü]'), 'u');
 
-List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true}) {
+List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo}) {
   final palabras = _sinTildes(q).split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (palabras.isEmpty) return const [];
   final r = <(int, EntradaAjuste)>[];
   for (final e in entradasLiga) {
+    if (solo != null && e.dentro != solo) continue;
     if (!tesoreria && (e.id == 'tesoreria' || e.id == 'viajes' || e.dentro == 'tesoreria' || e.dentro == 'cobros')) continue;
     final t = _sinTildes(e.titulo), todo = _sinTildes('${e.titulo} ${e.ruta} ${e.palabras}');
     if (!palabras.every(todo.contains)) continue;
@@ -129,8 +125,12 @@ List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true}) {
 
 /// Pantalla del buscador. Devuelve la entrada elegida.
 class BuscadorLigaScreen extends StatefulWidget {
-  const BuscadorLigaScreen({super.key, this.tesoreria = true});
+  const BuscadorLigaScreen({super.key, this.tesoreria = true, this.solo, this.donde = 'Mi Liga'});
   final bool tesoreria;
+
+  /// Solo los ajustes de una sección ('reglas', 'cobros'…), para su propia lupa.
+  final String? solo;
+  final String donde;
 
   @override
   State<BuscadorLigaScreen> createState() => _BuscadorLigaScreenState();
@@ -142,13 +142,13 @@ class _BuscadorLigaScreenState extends State<BuscadorLigaScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final r = buscarAjustes(_q, tesoreria: widget.tesoreria);
+    final r = buscarAjustes(_q, tesoreria: widget.tesoreria, solo: widget.solo);
     return Scaffold(
       appBar: AppBar(
         title: TextField(
           autofocus: true,
           onChanged: (v) => setState(() => _q = v),
-          decoration: const InputDecoration(hintText: 'Buscar en Mi Liga', border: InputBorder.none, filled: false),
+          decoration: InputDecoration(hintText: 'Buscar en ${widget.donde}', border: InputBorder.none, filled: false),
         ),
       ),
       body: AnimatedSwitcher(
@@ -185,6 +185,30 @@ class _BuscadorLigaScreenState extends State<BuscadorLigaScreen> {
       ),
     );
   }
+}
+
+/// Lupa de una sección grande (Victor, 2026-11-16): busca solo en ella y
+/// hace parpadear la fila elegida.
+class LupaSeccion extends StatelessWidget {
+  const LupaSeccion({super.key, required this.seccion, required this.donde, required this.resaltado});
+  final String seccion, donde;
+  final ValueNotifier<String?> resaltado;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'Buscar en $donde',
+    icon: const Icon(Icons.search_rounded),
+    onPressed: () async {
+      final e = await Navigator.of(context).push<EntradaAjuste>(
+        MaterialPageRoute(
+          builder: (_) => BuscadorLigaScreen(solo: seccion, donde: donde),
+        ),
+      );
+      if (e == null) return;
+      resaltado.value = null;
+      resaltado.value = e.id;
+    },
+  );
 }
 
 /// Envuelve una fila: cuando `resaltado` tiene su id, la lleva a la vista y

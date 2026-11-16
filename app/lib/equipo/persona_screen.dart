@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
+import '../core/sincroniza.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
@@ -122,10 +125,10 @@ class _FichaState extends State<_Ficha> {
             ),
         ],
       ),
-      body: RefreshIndicator(
+      body: Sincroniza(
         onRefresh: () => repo.cargar(forzar: true),
         child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40),
+          padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
           children: [
             Center(
               child: Stack(

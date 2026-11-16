@@ -105,7 +105,7 @@ class _FormasPagoScreenState extends State<FormasPagoScreen> {
       body: AbsorbPointer(
         absorbing: _ocupado,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100),
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100 + MediaQuery.paddingOf(context).bottom),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
@@ -291,7 +291,7 @@ class _MedioScreenState extends State<_MedioScreen> {
         actions: [if (widget.medio != null) IconButton(tooltip: 'Quitar', onPressed: _borrar, icon: const Icon(Icons.delete_outline_rounded))],
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100 + MediaQuery.paddingOf(context).bottom),
         children: [
           Center(
             child: Column(

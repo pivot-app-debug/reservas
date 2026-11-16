@@ -156,7 +156,7 @@ class _AnticipadaScreenState extends State<AnticipadaScreen> {
       final orden = visibles..sort((x, y) => _vigencia(x).index.compareTo(_vigencia(y).index));
       cuerpo = ListView(
         key: const ValueKey('lista'),
-        padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 96),
+        padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 14),

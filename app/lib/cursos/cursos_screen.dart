@@ -363,7 +363,7 @@ class _CursosScreenState extends State<CursosScreen> {
             ? (_error == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error!)))
             : ListView(
                 key: const ValueKey('l'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   Text(
                     'Cursos para quienes empiezan: varias fechas, precio propio y cupo. La última fecha es el try out, y ahí eliges a qué equipo pasa cada persona.',

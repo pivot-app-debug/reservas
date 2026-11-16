@@ -100,11 +100,12 @@ class _CobrosScreenState extends State<CobrosScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Cobros', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [LupaSeccion(seccion: 'cobros', donde: 'Cobros', resaltado: _resaltado)],
       ),
       body: ListenableBuilder(
         listenable: c,
         builder: (context, _) => ListView(
-          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
           children: [
             Text(
               'Qué se cobra, cuánto y por dónde. Cambiar un precio rige para los pagos nuevos; los ya hechos no cambian.',
@@ -160,12 +161,16 @@ class _CobrosScreenState extends State<CobrosScreen> {
                     alTocar: () => SubAjustes.abrir(context, PlanesScreen(sesion: widget.sesion)),
                   ),
                 ),
-                FilaAjuste(
-                  icono: Icons.school_outlined,
-                  seccion: 'cuota',
-                  titulo: 'Cursos',
-                  valor: 'Freshmeat con try out, con precio y cupo propios',
-                  alTocar: () => SubAjustes.abrir(context, CursosScreen(sesion: widget.sesion)),
+                Resaltable(
+                  id: 'cursos',
+                  resaltado: _resaltado,
+                  child: FilaAjuste(
+                    icono: Icons.school_outlined,
+                    seccion: 'cuota',
+                    titulo: 'Cursos',
+                    valor: 'Freshmeat con try out, con precio y cupo propios',
+                    alTocar: () => SubAjustes.abrir(context, CursosScreen(sesion: widget.sesion)),
+                  ),
                 ),
                 Resaltable(
                   id: 'vencimiento',

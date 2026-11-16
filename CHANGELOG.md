@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (revisión de Victor, 18:02)
+- Sin "deslizar para actualizar" en toda la app: cada pantalla se sincroniza al abrirse y al volver a la app (`core/sincroniza.dart`). Equipo pide los datos de nuevo cada vez que se abre.
+- Listas que se deslizan de lado (equipos en Mi Liga, cuentas de Finanzas, tareas, años en estadísticas, meses, redes): las tarjetas llegan hasta el borde de la pantalla en vez de cortarse en el margen. Movimientos: los filtros ya no quedan aplastados bajo la barra.
+- El final de las listas ya no queda tapado por la barra del sistema: todas suman el espacio de abajo del teléfono (Notificaciones, Reglas y el resto).
+- Barra de arriba: el desenfoque está siempre debajo y encima se desvanece el color de la página, así lo que pasa por detrás nunca se ve nítido por un instante.
+- Calendario: la flecha hacia hoy va sin el puntito rojo.
+- Ajustes de cada equipo: "Cuándo se aplican los cambios" abre su editor directo e "Historial de cambios" abre filtrado en Equipos (antes llevaban a la pantalla vieja de Equipos y puntos). Lo mismo desde el buscador de Mi Liga.
+- Buscadores en secciones grandes: lupa dentro de cada equipo (filtra sus ajustes), en Reglas, en Cobros y en Finanzas (buscan solo en esa sección y hacen parpadear la fila).
+
 ## 2026-11-16 (cursos con try out)
 - **Cursos** (Finanzas → Cobros → Cursos): un curso tiene varias fechas (cada una aparece en el calendario como evento "Curso"), precio propio, cupo opcional y el equipo al que pasan quienes aprueban. La última fecha es el try out.
 - Las personas lo ven en el "+" del calendario ("Cursos") y se inscriben pagando con los medios de la liga; queda confirmada cuando un Pivot aprueba el pago en Notificaciones. Gratis, se confirma al instante.

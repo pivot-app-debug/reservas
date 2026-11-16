@@ -1034,7 +1034,7 @@ class _ReservaExitoScreenState extends State<ReservaExitoScreen> with WidgetsBin
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(24, 8 + altoBarra(context), 24, 32),
+        padding: EdgeInsets.fromLTRB(24, 8 + altoBarra(context), 24, 32 + MediaQuery.paddingOf(context).bottom),
         children: [
           TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.6, end: 1),

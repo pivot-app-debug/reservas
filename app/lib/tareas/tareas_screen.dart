@@ -2,6 +2,8 @@ import '../equipo/equipo_repo.dart';
 
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../ajustes/componentes.dart';
 import '../core/tema.dart';
 import '../eventos/widgets_comunes.dart';
@@ -94,7 +96,7 @@ class _TareasScreenState extends State<TareasScreen> {
                   : _Error(texto: repo.error!, alReintentar: () => repo.cargar(forzar: true)),
             );
           }
-          return RefreshIndicator(
+          return Sincroniza(
             onRefresh: () => repo.cargar(forzar: true),
             child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: _lista(context)),
           );
@@ -111,7 +113,7 @@ class _TareasScreenState extends State<TareasScreen> {
     final sugeridas = repo.sugeridas;
     return ListView(
       key: ValueKey(repo.mias.length * 1000 + repo.tablero.length),
-      padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+      padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
       children: [
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
 
@@ -147,6 +149,8 @@ class _TareasScreenState extends State<TareasScreen> {
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
+              // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+              clipBehavior: Clip.none,
               padding: const EdgeInsets.only(bottom: 8),
               children: [
                 Padding(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -162,7 +164,7 @@ class _ExcepcionesPanelScreenState extends State<ExcepcionesPanelScreen> {
     final hayHistorial = excs.any((e) => e.mes.compareTo(actual) < 0) || sols.any((s) => !s.pendiente);
     final deEsteMes = excs.where((e) => e.mes == actual).firstOrNull;
     final vacio = vigentes.isEmpty && pendientes.isEmpty && !hayHistorial;
-    return RefreshIndicator(
+    return Sincroniza(
       key: const ValueKey('lista'),
       onRefresh: _cargar,
       child: ListView(
@@ -356,7 +358,7 @@ class _HistorialScreen extends StatelessWidget {
         title: const Text('Historial', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
         children: [
           if (resueltas.isNotEmpty)
             GrupoAjustes(

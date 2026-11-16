@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -269,11 +271,11 @@ class _AvisosScreenState extends State<AvisosScreen> {
             ? _error == null
                   ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
                   : Center(key: const ValueKey('e'), child: Text(_error!))
-            : RefreshIndicator(
+            : Sincroniza(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
                 child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
                     Text(
                       'Un mensaje para todo el equipo o para algunas personas, ahora o a una hora elegida. Llega por la app y por la web.',
@@ -375,7 +377,7 @@ class _EstadoAvisosScreenState extends State<EstadoAvisosScreen> {
                   : Center(key: const ValueKey('e'), child: Text(_error!))
             : ListView(
                 key: const ValueKey('l'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   Text(
                     '$llegan de ${ordenadas.length} personas reciben las notificaciones. Arriba, a quienes no les llegan.',

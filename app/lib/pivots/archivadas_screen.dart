@@ -130,7 +130,7 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                   : Center(key: const ValueKey('e'), child: Text(_error!))
             : ListView(
                 key: const ValueKey('l'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   Text(
                     'Quienes salieron de Equipo. Su historial se conserva. Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.',

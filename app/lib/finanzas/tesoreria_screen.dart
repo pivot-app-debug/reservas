@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../core/sincroniza.dart';
+
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -619,6 +622,8 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
       height: 132,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+        clipBehavior: Clip.none,
         itemCount: l.length + 1,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
@@ -690,6 +695,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Finanzas', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [LupaSeccion(seccion: 'tesoreria', donde: 'Finanzas', resaltado: _resaltado)],
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
@@ -697,7 +703,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
             ? _error_ == null
                   ? const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c'))
                   : Center(key: const ValueKey('e'), child: Text(_error_!))
-            : RefreshIndicator(
+            : Sincroniza(
                 key: const ValueKey('l'),
                 onRefresh: _cargar,
                 child: ListView(
@@ -765,6 +771,8 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         height: 148,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
+          // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+          clipBehavior: Clip.none,
           itemCount: _cuentas.length,
           separatorBuilder: (_, _) => const SizedBox(width: 10),
           itemBuilder: (_, i) {
@@ -1400,11 +1408,12 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
       ),
       body: Column(
         children: [
+          SizedBox(height: altoBarra(context)),
           SizedBox(
             height: 48,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.fromLTRB(16, 6 + altoBarra(context), 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
               children: [
                 ActionChip(avatar: const Icon(Icons.date_range_rounded, size: 18), label: Text(_textoRango()), onPressed: _elegirRango),
                 const SizedBox(width: 8),
@@ -1569,7 +1578,7 @@ class _SaldosScreenState extends State<SaldosScreen> {
       body: l == null
           ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
-              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text(
                   'Préstamos, merch o pagos de más: aparte de la cuota. Al cobrar la cuota se avisa y se elige cómo aplicarlo.',
@@ -1769,7 +1778,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
       body: r == null
           ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
-              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Center(
                   child: Text(
@@ -1923,7 +1932,7 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                   ? Center(key: const ValueKey('e'), child: Text(_error!))
                   : r == null
                   ? const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('c'))
-                  : RefreshIndicator(
+                  : Sincroniza(
                       key: ValueKey(_clave),
                       onRefresh: _cargar,
                       child: ListView(
@@ -2078,7 +2087,7 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
       body: l == null
           ? const Esqueleto(forma: FormaEsqueleto.lista)
           : ListView(
-              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text(
                   'Cada viaje reparte un monto entre quienes reciben fondos, según su % de asistencia en las fechas que elijas (por ejemplo, de 90 a 100 % recibe el 50 %).',
@@ -2235,7 +2244,7 @@ class _FondoScreenState extends State<_FondoScreen> {
         title: Text(widget.fondo == null ? 'Nuevo viaje' : 'Viaje', style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 100 + MediaQuery.paddingOf(context).bottom),
         children: [
           TextField(
             controller: _nombre,

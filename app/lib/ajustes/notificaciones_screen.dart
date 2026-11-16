@@ -203,7 +203,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
             ? const Esqueleto(forma: FormaEsqueleto.ajustes, key: ValueKey('cargando'))
             : ListView(
                 key: const ValueKey('lista'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   // Interruptor general, grande, con el degradado de la marca
                   // (el amarillo no se leía en modo oscuro).

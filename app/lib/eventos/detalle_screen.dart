@@ -259,7 +259,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
                 )
               : null,
           body: ListView(
-            padding: EdgeInsets.fromLTRB(0, 8 + altoBarra(context), 0, 96),
+            padding: EdgeInsets.fromLTRB(0, 8 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
               KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
               if (_esAdmin && ev.sePuedeTomarAsistencia)

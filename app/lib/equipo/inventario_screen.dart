@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../core/sincroniza.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
@@ -191,11 +194,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
         t,
         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
       );
-      cuerpo = RefreshIndicator(
+      cuerpo = Sincroniza(
         key: const ValueKey('lista'),
         onRefresh: _cargar,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
             // Recordatorio a la persona: "¿Ya lo devolviste?" (se renueva cada 7 días).
             for (final pr in preguntarme)
@@ -756,7 +759,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
         ],
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
         children: [
           // Foto de la lista (Victor, 2026-11-16).
           if (l.foto.isNotEmpty)
@@ -1167,7 +1170,7 @@ class _ReglasPrestamoScreenState extends State<ReglasPrestamoScreen> {
               ? (_error != null ? Center(child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.ajustes))
               : ListView(
                   key: const ValueKey('l'),
-                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),

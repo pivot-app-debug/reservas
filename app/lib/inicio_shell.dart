@@ -207,7 +207,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   }
 }
 
-/// Flecha hacia hoy (arriba o abajo) con un puntito rojo: aparece en lugar
+/// Flecha hacia hoy (arriba o abajo): aparece en lugar
 /// del número del día cuando el timeline se aleja de hoy.
 class _IconoFlechaHoy extends StatelessWidget {
   const _IconoFlechaHoy({super.key, required this.arriba});
@@ -215,30 +215,8 @@ class _IconoFlechaHoy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
-    return SizedBox(
-      width: 24,
-      height: 24,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Center(child: Icon(arriba ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded)),
-          Positioned(
-            top: -2,
-            right: -3,
-            child: Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                color: p.marca,
-                shape: BoxShape.circle,
-                border: Border.all(color: p.fondo, width: 1.5),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Sin el puntito rojo (Victor, 2026-11-16): solo la flecha.
+    return Icon(arriba ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded);
   }
 }
 

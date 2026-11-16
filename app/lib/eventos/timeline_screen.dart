@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../core/sincroniza.dart';
+
 import 'package:flutter/rendering.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -1171,7 +1174,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     // un acordeón, igual que Google Calendar. Cerrado, scrollea normal.
     final lista = NotificationListener<ScrollNotification>(
       onNotification: _alScrollearTimeline,
-      child: RefreshIndicator(
+      child: Sincroniza(
         key: _kLista,
         edgeOffset: _altoCabecera,
         onRefresh: () => Future.wait([repo.cargar(forzar: true), _bandeja.cargar(forzar: true), _bandeja.cargarMia()]),
@@ -2334,6 +2337,8 @@ class _FranjaParaTomar extends StatelessWidget {
           height: 112,
           child: ListView(
             scrollDirection: Axis.horizontal,
+            // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+            clipBehavior: Clip.none,
             children: [
               for (final t in orden.take(8)) ...[
                 tarjeta(

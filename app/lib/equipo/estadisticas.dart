@@ -239,11 +239,13 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
     } else {
       cuerpo = ListView(
         key: const ValueKey('l'),
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
         children: [
           if (d.anios.length > 1) ...[
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
+              // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+              clipBehavior: Clip.none,
               child: Row(
                 children: [
                   for (final a in d.anios)

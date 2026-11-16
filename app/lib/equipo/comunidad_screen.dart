@@ -466,6 +466,8 @@ Future<EnlaceComunidad?> mostrarHojaEnlace(BuildContext context, {EnlaceComunida
                 height: 44,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
+                  // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+                  clipBehavior: Clip.none,
                   children: [
                     for (final e in EnlaceComunidad.redes.entries)
                       Padding(

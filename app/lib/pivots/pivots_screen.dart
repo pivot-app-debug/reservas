@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
@@ -231,11 +233,11 @@ class _PivotsScreenState extends State<PivotsScreen> {
               duration: const Duration(milliseconds: 250),
               child: l == null
                   ? (_error != null ? Center(child: Text(_error!)) : const Esqueleto(forma: FormaEsqueleto.lista))
-                  : RefreshIndicator(
+                  : Sincroniza(
                       key: const ValueKey('l'),
                       onRefresh: _cargar,
                       child: ListView(
-                        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96),
+                        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                         children: [
                           Padding(
                             padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
@@ -538,7 +540,7 @@ class _PivotDetalleScreenState extends State<_PivotDetalleScreen> {
         title: Text(x.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
         children: [
           Center(
             child: AvatarPersona(nombre: x.nombre, foto: x.foto, tamano: 72),

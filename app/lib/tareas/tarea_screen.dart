@@ -143,7 +143,7 @@ class _TareaScreenState extends State<TareaScreen> {
             actions: [if (repo.esAdmin) _menuAdmin(t)],
           ),
           body: ListView(
-            padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40),
+            padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
             children: [
               _Cabecera(tarea: t, mia: mia),
               if (mia != null && mia.notaRechazo.isNotEmpty && !mia.enRevision)

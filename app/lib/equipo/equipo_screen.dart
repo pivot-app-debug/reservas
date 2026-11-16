@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -48,7 +50,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
   @override
   void initState() {
     super.initState();
-    repo.cargar();
+    repo.cargar(forzar: repo.personas != null); // al abrir, siempre al día
     _reloj = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_scrolleando && mounted) _tick.value++;
     });
@@ -184,7 +186,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       if (n is ScrollEndNotification) _scrolleando = false;
       return false;
     },
-    child: RefreshIndicator(edgeOffset: MediaQuery.paddingOf(context).top, onRefresh: () => repo.cargar(forzar: true), child: hijo),
+    child: Sincroniza(edgeOffset: MediaQuery.paddingOf(context).top, onRefresh: () => repo.cargar(forzar: true), child: hijo),
   );
 
   Widget _lista(BuildContext context, PivotPaleta p, List<Integrante> personas) {

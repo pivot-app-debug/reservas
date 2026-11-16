@@ -184,7 +184,7 @@ class SubAjustes extends StatelessWidget {
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: ListView(padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40), children: hijos),
+      body: ListView(padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom), children: hijos),
     );
   }
 }

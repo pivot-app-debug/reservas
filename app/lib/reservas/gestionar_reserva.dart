@@ -503,7 +503,7 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                   )
                 : ListView(
                     key: const ValueKey('lista'),
-                    padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24),
+                    padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
                     children: [for (final r in lista) _tarjeta(context, r)],
                   );
           }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/sincroniza.dart';
+
 import '../ajustes/campos.dart';
 import '../ajustes/componentes.dart';
 import '../core/config_liga.dart';
@@ -82,7 +84,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     }
     switch (e.dentro) {
       case 'equipos':
-        SubAjustes.abrir(context, CategoriasScreen(sesion: sesion, resaltar: e.id));
+        // Sin pasar por la pantalla vieja de Equipos y puntos (Victor, 2026-11-16).
+        if (e.id == 'corte') {
+          editarCorteEquipos(context, sesion, null);
+        } else if (e.id == 'historial') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => HistorialAjustesScreen(sesion: sesion, grupo: 'equipos'),
+            ),
+          );
+        } else {
+          SubAjustes.abrir(context, CategoriasScreen(sesion: sesion, resaltar: e.id));
+        }
       case 'tesoreria':
         SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion, resaltar: e.id));
       case 'cobros':
@@ -209,6 +222,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               listenable: gente,
               builder: (context, _) => ListView.separated(
                 scrollDirection: Axis.horizontal,
+                // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
+                clipBehavior: Clip.none,
                 itemCount: l.length + 1,
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (_, i) {
@@ -297,7 +312,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
       ),
       body: ListenableBuilder(
         listenable: c,
-        builder: (context, _) => RefreshIndicator(
+        builder: (context, _) => Sincroniza(
           edgeOffset: arriba,
           onRefresh: _cargarInicio,
           child: SingleChildScrollView(
