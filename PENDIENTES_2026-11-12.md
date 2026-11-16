@@ -580,3 +580,13 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - Tesorería pasa a llamarse Finanzas, va en la barra de abajo y se quita su tarjeta de Mi liga.
 **Antes de la beta cerrada (orden de Victor):** todo lo de la hoja de ruta: crear liga, varias ligas, planes/cursos/inscripción rápida/cupones manuales, partidos y torneos, cambios de categoría en la Bandeja, fotos y etiqueta en inventario, barra final, pasar cuentas a Google de Pivot (pasos manuales con Victor), política revisada por abogado. Después: dos versiones (prueba y producción) y recién ahí Play Store beta cerrada.
 - Preocupación de Victor: en crear liga son muchas reglas; el asistente debe ponerlas con valores por defecto y pocas preguntas.
+
+## T. Revisión de Victor (2026-11-16, 15:21)
+- **Justo antes de Play Store:** (1) revisar que ninguna función de Pivot sea accesible ni editable por quien no es Pivot; (2) buscar vulnerabilidades que expongan datos personales o de la liga, y blindar edición solo por la persona o un Pivot.
+- Detalle del evento: sin tour guiado; sin "editar asistencia" junto a tu propio avatar en "Asistencias del equipo" (ya se cambia arriba en "Tu asistencia").
+- Tareas: sin espacio en blanco entre el título y "Mis tareas"; Disponibles vacía → "Crear una tarea" con botón lindo; Mis tareas vacía → no se muestra; FAB de nueva tarea solo si hay tareas disponibles; "Tareas archivadas" como pill con ícono en la barra.
+- Calendario: quitar "Nueva tarea" del FAB "+" (se crean solo en Tareas).
+- Pendiente de respuesta: (14) tareas terminadas en el timeline; (15) aviso en el botón Calendario al salir de hoy.
+- Asistencia anticipada: sin subtítulo bajo "¿Por qué no asistirás?"; Inactivx con el texto "No entrenaré por un tiempo porque me dedicaré a otra cosa".
+- Comunidad: el canal de comunicación principal sale de la barra y va como botón debajo de las tarjetas.
+- Orden siguiente aprobado: cambios de categoría en Notificaciones → fotos y etiqueta de inventario → planes/cursos/inscripción rápida/cupones → varias ligas y crear liga → partidos y torneos. Migración de cuentas en paralelo; borrador para el abogado al final, antes de Play Store.

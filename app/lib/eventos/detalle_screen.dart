@@ -6,7 +6,6 @@ import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/reloj.dart';
 import '../core/tema.dart';
-import '../core/tour.dart';
 import '../reservas/gestionar_reserva.dart';
 import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
@@ -53,32 +52,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
   final _kEquipo = GlobalKey(debugLabel: 'tour-ev-equipo');
   final _kLista = GlobalKey(debugLabel: 'tour-ev-lista');
   final _kAdmin = GlobalKey(debugLabel: 'tour-ev-admin');
-  bool _tourPedido = false;
-
-  void _tour(Evento ev) {
-    if (_tourPedido || ev.finalizado || ev.cancelado) return;
-    _tourPedido = true;
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      Tour.mostrarSiCorresponde(
-        context,
-        preferencia: 'tour.evento.v1',
-        pasos: [
-          PasoTour(clave: _kResumen, titulo: 'Dónde y cuándo', texto: 'Hora, lugar y, si los hay, el mapa para llegar y el video del lugar.'),
-          PasoTour(
-            clave: _kRespuesta,
-            titulo: 'Tu respuesta',
-            texto: 'Marca Asistiré o No asistiré. Puedes cambiarla hasta que empiece; el equipo ve quién va.',
-          ),
-          PasoTour(clave: _kEquipo, titulo: 'Quiénes van', texto: 'Las respuestas del equipo. Toca a alguien para ver su ficha.'),
-          if (_esAdmin)
-            PasoTour(clave: _kLista, titulo: 'Tomar asistencia', texto: 'Cuando llega la hora, marcas quién vino a tiempo o tarde. Eso suma los puntos.'),
-          if (_esAdmin)
-            PasoTour(clave: _kAdmin, titulo: 'Opciones de Pivot', texto: 'Editar, cancelar o borrar el evento, y cambiar la respuesta de una persona.'),
-        ],
-      );
-    });
-  }
+  // Sin tour guiado (Victor, 2026-11-16).
+  void _tour(Evento ev) {}
 
   _Grupo _grupo = _Grupo.asisten;
   List<Persona>? _sinRespuesta;
@@ -908,7 +883,11 @@ class _DetalleScreenState extends State<DetalleScreen> {
                                         marcadxs.contains(per.username.trim().toLowerCase()) &&
                                         per.username.toLowerCase() != (repo.sesion.nombre ?? '').toLowerCase())
                                       PildoraEmergencia(alTocar: () => _emergencia(per))
-                                    else if (_esAdmin && elegido.$1 != _Grupo.sinRespuesta && !ev.yaEmpezo)
+                                    // La propia se cambia arriba en "Tu asistencia" (Victor, 2026-11-16).
+                                    else if (_esAdmin &&
+                                        elegido.$1 != _Grupo.sinRespuesta &&
+                                        !ev.yaEmpezo &&
+                                        per.username.toLowerCase() != (repo.sesion.nombre ?? '').toLowerCase())
                                       IconButton(
                                         tooltip: 'Cambiar respuesta',
                                         icon: Icon(Icons.edit_note_rounded, color: p.textoSecundario),

@@ -453,7 +453,7 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
       },
       ayuda: switch (_paso) {
         _Paso.estado => 'Se aplica sola a tus entrenamientos futuros, sin marcarlos uno por uno.',
-        _Paso.motivo => MotivoAusencia.ayudaComun,
+        _Paso.motivo => null, // sin subtítulo (Victor, 2026-11-16)
         _Paso.tipo => _restringe ? 'Con "Asistiré" solo puedes elegir los meses que tienes pagados.' : null,
         _Paso.fechas => null,
         _Paso.alcance => null,

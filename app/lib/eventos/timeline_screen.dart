@@ -25,7 +25,6 @@ import 'rectificacion.dart';
 import 'tomar_asistencia_screen.dart';
 import 'widgets_comunes.dart';
 import '../ajustes/componentes.dart';
-import '../tareas/crear_tarea_screen.dart';
 import '../tareas/tarea_screen.dart';
 import '../tareas/tareas_modelos.dart';
 import '../tareas/tareas_repo.dart';
@@ -1416,9 +1415,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           ? _Accion(Icons.event_available_outlined, 'Reserva por clase', () => _reservar(t))
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
-    _esAdmin
-        ? _Accion(Icons.add_task_rounded, 'Nueva tarea', () => CrearTareaScreen.abrir(context, repo: _tareas, modo: ModoTarea.crear))
-        : _Accion(Icons.add_task_rounded, 'Proponer tarea', () => CrearTareaScreen.abrir(context, repo: _tareas, modo: ModoTarea.proponer)),
+    // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
+
     if (repo.anticipada.disponible)
       _Accion(
         Symbols.event_upcoming_rounded,

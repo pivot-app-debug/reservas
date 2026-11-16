@@ -238,29 +238,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Comunidad', style: TextStyle(fontWeight: FontWeight.w700)),
-        // Canal de comunicación de la liga, solo para Pivots (Victor, 2026-11-14).
-        actions: [
-          if (repo.esPivot)
-            ListenableBuilder(
-              listenable: ConfigLiga.de(repo.sesion),
-              builder: (context, _) {
-                final c = ConfigLiga.de(repo.sesion);
-                return IconButton(
-                  tooltip: 'Canal de comunicación: ${c.nombreCanal}',
-                  icon: Icon(c.icono),
-                  onPressed: () => elegirLiga(
-                    context,
-                    c,
-                    'Canal de comunicación',
-                    ConfigLiga.canales,
-                    c.canal,
-                    'canal',
-                    ayuda: 'La app con la que se escribe a las personas del equipo desde su ficha.',
-                  ),
-                );
-              },
-            ),
-        ],
+
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(3),
           child: AnimatedOpacity(opacity: _guardando ? 1 : 0, duration: const Duration(milliseconds: 200), child: const LinearProgressIndicator(minHeight: 3)),
@@ -301,40 +279,77 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
             );
           } else {
             final n = repo.enlaces.length;
-            cuerpo = GridView.builder(
+            cuerpo = ListView(
               key: const ValueKey('lista'),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.25,
-              ),
-              itemCount: n + (repo.esPivot ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (i == n) {
-                  return _Mosaico(
-                    icono: Icons.add_rounded,
-                    titulo: 'Agregar',
-                    sub: 'Grupo o red',
-                    resaltado: true,
-                    alTocar: _guardando ? null : () => _editar(),
-                  );
-                }
-                final e = repo.enlaces[i];
-                return _Mosaico(
-                  red: e.red,
-                  icono: e.icono,
-                  titulo: e.nombre,
-                  sub: e.nombreRed,
-                  // Pivots: abrir, editar o eliminar; el resto, abrir.
-                  alTocar: _guardando ? null : (repo.esPivot ? () => _opciones(i) : () => abrirEnlace(context, e.url)),
-                );
-              },
+              children: [
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.25,
+                  ),
+                  itemCount: n + (repo.esPivot ? 1 : 0),
+                  itemBuilder: (context, i) {
+                    if (i == n) {
+                      return _Mosaico(
+                        icono: Icons.add_rounded,
+                        titulo: 'Agregar',
+                        sub: 'Grupo o red',
+                        resaltado: true,
+                        alTocar: _guardando ? null : () => _editar(),
+                      );
+                    }
+                    final e = repo.enlaces[i];
+                    return _Mosaico(
+                      red: e.red,
+                      icono: e.icono,
+                      titulo: e.nombre,
+                      sub: e.nombreRed,
+                      // Pivots: abrir, editar o eliminar; el resto, abrir.
+                      alTocar: _guardando ? null : (repo.esPivot ? () => _opciones(i) : () => abrirEnlace(context, e.url)),
+                    );
+                  },
+                ),
+                // Canal de comunicación de la liga, debajo de las tarjetas
+                // (Victor, 2026-11-16; antes en la barra). Solo Pivots.
+                if (repo.esPivot) ...[const SizedBox(height: 16), _BotonCanal(sesion: repo.sesion)],
+              ],
             );
           }
           return AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: cuerpo);
         },
+      ),
+    );
+  }
+}
+
+/// Canal con el que se escribe a las personas desde su ficha (Pivots).
+class _BotonCanal extends StatelessWidget {
+  const _BotonCanal({required this.sesion});
+  final Sesion sesion;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ConfigLiga.de(sesion);
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) => OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+        onPressed: () => elegirLiga(
+          context,
+          c,
+          'Canal de comunicación',
+          ConfigLiga.canales,
+          c.canal,
+          'canal',
+          ayuda: 'La app con la que se escribe a las personas del equipo desde su ficha.',
+        ),
+        icon: Icon(c.icono),
+        label: Text('Canal de comunicación: ${c.nombreCanal}'),
       ),
     );
   }

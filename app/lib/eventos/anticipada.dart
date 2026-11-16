@@ -37,7 +37,7 @@ class MotivoAusencia {
   static const todos = [
     MotivoAusencia('De viaje', 'De viaje', Icons.flight_rounded, 'Tu equipo no cambia durante el viaje.'),
     MotivoAusencia('Lesionadx', 'Lesionadx', Icons.personal_injury_outlined, 'Tu equipo no cambia mientras dure la lesión.'),
-    MotivoAusencia('Inactivx', 'Ausente', Icons.event_busy_outlined, 'Tu equipo sigue las reglas normales de asistencia.'),
+    MotivoAusencia('Inactivx', 'Ausente', Icons.event_busy_outlined, 'No entrenaré por un tiempo porque me dedicaré a otra cosa.'),
     MotivoAusencia('Enfermedad', 'Enfermedad', Icons.sick_outlined, 'El equipo solo ve que no vendrás por un tiempo.'),
     MotivoAusencia('Situación personal o fuerza mayor', 'Situación personal', Icons.support_outlined, 'El equipo no ve el motivo.'),
     MotivoAusencia('Otro', 'Otro', Icons.more_horiz_rounded, 'El equipo no ve el motivo.'),

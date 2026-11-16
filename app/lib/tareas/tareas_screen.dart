@@ -55,11 +55,33 @@ class _TareasScreenState extends State<TareasScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: Text('Tareas', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        // Tareas archivadas en la barra (Victor, 2026-11-16).
+        actions: [
+          if (repo.esAdmin)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ActionChip(
+                avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Archivadas'),
+                shape: const StadiumBorder(),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo))),
+              ),
+            ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _nueva,
-        icon: const Icon(Icons.add_rounded),
-        label: Text(repo.esAdmin ? 'Nueva tarea' : 'Proponer tarea'),
+      // Solo con tareas disponibles; si no hay, el botón está en la lista (Victor, 2026-11-16).
+      floatingActionButton: ListenableBuilder(
+        listenable: repo,
+        builder: (context, _) => AnimatedScale(
+          scale: repo.cargado && repo.disponibles.isNotEmpty ? 1 : 0,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
+          child: FloatingActionButton.extended(
+            onPressed: _nueva,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(repo.esAdmin ? 'Nueva tarea' : 'Proponer tarea'),
+          ),
+        ),
       ),
       body: ListenableBuilder(
         listenable: repo,
@@ -93,37 +115,20 @@ class _TareasScreenState extends State<TareasScreen> {
       children: [
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
 
-        GrupoAjustes(
-          titulo: 'MIS TAREAS',
-          filas: repo.mias.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('Todavía no tienes tareas. Elige una de las disponibles.', style: TextStyle(color: p.textoSecundario)),
-                  ),
-                ]
-              : [
-                  for (final m in repo.mias)
-                    FilaTarea(
-                      tarea: m.tarea,
-                      mia: m,
-                      alTocar: () => _abrir(m.tarea, mia: m),
-                    ),
-                ],
-        ),
-        if (repo.esAdmin) RecurrentesScreen(repo: repo),
-        if (repo.esAdmin)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo))),
-                icon: const Icon(Icons.inventory_2_outlined, size: 18),
-                label: const Text('Ver tareas archivadas'),
-              ),
-            ),
+        // Sin tareas propias, la sección no aparece (Victor, 2026-11-16).
+        if (repo.mias.isNotEmpty)
+          GrupoAjustes(
+            titulo: 'MIS TAREAS',
+            filas: [
+              for (final m in repo.mias)
+                FilaTarea(
+                  tarea: m.tarea,
+                  mia: m,
+                  alTocar: () => _abrir(m.tarea, mia: m),
+                ),
+            ],
           ),
+        if (repo.esAdmin) RecurrentesScreen(repo: repo),
         if (sugeridas.isNotEmpty)
           GrupoAjustes(
             titulo: 'SUGERIDAS PARA TI',
@@ -161,19 +166,12 @@ class _TareasScreenState extends State<TareasScreen> {
               ],
             ),
           ),
-        GrupoAjustes(
-          filas: disponibles.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      repo.esAdmin ? 'No hay tareas disponibles. Crea una con "Nueva tarea".' : 'No hay tareas disponibles por ahora. Puedes proponer una.',
-                      style: TextStyle(color: p.textoSecundario),
-                    ),
-                  ),
-                ]
-              : [for (final x in disponibles) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
-        ),
+        if (disponibles.isEmpty)
+          _SinTareas(esPivot: repo.esAdmin, alCrear: _nueva)
+        else
+          GrupoAjustes(
+            filas: [for (final x in disponibles) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
+          ),
         if (repo.completas.isNotEmpty)
           GrupoAjustes(
             titulo: 'SIN CUPOS',
@@ -186,6 +184,47 @@ class _TareasScreenState extends State<TareasScreen> {
             filas: [for (final x in repo.baul) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
           ),
       ],
+    );
+  }
+}
+
+/// Disponibles vacía: invitación a crear (o proponer) una tarea.
+class _SinTareas extends StatelessWidget {
+  const _SinTareas({required this.esPivot, required this.alCrear});
+  final bool esPivot;
+  final VoidCallback alCrear;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final (degradado, sobre) = PivotPaleta.seccion('organizacion', Theme.of(context).brightness);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Icon(Icons.task_alt_rounded, color: sobre, size: 30),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'No hay tareas disponibles',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            esPivot ? 'Crea una para que el equipo sume puntos ayudando.' : 'Propón una: un Pivot la revisa y la publica.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.textoSecundario),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(onPressed: alCrear, icon: const Icon(Icons.add_rounded), label: Text(esPivot ? 'Crear una tarea' : 'Proponer una tarea')),
+        ],
+      ),
     );
   }
 }
