@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (Calendario abre en hoy; Cursos en el calendario)
+- **Bug:** al abrir la app, el Calendario podía quedar en el mes anterior (el inicio de lo cargado). Ahora va a hoy e insiste hasta que la lista y la barra estén listas, y vuelve a hoy si llegan datos nuevos, mientras nadie lo haya movido.
+- **Cursos pasan al calendario:** "+" → Nuevo evento → **Curso** (después de Temporada de descanso). Ya no están en Finanzas → Cobros. Tarjeta "¿Qué es un curso?" que explica los pasos. El editor separa **Clases** (cada una en el calendario) y **Try out** (fecha aparte, después de la última clase). Al volver, el calendario se actualiza.
+- Permiso: los cursos los maneja el área de Asistencia y eventos; aprobar el pago sigue siendo de Finanzas.
+
 ## 2026-11-16 (revisión de Victor, 18:02)
 - Sin "deslizar para actualizar" en toda la app: cada pantalla se sincroniza al abrirse y al volver a la app (`core/sincroniza.dart`). Equipo pide los datos de nuevo cada vez que se abre.
 - Listas que se deslizan de lado (equipos en Mi Liga, cuentas de Finanzas, tareas, años en estadísticas, meses, redes): las tarjetas llegan hasta el borde de la pantalla en vez de cortarse en el margen. Movimientos: los filtros ya no quedan aplastados bajo la barra.

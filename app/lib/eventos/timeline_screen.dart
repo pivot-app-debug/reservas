@@ -275,6 +275,22 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   // mostrando junio y el panel "volvía" a junio un segundo después).
   bool _scrollDelUsuario = false;
 
+  /// Si la persona ya movió el timeline con el dedo desde que se abrió.
+  bool _yaDesplazo = false;
+
+  /// Al abrir, el timeline va a hoy (bug, Victor 2026-11-16: abría en el mes
+  /// anterior). Se insiste hasta que la lista esté lista y se repite si la
+  /// barra de arriba cambia de alto o llegan datos nuevos, mientras nadie la
+  /// haya movido.
+  void _saltoAHoy([int intento = 0]) {
+    if (!mounted || _yaDesplazo) return;
+    if (!_scroll.isAttached || _filas.isEmpty) {
+      if (intento < 30) WidgetsBinding.instance.addPostFrameCallback((_) => _saltoAHoy(intento + 1));
+      return;
+    }
+    _irA(Fechas.hoy(), animado: false);
+  }
+
   void _alDesplazar() {
     // La fila de arriba cuenta solo si se ve de verdad (no un borde de la
     // anterior que asoma): si no, al ir al día 1 el título quedaba en el mes previo.
@@ -482,6 +498,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   void _irA(DateTime dia, {bool animado = true}) {
     _diaArriba = Fechas.soloDia(dia);
+    // Ir a otro día (calendario, búsqueda) cuenta como moverlo: ya no se vuelve solo a hoy.
+    if (_diaArriba != Fechas.hoy()) _yaDesplazo = true;
     if (!_scroll.isAttached || _filas.isEmpty) return;
     final i = _indiceDeDia(dia);
     if (animado) {
@@ -657,12 +675,20 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         }
         _firmaFiltros = firmaFiltros;
         final firma = Object.hash(identityHashCode(repo.eventos), identityHashCode(repo.cumples));
-        if (_firmaDatos != null && firma != _firmaDatos && _saltoInicialHecho) _mantenerAncla(antes, _filas);
+        if (_firmaDatos != null && firma != _firmaDatos && _saltoInicialHecho) {
+          if (_yaDesplazo) {
+            _mantenerAncla(antes, _filas);
+          } else {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _saltoAHoy());
+          }
+        }
         _firmaDatos = firma;
         if (!_saltoInicialHecho && repo.eventos.isNotEmpty) {
           _saltoInicialHecho = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _irA(Fechas.hoy(), animado: false);
+            _saltoAHoy();
+            // Por si la barra o la lista terminan de acomodarse después.
+            Future.delayed(const Duration(milliseconds: 350), _saltoAHoy);
             Future.delayed(const Duration(milliseconds: 900), _tourSiCorresponde);
           });
         }
@@ -700,7 +726,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                       child: _Medida(
                         alMedir: (alto) {
                           final total = alto + MediaQuery.paddingOf(context).top;
-                          if ((total - _altoCabecera).abs() > 0.5) setState(() => _altoCabecera = total);
+                          if ((total - _altoCabecera).abs() > 0.5) {
+                            setState(() => _altoCabecera = total);
+                            if (_saltoInicialHecho) WidgetsBinding.instance.addPostFrameCallback((_) => _saltoAHoy());
+                          }
                         },
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -1199,6 +1228,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   final bool _colapsandoPorScroll = false;
   bool _alScrollearTimeline(ScrollNotification n) {
     if (n is ScrollStartNotification) _scrollDelUsuario = n.dragDetails != null;
+    if (_scrollDelUsuario) _yaDesplazo = true;
     if (n is ScrollEndNotification) _scrollDelUsuario = false;
     return false;
   }
@@ -1496,6 +1526,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       // Temporada de descanso: la pantalla ya avisó; se lleva al inicio del período.
       final d = r['descanso'];
       if (d is DateTime) WidgetsBinding.instance.addPostFrameCallback((_) => _irA(d));
+      if (r['curso'] == true) repo.cargar(forzar: true);
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Evento creado. Se avisó al equipo.')));

@@ -45,6 +45,52 @@ class Curso {
   }
 }
 
+/// Qué es un curso, para guiar a quien lo arma (Victor, 2026-11-16).
+class _QueEsUnCurso extends StatelessWidget {
+  const _QueEsUnCurso();
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    Widget paso(IconData i, String t) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(i, size: 18, color: p.sobreSuave),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(t, style: TextStyle(height: 1.35, color: p.sobreSuave)),
+          ),
+        ],
+      ),
+    );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '¿Qué es un curso?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Un grupo de clases para quienes recién empiezan (por ejemplo, freshmeat), con un try out al final para entrar a un equipo.',
+            style: TextStyle(height: 1.35, color: p.sobreSuave),
+          ),
+          paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
+          paso(
+            Icons.payments_outlined,
+            'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
+          ),
+          paso(Icons.emoji_events_outlined, 'El día del try out marcas quién aprobó y a qué equipo pasa.'),
+        ],
+      ),
+    );
+  }
+}
+
 String _precio(double v) => v == 0 ? 'Gratis' : ReservasRepo.dinero(v);
 
 /// Lista de fechas: la última, marcada como try out.
@@ -365,16 +411,13 @@ class _CursosScreenState extends State<CursosScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                 children: [
-                  Text(
-                    'Cursos para quienes empiezan: varias fechas, precio propio y cupo. La última fecha es el try out, y ahí eliges a qué equipo pasa cada persona.',
-                    style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
-                  ),
+                  const _QueEsUnCurso(),
                   const SizedBox(height: 14),
                   if (l.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 24),
+                      padding: const EdgeInsets.only(top: 16),
                       child: Text(
-                        'Todavía no hay cursos.',
+                        'Todavía no hay cursos. Toca "Nuevo curso" para armar el primero.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: p.textoSecundario),
                       ),
@@ -587,7 +630,10 @@ class _EditorCursoState extends State<_EditorCurso> {
   late bool _conCupo = o?.cupo != null;
   late int _cupo = o?.cupo ?? 20;
   late String? _equipo = o?.equipoDestino;
-  late final List<Map<String, dynamic>> _fechas = [...?o?.fechas];
+  // Clases del curso y, aparte, el try out (Victor, 2026-11-16). Guardado, el
+  // try out es la última fecha.
+  late final List<Map<String, dynamic>> _clases = [...?o?.fechas.take((o?.fechas.length ?? 1) - 1)];
+  late Map<String, dynamic>? _tryout = (o?.fechas.isEmpty ?? true) ? null : o!.fechas.last;
 
   @override
   void dispose() {
@@ -604,26 +650,26 @@ class _EditorCursoState extends State<_EditorCurso> {
     return d == null ? '${f['fecha']}' : '${Fechas.dia(d)} ${Fechas.corta(d)}';
   }
 
-  void _ordenar() => _fechas.sort((a, b) => '${a['fecha']}'.compareTo('${b['fecha']}'));
+  /// El try out va después de la última clase.
+  bool get _tryoutAntes => _tryout != null && _clases.isNotEmpty && '${_tryout!['fecha']}'.compareTo('${_clases.last['fecha']}') < 0;
 
-  /// Agrega o edita una fecha: día, hora y lugar.
-  Future<void> _fecha([int? i]) async {
-    final previa = i == null ? (_fechas.isEmpty ? null : _fechas.last) : _fechas[i];
-    final base = previa == null ? Fechas.hoy() : (Curso.fecha(previa) ?? Fechas.hoy());
+  /// Elige día, hora y lugar, partiendo de [previa] (o de [sugerida]).
+  Future<Map<String, dynamic>?> _elegir(Map<String, dynamic>? previa, DateTime sugerida) async {
     final d = await showDatePicker(
       context: context,
-      initialDate: i == null && previa != null ? base.add(const Duration(days: 7)) : base,
+      initialDate: previa == null ? sugerida : (Curso.fecha(previa) ?? sugerida),
       firstDate: Fechas.hoy().subtract(const Duration(days: 365)),
       lastDate: Fechas.hoy().add(const Duration(days: 730)),
     );
-    if (d == null || !mounted) return;
-    final h0 = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch('${previa?['hora'] ?? '09:00'}');
+    if (d == null || !mounted) return null;
+    final base = previa ?? (_clases.isEmpty ? null : _clases.last);
+    final h0 = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch('${base?['hora'] ?? '09:00'}');
     final h = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: int.parse(h0?.group(1) ?? '9'), minute: int.parse(h0?.group(2) ?? '0')),
     );
-    if (h == null || !mounted) return;
-    var lugar = '${previa?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
+    if (h == null || !mounted) return null;
+    var lugar = '${base?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
     if (widget.lugares.length > 1) {
       final l = await showModalBottomSheet<String>(
         context: context,
@@ -632,6 +678,13 @@ class _EditorCursoState extends State<_EditorCurso> {
           child: ListView(
             shrinkWrap: true,
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  '¿Dónde?',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.pivot.texto),
+                ),
+              ),
               for (final x in widget.lugares)
                 ListTile(
                   leading: Icon(x == lugar ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded),
@@ -642,35 +695,61 @@ class _EditorCursoState extends State<_EditorCurso> {
           ),
         ),
       );
-      if (l == null) return;
+      if (l == null) return null;
       lugar = l;
     }
+    return {'fecha': Fechas.iso(d), 'hora': '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}', 'lugar': lugar};
+  }
+
+  Future<void> _clase([int? i]) async {
+    final ultima = _clases.isEmpty ? null : Curso.fecha(_clases.last);
+    final f = await _elegir(i == null ? null : _clases[i], ultima == null ? Fechas.hoy() : ultima.add(const Duration(days: 7)));
+    if (f == null) return;
     setState(() {
-      final f = <String, dynamic>{
-        ...?(i == null ? null : _fechas[i]),
-        'fecha': Fechas.iso(d),
-        'hora': '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}',
-        'lugar': lugar,
-      };
       if (i == null) {
-        _fechas.add(f);
+        _clases.add(f);
       } else {
-        _fechas[i] = f;
+        _clases[i] = f;
       }
-      _ordenar();
+      _clases.sort((a, b) => '${a['fecha']}'.compareTo('${b['fecha']}'));
     });
   }
+
+  Future<void> _elegirTryout() async {
+    final ultima = _clases.isEmpty ? null : Curso.fecha(_clases.last);
+    final f = await _elegir(_tryout, ultima == null ? Fechas.hoy() : ultima.add(const Duration(days: 7)));
+    if (f != null) setState(() => _tryout = f);
+  }
+
+  Widget _filaFecha(PivotPaleta p, Map f, {required IconData icono, required VoidCallback alTocar, VoidCallback? alQuitar}) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Material(
+      color: p.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: Icon(icono, color: p.marcaTexto),
+        title: Text(_titulo(f), style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(['${f['hora']}', if ('${f['lugar'] ?? ''}'.isNotEmpty) '${f['lugar']}'].join(' · ')),
+        onTap: alTocar,
+        trailing: alQuitar == null
+            ? const Icon(Icons.edit_outlined)
+            : IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: alQuitar),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final valido = _nombre.text.trim().isNotEmpty && _monto != null && _fechas.isNotEmpty;
+    final valido = _nombre.text.trim().isNotEmpty && _monto != null && _tryout != null && !_tryoutAntes;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _barra(o == null ? 'Nuevo curso' : 'Editar curso'),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
+          if (o == null) ...[const _QueEsUnCurso(), const SizedBox(height: 16)],
           TextField(
             controller: _nombre,
             onChanged: (_) => setState(() {}),
@@ -725,32 +804,54 @@ class _EditorCursoState extends State<_EditorCurso> {
               ],
             ),
           ],
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           Text(
-            'Fechas',
+            'Clases',
             style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
           ),
           const SizedBox(height: 2),
-          Text('Cada fecha aparece en el calendario. La última es el try out.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-          const SizedBox(height: 6),
-          for (var i = 0; i < _fechas.length; i++)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(i == _fechas.length - 1 ? Icons.emoji_events_outlined : Icons.event_outlined, color: p.marcaTexto),
-              title: Text(_titulo(_fechas[i])),
-              subtitle: Text(
-                [
-                  '${_fechas[i]['hora']}',
-                  if ('${_fechas[i]['lugar'] ?? ''}'.isNotEmpty) '${_fechas[i]['lugar']}',
-                  if (i == _fechas.length - 1 && _fechas.length > 1) 'Try out',
-                ].join(' · '),
-              ),
-              onTap: () => _fecha(i),
-              trailing: IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: () => setState(() => _fechas.removeAt(i))),
-            ),
+          Text(
+            'Cada clase queda en el calendario como evento "Curso", con su día, hora y lugar. Quienes se inscriben la ven ahí.',
+            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+          ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < _clases.length; i++)
+            _filaFecha(p, _clases[i], icono: Icons.event_outlined, alTocar: () => _clase(i), alQuitar: () => setState(() => _clases.removeAt(i))),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: _fecha, icon: const Icon(Icons.add_rounded), label: const Text('Agregar fecha')),
+            child: TextButton.icon(
+              onPressed: _clase,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(_clases.isEmpty ? 'Agregar la primera clase' : 'Agregar otra clase'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Try out',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'La prueba final, después de la última clase. Ese día marcas quién aprobó y a qué equipo pasa.',
+            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+          ),
+          const SizedBox(height: 8),
+          if (_tryout != null)
+            _filaFecha(p, _tryout!, icono: Icons.emoji_events_outlined, alTocar: _elegirTryout)
+          else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(onPressed: _elegirTryout, icon: const Icon(Icons.emoji_events_outlined), label: const Text('Elegir la fecha del try out')),
+            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            alignment: Alignment.topCenter,
+            child: _tryoutAntes
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('El try out tiene que ser después de la última clase.', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
+                  )
+                : const SizedBox(width: double.infinity),
           ),
           const SizedBox(height: 20),
           FilledButton(
@@ -763,7 +864,7 @@ class _EditorCursoState extends State<_EditorCurso> {
                     'cupo': _conCupo ? _cupo : null,
                     'equipoDestino': _equipo,
                     'fechas': [
-                      for (final f in _fechas) {'fecha': f['fecha'], 'hora': f['hora'], 'lugar': f['lugar']},
+                      for (final f in [..._clases, ?_tryout]) {'fecha': f['fecha'], 'hora': f['hora'], 'lugar': f['lugar']},
                     ],
                   })
                 : null,

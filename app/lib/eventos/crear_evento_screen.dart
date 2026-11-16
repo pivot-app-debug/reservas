@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../cursos/cursos_screen.dart';
 import '../core/asistente.dart';
 
 import '../core/fechas.dart';
@@ -417,6 +418,20 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
             texto: 'Un período sin entrenamientos',
             activa: _descanso,
             alTocar: () => elegir(null),
+          ),
+        // Cursos en el calendario (Victor, 2026-11-16: antes en Finanzas).
+        if (widget.repo.sesion.esAdmin)
+          _tarjetaOpcion(
+            context,
+            icono: Icons.school_outlined,
+            titulo: 'Curso',
+            texto: 'Clases para quienes empiezan, con inscripción y un try out al final',
+            activa: false,
+            alTocar: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosScreen(sesion: widget.repo.sesion)));
+              // Al volver, el calendario se actualiza con las clases del curso.
+              if (context.mounted) Navigator.of(context).pop(const {'curso': true});
+            },
           ),
       ],
     );

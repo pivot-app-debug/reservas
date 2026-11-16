@@ -200,11 +200,11 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminCursos', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
-    'adminCancelarEvento', 'adminRegenerarVentanaAsistencias', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue'],
+    'adminCancelarEvento', 'adminRegenerarVentanaAsistencias', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue', 'adminCursos'],
   equipo: ['adminSetCategoria', 'adminSetTierModo', 'upsertTier', 'deleteTier', 'adminDatosCategorias', 'adminSetEstadoMiembro', 'adminActualizarEstadoViaje',
     'adminCancelarViaje', 'adminEliminarUsuario', 'adminRestaurarUsuario', 'adminBorrarDatosPersona', 'adminRolesEquipo', 'adminGuardarTemporadaDescanso', 'adminEliminarTemporadaDescanso',
         'adminBackfillHistorialTier', 'adminRecalcularStats', 'adminReglasLiga', 'adminCambiosEquipo', 'adminResolverRevisionEquipo', 'adminRecompensas'],

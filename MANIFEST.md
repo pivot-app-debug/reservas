@@ -257,7 +257,8 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 ## Cursos con try out (2026-11-16)
 - Tablas `cursos` (fechas jsonb `[{fecha,hora,lugar,venueId}]`, la última es el try out; estado abierto/cerrado/terminado; equipo_destino) y `curso_inscripciones` (pendiente/confirmada/cancelada, resultado aprobado/no_aprobado, equipo_final); `reservas.curso_id`. Migración `20261117010000_cursos.sql`.
 - API: `adminCursos` (finanzas; listar/guardar/estado/resultado). Guardar crea un venue `tipo 'unico'`, `tipo_icono 'Curso'` por fecha nueva, conserva los que no cambian y borra solo los quitados por venir; luego `regenerar_ventana_asistencias`. Resultado aprobado: `equipo.categoria`, `historial_tier` del mes y `_avisarCambioEquipo`. `getCursos` (abiertos + los míos), `inscribirseCurso` (reserva tipo 'curso'; `adminSetEstadoReserva` confirma o cancela la inscripción).
-- App: `cursos/cursos_screen.dart` (`CursosAbiertosScreen` desde el "+" del timeline cuando `hayCursos`; `CursosScreen` Pivot desde Cobros; pago con `ReservaExitoScreen`).
+- App: `cursos/cursos_screen.dart` (`CursosAbiertosScreen` desde el "+" del timeline cuando `hayCursos`; `CursosScreen` Pivot desde "+" → Nuevo evento → Curso, que vuelve con `{'curso': true}` para recargar; pago con `ReservaExitoScreen`). El editor guarda `[...clases, tryout]`. `adminCursos` es del área asistencia.
+- Timeline: `_saltoAHoy()` (reintenta hasta que la lista esté y se repite al cambiar el alto de la cabecera o los datos) mientras `_yaDesplazo` sea false; `_irA` a otro día lo pone en true.
 
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.

@@ -10,7 +10,6 @@ import '../pivots/formas_pago_screen.dart';
 import '../pivots/vencimiento_screen.dart';
 import '../sesion/sesion.dart';
 import 'planes_screen.dart';
-import '../cursos/cursos_screen.dart';
 
 /// Tesorería → Cobros (Victor, 2026-11-14): todo lo que se cobra en un solo
 /// lugar. Cada modalidad dice a quién aplica (hoy fijo, como en la web; se
@@ -161,17 +160,7 @@ class _CobrosScreenState extends State<CobrosScreen> {
                     alTocar: () => SubAjustes.abrir(context, PlanesScreen(sesion: widget.sesion)),
                   ),
                 ),
-                Resaltable(
-                  id: 'cursos',
-                  resaltado: _resaltado,
-                  child: FilaAjuste(
-                    icono: Icons.school_outlined,
-                    seccion: 'cuota',
-                    titulo: 'Cursos',
-                    valor: 'Freshmeat con try out, con precio y cupo propios',
-                    alTocar: () => SubAjustes.abrir(context, CursosScreen(sesion: widget.sesion)),
-                  ),
-                ),
+
                 Resaltable(
                   id: 'vencimiento',
                   resaltado: _resaltado,
