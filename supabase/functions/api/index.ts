@@ -2638,10 +2638,22 @@ async function getTareasApp(params: Record<string, any>): Promise<Record<string,
     notaRechazo: a.estado === 'iniciada' ? (a.nota_rechazo ?? '') : '', tarea: armar(todas[a.tarea_id]),
   }));
   const puntosMes = pm ? Number(pm.puntos_total ?? 0) || (Number(pm.puntos_asistencia ?? 0) + Number(pm.puntos_tareas ?? 0) + Number(pm.puntos_bonificacion ?? 0) + Number(pm.puntos_extra ?? 0)) : 0;
-  const meta = (tiers ?? []).find((t: any) => Number(t.min_puntos) > 0);
+    const meta = (tiers ?? []).find((t: any) => Number(t.min_puntos) > 0);
+  // Tareas propias terminadas (aprobadas) del último año, para verlas en el
+  // timeline el día en que se aprobaron (Victor, 2026-11-16).
+  const { data: aprob } = await supabase.from('asignaciones_tareas').select('id, tarea_id, fecha_revision')
+    .eq('nombre_usuario', username).eq('estado', 'aprobada').not('fecha_revision', 'is', null)
+    .gte('fecha_revision', new Date(Date.now() - 366 * 86400000).toISOString());
+  const idsAprob = [...new Set((aprob ?? []).map((a: any) => a.tarea_id))].filter((id) => !todas[id]);
+  const { data: tareasAprob } = idsAprob.length ? await supabase.from('tareas').select('*').in('id', idsAprob) : { data: [] as any[] };
+  (tareasAprob ?? []).forEach((t: any) => { todas[t.id] = t; });
+  const terminadas = (aprob ?? []).filter((a: any) => todas[a.tarea_id]).map((a: any) => ({
+    idAsignacion: a.id, estado: 'aprobada', fechaVencimiento: new Date(new Date(a.fecha_revision).getTime() - 5 * 3600000).toISOString().slice(0, 10), tarea: armar(todas[a.tarea_id]),
+  }));
   return {
     exito: true,
     misTareas,
+    terminadas,
     tablero: lista.filter((t: any) => t.estado !== 'expirada').map(armar),
     baul: lista.filter((t: any) => t.estado === 'expirada').map(armar).filter((x: any) => x.cuposLibres > 0),
     limite, iniciadas: (mias ?? []).filter((a: any) => a.estado === 'iniciada').length,

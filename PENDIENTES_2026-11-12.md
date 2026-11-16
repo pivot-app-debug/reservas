@@ -599,3 +599,8 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - (14) Tareas terminadas en el timeline: propuesta = solo las propias, el día en que se aprobaron, estilo apagado, con los puntos.
 - Cambios de categoría: propuesta = la ventana al abrir la app explica el cambio; si baja, "Entiendo" o "Pedir revisión" (llega a Notificaciones; un Pivot elige Mantener o Devolver), sin los 7 días de espera.
 - Planes, cursos, inscripción rápida y cupón manual: propuesta enviada, falta su visto bueno.
+
+## V. Respuestas de Victor (2026-11-16, 17:38)
+- (14) Sí: en el timeline, solo las tareas propias terminadas, el día en que se aprobaron, apagadas y con los puntos.
+- Cambios de equipo: la propuesta (ventana con números; si baja, "Entiendo" o "Pedir revisión" → Notificaciones, Mantener o Devolver), y además en Mi Liga una opción para que la lista de cambios ("Revisar antes") se apruebe sola si ningún Pivot la revisa en N días. Por defecto automático con 7 días; editable (manual o automático con los días que quiera).
+- Planes, cursos, inscripción rápida y cupón manual: aprobados tal como la propuesta.

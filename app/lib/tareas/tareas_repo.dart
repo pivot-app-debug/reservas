@@ -23,6 +23,9 @@ class TareasRepo extends ChangeNotifier {
   String get yo => sesion.nombre ?? '';
 
   List<MiTarea> mias = [];
+
+  /// Mis tareas aprobadas del último año (para el timeline).
+  List<MiTarea> terminadas = [];
   List<Tarea> tablero = [];
   List<Tarea> baul = [];
   int limite = 3;
@@ -47,6 +50,7 @@ class TareasRepo extends ChangeNotifier {
           if (x is Map<String, dynamic>) x,
       ];
       mias = lista('misTareas').map(MiTarea.new).toList()..sort(_porVencimiento);
+      terminadas = lista('terminadas').map(MiTarea.new).toList();
       tablero = lista('tablero').map(Tarea.new).toList();
       baul = lista('baul').map(Tarea.new).toList();
       limite = (r['limite'] as num?)?.toInt() ?? 3;

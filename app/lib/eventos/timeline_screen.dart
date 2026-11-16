@@ -369,7 +369,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   /// las tomadas por otras personas, agrupadas por día de vencimiento.
   List<_Item> _itemsTareas() {
     final items = <_Item>[];
-    for (final m in _tareas.mias) {
+    for (final m in [..._tareas.mias, ..._tareas.terminadas]) {
       if (m.vence == null || _atrasada(m)) continue;
       if (_filtroArea.isNotEmpty && !_filtroArea.contains(m.tarea.area)) continue;
       items.add(_Item.mia(m));
@@ -385,7 +385,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     return items;
   }
 
-  static bool _atrasada(MiTarea m) => !m.enRevision && (m.dias ?? 0) < 0;
+  static bool _atrasada(MiTarea m) => !m.enRevision && !m.terminada && (m.dias ?? 0) < 0;
 
   /// Opciones de los filtros: solo las que existen en lo que ya coincide con
   /// el texto buscado (y con el otro filtro), igual que la web.
@@ -1226,7 +1226,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       contenido = f.item!.mia != null
           ? _TarjetaMiTarea(
               mia: f.item!.mia!,
-              alAbrir: () => _abrirTarea(f.item!.mia!.tarea, mia: f.item!.mia),
+              alAbrir: () => _abrirTarea(f.item!.mia!.tarea, mia: f.item!.mia!.terminada ? null : f.item!.mia),
             )
           : f.item!.grupo != null
           ? _GrupoTareas(tareas: f.item!.grupo!, alAbrir: (t) => _abrirTarea(t))
@@ -2167,48 +2167,53 @@ class _TarjetaMiTarea extends StatelessWidget {
     final p = context.pivot;
     final t = mia.tarea;
     final (degradado, sobre) = PivotPaleta.seccion(t.areaInfo.seccion, Theme.of(context).brightness);
-    return Material(
-      color: p.tarjeta,
-      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      child: InkWell(
+    // Terminada: apagada, como un evento pasado.
+    final hecha = mia.terminada;
+    return Opacity(
+      opacity: hecha ? 0.6 : 1,
+      child: Material(
+        color: hecha ? p.apagadoFondo : p.tarjeta,
         borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-        onTap: alAbrir,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              HeroOpcional(
-                tag: 'tarea-${t.id}',
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
-                  child: Icon(mia.enRevision ? Icons.hourglass_top_rounded : t.areaInfo.icono, size: 18, color: sobre),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          onTap: alAbrir,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                HeroOpcional(
+                  tag: 'tarea-${t.id}',
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+                    child: Icon(hecha ? Icons.check_rounded : (mia.enRevision ? Icons.hourglass_top_rounded : t.areaInfo.icono), size: 18, color: sobre),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tu tarea',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.marcaTexto),
-                    ),
-                    Text(
-                      t.titulo,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.texto),
-                    ),
-                    if (mia.enRevision || mia.notaRechazo.isNotEmpty)
-                      Text(mia.enRevision ? 'En revisión' : 'Con cambios pedidos', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hecha ? 'Tarea terminada' : 'Tu tarea',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: hecha ? p.textoSecundario : p.marcaTexto),
+                      ),
+                      Text(
+                        t.titulo,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.texto),
+                      ),
+                      if (mia.enRevision || mia.notaRechazo.isNotEmpty)
+                        Text(mia.enRevision ? 'En revisión' : 'Con cambios pedidos', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              PillPuntos(puntos: t.puntos),
-            ],
+                const SizedBox(width: 8),
+                PillPuntos(puntos: t.puntos),
+              ],
+            ),
           ),
         ),
       ),

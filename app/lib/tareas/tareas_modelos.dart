@@ -66,6 +66,9 @@ class MiTarea {
   final Map<String, dynamic> m;
   String get idAsignacion => '${m['idAsignacion']}';
   bool get enRevision => m['estado'] == 'pendiente_revision';
+
+  /// Aprobada: se ve en el timeline el día en que se aprobó (Victor, 2026-11-16).
+  bool get terminada => m['estado'] == 'aprobada';
   bool get rescate => m['esRescate'] == true;
   String get notaRechazo => '${m['notaRechazo'] ?? ''}'.trim();
   DateTime? get vence => _fecha(m['fechaVencimiento']);
