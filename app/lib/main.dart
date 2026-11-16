@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -79,6 +80,16 @@ class _RaizState extends State<_Raiz> {
       _pendiente = a;
       _abrirPendiente();
     });
+    // Web: un aviso abre la app con ?evento=<id>[&accion=cancelar] (mismo
+    // enlace que usa la web vieja), así funcionan igual al cambiar de dirección.
+    if (kIsWeb) {
+      final q = Uri.base.queryParameters;
+      final ev = q['evento'] ?? '';
+      if (ev.isNotEmpty) {
+        _pendiente = AperturaPush(eventoId: ev, accion: q['accion']);
+        _abrirPendiente();
+      }
+    }
     widget.sesion.addListener(_alCambiarSesion);
     widget.sesion.addListener(_revisarListo);
     _repo.addListener(_revisarListo);

@@ -22,6 +22,7 @@ import 'salud_screen.dart';
 import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
 import 'recorte_foto.dart';
+import '../push/activar_avisos.dart';
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
 /// ajustes de la app, de seguridad y de emergencia; lo que ve el resto del
@@ -79,6 +80,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
               // Mi perfil (Victor, 2026-11-12): arriba quién eres y tus datos
               // de la ficha; después pagos y datos personales; al final, la app.
               _CabeceraPerfil(sesion: sesion),
+              TarjetaActivarAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
               GrupoAjustes(
                 filas: [

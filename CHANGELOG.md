@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (web: avisos en iPhone y enlaces)
+- **Activar notificaciones (web):** en Mi perfil aparece una tarjeta mientras los avisos no estén activos: botón "Activar" (en iPhone el permiso solo se pide con un toque), o cómo hacerlo si están bloqueados o si falta agregar Pivot a la pantalla de inicio del iPhone.
+- La web nueva abre el evento cuando llega con `?evento=` (mismo enlace de los avisos de la web vieja), para el cambio de dirección.
+
 ## 2026-11-16 (personalización de la liga)
 - **Moneda** (Mi Liga → Datos de la liga): el símbolo de todos los montos de la app y de los avisos ($, S/, €, Bs, Q, ₡, R$ u otro).
 - **Estados nuevos:** Enfermedad, Situación personal o fuerza mayor, y Otro. Se pueden elegir en Asistencia anticipada y en la ficha. Al equipo solo le llega "no vendrá por un tiempo" y en la lista se ve "Fuera por un tiempo", nunca el motivo.
