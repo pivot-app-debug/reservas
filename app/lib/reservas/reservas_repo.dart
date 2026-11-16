@@ -206,6 +206,15 @@ class ReservasRepo {
   bool get necesitaProtecciones => _usa(_d['necesitaProtecciones']);
   String get talla => (_d['talla'] ?? '').toString();
 
+  /// Equipamiento solo para esta reserva (Victor, 2026-11-16, como la web
+  /// vieja): sin protecciones, solo muñequeras, otra talla… null = el del perfil.
+  bool? patinesEsta;
+  String? tallaEsta, protecEsta;
+  bool get _pat => patinesEsta ?? necesitaPatines;
+  String get _tal => tallaEsta ?? talla;
+  String get _pro => protecEsta ?? (necesitaProtecciones ? (_d['necesitaProtecciones'] ?? '').toString() : 'No');
+  bool get cambiadoParaEsta => patinesEsta != null || tallaEsta != null || protecEsta != null;
+
   /// Equipamiento del club: solo reserva por clase (`canPayMonthly()`).
   bool get necesitaEquipo => necesitaPatines || necesitaProtecciones;
 
@@ -244,9 +253,8 @@ class ReservasRepo {
   /// "Patines talla 38 y protecciones (Rodilleras)" o null con equipo propio.
   String? get resumenEquipo {
     final partes = [
-      if (necesitaPatines) 'patines talla $talla',
-      if (necesitaProtecciones)
-        _d['necesitaProtecciones'].toString().toLowerCase() == 'sí' ? 'protecciones completas' : 'protecciones (${_d['necesitaProtecciones']})',
+      if (_pat) 'patines talla $_tal',
+      if (_usa(_pro)) _pro.toLowerCase() == 'sí' ? 'protecciones completas' : 'protecciones (${_pro.toLowerCase()})',
     ];
     if (partes.isEmpty) return null;
     final t = partes.join(' y ');
@@ -292,12 +300,8 @@ class ReservasRepo {
 
   /// Próximos entrenamientos con sus cupos (`getFechasDisponibles`).
   Future<List<FechaClase>> fechas() async {
-    final lista = await _api.getLista('getFechasDisponibles', {
-      'nombre': sesion.nombre,
-      'talla': necesitaPatines ? talla : '',
-      'necesitaProtecciones': (_d['necesitaProtecciones'] ?? '').toString(),
-    });
-    final agotada = 'sin patines talla $talla disponibles';
+    final lista = await _api.getLista('getFechasDisponibles', {'nombre': sesion.nombre, 'talla': _pat ? _tal : '', 'necesitaProtecciones': _pro});
+    final agotada = 'sin patines talla $_tal disponibles';
     return [
       for (final f in lista.whereType<Map<String, dynamic>>())
         FechaClase(
@@ -307,7 +311,7 @@ class ReservasRepo {
           lugar: (f['donde'] ?? '').toString(),
           disponible: f['disponible'] == true,
           razon: (f['razon'] ?? '').toString(),
-          tallaAgotada: f['disponible'] != true && necesitaPatines && (f['razon'] ?? '').toString().trim().toLowerCase() == agotada,
+          tallaAgotada: f['disponible'] != true && _pat && (f['razon'] ?? '').toString().trim().toLowerCase() == agotada,
         ),
     ];
   }
@@ -454,8 +458,8 @@ class ReservasRepo {
     String? medio,
     String? medioNombre,
   }) async {
-    final tallaBase = necesitaPatines ? talla : 'No';
-    final protec = necesitaProtecciones ? (_d['necesitaProtecciones'] ?? '').toString() : 'No';
+    final tallaBase = _pat ? _tal : 'No';
+    final protec = _usa(_pro) ? _pro : 'No';
     final email = (_d['email'] ?? '').toString();
     final guardados = <String>[];
     final ids = <String>[];

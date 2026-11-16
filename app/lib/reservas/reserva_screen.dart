@@ -6,6 +6,7 @@ import '../core/config_liga.dart';
 import '../core/iconos_marca.dart';
 import '../core/asistente.dart';
 import '../core/fechas.dart';
+import '../core/api.dart';
 import '../core/tema.dart';
 import '../eventos/anticipada.dart';
 import '../eventos/eventos_repo.dart';
@@ -217,9 +218,162 @@ class _ReservaScreenState extends State<ReservaScreen> {
             Icons.autorenew_rounded,
             'Tienes $_creditos ${_creditos == 1 ? 'clase a favor' : 'clases a favor'} por entrenamientos cancelados. Se descuentan solas.',
           ),
+        _tarjetaEquipo(context),
         for (final c in clases) _tarjetaClase(context, c),
       ],
     );
+  }
+
+  /// Equipamiento para estas clases, con "Cambiar" (Victor, 2026-11-16).
+  Widget _tarjetaEquipo(BuildContext context) {
+    final p = context.pivot;
+    final r = _r.resumenEquipo;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: p.suave,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          onTap: _cambiarEquipo,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Row(
+              children: [
+                Icon(Icons.roller_skating_outlined, color: p.sobreSuave),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _r.cambiadoParaEsta ? 'Equipamiento para esta reserva' : 'Tu equipamiento',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                      ),
+                      Text(r == null ? 'Llevas tu propio equipamiento' : 'Del equipo: ${r.toLowerCase()}', style: TextStyle(fontSize: 13, color: p.sobreSuave)),
+                    ],
+                  ),
+                ),
+                TextButton(onPressed: _cambiarEquipo, child: const Text('Cambiar')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cambiarEquipo() async {
+    const piezas = ['Casco', 'Muñequeras', 'Rodilleras', 'Coderas'];
+    final d = widget.repo.sesion.datos;
+    var patines = _r.patinesEsta ?? _r.necesitaPatines;
+    var talla = _r.tallaEsta ?? _r.talla;
+    final proIni = _r.protecEsta ?? (_r.necesitaProtecciones ? '${d['necesitaProtecciones'] ?? ''}' : 'No');
+    var modo = proIni.isEmpty || proIni == 'No' ? 'propias' : (proIni == 'Sí' ? 'todas' : 'algunas');
+    final algunas = modo == 'algunas' ? proIni.split(',').map((x) => x.trim()).where(piezas.contains).toSet() : <String>{};
+    var guardar = false;
+    List<String> tallas = const [];
+    try {
+      tallas = [for (final t in await widget.repo.sesion.api.getLista('getTallasDisponibles')) '$t']
+        ..sort((a, b) => (num.tryParse(a) ?? 0).compareTo(num.tryParse(b) ?? 0));
+    } catch (_) {}
+    if (!mounted) return;
+    String protec() => switch (modo) {
+      'todas' => 'Sí',
+      'algunas' => algunas.isEmpty ? 'No' : piezas.where(algunas.contains).join(', '),
+      _ => 'No',
+    };
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
+            children: [
+              Text('Equipamiento para estas clases', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('Elige lo que necesitas del equipo solo para esta reserva.', style: TextStyle(color: h.pivot.textoSecundario)),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Patines del equipo'),
+                value: patines,
+                onChanged: (v) => set(() => patines = v),
+              ),
+              if (patines && tallas.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [for (final t in tallas) ChoiceChip(label: Text('Talla $t'), selected: talla == t, onSelected: (_) => set(() => talla = t))],
+                ),
+              const SizedBox(height: 12),
+              const Text('Protecciones', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final (k, t) in const [('propias', 'Llevo las mías'), ('todas', 'Todas del equipo'), ('algunas', 'Algunas')])
+                    ChoiceChip(label: Text(t), selected: modo == k, onSelected: (_) => set(() => modo = k)),
+                ],
+              ),
+              if (modo == 'algunas') ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final x in piezas)
+                      FilterChip(label: Text(x), selected: algunas.contains(x), onSelected: (v) => set(() => v ? algunas.add(x) : algunas.remove(x))),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Guardarlo en mi perfil'),
+                subtitle: const Text('Para mis próximas reservas. Si pasas a usar equipamiento del equipo, tu equipo puede cambiar.'),
+                value: guardar,
+                onChanged: (v) => set(() => guardar = v == true),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(onPressed: patines && talla.isEmpty ? null : () => Navigator.of(h).pop(true), child: const Text('Listo')),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final pro = protec();
+    if (guardar) {
+      try {
+        await widget.repo.sesion.guardarEquipamiento(patines: patines ? 'Sí' : 'No', talla: patines ? talla : '', protecciones: pro);
+        _r.patinesEsta = null;
+        _r.tallaEsta = null;
+        _r.protecEsta = null;
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardado en tu perfil')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar en tu perfil.')));
+        return;
+      }
+    } else {
+      _r.patinesEsta = patines;
+      _r.tallaEsta = patines ? talla : null;
+      _r.protecEsta = pro;
+    }
+    // Los cupos dependen de la talla: se vuelven a pedir.
+    try {
+      final l = await _r.fechas();
+      if (!mounted) return;
+      setState(() {
+        _clases = l;
+        _tallaPorFecha.clear();
+        _clasesSel.removeWhere((id) => !l.any((c) => c.id == id && c.elegible));
+      });
+    } catch (_) {
+      if (mounted) setState(() {});
+    }
   }
 
   Widget _tarjetaClase(BuildContext context, FechaClase c) {
