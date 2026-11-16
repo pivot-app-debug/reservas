@@ -203,6 +203,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Web principal = Flutter (2026-11-16)
+- La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con `<base href="/">` (usa css/, js/, shared/, assets/ de la raíz). `nueva/` solo redirige.
+- `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.
+- `Sesion._entrarDesdeEnlace()`: `?nuevx=1&token=<idToken Google>` (inscripcion/) y `?registro=1&token=<sesión>` (registro-express/); limpia la dirección. `?evento=<id>[&accion=]` abre el evento (main.dart). Service worker de avisos con `APP = '/'`.
+
 ## Personalización: moneda, estados, temporadas, tipos de evento (2026-11-16)
 - Moneda: `config_app.moneda` (CLAVES_LIGA), `_monedaLiga` en el servidor (textos de avisos), `getConfigEquipo.moneda`; app `core/moneda.dart` (`Moneda.s`, cargado por `Sesion` y `ConfigLiga`), todos los montos lo usan.
 - Estados: `ESTADOS_NUEVOS` = Enfermedad, Situación personal, Otro (constraint ampliado, migración `20261116080000_estados_nuevos.sql`); `reglas_liga.estados[estado] = {activo, congela, exentaCuota}` (`_cfgEstado`); `recalcular-categorias` salta los estados que congelan. Al salir de un estado nuevo, `exenta_cuota` vuelve a false. App: `EstadoScreen`, `MotivoAusencia` con los nuevos, `Integrante.fueraConMotivo`.

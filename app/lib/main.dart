@@ -15,6 +15,7 @@ import 'sesion/login_screen.dart';
 import 'sesion/sesion.dart';
 import 'core/cargando.dart';
 import 'core/intro.dart';
+import 'core/puerta_instalar.dart';
 
 final _navegador = GlobalKey<NavigatorState>();
 
@@ -53,7 +54,9 @@ class PivotApp extends StatelessWidget {
         return const Locale('es');
       },
       // Actualización obligatoria: tapa toda la app si hay versión nueva.
-      builder: (context, child) => ControlActualizacion(child: IntroPivot(child: child ?? const SizedBox.shrink())),
+      builder: (context, child) => PuertaInstalar(
+        child: ControlActualizacion(child: IntroPivot(child: child ?? const SizedBox.shrink())),
+      ),
       home: _Raiz(sesion: sesion),
     );
   }

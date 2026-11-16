@@ -15,7 +15,7 @@ firebase.initializeApp({
   appId: '1:167871376984:web:565066c2084cf2adeae42d',
 });
 
-var APP = '/nueva/';
+var APP = '/';
 
 firebase.messaging().onBackgroundMessage(function (m) {
   var d = (m && m.data) || {};

@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (la web nueva pasa a la dirección principal)
+- **app.quindesvolcanicos.com ahora abre la app nueva (Flutter).** La web vieja queda congelada en /vieja/ como respaldo. /nueva/ redirige a la raíz. Las páginas de inscripción (inscripcion/, registro-express/, activar/) siguen igual.
+- **Pantalla "Instala la app"** en teléfonos, igual que en la web vieja: en Android pide Chrome y en iPhone Safari (con botón para copiar el enlace si se abrió en otro navegador), con los pasos para agregarla a la pantalla de inicio y, en Chrome, el botón "Instalar app". En computadora no aparece.
+- Al terminar la inscripción, la app nueva entra sola con la sesión del enlace (Google o registro rápido), como antes.
+- Quien tenía la web vieja instalada en el teléfono abre la nueva al tocar el ícono. Tiene que activar los avisos de nuevo (tarjeta en Mi perfil).
+
 ## 2026-11-16 (web: avisos en iPhone y enlaces)
 - **Activar notificaciones (web):** en Mi perfil aparece una tarjeta mientras los avisos no estén activos: botón "Activar" (en iPhone el permiso solo se pide con un toque), o cómo hacerlo si están bloqueados o si falta agregar Pivot a la pantalla de inicio del iPhone.
 - La web nueva abre el evento cuando llega con `?evento=` (mismo enlace de los avisos de la web vieja), para el cambio de dirección.

@@ -25,7 +25,12 @@
 </head>
 <body>
   <div id="carga"><img src="icons/Icon-192.png" alt="Pivot"></div>
-  <script>
+    <script>
+    // Instalar la app (Android/Chrome): se guarda el aviso del navegador
+    // para el botón "Instalar app" de la pantalla de instalación.
+    window.pivotPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.pivotPrompt = e; });
+    window.addEventListener('appinstalled', function () { window.pivotInstalada = true; });
     window.addEventListener('flutter-first-frame', function () {
       var c = document.getElementById('carga');
       if (c) { c.style.opacity = '0'; setTimeout(function () { c.remove(); }, 400); }

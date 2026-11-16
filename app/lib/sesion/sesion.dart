@@ -8,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../core/api.dart';
 import '../push/push.dart';
 import '../core/moneda.dart';
+import '../core/instalar_web.dart' show limpiarEnlace;
 
 /// Resultado de un intento de inicio de sesión que no terminó en sesión.
 class LoginFallido implements Exception {
@@ -66,6 +67,10 @@ class Sesion extends ChangeNotifier {
   /// Restaura la sesión guardada (equivalente a `restaurarSesion` de la web).
   Future<void> restaurar() async {
     try {
+      // Web: al terminar la inscripción se llega con la sesión en el enlace
+      // (inscripcion/ con Google: ?nuevx=1&token=<idToken>; registro-express/:
+      // ?registro=1&token=<sesión>), igual que en la web vieja.
+      if (kIsWeb && await _entrarDesdeEnlace()) return;
       final guardado = await _almacen.read(key: 'sesion');
       if (guardado == null) return;
       final s = jsonDecode(guardado) as Map<String, dynamic>;
@@ -83,6 +88,31 @@ class Sesion extends ChangeNotifier {
     } finally {
       cargando = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> _entrarDesdeEnlace() async {
+    final q = Uri.base.queryParameters;
+    final t = q['token'] ?? '';
+    if (t.isEmpty || (q['nuevx'] != '1' && q['registro'] != '1')) return false;
+    limpiarEnlace();
+    try {
+      if (q['nuevx'] == '1') {
+        final res = await api.post('loginGoogle', {'idToken': t});
+        if (res['valido'] != true || res['token'] == null) return false;
+        await _guardar(res);
+        return true;
+      }
+      api.token = t;
+      final res = await api.get('restaurarSesion');
+      if (res['valido'] != true) {
+        api.token = null;
+        return false;
+      }
+      await _guardar({...res, 'token': t});
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
