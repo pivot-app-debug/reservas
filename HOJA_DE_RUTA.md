@@ -82,7 +82,7 @@ Reglas de siempre:
    - Ajustes por equipo con "Igual que la liga" o valor propio: cobro, clases de gracia, asistencia, requisitos, equipamiento, fondos.
    - Cobros dentro de Tesorería como modalidades (mensual, por clase, paquete, curso, inscripción, sin cobro) que cada equipo elige.
    - Reglas por tipo con asistente (ejemplos y consecuencias claras), globales o por equipo; cada regla rige desde que se guarda.
-   - [x] Personalización (2026-11-16): moneda, estados editables, tipos de evento, temporadas de descanso con reglas. Falta: documentos (preguntar a Victor qué incluye).
+   - [x] Personalización (2026-11-16): moneda, estados editables, tipos de evento, temporadas de descanso con reglas. "Documentos" era el documento "Pivot — Reglas actuales" (Victor, 2026-11-16): cubierto.
    - [x] Hecho 2026-11-14: Formas de pago solo en Tesorería; Vencimiento de la cuota explicado en su pantalla; Salud y seguros en pantalla propia.
    - [x] Hecho 2026-11-15: revisión de 15 puntos de Victor (PENDIENTES sección R). Fecha límite de pago con calendario; punto extra y avisos siguen la fecha límite; Viajes como sección propia; reglas del equipo en Reglas. Falta: sección Recompensas y motor de reglas.
 6. [ ] **Planes de pago, cursos e inscripción rápida**:

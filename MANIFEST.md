@@ -204,7 +204,7 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - Pendiente: cambiar el equipamiento del club desde la app.
 
 ## Web principal = Flutter (2026-11-16)
-- La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con `<base href="/">` (usa css/, js/, shared/, assets/ de la raíz). `nueva/` solo redirige.
+- La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.
 - `Sesion._entrarDesdeEnlace()`: `?nuevx=1&token=<idToken Google>` (inscripcion/) y `?registro=1&token=<sesión>` (registro-express/); limpia la dirección. `?evento=<id>[&accion=]` abre el evento (main.dart). Service worker de avisos con `APP = '/'`.
 
