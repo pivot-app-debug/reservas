@@ -292,12 +292,19 @@ class Sesion extends ChangeNotifier {
 
   /// País del equipo (ISO, ej. 'EC'): prefijo y documento por defecto.
   String paisEquipo = 'EC';
+
+  /// Cómo paga su equipo ('mes', 'clase', 'elige', 'segun_equipamiento',
+  /// 'sin_cobro'); null hasta cargarlo (se usa el criterio de siempre).
+  String? modoCobro;
   bool _paisCargado = false;
   Future<void> cargarPaisEquipo() async {
     if (_paisCargado) return;
     try {
       final r = await api.get('getConfigEquipo');
-      if (r['exito'] == true) paisEquipo = '${r['paisEquipo'] ?? 'EC'}';
+      if (r['exito'] == true) {
+        paisEquipo = '${r['paisEquipo'] ?? 'EC'}';
+        modoCobro = r['modoCobro'] as String?;
+      }
       _paisCargado = true;
       notifyListeners();
     } catch (_) {}
@@ -320,5 +327,7 @@ class Sesion extends ChangeNotifier {
     esAdmin = res['esAdmin'] == true;
     adminToken = res['adminToken'] as String?;
     cargarAreas();
+    _paisCargado = false;
+    cargarPaisEquipo();
   }
 }

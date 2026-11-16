@@ -64,6 +64,35 @@ class ConfigLiga extends ChangeNotifier {
 
   bool get rankingVisible => reglas['rankingVisible'] != false;
 
+  /// Reparto por defecto de los fondos de viaje: [{min: % asistencia, pct: % del fondo}].
+  List<Map<String, dynamic>> get repartoViaje {
+    final l = reglas['repartoViaje'];
+    if (l is List && l.isNotEmpty) {
+      return [
+        for (final x in l)
+          if (x is Map) Map<String, dynamic>.from(x),
+      ];
+    }
+    return const [
+      {'min': 90, 'pct': 50},
+      {'min': 35, 'pct': 50},
+    ];
+  }
+
+  /// Reservas (antes fijas): clases visibles, cierre antes de empezar,
+  /// cupón al cancelar y cierre de reservas sin aprobar.
+  int get reservaClasesVisibles => (reglas['reservaClasesVisibles'] as num?)?.toInt() ?? 6;
+  int get reservaCierraHoras => (reglas['reservaCierraHoras'] as num?)?.toInt() ?? 2;
+  int get cuponCancelarMin => (reglas['cuponCancelarMin'] as num?)?.toInt() ?? 60;
+  int get sinAprobarHoras => (reglas['sinAprobarHoras'] as num?)?.toInt() ?? 2;
+
+  /// Cobro por equipo (Victor, 2026-11-15), mismo criterio que `_cobroEquipo` del servidor.
+  Map<String, dynamic> cobroEquipo(String equipo) {
+    final c = (reglas['cobroEquipos'] as Map?)?[equipo];
+    if (c is Map && c['modo'] != null) return Map<String, dynamic>.from(c);
+    return {'modo': equipo == 'Quindes' || graciaPorEquipo.containsKey(equipo) ? 'mes' : 'segun_equipamiento', 'precioMensual': null, 'precioClase': null};
+  }
+
   /// Clases de gracia por equipo: null = no aplica a ese equipo; 0 = paga antes.
   Map<String, int> get graciaPorEquipo => {
     for (final e in ((reglas['graciaClases'] as Map?) ?? const {'Quindes': 1}).entries) '${e.key}': (e.value as num?)?.toInt() ?? 0,

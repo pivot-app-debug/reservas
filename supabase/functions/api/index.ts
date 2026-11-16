@@ -483,6 +483,8 @@ function _horaTextoADate(horaStr: string | null): Date | null {
 }
 
 async function _proximosEntrenamientos(): Promise<any[]> {
+  const reglasRes = await _reglasLiga();
+  const cierraMs = (Number(reglasRes.reservaCierraHoras) >= 0 ? Number(reglasRes.reservaCierraHoras) : 2) * 3600 * 1000;
   const ecuadorNow = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
   const hoyISO = ecuadorNow.toISOString().substring(0, 10);
   const { data } = await supabase.from('asistencias')
@@ -496,7 +498,7 @@ async function _proximosEntrenamientos(): Promise<any[]> {
     const [yr, mo, dy] = f.fecha.split('-').map(Number);
     const [h, m] = (f.inicia ?? '00:00').split(':').map(Number);
     const inicioUTC = new Date(Date.UTC(yr, mo - 1, dy, h + 5, m, 0, 0)); // Ecuador = UTC-5
-    const limite = new Date(inicioUTC.getTime() - 2 * 60 * 60 * 1000);
+        const limite = new Date(inicioUTC.getTime() - cierraMs);
     return ahora < limite;
   }).map((f: any) => ({
     idEvento: f.id_evento, fecha: f.fecha, donde: f.donde,
@@ -504,7 +506,7 @@ async function _proximosEntrenamientos(): Promise<any[]> {
     horaFin:    f.termina ? f.termina.substring(0, 5) : '',
     descripcion: f.info_adicional ?? '', mapsUrl: f.google_maps ?? '', duracion: f.dura ?? '', videoInstructivo: videoInstructivo[f.donde] ?? '',
   }));
-  return lista.slice(0, 6);
+    return lista.slice(0, Math.max(1, Number(reglasRes.reservaClasesVisibles) || 6));
 }
 
 // ─── Acciones: auth ───────────────────────────────────────────────────────────
@@ -925,7 +927,18 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   // Recompensas por pagar a tiempo (Victor, 2026-11-15): qué recibe quien
   // envía el pago de su cuota hasta la fecha límite. Se puede combinar.
   // Un cambio rige para los pagos que se aprueben desde ahora.
-  recompensaPago: { activa: true, puntos: 1, claseGratis: false, saldo: 0 },
+    recompensaPago: { activa: true, puntos: 1, claseGratis: false, saldo: 0 },
+  // Cobro por equipo (Victor, 2026-11-15): cómo paga cada equipo y precio
+  // propio opcional. Sin entrada, ver `_cobroEquipo`.
+  //   modo: 'mes' | 'clase' | 'elige' | 'segun_equipamiento' | 'sin_cobro'
+    cobroEquipos: {},
+  // Reparto por defecto de los fondos de viaje (con lo que empieza cada viaje).
+  repartoViaje: [{ min: 90, pct: 50 }, { min: 35, pct: 50 }],
+  // Reservas (antes fijas en el código).
+  reservaClasesVisibles: 6,   // próximas clases que se pueden reservar
+  reservaCierraHoras: 2,      // se deja de reservar N horas antes de empezar
+  cuponCancelarMin: 60,       // el cupón vuelve si cancela con esta anticipación
+  sinAprobarHoras: 2,         // reserva sin aprobar: se cierra N horas después de la clase
     // Privacidad: si las demás personas (no Pivots) ven los puntos de otras.
   rankingVisible: true,
   // Clases de gracia por equipo (Victor, 2026-11-14): cuántas clases puede
@@ -937,6 +950,16 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   atencionMedica: ['MSP (Ministerio de Salud Pública)', 'IESS', 'Seguro Privado'],
   segurosPrivados: ['Saludsa', 'Ecuasanitas', 'Humana', 'BMI del Ecuador', 'Confiamed', 'BUPA Ecuador', 'Pan American Life', 'CruzBlanca'],
 };
+/** Cómo paga un equipo. Sin configurar: Quindes (o un equipo con clases de
+ *  gracia) paga por mes; el resto, según su equipamiento (como siempre). */
+function _cobroEquipo(reglas: Record<string, any>, equipo: string | null | undefined): { modo: string; precioMensual: number | null; precioClase: number | null } {
+  const e = String(equipo ?? '');
+  const c = (reglas.cobroEquipos ?? {})[e];
+  if (c?.modo) return { modo: c.modo, precioMensual: c.precioMensual ?? null, precioClase: c.precioClase ?? null };
+  const mes = e === 'Quindes' || (reglas.graciaClases ?? {})[e] !== undefined;
+  return { modo: mes ? 'mes' : 'segun_equipamiento', precioMensual: null, precioClase: null };
+}
+
 async function _reglasLiga(): Promise<Record<string, any>> {
   const { data } = await supabase.from('config_app').select('value').eq('key', 'reglas_liga').maybeSingle();
   let r: Record<string, any> = {};
@@ -995,6 +1018,24 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
       const n = Math.round(Number(reglasNuevas[k]));
       if (Number.isFinite(n)) r[k] = Math.min(max, Math.max(min, n));
     };
+            if (Array.isArray(reglasNuevas.repartoViaje)) {
+      const t = reglasNuevas.repartoViaje.slice(0, 6).map((x: any) => ({ min: Math.max(0, Math.min(100, Math.round(Number(x?.min) || 0))), pct: Math.max(0, Math.min(100, Math.round(Number(x?.pct) || 0))) }))
+        .sort((a: any, b: any) => b.min - a.min);
+      if (t.length && t.reduce((s: number, x: any) => s + x.pct, 0) <= 100) r.repartoViaje = t;
+    }
+    entero('reservaClasesVisibles', 1, 20); entero('reservaCierraHoras', 0, 48); entero('cuponCancelarMin', 0, 1440); entero('sinAprobarHoras', 1, 72);
+    if (reglasNuevas.cobroEquipos && typeof reglasNuevas.cobroEquipos === 'object') {
+      const modos = ['mes', 'clase', 'elige', 'segun_equipamiento', 'sin_cobro'];
+      const precio = (v: unknown) => { if (v == null || v === '') return null; const n = Math.round(Number(v) * 100) / 100; return Number.isFinite(n) && n >= 0 ? Math.min(100000, n) : null; };
+      const c: Record<string, any> = { ...(antes.cobroEquipos ?? {}) };
+      for (const [k, v] of Object.entries(reglasNuevas.cobroEquipos as Record<string, any>)) {
+        const eq = String(k).trim().slice(0, 60);
+        if (!eq) continue;
+        if (v == null) { delete c[eq]; continue; }
+        c[eq] = { modo: modos.includes(String(v.modo)) ? String(v.modo) : 'segun_equipamiento', precioMensual: precio(v.precioMensual), precioClase: precio(v.precioClase) };
+      }
+      r.cobroEquipos = c;
+    }
     entero('toleranciaMin', 0, 120); entero('rectificacionDias', 1, 60); entero('eventosMinPersonas', 0, 200); entero('inactividadDias', 7, 365);
         entero('cuotaVenceDia', 0, 28); entero('cuotaGraciaDias', 0, 27);
     if (reglasNuevas.cuotaRecargo !== undefined) {
@@ -1268,9 +1309,14 @@ async function adminGuardarConfigLiga(params: Record<string, any>): Promise<Reco
 
 // País del equipo (prefijo y documento por defecto en Ajustes).
 async function getConfigEquipo(params: Record<string, any>): Promise<Record<string, any>> {
-  if (!(await _validarToken(params.token))) return { exito: false, error: 'Sesión inválida.' };
-  const { data: pais } = await supabase.from('config_app').select('value').eq('key', 'pais_equipo').maybeSingle();
-  return { exito: true, paisEquipo: pais?.value ?? 'EC' };
+    const yo = await _validarToken(params.token);
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const [{ data: pais }, { data: p }, reglas] = await Promise.all([
+    supabase.from('config_app').select('value').eq('key', 'pais_equipo').maybeSingle(),
+    supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle(),
+    _reglasLiga(),
+  ]);
+  return { exito: true, paisEquipo: pais?.value ?? 'EC', modoCobro: _cobroEquipo(reglas, p?.categoria).modo };
 }
 
 async function actualizarPin(params: Record<string, any>): Promise<Record<string, any>> {
@@ -1767,13 +1813,21 @@ function _recargoCuota(mes: string, hoy: string, reglas: Record<string, any>): n
   return hoy > limite ? monto : 0;
 }
 
-async function getPreciosClases(): Promise<Record<string, any>> {
+async function getPreciosClases(params: Record<string, any> = {}, equipo?: string | null): Promise<Record<string, any>> {
   const { data } = await supabase.from('config_app').select('key, value').in('key', ['precio_por_clase', 'precio_mensual']);
   const map: Record<string, any> = {};
   (data ?? []).forEach((r: any) => { map[r.key] = r.value; });
     const r = await _reglasLiga();
+  // Precio propio del equipo (de quien pregunta, o el que se pase).
+  let eq = equipo;
+  if (eq === undefined && params?.token) {
+    const yo = await _validarToken(params.token);
+    if (yo) eq = (await supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle()).data?.categoria ?? null;
+  }
+  const cobro = _cobroEquipo(r, eq);
   return {
-    precioPorClase: map['precio_por_clase'] ?? null, precioMensual: map['precio_mensual'] ?? null,
+    precioPorClase: cobro.precioClase ?? map['precio_por_clase'] ?? null, precioMensual: cobro.precioMensual ?? map['precio_mensual'] ?? null,
+    modoCobro: cobro.modo,
     cuota: { venceDia: Number(r.cuotaVenceDia) || 0, graciaDias: Number(r.cuotaGraciaDias) || 0, recargo: Number(r.cuotaRecargo) || 0 },
   };
 }
@@ -4571,7 +4625,7 @@ function _mesActualClave(): string {
 // curso; el cron diario agrega cada mes nuevo). La nota lleva la solicitud
 // para poder quitar los meses futuros si se cancela.
 async function _aplicarExcepcionCuota(sol: { id: any; nombre: string; tipo: string; mes_aplicacion: string; efecto: string; vigente_hasta: string | null; indefinida: boolean }): Promise<{ mitad: number }> {
-  const precios = await getPreciosClases();
+    const precios = await getPreciosClases({}, (await supabase.from('equipo').select('categoria').eq('username', sol.nombre).maybeSingle()).data?.categoria ?? null);
   const mitad = Math.round(Number(precios.precioMensual ?? 0) * 50) / 100;
   const actual = _mesActualClave();
   const fin = sol.indefinida ? (actual > sol.mes_aplicacion ? actual : sol.mes_aplicacion) : (sol.vigente_hasta ?? sol.mes_aplicacion);
@@ -4755,8 +4809,8 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     if (dupMensual) return { exito: false, mensaje: 'Ya tienes una reserva pendiente para ese mes. Espera a que sea revisada.' };
   }
 
-  // Precio server-side
-  const precios = await getPreciosClases();
+    // Precio server-side (con el precio propio de su equipo, si tiene)
+  const precios = await getPreciosClases({}, (await supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle()).data?.categoria ?? null);
     let montoFinal = esMensual ? Number(precios.precioMensual ?? 0) : Number(precios.precioPorClase ?? 0);
   // Recargo fijo por pagar la cuota después del vencimiento + gracia (Mi Liga → Cobros).
     let recargo = 0;
@@ -4935,7 +4989,7 @@ async function cancelarReserva(params: Record<string, any>): Promise<Record<stri
   // cualquiera que cancelara una reserva confirmada, la hubiera pagado con
   // cupón o no. Al reagendar, el cupón viaja con la reserva.
   let cuponRestaurado = false;
-  if (r.uso_cupon && r.id_evento && (await _faltaAlMenos(r.id_evento, 60))) {
+    if (r.uso_cupon && r.id_evento && (await _faltaAlMenos(r.id_evento, Number((await _reglasLiga()).cuponCancelarMin) || 0))) {
     await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', nombre);
     cuponRestaurado = true;
   }
@@ -5301,7 +5355,8 @@ async function _cerrarReservasVencidas(ahora: number): Promise<void> {
   const { data: rs } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, monto, id_evento')
     .eq('estado', 'Pendiente').eq('tipo', 'clase').not('id_evento', 'is', null).limit(500);
   if (!rs?.length) return;
-  const ids = [...new Set(rs.map((r: any) => r.id_evento))];
+    const ids = [...new Set(rs.map((r: any) => r.id_evento))];
+  const horasCierre = Number((await _reglasLiga()).sinAprobarHoras) || 2;
   const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina').in('id_evento', ids);
   const ev: Record<string, any> = {};
   for (const e of evs ?? []) ev[e.id_evento] = e;
@@ -5309,7 +5364,7 @@ async function _cerrarReservasVencidas(ahora: number): Promise<void> {
     const e = ev[r.id_evento];
     if (!e?.fecha) continue;
     const fin = Date.parse(`${e.fecha}T${String(e.termina || e.inicia || '23:59:00').slice(0, 8)}-05:00`);
-    if (!Number.isFinite(fin) || ahora < fin + 2 * 3600 * 1000) continue;
+        if (!Number.isFinite(fin) || ahora < fin + horasCierre * 3600 * 1000) continue;
     const que = `Clase del ${_fechaCorta(e.fecha)}`;
     const monto = _num2(Number(r.monto) || 0);
     if (monto > 0 && await _vinoAlEvento(r.nombre_usuario, r.id_evento)) { await _pasarADeuda(r, que, monto, 'automático'); continue; }
@@ -5350,13 +5405,13 @@ async function _deudaVinoSinReserva(nombre: string, idEvento: string): Promise<v
   if (ya?.length) return; // cualquier reserva (pagada, pendiente, con cupón o ya pasada a deuda)
   const { data: e } = await supabase.from('asistencias').select('fecha, tipo_evento').eq('id_evento', idEvento).maybeSingle();
   if (!e?.fecha || e.tipo_evento !== 'Entrenamiento' || String(e.fecha) < DEUDA_SIN_RESERVA_DESDE) return;
-  const { data: p } = await supabase.from('equipo').select('categoria, exenta_cuota, estado_miembro').eq('username', nombre).maybeSingle();
+    const { data: p } = await supabase.from('equipo').select('categoria, exenta_cuota, estado_miembro').eq('username', nombre).maybeSingle();
   if (!p || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return;
-  const gracia = (await _reglasLiga()).graciaClases ?? {};
-  if (gracia[String(p.categoria ?? '')] !== undefined) return; // paga por mes (clases de gracia)
+  const cobro = _cobroEquipo(await _reglasLiga(), p.categoria);
+  if (cobro.modo === 'mes' || cobro.modo === 'sin_cobro') return; // paga por mes (clases de gracia) o no paga
   const mes = String(e.fecha).slice(0, 7);
   if ((await _estadosCuotaMes([nombre], mes))[nombre] !== 'debe') return;
-  const monto = _num2(Number((await getPreciosClases()).precioPorClase) || 0);
+  const monto = _num2(Number((await getPreciosClases({}, p.categoria)).precioPorClase) || 0);
   if (!(monto > 0)) return;
   const que = `Clase del ${_fechaCorta(e.fecha)}`;
   const { data: mov } = await supabase.from('saldos_movimientos').insert({
@@ -9841,7 +9896,7 @@ async function _otorgarRecompensa(regla: any, u: string, periodo: string, mesPun
       await supabase.from('cuota_excepcion').insert({ id_miembro: u, mes: sig, tipo: 'exenta', monto: null, notas: `Recompensa: ${regla.nombre}` });
       dado.mensualidadGratis = sig;
     } else {
-      saldo += Number((await getPreciosClases()).precioMensual) || 0;
+            saldo += Number((await getPreciosClases({}, (await supabase.from('equipo').select('categoria').eq('username', u).maybeSingle()).data?.categoria ?? null)).precioMensual) || 0;
     }
   }
   if (saldo > 0) {
@@ -10239,7 +10294,7 @@ Deno.serve(async (req: Request) => {
       case 'completarActivacion':             return json(await completarActivacion(params));
       case 'generarInviteToken':              return json(await generarInviteToken(params));
       // Config
-      case 'getPreciosClases':                return json(await getPreciosClases());
+            case 'getPreciosClases':                return json(await getPreciosClases(params));
       case 'adminSetPreciosClases':           return json(await adminSetPreciosClases(params));
       // Venues
       case 'adminGetVenues':                  return json(await adminGetVenues());

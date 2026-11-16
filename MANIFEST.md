@@ -203,6 +203,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Cobro por equipo y reglas de reservas (2026-11-16)
+- `reglas_liga.cobroEquipos[equipo] = {modo: mes|clase|elige|segun_equipamiento|sin_cobro, precioMensual, precioClase}`; sin entrada, `_cobroEquipo()` da 'mes' a Quindes o a un equipo con `graciaClases`, si no 'segun_equipamiento'. `getPreciosClases(params, equipo)` usa el precio propio (por token o equipo); lo usan `guardarReserva`, `_aplicarExcepcionCuota`, `_deudaVinoSinReserva` y la mensualidad gratis de recompensas. `getConfigEquipo` devuelve `modoCobro` → `Sesion.modoCobro` → `ReservasRepo.opciones`.
+- `reservaClasesVisibles` (6), `reservaCierraHoras` (2), `cuponCancelarMin` (60), `sinAprobarHoras` (2) en `reglas_liga`, usados por `_proximosEntrenamientos`, `cancelarReserva` y `_cerrarReservasVencidas`.
+- `reglas_liga.repartoViaje` (tramos por defecto de los viajes). App: `EditorTramos`, `RepartoViajeScreen` (tesoreria_screen.dart), `CobroEquipoScreen` y `ReservasReglasScreen` (pivots/cobro_equipo_screen.dart), paso "¿Cómo paga?" en el asistente de equipo nuevo.
+
 ## Recompensas automáticas (2026-11-16)
 - Tablas `reglas_recompensa` (condición `{tipo: racha|asistencias_mes|porcentaje_mes, valor}`, premio `{puntos, claseGratis, saldo, mensualidadGratis}`, `equipo` null = liga, `desde`, borrado lógico) y `recompensas_otorgadas` (único por regla, persona y período). Migración `20261116050000_reglas_recompensa.sql`.
 - Servidor: `adminRecompensas` (op listar/guardar/eliminar, área equipo), `_otorgarRecompensa` (puntos, cupón si no tiene, `cuota_excepcion` exenta del mes siguiente o saldo a favor si ya pagó, abono 'aparte', push), `_recompensasRacha` (en `adminMarcarAsistencia`, marcas nuevas), `_recompensasMes` (cronDiario días 1–3, mes cerrado, solo reglas creadas hasta el día 1 de ese mes; Entrenamientos no cancelados).

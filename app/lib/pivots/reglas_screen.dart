@@ -9,6 +9,8 @@ import '../equipo/inventario_screen.dart';
 import '../sesion/sesion.dart';
 import 'buscador_liga.dart';
 import 'categorias_screen.dart';
+import 'cobro_equipo_screen.dart';
+
 import 'editores_liga.dart';
 import 'recompensas_asistencia.dart';
 import 'recompensas_screen.dart';
@@ -178,14 +180,15 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   editar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
                 ),
 
-                _regla(
-                  'quienPaga',
-                  Icons.payments_outlined,
-                  'Quién paga por clase',
-                  'Sin equipamiento propio: solo por clase. Con equipamiento propio: elige por clase o por mes',
-                  equipo: 'Mirlxs',
-                ),
-                _regla('soloMes', Icons.calendar_month_outlined, 'Paga solo por mes', 'Nunca por clase', equipo: 'Quindes'),
+                for (final e in _equipos)
+                  _regla(
+                    'cobro_$e',
+                    Icons.payments_outlined,
+                    'Cómo paga',
+                    textoCobroEquipo(c, e),
+                    equipo: e,
+                    editar: () => SubAjustes.abrir(context, CobroEquipoScreen(config: c, equipo: e)),
+                  ),
                 for (final e in (_equipos.isEmpty ? gracia.keys : _equipos))
                   _regla(
                     'gracia_$e',
@@ -199,14 +202,28 @@ class _ReglasScreenState extends State<ReglasScreen> {
                     equipo: e,
                     editar: () => editarGracia(context, s, c, soloEquipo: e),
                   ),
-                _regla('seisClases', Icons.event_available_outlined, 'Clases para reservar', 'Se ven las 6 próximas; se cierra 2 horas antes de empezar'),
+                _regla(
+                  'seisClases',
+                  Icons.event_available_outlined,
+                  'Clases para reservar',
+                  'Se ven las ${c.reservaClasesVisibles} próximas; ${c.reservaCierraHoras == 0 ? 'se puede reservar hasta que empieza' : 'se cierra ${c.reservaCierraHoras} ${c.reservaCierraHoras == 1 ? 'hora' : 'horas'} antes de empezar'}',
+                  editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
+                ),
                 _regla(
                   'cupon',
                   Icons.local_activity_outlined,
                   'Clase gratis de bienvenida',
-                  'Una por persona nueva; vuelve si cancela con 1 hora de anticipación',
+                  'Una por persona nueva; ${c.cuponCancelarMin == 0 ? 'vuelve siempre que cancele' : 'vuelve si cancela con ${c.cuponCancelarMin % 60 == 0 ? '${c.cuponCancelarMin ~/ 60} ${c.cuponCancelarMin == 60 ? 'hora' : 'horas'}' : '${c.cuponCancelarMin} minutos'} de anticipación'}',
+                  editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
                 ),
-                _regla('sinAprobar', Icons.cancel_outlined, 'Reserva sin aprobar', '2 horas después de la clase se cancela; si vino, queda la deuda'),
+                _regla(
+                  'sinAprobar',
+                  Icons.cancel_outlined,
+                  'Reserva sin aprobar',
+                  '${c.sinAprobarHoras} ${c.sinAprobarHoras == 1 ? 'hora' : 'horas'} después de la clase se cancela; si vino, queda la deuda',
+                  editar: () => SubAjustes.abrir(context, ReservasReglasScreen(config: c)),
+                ),
+                _regla('sinReserva', Icons.person_off_outlined, 'Vino sin reserva', 'Si debía pagar esa clase, queda la deuda del valor por clase'),
               ],
             ),
             const SizedBox(height: 16),

@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'reglas_screen.dart';
+import 'cobro_equipo_screen.dart' show modosCobro;
+import '../core/config_liga.dart';
+
 import 'editores_liga.dart';
 
 import 'package:flutter/services.dart';
@@ -1475,7 +1478,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   }
 }
 
-enum _Paso { nombre, que, periodo, clases, puntos, subirBajar, resumen }
+enum _Paso { nombre, cobro, que, periodo, clases, puntos, subirBajar, resumen }
 
 /// Asistente para crear un equipo nuevo (queda justo encima del inicial).
 class _NuevoEquipoAsistente extends StatefulWidget {
@@ -1497,12 +1500,16 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
   _Paso _paso = _Paso.nombre;
   bool _adelante = true, _ocupado = false;
 
+  /// Cómo paga el equipo nuevo (Victor, 2026-11-15); se cambia en Reglas.
+  String _cobro = 'mes';
+
   String get _nombre => _nombreCtl.text.trim().isEmpty ? 'el equipo nuevo' : _nombreCtl.text.trim();
   String get _nombreDebajo => '${widget.inicial['nombre']}';
   List<_Persona> get _candidatos => widget.gente.where((x) => x.categoria == _nombreDebajo && x.evaluable).toList();
 
   List<_Paso> get _pasos => [
     _Paso.nombre,
+    _Paso.cobro,
     _Paso.que,
     _Paso.periodo,
     if (_r.modo != 'puntos') _Paso.clases,
@@ -1559,6 +1566,11 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
         ..._r.params({'orden': orden, 'nombre': _nombreCtl.text.trim(), 'requisitos': const {}}),
       });
       await _guardarTier(widget.sesion, {..._Regla.de(ini).params(ini), 'orden': orden + 1});
+      await ConfigLiga.de(widget.sesion).guardarReglas({
+        'cobroEquipos': {
+          _nombreCtl.text.trim(): {'modo': _cobro},
+        },
+      });
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -1582,6 +1594,7 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
       alAtras: () => _ir(-1),
       tituloPaso: switch (_paso) {
         _Paso.nombre => '¿Cómo se llama?',
+        _Paso.cobro => '¿Cómo paga?',
         _Paso.que => '¿Qué pide?',
         _Paso.periodo => '¿En cuánto tiempo?',
         _Paso.clases => '¿Cuántas clases?',
@@ -1591,6 +1604,7 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
       },
       ayuda: switch (_paso) {
         _Paso.nombre => 'Quedará justo encima de $_nombreDebajo.',
+        _Paso.cobro => 'Se puede cambiar después en Reglas, con precio propio si quieres.',
         _Paso.periodo => 'Con meses, se cuentan meses completos.',
         _ => null,
       },
@@ -1605,6 +1619,25 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
               decoration: const InputDecoration(hintText: 'Ej. Halcones'),
               onChanged: (_) => setState(() {}),
             ),
+          ],
+        ),
+        _Paso.cobro => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            for (final e in modosCobro.entries)
+              OpcionAsistente(
+                icono: switch (e.key) {
+                  'mes' => Icons.calendar_month_outlined,
+                  'clase' => Icons.confirmation_number_outlined,
+                  'elige' => Icons.alt_route_rounded,
+                  'sin_cobro' => Icons.money_off_rounded,
+                  _ => Icons.roller_skating_outlined,
+                },
+                titulo: e.value.$1,
+                texto: e.value.$2,
+                activa: _cobro == e.key,
+                alTocar: () => setState(() => _cobro = e.key),
+              ),
           ],
         ),
         _Paso.que => ListView(

@@ -198,8 +198,21 @@ class ReservasRepo {
   /// Qué reservas ofrece el "+" (doc Fase 3, validado por Victor 2026-11-07):
   /// Quindes → por mes; Mirlxs con equipo del club → por clase; Mirlxs con
   /// equipo propio → por clase o por mes. Exentas, Técnico y Lesionadx no pagan.
+  /// Con el cobro de su equipo cargado (Mi Liga → Reglas), manda ese.
   List<TipoReserva> get opciones {
     if (_exenta) return const [];
+    switch (sesion.modoCobro) {
+      case 'mes':
+        return const [TipoReserva.mes];
+      case 'clase':
+        return const [TipoReserva.clase];
+      case 'elige':
+        return const [TipoReserva.clase, TipoReserva.mes];
+      case 'sin_cobro':
+        return const [];
+      case 'segun_equipamiento':
+        return necesitaEquipo ? const [TipoReserva.clase] : const [TipoReserva.clase, TipoReserva.mes];
+    }
     if (_categoria == 'quindes') return necesitaEquipo ? const [] : const [TipoReserva.mes];
     if (_categoria == 'mirlxs' || _categoria.isEmpty) {
       return necesitaEquipo ? const [TipoReserva.clase] : const [TipoReserva.clase, TipoReserva.mes];

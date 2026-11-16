@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (cobro por equipo y reglas editables)
+- **Cómo paga cada equipo** (Reglas → Cobros → Cómo paga): por mes, por clase, elige, según su equipamiento (como Mirlxs hoy) o sin cobro, con precio propio opcional de mensualidad y de clase. La app ofrece las reservas según eso, y el precio de cada reserva es el del equipo de la persona. Al crear un equipo se elige cómo paga.
+- **Reglas de reservas editables** (antes fijas): cuántas clases se ven para reservar, hasta cuántas horas antes se puede reservar, con cuánta anticipación vuelve la clase gratis al cancelar y cuándo se cierra una reserva sin aprobar.
+- **Viajes → Reglas de reparto:** reparto por defecto de la liga ("quien asistió al 90 % o más recibe 50 % del fondo") con el que empieza cada viaje nuevo. El editor de tramos ya no usa + y −.
+
 ## 2026-11-16 (recompensas automáticas)
 - **Recompensas por asistencia** (Reglas → Recompensas → Nueva recompensa): un asistente por pasos arma reglas que premian asistir seguido (racha), venir N veces en el mes o un porcentaje de asistencia del mes, para toda la liga o un equipo. El premio puede ser puntos extra, clase gratis, la mensualidad del mes siguiente gratis o saldo a favor (combinables). Se dan solas con un aviso a la persona; se pueden pausar, editar o borrar. Rigen desde que se guardan y lo ya dado no cambia.
 - "Recompensas" es ahora una sección de Reglas con "Por pagar a tiempo", la racha de siempre (cada 3 seguidas, 2 puntos; fija por ahora) y las nuevas.

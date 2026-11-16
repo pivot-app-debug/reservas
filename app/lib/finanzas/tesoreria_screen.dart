@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../ajustes/componentes.dart';
 import '../core/api.dart';
+import '../core/config_liga.dart';
 import '../core/cargando.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -2053,11 +2055,7 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
   }
 
   Future<void> _editar([Map<String, dynamic>? f]) async {
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _FondoScreen(repo: widget.repo, fondo: f),
-      ),
-    );
+    final ok = await SubAjustes.abrir<bool>(context, _FondoScreen(repo: widget.repo, fondo: f));
     if (ok == true) _cargar();
   }
 
@@ -2110,6 +2108,28 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
                   child: Text(
+                    'REGLAS DE REPARTO',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  ),
+                ),
+                Material(
+                  color: p.tarjeta,
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    leading: Icon(Icons.pie_chart_outline_rounded, color: p.marcaTexto),
+                    title: const Text('Reparto por defecto', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(textoTramos(ConfigLiga.de(widget.repo.sesion).repartoViaje)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      await SubAjustes.abrir<void>(context, RepartoViajeScreen(config: ConfigLiga.de(widget.repo.sesion)));
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  child: Text(
                     'VIAJES',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
                   ),
@@ -2152,13 +2172,9 @@ class _FondoScreenState extends State<_FondoScreen> {
   late final _monto = TextEditingController(text: widget.fondo == null ? '' : '${widget.fondo!['monto']}');
   late DateTime _desde = DateTime.tryParse('${widget.fondo?['ventana_desde'] ?? ''}') ?? DateTime(Fechas.hoy().year - 1, Fechas.hoy().month, Fechas.hoy().day);
   late DateTime _hasta = DateTime.tryParse('${widget.fondo?['ventana_hasta'] ?? ''}') ?? Fechas.hoy();
+  // Un viaje nuevo empieza con el reparto por defecto de la liga (Viajes → Reglas de reparto).
   late List<Map<String, num>> _tramos = [
-    for (final t
-        in (widget.fondo?['tramos'] as List? ??
-            const [
-              {'min': 90, 'pct': 50},
-              {'min': 35, 'pct': 50},
-            ]))
+    for (final t in (widget.fondo?['tramos'] as List? ?? ConfigLiga.de(widget.repo.sesion).repartoViaje))
       {'min': (t['min'] as num?) ?? 0, 'pct': (t['pct'] as num?) ?? 0},
   ];
   Map<String, dynamic>? _vista;
@@ -2206,7 +2222,6 @@ class _FondoScreenState extends State<_FondoScreen> {
     final p = context.pivot;
     final v = _vista;
     final personas = [for (final x in (v?['personas'] as List? ?? const [])) x as Map<String, dynamic>];
-    final sumaPct = _tramos.fold<num>(0, (s, t) => s + (t['pct'] ?? 0));
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -2250,52 +2265,12 @@ class _FondoScreenState extends State<_FondoScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Tramos',
+            'Reglas de reparto',
             style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
           ),
-          for (final (i, t) in _tramos.indexed)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    i == 0 ? 'Desde ${t['min']} % de asistencia' : 'De ${t['min']} % a menos de ${_tramos[i - 1]['min']} %',
-                    style: TextStyle(color: p.texto),
-                  ),
-                ),
-                IconButton(onPressed: () => setState(() => t['min'] = ((t['min'] ?? 0) - 5).clamp(0, 100)), icon: const Icon(Icons.remove_rounded)),
-                IconButton(onPressed: () => setState(() => t['min'] = ((t['min'] ?? 0) + 5).clamp(0, 100)), icon: const Icon(Icons.add_rounded)),
-                SizedBox(
-                  width: 64,
-                  child: TextFormField(
-                    initialValue: '${t['pct']}',
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(suffixText: '%', isDense: true),
-                    onChanged: (x) => setState(() => t['pct'] = num.tryParse(x) ?? 0),
-                  ),
-                ),
-              ],
-            ),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: () => setState(
-                  () => _tramos = [
-                    ..._tramos,
-                    {'min': 0, 'pct': 0},
-                  ],
-                ),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Agregar tramo'),
-              ),
-              if (_tramos.length > 1)
-                TextButton(onPressed: () => setState(() => _tramos = _tramos.sublist(0, _tramos.length - 1)), child: const Text('Quitar el último')),
-              const Spacer(),
-              Text(
-                '$sumaPct %',
-                style: TextStyle(fontWeight: FontWeight.w700, color: sumaPct > 100 ? p.marcaTexto : p.textoSecundario),
-              ),
-            ],
-          ),
+          const SizedBox(height: 8),
+          EditorTramos(tramos: _tramos, alCambiar: (t) => setState(() => _tramos = t)),
+          const SizedBox(height: 8),
           FilledButton.tonalIcon(onPressed: _previsualizar, icon: const Icon(Icons.visibility_outlined), label: const Text('Ver reparto')),
           const SizedBox(height: 12),
           if (v != null) ...[
@@ -2321,6 +2296,176 @@ class _FondoScreenState extends State<_FondoScreen> {
         onPressed: _ocupado ? null : _guardar,
         icon: const Icon(Icons.check_rounded),
         label: const Text('Guardar'),
+      ),
+    );
+  }
+}
+
+/// "Desde 90 %: 50 % · desde 35 %: 50 %".
+String textoTramos(List tramos) => tramos.isEmpty
+    ? 'Sin reglas'
+    : [for (final t in tramos) 'desde ${(t as Map)['min']} % de asistencia: ${t['pct']} % del fondo'].join(' · ').replaceFirst('d', 'D');
+
+/// Reglas de reparto de un fondo de viaje (Victor, 2026-11-15), sin + y −:
+/// "Quien asistió al X % o más recibe Y % del fondo", repartido en partes
+/// iguales entre quienes caen en ese tramo.
+class EditorTramos extends StatelessWidget {
+  const EditorTramos({super.key, required this.tramos, required this.alCambiar});
+  final List<Map<String, num>> tramos;
+  final ValueChanged<List<Map<String, num>>> alCambiar;
+
+  static const _minimos = [0, 10, 20, 25, 30, 35, 40, 50, 60, 70, 75, 80, 85, 90, 95, 100];
+
+  List<Map<String, num>> _ordenar(List<Map<String, num>> l) => [...l]..sort((a, b) => (b['min'] ?? 0).compareTo(a['min'] ?? 0));
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final suma = tramos.fold<num>(0, (s, t) => s + (t['pct'] ?? 0));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, t) in tramos.indexed)
+          Container(
+            key: ValueKey('tramo_$i'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+            decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Text('Quien asistió al', style: TextStyle(color: p.texto)),
+                      DropdownButton<int>(
+                        value: _minimos.contains((t['min'] ?? 0).toInt()) ? (t['min'] ?? 0).toInt() : null,
+                        hint: Text('${t['min']} %'),
+                        isDense: true,
+                        underline: const SizedBox.shrink(),
+                        items: [for (final m in _minimos) DropdownMenuItem(value: m, child: Text('$m %'))],
+                        onChanged: (m) => alCambiar(
+                          _ordenar([
+                            for (final (j, x) in tramos.indexed) j == i ? {...x, 'min': m ?? 0} : x,
+                          ]),
+                        ),
+                      ),
+                      Text('o más recibe', style: TextStyle(color: p.texto)),
+                      SizedBox(
+                        width: 76,
+                        child: TextFormField(
+                          key: ValueKey('pct_${i}_${t['min']}'),
+                          initialValue: '${t['pct']}',
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: const InputDecoration(suffixText: '%', isDense: true),
+                          onChanged: (x) => alCambiar([
+                            for (final (j, y) in tramos.indexed) j == i ? {...y, 'pct': num.tryParse(x) ?? 0} : y,
+                          ]),
+                        ),
+                      ),
+                      Text('del fondo', style: TextStyle(color: p.texto)),
+                    ],
+                  ),
+                ),
+                if (tramos.length > 1)
+                  IconButton(
+                    tooltip: 'Quitar',
+                    icon: Icon(Icons.close_rounded, color: p.textoSecundario),
+                    onPressed: () => alCambiar([
+                      for (final (j, x) in tramos.indexed)
+                        if (j != i) x,
+                    ]),
+                  ),
+              ],
+            ),
+          ),
+        Row(
+          children: [
+            if (tramos.length < 6)
+              TextButton.icon(
+                onPressed: () => alCambiar(
+                  _ordenar([
+                    ...tramos,
+                    {'min': 0, 'pct': 0},
+                  ]),
+                ),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Agregar regla'),
+              ),
+            const Spacer(),
+            Text(
+              'Total: $suma %',
+              style: TextStyle(fontWeight: FontWeight.w700, color: suma > 100 ? p.marcaTexto : p.textoSecundario),
+            ),
+          ],
+        ),
+        Text(
+          'Cada parte se divide en partes iguales entre quienes caen en ese rango (hasta la regla de arriba). Lo que no se reparte queda en la cuenta.',
+          style: TextStyle(fontSize: 12.5, height: 1.4, color: p.textoSecundario),
+        ),
+      ],
+    );
+  }
+}
+
+/// Reparto por defecto de la liga: con lo que empieza cada viaje nuevo.
+class RepartoViajeScreen extends StatefulWidget {
+  const RepartoViajeScreen({super.key, required this.config});
+  final ConfigLiga config;
+
+  @override
+  State<RepartoViajeScreen> createState() => _RepartoViajeScreenState();
+}
+
+class _RepartoViajeScreenState extends State<RepartoViajeScreen> {
+  late List<Map<String, num>> _tramos = [
+    for (final t in widget.config.repartoViaje) {'min': (t['min'] as num?) ?? 0, 'pct': (t['pct'] as num?) ?? 0},
+  ];
+  bool _guardando = false;
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    try {
+      await widget.config.guardarReglas({'repartoViaje': _tramos});
+      if (mounted) {
+        _aviso(context, 'Guardado. Se usa en los viajes nuevos.');
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) _aviso(context, _error(e));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final suma = _tramos.fold<num>(0, (s, t) => s + (t['pct'] ?? 0));
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('Reparto por defecto', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          Text(
+            'Con estas reglas empieza cada viaje nuevo; en cada viaje se pueden cambiar. Los viajes ya guardados no cambian.',
+            style: TextStyle(fontSize: 15, height: 1.4, color: p.texto),
+          ),
+          const SizedBox(height: 16),
+          EditorTramos(tramos: _tramos, alCambiar: (t) => setState(() => _tramos = t)),
+          const SizedBox(height: 20),
+          FilledButton(onPressed: _guardando || suma > 100 ? null : _guardar, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
+        ],
       ),
     );
   }

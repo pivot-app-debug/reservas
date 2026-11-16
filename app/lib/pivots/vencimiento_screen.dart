@@ -270,10 +270,10 @@ class _Tarjeta extends StatelessWidget {
   const _Tarjeta({required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: context.pivot.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-    child: child,
+  Widget build(BuildContext context) => Material(
+    color: context.pivot.tarjeta,
+    borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
   );
 }
 
