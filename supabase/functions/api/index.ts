@@ -204,7 +204,7 @@ for (const [area, acciones] of Object.entries({
     'adminCancelarEvento', 'adminRegenerarVentanaAsistencias', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue'],
   equipo: ['adminSetCategoria', 'adminSetTierModo', 'upsertTier', 'deleteTier', 'adminDatosCategorias', 'adminSetEstadoMiembro', 'adminActualizarEstadoViaje',
     'adminCancelarViaje', 'adminEliminarUsuario', 'adminRestaurarUsuario', 'adminRolesEquipo', 'adminGuardarTemporadaDescanso', 'adminEliminarTemporadaDescanso',
-        'adminBackfillHistorialTier', 'adminRecalcularStats', 'adminReglasLiga', 'adminCambiosEquipo'],
+        'adminBackfillHistorialTier', 'adminRecalcularStats', 'adminReglasLiga', 'adminCambiosEquipo', 'adminRecompensas'],
   salud: ['adminFichaEmergencia', 'adminAprobarLesion', 'adminRechazarLesion', 'adminGetSolicitudesLesion'],
   inventario: ['adminInventarioLista', 'adminPrestamo', 'adminReglaPrestamo', 'adminGuardarEquipamiento'],
   tareas: ['adminCrearTarea', 'adminEditarTarea', 'adminEliminarTarea', 'adminArchivarTarea', 'adminEliminarTareaArchivada', 'adminValidarTarea', 'adminDesvalidarTarea',
@@ -4116,11 +4116,12 @@ async function adminMarcarAsistencia(params: Record<string, any>): Promise<Recor
   } else {
     const { data: filaEquipo } = await supabase.from('equipo').select('racha_actual').eq('username', nombre).maybeSingle();
     if (estado === 'A tiempo' || estado === 'Tarde') {
-      const rachaNueva = (Number(filaEquipo?.racha_actual) || 0) + 1;
+            const rachaNueva = (Number(filaEquipo?.racha_actual) || 0) + 1;
       await supabase.from('equipo').update({ racha_actual: rachaNueva }).eq('username', nombre);
       if (rachaNueva % 3 === 0) {
         await _acreditarPuntosExtra(nombre, anioEvento, mesEvento, 2);
       }
+      try { await _recompensasRacha(nombre, rachaNueva, idEvento, String(ev.fecha)); } catch (e) { console.error('[recompensas] racha:', e); }
     } else if (estado === 'Ninguno') {
       await supabase.from('equipo').update({ racha_actual: 0 }).eq('username', nombre);
     }
@@ -9694,7 +9695,14 @@ async function cronDiario(): Promise<Record<string, any>> {
   // gracia usada). Solo a quien paga cuota (`paga_cuota` 'Sí'), Activx, sin
   // `exenta_cuota`, y solo si el mes está en 'debe' según `_estadoCuotaMes`
   // (nunca a quien ya pagó o tiene el pago en revisión).
-  try { await _recordatoriosCuota(hoyIso); } catch (e) { console.error('[cuota] recordatorios:', e); }
+    try { await _recordatoriosCuota(hoyIso); } catch (e) { console.error('[cuota] recordatorios:', e); }
+
+  // 5) Recompensas automáticas del mes que cerró (los primeros días del mes;
+  // la tabla evita dar dos veces lo mismo).
+  if (diaDelMes <= 3) {
+    const [y0, m0] = hoyIso.slice(0, 7).split('-').map(Number);
+    try { await _recompensasMes(_mesClave(y0, m0 - 1)); } catch (e) { console.error('[recompensas] mes:', e); }
+  }
 
   return { exito: true };
 }
@@ -9734,13 +9742,169 @@ async function _recompensaPago(): Promise<{ activa: boolean; puntos: number; cla
 }
 
 /** "un punto extra", "2 puntos extra y una clase gratis", etc. */
-function _textoRecompensa(x: { puntos: number; claseGratis: boolean; saldo: number }): string {
+function _textoRecompensa(x: { puntos: number; claseGratis: boolean; saldo: number; mensualidadGratis?: boolean }): string {
   const partes = [
+    ...(x.mensualidadGratis ? ['tu próxima mensualidad gratis'] : []),
     ...(x.puntos > 0 ? [x.puntos === 1 ? 'un punto extra' : `${x.puntos} puntos extra`] : []),
     ...(x.claseGratis ? ['una clase gratis'] : []),
     ...(x.saldo > 0 ? [`$${x.saldo % 1 === 0 ? x.saldo : x.saldo.toFixed(2)} de saldo a favor`] : []),
   ];
   return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : (partes[0] ?? '');
+}
+
+// ─── Recompensas automáticas (Victor, 2026-11-15) ───────────────────────────
+// Reglas que arma un Pivot: condición de asistencia → premio, para toda la
+// liga o un equipo. Se otorgan solas con aviso. Rigen desde `desde` (nunca
+// hacia atrás) y cada premio queda en `recompensas_otorgadas` (una vez por
+// regla, persona y período). Borrar o cambiar una regla no toca lo ya dado.
+const TIPOS_RECOMPENSA = ['racha', 'asistencias_mes', 'porcentaje_mes'];
+function _limpiarPremio(x: any): Record<string, any> {
+  const si = (v: unknown) => v === true || v === 'true';
+  const pts = Math.round(Number(x?.puntos)), sal = Math.round(Number(x?.saldo) * 100) / 100;
+  return {
+    puntos: Number.isFinite(pts) ? Math.min(20, Math.max(0, pts)) : 0,
+    claseGratis: si(x?.claseGratis),
+    saldo: Number.isFinite(sal) ? Math.min(1000, Math.max(0, sal)) : 0,
+    mensualidadGratis: si(x?.mensualidadGratis),
+  };
+}
+function _textoCondicion(c: any): string {
+  const n = Number(c?.valor) || 0;
+  if (c?.tipo === 'racha') return `asistir ${n} veces seguidas`;
+  if (c?.tipo === 'asistencias_mes') return `asistir ${n} ${n === 1 ? 'vez' : 'veces'} en el mes`;
+  return `asistir al ${n} % de los entrenamientos del mes`;
+}
+
+async function adminRecompensas(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const op = String(params.op ?? 'listar');
+  const leer = (v: unknown) => { if (v == null || v === '') return null; if (typeof v === 'object') return v as Record<string, any>; try { return JSON.parse(String(v)); } catch { return null; } };
+  if (op === 'guardar') {
+    const r = leer(params.regla);
+    if (!r) return { exito: false, error: 'Faltan datos.' };
+    const tipo = String(r.condicion?.tipo ?? '');
+    if (!TIPOS_RECOMPENSA.includes(tipo)) return { exito: false, error: 'Condición inválida.' };
+    const valor = Math.round(Number(r.condicion?.valor));
+    const max = tipo === 'porcentaje_mes' ? 100 : 60;
+    if (!Number.isFinite(valor) || valor < 1 || valor > max) return { exito: false, error: 'Valor inválido.' };
+    const premio = _limpiarPremio(r.premio);
+    if (!_textoRecompensa(premio)) return { exito: false, error: 'Elige al menos un premio.' };
+    const fila = {
+      nombre: String(r.nombre ?? '').trim().slice(0, 80) || 'Recompensa',
+      activa: r.activa !== false && r.activa !== 'false',
+      equipo: String(r.equipo ?? '').trim().slice(0, 60) || null,
+      condicion: { tipo, valor }, premio,
+    };
+    if (r.id) {
+      const { error } = await supabase.from('reglas_recompensa').update(fila).eq('id', String(r.id)).is('eliminada_en', null);
+      if (error) return { exito: false, error: error.message };
+      await _registrarAjuste('recompensa', null, { id: r.id, ...fila }, email);
+    } else {
+      const { error } = await supabase.from('reglas_recompensa').insert({ ...fila, desde: _hoyEcuadorISO(), creada_por: email });
+      if (error) return { exito: false, error: error.message };
+      await _registrarAjuste('recompensa', null, fila, email);
+    }
+  } else if (op === 'eliminar') {
+    await supabase.from('reglas_recompensa').update({ eliminada_en: new Date().toISOString(), activa: false }).eq('id', String(params.id ?? ''));
+    await _registrarAjuste('recompensa', { id: params.id }, null, email);
+  }
+  const { data: reglas } = await supabase.from('reglas_recompensa').select('id, nombre, activa, equipo, condicion, premio, desde, creada_en')
+    .is('eliminada_en', null).order('creada_en', { ascending: true });
+  const ids = (reglas ?? []).map((r: any) => r.id);
+  const { data: dadas } = ids.length ? await supabase.from('recompensas_otorgadas').select('regla_id').in('regla_id', ids) : { data: [] as any[] };
+  const cuenta: Record<string, number> = {};
+  (dadas ?? []).forEach((d: any) => { cuenta[d.regla_id] = (cuenta[d.regla_id] ?? 0) + 1; });
+  return { exito: true, reglas: (reglas ?? []).map((r: any) => ({ ...r, otorgadas: cuenta[r.id] ?? 0, condicionTexto: _textoCondicion(r.condicion), premioTexto: _textoRecompensa(r.premio) })) };
+}
+
+/** Da el premio de una regla a una persona (una sola vez por período) y le avisa. */
+async function _otorgarRecompensa(regla: any, u: string, periodo: string, mesPuntos: string): Promise<boolean> {
+  const { data: fila, error } = await supabase.from('recompensas_otorgadas').insert({ regla_id: regla.id, username: u, periodo }).select('id').maybeSingle();
+  if (error || !fila) return false; // ya la tenía
+  const p = _limpiarPremio(regla.premio), dado: Record<string, any> = { puntos: 0, claseGratis: false, saldo: 0, mensualidadGratis: false };
+  if (p.puntos > 0) {
+    await _acreditarPuntosExtra(u, Number(mesPuntos.slice(0, 4)), Number(mesPuntos.slice(5, 7)), p.puntos);
+    dado.puntos = p.puntos;
+  }
+  if (p.claseGratis) {
+    const { data: eq } = await supabase.from('equipo').select('cupon_disponible').eq('username', u).maybeSingle();
+    if (eq && !eq.cupon_disponible) { await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', u); dado.claseGratis = true; }
+  }
+  let saldo = p.saldo;
+  if (p.mensualidadGratis) {
+    // La mensualidad del mes siguiente; si ya la pagó o no le toca, va como saldo a favor.
+    const [y, m] = _hoyEcuadorISO().slice(0, 7).split('-').map(Number);
+    const sig = _mesClave(y, m + 1);
+    const { data: ex } = await supabase.from('cuota_excepcion').select('id').eq('id_miembro', u).eq('mes', sig).maybeSingle();
+    if (!ex && (await _estadosCuotaMes([u], sig))[u] === 'debe') {
+      await supabase.from('cuota_excepcion').insert({ id_miembro: u, mes: sig, tipo: 'exenta', monto: null, notas: `Recompensa: ${regla.nombre}` });
+      dado.mensualidadGratis = sig;
+    } else {
+      saldo += Number((await getPreciosClases()).precioMensual) || 0;
+    }
+  }
+  if (saldo > 0) {
+    const { data: mov } = await supabase.from('saldos_movimientos').insert({
+      username: u, persona_nombre: await _nombrePersona(u), fecha: _hoyEcuadorISO(), monto: _num2(saldo), tipo: 'abono', aplicar: 'aparte',
+      concepto: `Recompensa: ${regla.nombre}`, por: 'automático',
+    }).select('id').maybeSingle();
+    dado.saldo = _num2(saldo); dado.saldoMov = mov?.id ?? null;
+  }
+  await supabase.from('recompensas_otorgadas').update({ premio: dado }).eq('id', fila.id);
+  const texto = _textoRecompensa({ puntos: dado.puntos, claseGratis: dado.claseGratis, saldo: dado.saldo, mensualidadGratis: !!dado.mensualidadGratis });
+  if (texto) {
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [u], headings: { es: '¡Ganaste una recompensa!' },
+      contents: { es: `Por ${_textoCondicion(regla.condicion)} recibes ${texto}.` }, url: APP_URL }).catch(() => {});
+  }
+  return true;
+}
+
+async function _reglasRecompensaActivas(tipos: string[]): Promise<any[]> {
+  const { data } = await supabase.from('reglas_recompensa').select('id, nombre, equipo, condicion, premio, desde')
+    .eq('activa', true).is('eliminada_en', null);
+  return (data ?? []).filter((r: any) => tipos.includes(r.condicion?.tipo));
+}
+
+/** Racha: al marcar presente, si la racha llega a un múltiplo de N. */
+async function _recompensasRacha(u: string, racha: number, idEvento: string, fechaEvento: string): Promise<void> {
+  const reglas = await _reglasRecompensaActivas(['racha']);
+  if (!reglas.length || racha < 1) return;
+  const { data: p } = await supabase.from('equipo').select('categoria, estado_miembro').eq('username', u).maybeSingle();
+  if (!p || p.estado_miembro === 'Técnico') return;
+  for (const r of reglas) {
+    const n = Number(r.condicion?.valor) || 0;
+    if (n < 1 || racha % n !== 0 || String(fechaEvento) < String(r.desde)) continue;
+    if (r.equipo && r.equipo !== p.categoria) continue;
+    await _otorgarRecompensa(r, u, `racha:${idEvento}`, String(fechaEvento).slice(0, 7));
+  }
+}
+
+/** Mes cerrado: asistencias (a horario o tarde) a Entrenamientos y su porcentaje. */
+async function _recompensasMes(mes: string): Promise<void> {
+  const reglas = (await _reglasRecompensaActivas(['asistencias_mes', 'porcentaje_mes']))
+    .filter((r: any) => String(r.desde) <= `${mes}-01`); // rige para meses completos desde que se creó
+  if (!reglas.length) return;
+  const [y, m] = mes.split('-').map(Number);
+  const hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const { data: evs } = await supabase.from('asistencias').select('fecha, a_horario, tarde')
+    .eq('tipo_evento', 'Entrenamiento').not('estado', 'in', '("Evento Cancelado","No se entrena","Eliminado")')
+    .gte('fecha', `${mes}-01`).lte('fecha', hasta);
+  const total = (evs ?? []).length;
+  if (!total) return;
+  const veces: Record<string, number> = {};
+  const nombres = (v: unknown) => String(v ?? '').split(',').map((n) => n.trim().toUpperCase()).filter(Boolean);
+  for (const e of evs ?? []) for (const n of new Set([...nombres(e.a_horario), ...nombres(e.tarde)])) veces[n] = (veces[n] ?? 0) + 1;
+  const { data: gente } = await supabase.from('equipo').select('username, categoria, estado_miembro').is('eliminado_en', null);
+  for (const r of reglas) {
+    const n = Number(r.condicion?.valor) || 0;
+    for (const p of gente ?? []) {
+      if (p.estado_miembro === 'Técnico' || (r.equipo && r.equipo !== p.categoria)) continue;
+      const v = veces[String(p.username).toUpperCase()] ?? 0;
+      const cumple = r.condicion?.tipo === 'asistencias_mes' ? v >= n : (v * 100) / total >= n;
+      if (cumple && v > 0) await _otorgarRecompensa(r, p.username, mes, mes);
+    }
+  }
 }
 
 async function _diaPuntoExtra(): Promise<number> {
@@ -10094,7 +10258,8 @@ Deno.serve(async (req: Request) => {
                         case 'adminBandeja':                    return json(await adminBandeja(params));
                         case 'adminPivots':                     return json(await adminPivots(params));
             case 'getReglasLiga':                   return json(await getReglasLiga(params));
-            case 'adminReglasLiga':                 return json(await adminReglasLiga(params));
+                        case 'adminReglasLiga':                 return json(await adminReglasLiga(params));
+      case 'adminRecompensas':                return json(await adminRecompensas(params));
                         case 'adminCambiosEquipo':              return json(await adminCambiosEquipo(params));
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));

@@ -54,7 +54,7 @@ const entradasLiga = [
     'puntoExtra',
     'Recompensas por pagar a tiempo',
     'Mi Liga › Reglas',
-    'punto extra premio bono descuento clase gratis saldo a favor pronto pago',
+    'punto extra premio bono descuento clase gratis saldo a favor pronto pago recompensa racha asistencia perfecta mensualidad gratis',
     dentro: 'reglas',
   ),
   EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),

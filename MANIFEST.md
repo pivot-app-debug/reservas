@@ -203,6 +203,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Recompensas automáticas (2026-11-16)
+- Tablas `reglas_recompensa` (condición `{tipo: racha|asistencias_mes|porcentaje_mes, valor}`, premio `{puntos, claseGratis, saldo, mensualidadGratis}`, `equipo` null = liga, `desde`, borrado lógico) y `recompensas_otorgadas` (único por regla, persona y período). Migración `20261116050000_reglas_recompensa.sql`.
+- Servidor: `adminRecompensas` (op listar/guardar/eliminar, área equipo), `_otorgarRecompensa` (puntos, cupón si no tiene, `cuota_excepcion` exenta del mes siguiente o saldo a favor si ya pagó, abono 'aparte', push), `_recompensasRacha` (en `adminMarcarAsistencia`, marcas nuevas), `_recompensasMes` (cronDiario días 1–3, mes cerrado, solo reglas creadas hasta el día 1 de ese mes; Entrenamientos no cancelados).
+- App: `pivots/recompensas_asistencia.dart` (`RecompensasRepo`, `RecompensaAsistenteScreen` de 5 pasos); grupo "Recompensas" en `ReglasScreen`.
+
 ## Deuda sin reserva y gracia (2026-11-16)
 - `_deudaVinoSinReserva(nombre, idEvento)` (desde `_deudaSiVinoSinPago`, al marcar o rectificar a horario/tarde): sin ninguna reserva para el evento, Entrenamiento desde `DEUDA_SIN_RESERVA_DESDE` (2026-11-16), equipo sin `graciaClases` (paga por clase), no exentx ni Técnico, mes del evento 'debe' → cargo 'con_cuota' por el valor por clase y reserva Cancelada con `motivo_rechazo` `VINO_SIN_RESERVA` y `saldo_movimiento_id`. `_anularDeudaSinReserva` la deshace si la marca deja de ser presente.
 - App `motivoSinAsistire`: gracia = asistencias confirmadas del mes + Asistiré por venir < N; Lesionadx ya no está exentx de esta regla.

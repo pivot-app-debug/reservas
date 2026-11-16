@@ -10,6 +10,7 @@ import '../sesion/sesion.dart';
 import 'buscador_liga.dart';
 import 'categorias_screen.dart';
 import 'editores_liga.dart';
+import 'recompensas_asistencia.dart';
 import 'recompensas_screen.dart';
 
 import 'vencimiento_screen.dart';
@@ -34,8 +35,32 @@ class _ReglasScreenState extends State<ReglasScreen> {
   List<String> _equipos = const [];
   List<Map<String, dynamic>> _tiers = const [];
   final _resaltado = ValueNotifier<String?>(null);
+  late final _recRepo = RecompensasRepo(widget.sesion);
+  List<ReglaRecompensa> _recompensas = const [];
 
   Sesion get s => widget.sesion;
+
+  Future<void> _cargarRecompensas() async {
+    try {
+      final l = await _recRepo.listar();
+      if (mounted) setState(() => _recompensas = l);
+    } catch (_) {}
+  }
+
+  Future<void> _abrirRecompensa([ReglaRecompensa? r]) async {
+    final ok = await SubAjustes.abrir<bool>(context, RecompensaAsistenteScreen(repo: _recRepo, equipos: _equipos, regla: r));
+    if (ok == true) _cargarRecompensas();
+  }
+
+  Future<void> _activarRecompensa(ReglaRecompensa r, bool v) async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final l = await _recRepo.guardar({...r.d, 'activa': v});
+      if (mounted) setState(() => _recompensas = l);
+    } catch (e) {
+      m.showSnackBar(const SnackBar(content: Text('No se pudo guardar. Revisa tu conexión.')));
+    }
+  }
 
   Future<void> _cargarEquipos() async {
     try {
@@ -55,6 +80,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
   void initState() {
     super.initState();
     _cargarEquipos();
+    _cargarRecompensas();
     final x = widget.resaltar;
     if (x != null) WidgetsBinding.instance.addPostFrameCallback((_) => _resaltado.value = x);
   }
@@ -151,13 +177,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   textoVencimiento(c),
                   editar: () => SubAjustes.abrir(context, VencimientoScreen(config: c)),
                 ),
-                _regla(
-                  'puntoExtra',
-                  Icons.star_outline_rounded,
-                  'Recompensas por pagar a tiempo',
-                  resumenRecompensa(c),
-                  editar: () => SubAjustes.abrir(context, RecompensasPagoScreen(config: c)),
-                ),
+
                 _regla(
                   'quienPaga',
                   Icons.payments_outlined,
@@ -187,6 +207,53 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   'Una por persona nueva; vuelve si cancela con 1 hora de anticipación',
                 ),
                 _regla('sinAprobar', Icons.cancel_outlined, 'Reserva sin aprobar', '2 horas después de la clase se cancela; si vino, queda la deuda'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GrupoAjustes(
+              titulo: 'Recompensas',
+              pie: 'Se dan solas y le llega un aviso a la persona. Un cambio rige desde que lo guardas; lo ya dado no cambia.',
+              filas: [
+                _regla(
+                  'puntoExtra',
+                  Icons.star_outline_rounded,
+                  'Por pagar a tiempo',
+                  resumenRecompensa(c),
+                  editar: () => SubAjustes.abrir(context, RecompensasPagoScreen(config: c)),
+                ),
+                _regla(
+                  'racha3',
+                  Icons.local_fire_department_outlined,
+                  'Racha de asistencia',
+                  'Cada 3 asistencias seguidas, 2 puntos extra',
+                  seccion: 'entrenamientos',
+                ),
+                for (final r in _recompensas)
+                  if (_equipo == null || r.equipo == null || r.equipo == _equipo)
+                    Resaltable(
+                      id: 'rec_${r.id}',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.emoji_events_outlined,
+                        seccion: 'entrenamientos',
+                        titulo: r.nombre,
+                        valor: '${r.resumen}${r.otorgadas > 0 ? ' · ${r.otorgadas} ${r.otorgadas == 1 ? 'vez' : 'veces'} dada' : ''}',
+                        derecha: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ChipAlcance(equipo: r.equipo),
+                            Switch(value: r.activa, onChanged: (v) => _activarRecompensa(r, v)),
+                          ],
+                        ),
+                        alTocar: () => _abrirRecompensa(r),
+                      ),
+                    ),
+                FilaAjuste(
+                  icono: Icons.add_rounded,
+                  titulo: 'Nueva recompensa',
+                  valor: 'Premia la asistencia con puntos, clases o descuentos',
+                  alTocar: _abrirRecompensa,
+                ),
               ],
             ),
             const SizedBox(height: 16),
