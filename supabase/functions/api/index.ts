@@ -200,7 +200,7 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
@@ -5096,6 +5096,15 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     recargo = vig ? _recargoCuota(vig.slice(0, 7), _hoyEcuadorISO(), await _reglasLiga(), montoFinal) : 0;
                                 montoFinal += recargo;
   }
+    // Plan de N meses (Victor, 2026-11-16): cada mes vale precio / N, sin recargo.
+  let planIdUsado: string | null = null;
+  if (esMensual && params.planId) {
+    const plan = await _planDe(String(params.planId), nombre);
+    if (!plan || plan.tipo !== 'meses') return { exito: false, mensaje: 'Ese plan ya no está disponible.' };
+    montoFinal = _num2(Number(plan.precio) / Number(plan.cantidad));
+    recargo = 0;
+    planIdUsado = plan.id;
+  }
   // Cupón manual de descuento (Victor, 2026-11-16): un % para el próximo
   // pago, una sola vez. Vuelve si se cancela esa reserva.
   let descuentoPct: number | null = null, descuentoMonto: number | null = null;
@@ -5134,9 +5143,14 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
   // (manda monto 0, web y app, 2026-11-07); antes se aplicaba siempre, aunque
   // la persona no hubiera elegido el cupón o fuera una cuota mensual.
   const pideGratis = params.monto === undefined || Number(params.monto) === 0;
-  const credito = pideGratis ? await _consumirCreditoReal(nombre) : false;
+    const credito = pideGratis ? await _consumirCreditoReal(nombre) : false;
   let usoCupon = false;
-  if (credito) {
+  // Clase de un plan de clases (antes que el cupón de bienvenida).
+  const creditoPlan = !credito && pideGratis && !esMensual ? await _consumirCreditoPlan(nombre) : null;
+  if (creditoPlan) {
+    montoFinal = 0;
+    planIdUsado = creditoPlan.plan_id ?? null;
+  } else if (credito) {
     montoFinal = 0;
   } else if (pideGratis) {
     const { data: eq } = await supabase.from('equipo').select('cupon_disponible').eq('username', nombre).maybeSingle();
@@ -5154,7 +5168,8 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
                                 estado: 'Pendiente', monto: montoFinal, fecha_pago: _hoyEcuadorISO(), email: email ?? null, saldo_aplicado: saldoAplicado,
                 validez_hasta: esMensual ? _vigenciaMensualISO(fecha, hoyISO, anioMes) : null,
         uso_cupon: usoCupon,
-    descuento_pct: descuentoPct, descuento_monto: descuentoMonto,
+        descuento_pct: descuentoPct, descuento_monto: descuentoMonto,
+    plan_id: planIdUsado, plan_credito_id: creditoPlan?.id ?? null,
     // Dónde dice que pagó (2026-11-13), para que el Pivot sepa dónde revisar.
         medio_pago: /^[a-z0-9_-]{1,40}$/.test(String(params.medio ?? '')) ? String(params.medio) : null,
         medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
@@ -5286,7 +5301,12 @@ async function cancelarReserva(params: Record<string, any>): Promise<Record<stri
     await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', nombre);
     cuponRestaurado = true;
   }
-    // El descuento manual vuelve si no tiene otro.
+      // La clase de un plan vuelve al plan.
+  if (r.plan_credito_id) {
+    const { data: pc } = await supabase.from('plan_creditos').select('usadas').eq('id', r.plan_credito_id).maybeSingle();
+    if (pc && Number(pc.usadas) > 0) await supabase.from('plan_creditos').update({ usadas: Number(pc.usadas) - 1 }).eq('id', r.plan_credito_id);
+  }
+  // El descuento manual vuelve si no tiene otro.
   if (r.descuento_pct) await supabase.from('equipo').update({ cupon_descuento: r.descuento_pct }).eq('username', nombre).is('cupon_descuento', null);
   await _notificarReservaMensualCambio(r, nombre, 'cancelar');
   return { exito: true, cuponRestaurado };
@@ -7531,6 +7551,103 @@ async function adminCuponDescuento(params: Record<string, any>): Promise<Record<
     }).catch(() => {});
   }
   return { exito: true };
+}
+
+// ─── Planes de pago (Victor, 2026-11-16) ───────────────────────────────────
+/** Plan activo que le corresponde a la persona (por equipo o por nombre). */
+async function _planDe(id: string, username: string): Promise<any | null> {
+  const [{ data: p }, { data: f }] = await Promise.all([
+    supabase.from('planes').select('*').eq('id', id).eq('activo', true).maybeSingle(),
+    supabase.from('equipo').select('categoria').eq('username', username).maybeSingle(),
+  ]);
+  return p && _planAplica(p, username, f?.categoria ?? null) ? p : null;
+}
+function _planAplica(p: any, username: string, categoria: string | null): boolean {
+  const eqs: string[] = p.equipos ?? [], pers: string[] = p.personas ?? [];
+  if (!eqs.length && !pers.length) return true;
+  return (categoria != null && eqs.includes(categoria)) || pers.includes(username);
+}
+/** Usa una clase del plan que vence antes. */
+async function _consumirCreditoPlan(username: string): Promise<any | null> {
+  const { data } = await supabase.from('plan_creditos').select('*').eq('username', username).gte('vence', _hoyEcuadorISO()).order('vence');
+  const c = (data ?? []).find((x: any) => Number(x.usadas) < Number(x.total));
+  if (!c) return null;
+  const { data: ok } = await supabase.from('plan_creditos').update({ usadas: Number(c.usadas) + 1 }).eq('id', c.id).eq('usadas', c.usadas).select('id');
+  return ok?.length ? c : null;
+}
+async function _clasesDePlan(username: string): Promise<{ restantes: number; vence: string | null }> {
+  const { data } = await supabase.from('plan_creditos').select('total, usadas, vence').eq('username', username).gte('vence', _hoyEcuadorISO()).order('vence');
+  const l = (data ?? []).filter((x: any) => Number(x.usadas) < Number(x.total));
+  return { restantes: l.reduce((s: number, x: any) => s + Number(x.total) - Number(x.usadas), 0), vence: l[0]?.vence ?? null };
+}
+
+/** Planes que puede comprar la persona y sus clases de plan vigentes. */
+async function getMisPlanes(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const [{ data: planes }, { data: f }] = await Promise.all([
+    supabase.from('planes').select('*').eq('activo', true).order('created_at'),
+    supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle(),
+  ]);
+  return {
+    exito: true,
+    planes: (planes ?? []).filter((p: any) => _planAplica(p, yo, f?.categoria ?? null))
+      .map((p: any) => ({ id: p.id, nombre: p.nombre, tipo: p.tipo, cantidad: p.cantidad, precio: Number(p.precio), venceMeses: p.vence_meses })),
+    clases: await _clasesDePlan(yo),
+  };
+}
+
+/** Comprar un plan de clases: queda pendiente hasta que un Pivot apruebe el pago. */
+async function comprarPlan(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const plan = await _planDe(String(params.planId ?? ''), yo);
+  if (!plan || plan.tipo !== 'clases') return { exito: false, error: 'Ese plan ya no está disponible.' };
+  const { data: nueva, error } = await supabase.from('reservas').insert({
+    nombre_usuario: yo, tipo: 'plan', mes_texto: plan.nombre, estado: 'Pendiente', monto: Number(plan.precio),
+    fecha_pago: _hoyEcuadorISO(), plan_id: plan.id,
+    medio_pago: /^[a-z0-9_-]{1,40}$/.test(String(params.medio ?? '')) ? String(params.medio) : null,
+    medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
+  }).select('id, monto').maybeSingle();
+  if (error) return { exito: false, error: 'No se pudo guardar.' };
+  return { exito: true, id: nueva?.id ?? null, monto: Number(nueva?.monto) || 0 };
+}
+
+/** Pivots: listar, guardar o borrar planes. */
+async function adminPlanes(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const accion = String(params.accion ?? 'listar');
+  if (accion === 'guardar') {
+    let p: any = params.plan;
+    if (typeof p === 'string') { try { p = JSON.parse(p); } catch { p = null; } }
+    if (!p || typeof p !== 'object') return { exito: false, error: 'Plan inválido.' };
+    const nombre = String(p.nombre ?? '').trim().slice(0, 50);
+    const tipo = p.tipo === 'clases' ? 'clases' : 'meses';
+    const cantidad = Math.round(Number(p.cantidad)), precio = _num2(Number(p.precio));
+    if (!nombre) return { exito: false, error: 'Ponle un nombre.' };
+    if (!(cantidad >= 1 && cantidad <= (tipo === 'meses' ? 12 : 100))) return { exito: false, error: 'Cantidad inválida.' };
+    if (!(precio >= 0 && precio <= 100000)) return { exito: false, error: 'Precio inválido.' };
+    const lista = (x: unknown) => (Array.isArray(x) ? x.map((y) => String(y).trim().slice(0, 60)).filter(Boolean).slice(0, 50) : []);
+    const fila = {
+      nombre, tipo, cantidad, precio, vence_meses: Math.min(24, Math.max(1, Math.round(Number(p.venceMeses) || 3))),
+      equipos: lista(p.equipos), personas: lista(p.personas), activo: p.activo !== false,
+    };
+    const r = p.id ? await supabase.from('planes').update(fila).eq('id', String(p.id)) : await supabase.from('planes').insert(fila);
+    if (r.error) return { exito: false, error: r.error.message };
+    await _registrarAjuste('plan', null, fila, email);
+  } else if (accion === 'borrar') {
+    // Se desactiva: los ya comprados siguen valiendo.
+    await supabase.from('planes').update({ activo: false }).eq('id', String(params.id ?? ''));
+  }
+  const { data } = await supabase.from('planes').select('*').order('created_at');
+  return {
+    exito: true,
+    planes: (data ?? []).map((p: any) => ({
+      id: p.id, nombre: p.nombre, tipo: p.tipo, cantidad: p.cantidad, precio: Number(p.precio), venceMeses: p.vence_meses,
+      equipos: p.equipos ?? [], personas: p.personas ?? [], activo: p.activo,
+    })),
+  };
 }
 
 async function adminGetAdmins(): Promise<any[]> {
@@ -10513,7 +10630,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
   const id = params.id ?? params.fila;
   const { estado } = params;
   if (!id || !estado) return { exito: false, error: 'Parámetros inválidos.' };
-                const { data: reservaAntes } = await supabase.from('reservas').select('nombre_usuario, id_evento, tipo, monto, medio_pago, medio_nombre, mes_texto, uso_cupon, saldo_aplicado, saldo_movimiento_id, fecha_pago, validez_hasta, punto_extra_en, recompensa, estado').eq('id', id).maybeSingle();
+                                const { data: reservaAntes } = await supabase.from('reservas').select('nombre_usuario, id_evento, tipo, monto, medio_pago, medio_nombre, mes_texto, uso_cupon, saldo_aplicado, saldo_movimiento_id, fecha_pago, validez_hasta, punto_extra_en, recompensa, estado, plan_id').eq('id', id).maybeSingle();
     // Rechazo con motivo (Victor, 2026-11-13): se guarda y se le avisa de inmediato.
   const motivo = String(params.motivo ?? '').trim().slice(0, 120);
   const mensaje = String(params.mensaje ?? '').trim().slice(0, 400);
@@ -10536,8 +10653,8 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
     const cuenta = String(params.cuentaId ?? '') || await _cuentaPorMedio(String(reservaAntes.medio_pago ?? ''));
     if (cuenta) {
       await _registrarMovimiento({
-        tipo: 'ingreso', monto: Number(reservaAntes.monto), cuenta_id: cuenta, categoria: reservaAntes.tipo === 'mensual' ? 'cuota' : 'clase',
-        descripcion: reservaAntes.tipo === 'mensual' ? `Mensualidad ${reservaAntes.mes_texto ?? ''}`.trim() : 'Clase', persona: reservaAntes.nombre_usuario,
+                tipo: 'ingreso', monto: Number(reservaAntes.monto), cuenta_id: cuenta, categoria: reservaAntes.tipo === 'mensual' ? 'cuota' : 'clase',
+        descripcion: reservaAntes.tipo === 'mensual' ? `Mensualidad ${reservaAntes.mes_texto ?? ''}`.trim() : (reservaAntes.tipo === 'plan' ? `Plan ${reservaAntes.mes_texto ?? ''}`.trim() : 'Clase'), persona: reservaAntes.nombre_usuario,
                 origen: 'reserva', origen_id: String(id), registrado_por: adminEmail, medio_nombre: reservaAntes.medio_nombre ?? null,
       });
     }
@@ -10591,11 +10708,29 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
     if (dado.saldoMov) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: adminEmail }).eq('id', dado.saldoMov);
     await supabase.from('reservas').update({ punto_extra_en: null, recompensa: null }).eq('id', id);
   }
+    // Plan de clases: al aprobar el pago se dan sus clases; al cancelar se
+  // quitan las que no se usaron (Victor, 2026-11-16).
+  if (reservaAntes?.tipo === 'plan') {
+    if (estado === 'Confirmada' && reservaAntes.estado === 'Pendiente') {
+      const { data: plan } = await supabase.from('planes').select('nombre, cantidad, vence_meses').eq('id', reservaAntes.plan_id).maybeSingle();
+      const h = _hoyEcuadorISO();
+      const v = new Date(Date.UTC(Number(h.slice(0, 4)), Number(h.slice(5, 7)) - 1 + (Number(plan?.vence_meses) || 3), Number(h.slice(8, 10))));
+      await supabase.from('plan_creditos').insert({
+        username: reservaAntes.nombre_usuario, plan_id: reservaAntes.plan_id, reserva_id: id, nombre: plan?.nombre ?? reservaAntes.mes_texto ?? '',
+        total: Number(plan?.cantidad) || 1, vence: v.toISOString().slice(0, 10),
+      });
+    } else if (estado === 'Cancelada') {
+      const { data: pcs } = await supabase.from('plan_creditos').select('id, usadas').eq('reserva_id', id);
+      for (const pc of pcs ?? []) await supabase.from('plan_creditos').update({ total: Number(pc.usadas) }).eq('id', pc.id);
+    }
+  }
   // Aviso de pago aprobado (rechazo: arriba, con motivo).
   if (estado === 'Confirmada' && reservaAntes?.estado === 'Pendiente' && reservaAntes.nombre_usuario) {
     const mesTxt = mesCuota ? _MESES_ES[Number(mesCuota.slice(5, 7)) - 1] : String(reservaAntes.mes_texto ?? '').toLowerCase();
-    const texto = reservaAntes.tipo === 'mensual'
+        const texto = reservaAntes.tipo === 'mensual'
       ? `Recibimos tu pago de ${mesTxt}, ¡gracias!${premio ? ` Por pagar a tiempo recibes ${premio}.` : ''}`
+      : reservaAntes.tipo === 'plan'
+      ? `Tu plan ${reservaAntes.mes_texto ?? ''} está activo. Ya puedes reservar tus clases sin pagar cada una.`
       : 'Tu reserva fue confirmada. ¡Nos vemos en la pista!';
     await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario], headings: { es: reservaAntes.tipo === 'mensual' ? 'Pago confirmado' : 'Reserva confirmada' }, contents: { es: texto }, url: APP_URL }).catch(() => {});
   }
@@ -10759,7 +10894,10 @@ Deno.serve(async (req: Request) => {
       case 'adminRecompensas':                return json(await adminRecompensas(params));
                                                 case 'adminCambiosEquipo':              return json(await adminCambiosEquipo(params));
             case 'adminResolverRevisionEquipo':     return json(await adminResolverRevisionEquipo(params));
-      case 'adminCuponDescuento':             return json(await adminCuponDescuento(params));
+            case 'adminCuponDescuento':             return json(await adminCuponDescuento(params));
+      case 'adminPlanes':                     return json(await adminPlanes(params));
+      case 'getMisPlanes':                    return json(await getMisPlanes(params));
+      case 'comprarPlan':                     return json(await comprarPlan(params));
       case 'responderCambioEquipo':           return json(await responderCambioEquipo(params));
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));

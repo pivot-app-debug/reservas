@@ -9,6 +9,7 @@ import '../pivots/editores_liga.dart';
 import '../pivots/formas_pago_screen.dart';
 import '../pivots/vencimiento_screen.dart';
 import '../sesion/sesion.dart';
+import 'planes_screen.dart';
 
 /// Tesorería → Cobros (Victor, 2026-11-14): todo lo que se cobra en un solo
 /// lugar. Cada modalidad dice a quién aplica (hoy fijo, como en la web; se
@@ -145,6 +146,17 @@ class _CobrosScreenState extends State<CobrosScreen> {
                     titulo: 'Formas de pago',
                     valor: c.mediosActivos.isEmpty ? 'Sin medios de pago' : c.mediosActivos.map((m) => m.nombre).join(' · '),
                     alTocar: () => SubAjustes.abrir(context, FormasPagoScreen(config: c)),
+                  ),
+                ),
+                Resaltable(
+                  id: 'planes',
+                  resaltado: _resaltado,
+                  child: FilaAjuste(
+                    icono: Icons.inventory_outlined,
+                    seccion: 'cuota',
+                    titulo: 'Planes de pago',
+                    valor: 'Paquetes de meses o clases con precio propio',
+                    alTocar: () => SubAjustes.abrir(context, PlanesScreen(sesion: widget.sesion)),
                   ),
                 ),
                 Resaltable(

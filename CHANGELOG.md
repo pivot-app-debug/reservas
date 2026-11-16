@@ -6,6 +6,12 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - Al alejarse de hoy en el timeline, el ícono del Calendario en la barra de abajo pasa a una flecha hacia hoy (arriba o abajo) con un puntito rojo. Al tocarlo vuelve a hoy y regresa el número del día, con una transición suave.
 - Nueva guía `MIGRACION_CUENTAS.md` para pasar GitHub, Supabase, Firebase y OneSignal a pivot.app.suppor@gmail.com.
 
+## 2026-11-16 (planes de pago)
+- **Planes de pago** (Finanzas → Cobros → Planes de pago): paquetes de N meses o N clases con precio propio, para todos o algunos equipos.
+  - Al reservar por mes, elegir un plan marca los N meses seguidos y cada mes vale precio / N, sin recargo.
+  - Al reservar por clase, se compra el plan; cuando un Pivot aprueba el pago, quedan N clases para reservar sin pagar cada una, hasta que vencen. Si se cancela una reserva, la clase vuelve al plan.
+  - Quitar un plan solo impide comprarlo: lo comprado sigue valiendo.
+
 ## 2026-11-16 (cupón manual e inscripción rápida)
 - **Cupón manual:** en la ficha de una persona, un Pivot le da 10, 15, 25, 50 % o gratis para su próximo pago. Se aplica solo al reservar (se ve en el total), se usa una vez y vuelve si cancela esa reserva. Le llega un aviso.
 - **Inscripción rápida:** pide el WhatsApp. La clase gratis de bienvenida es una por teléfono, aunque se cree otra cuenta. Textos de la página en español neutro.

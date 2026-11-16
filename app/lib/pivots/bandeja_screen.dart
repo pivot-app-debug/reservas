@@ -681,6 +681,8 @@ class _CuentaCorte extends StatelessWidget {
       final ev = x.evento;
       final que = m['tipo'] == 'mensual'
           ? 'Mensualidad ${m['mesTexto'] ?? ''}'.trim()
+          : m['tipo'] == 'plan'
+          ? 'Plan ${m['mesTexto'] ?? ''}'.trim()
           : [
               '${ev?['tipo'] ?? ''}'.isEmpty ? 'Clase' : '${ev!['tipo']}',
               if (f != null) 'del ${Fechas.corta(f)}',

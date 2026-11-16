@@ -119,6 +119,24 @@ class Total {
   final double precio;
 }
 
+/// Plan de pago (Victor, 2026-11-16): N meses o N clases con precio propio.
+class PlanPago {
+  PlanPago(Map m)
+    : id = '${m['id']}',
+      nombre = '${m['nombre'] ?? ''}',
+      tipo = '${m['tipo'] ?? 'meses'}',
+      cantidad = (m['cantidad'] as num?)?.toInt() ?? 1,
+      precio = (m['precio'] as num?)?.toDouble() ?? 0,
+      venceMeses = (m['venceMeses'] as num?)?.toInt() ?? 3;
+  final String id, nombre, tipo;
+  final int cantidad, venceMeses;
+  final double precio;
+  bool get deClases => tipo == 'clases';
+  String get detalle => deClases
+      ? '$cantidad ${cantidad == 1 ? 'clase' : 'clases'} por ${ReservasRepo.dinero(precio)} · vence en $venceMeses ${venceMeses == 1 ? 'mes' : 'meses'}'
+      : '$cantidad ${cantidad == 1 ? 'mes' : 'meses'} por ${ReservasRepo.dinero(precio)}';
+}
+
 class ResultadoReserva {
   const ResultadoReserva({required this.guardados, required this.fallidos, required this.mensajeWhatsapp, this.ids = const []});
 
@@ -175,6 +193,7 @@ class ReservaActiva {
     final estado = (r['estado'] ?? '').toString();
     if (estado == 'Cancelada' || estado == 'Crédito usado') return null;
     final hoy = Fechas.hoy();
+    if (r['tipo'] == 'plan') return null; // compra de un plan, no una clase
     if (r['tipo'] == 'mensual') {
       final v = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch('${r['validezHasta'] ?? ''}');
       final nombre = (r['fecha'] ?? r['mes_texto'] ?? '').toString();
@@ -464,7 +483,39 @@ class ReservasRepo {
 
   /// Guarda cada clase o mes (`guardarReserva`), la nota de pago y el
   /// resumen por correo, y marca "Asistiré" en las clases reservadas.
+  /// Planes que puede comprar y clases de plan que le quedan.
+  Future<({List<PlanPago> planes, int clases, DateTime? vence})> misPlanes() async {
+    try {
+      final r = await _api.get('getMisPlanes');
+      final c = (r['clases'] as Map?) ?? const {};
+      return (
+        planes: [for (final p in (r['planes'] as List? ?? const [])) PlanPago(p as Map)],
+        clases: (c['restantes'] as num?)?.toInt() ?? 0,
+        vence: DateTime.tryParse('${c['vence'] ?? ''}'),
+      );
+    } catch (_) {
+      return (planes: <PlanPago>[], clases: 0, vence: null);
+    }
+  }
+
+  /// Compra de un plan de clases: queda pendiente hasta que un Pivot apruebe el pago.
+  Future<ResultadoReserva> comprarPlan(PlanPago p, {String? medio, String? medioNombre}) async {
+    try {
+      final r = await _api.post('comprarPlan', {'planId': p.id, 'medio': ?medio, 'medioNombre': ?medioNombre});
+      if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar'}');
+      return ResultadoReserva(
+        guardados: ['Plan ${p.nombre}'],
+        fallidos: const [],
+        mensajeWhatsapp: '',
+        ids: [if (r['id'] != null && p.precio > 0) '${r['id']}'],
+      );
+    } catch (_) {
+      return ResultadoReserva(guardados: const [], fallidos: ['Plan ${p.nombre}'], mensajeWhatsapp: '');
+    }
+  }
+
   Future<ResultadoReserva> confirmar({
+    String? planId,
     required TipoReserva tipo,
     required List<FechaClase> clases,
     required List<DateTime> meses,
@@ -498,6 +549,7 @@ class ReservasRepo {
             'medio': ?medio,
             'medioNombre': ?medioNombre,
             if (total.saldo != 0) 'saldo': total.saldo > 0 ? 'usar' : 'pagar',
+            'planId': ?planId,
           });
           if (r['exito'] == false) throw ApiException('${r['mensaje'] ?? r['error'] ?? 'No se pudo guardar'}');
           guardados.add(etiqueta);

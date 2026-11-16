@@ -241,6 +241,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - `equipo.aviso_cambio_equipo` (lo ponen `_aplicarCambioEquipo`→`_avisarCambioEquipo` y recalcular-categorias al aplicar directo), `equipo.revision_cambio` (pedido de la persona, `responderCambioEquipo`), `equipo.equipo_fijo_hasta` (al devolver; recalcular-categorias lo saltea). Pivots: `adminResolverRevisionEquipo` (mantener/devolver), Bandeja `revisionesEquipo` (área equipo). App: `core/aviso_cambio_equipo.dart`, desde `inicio_shell._recordarDatos`.
 - `getTareasApp.terminadas`: asignaciones aprobadas del último año; el timeline las muestra con `MiTarea.terminada`.
 
+## Planes de pago y cupón manual (2026-11-16)
+- Tablas `planes` y `plan_creditos`; `reservas.plan_id`, `reservas.plan_credito_id`, `reservas.descuento_pct/monto`; `equipo.cupon_descuento`.
+- API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
+- App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
+
 ## Web principal = Flutter (2026-11-16)
 - La raíz del sitio (GitHub Pages, CNAME app.quindesvolcanicos.com) es el build de `app/` (`--base-href /`); el workflow App Web lo publica ahí y mezcla `icons/` y `assets/` con los de la web vieja. La web vieja: `vieja/index.html` con rutas absolutas (/css, /js, /shared, /assets de la raíz). `nueva/` solo redirige.
 - `core/puerta_instalar.dart` (`PuertaInstalar`, en el `builder` de MaterialApp): en teléfonos fuera de la app instalada bloquea con los pasos (Android/Chrome, iPhone/Safari, otro navegador → copiar enlace; `beforeinstallprompt` guardado en `window.pivotPrompt` por `web/index.html`). Ayudantes en `core/instalar_web*.dart`.

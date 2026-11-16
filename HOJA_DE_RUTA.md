@@ -86,9 +86,7 @@ Reglas de siempre:
    - [x] Hecho 2026-11-14: Formas de pago solo en Tesorería; Vencimiento de la cuota explicado en su pantalla; Salud y seguros en pantalla propia.
    - [x] Hecho 2026-11-15: revisión de 15 puntos de Victor (PENDIENTES sección R). Fecha límite de pago con calendario; punto extra y avisos siguen la fecha límite; Viajes como sección propia; reglas del equipo en Reglas. Falta: sección Recompensas y motor de reglas.
 6. [ ] **Planes de pago, cursos e inscripción rápida**:
-   - **Planes**:
-     - 1 a 12 meses o N clases.
-     - Se asignan a categorías y, si hace falta, a personas.
+   - [x] **Planes** (2026-11-16): 1 a 12 meses o N clases, por equipos (personas puntuales: el campo existe, falta elegirlas en la pantalla).
    - **Cursos**:
      - Fechas de inicio rígidas o flexibles, clases a mano o por CSV.
      - Curso de principiantes (freshmeat) con **try out** al final para pasar a un equipo.
