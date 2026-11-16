@@ -590,3 +590,12 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - Asistencia anticipada: sin subtítulo bajo "¿Por qué no asistirás?"; Inactivx con el texto "No entrenaré por un tiempo porque me dedicaré a otra cosa".
 - Comunidad: el canal de comunicación principal sale de la barra y va como botón debajo de las tarjetas.
 - Orden siguiente aprobado: cambios de categoría en Notificaciones → fotos y etiqueta de inventario → planes/cursos/inscripción rápida/cupones → varias ligas y crear liga → partidos y torneos. Migración de cuentas en paralelo; borrador para el abogado al final, antes de Play Store.
+
+## U. Para la tarea programada de las 17:20 (2026-11-16)
+Decidido por Victor:
+- (15) Botón Calendario, opción A: al alejarse de hoy en el timeline, el ícono del día en la barra de abajo cambia a una flecha hacia hoy (arriba o abajo) con un puntito rojo; al tocarlo vuelve a hoy y regresa al número del día. Transición suave.
+- Migración de cuentas: el correo de Google de Pivot es pivot.app.suppor@gmail.com (así, con "suppor"). Preparar la guía paso a paso empezando por GitHub (transferir el repo quindesvolcanicosrd-sys/reservas a una cuenta u organización de ese correo); Victor hace los pasos manuales.
+Esperando respuesta de Victor (no hacer hasta que conteste aquí):
+- (14) Tareas terminadas en el timeline: propuesta = solo las propias, el día en que se aprobaron, estilo apagado, con los puntos.
+- Cambios de categoría: propuesta = la ventana al abrir la app explica el cambio; si baja, "Entiendo" o "Pedir revisión" (llega a Notificaciones; un Pivot elige Mantener o Devolver), sin los 7 días de espera.
+- Planes, cursos, inscripción rápida y cupón manual: propuesta enviada, falta su visto bueno.
