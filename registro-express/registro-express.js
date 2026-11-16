@@ -1,3 +1,4 @@
+var _reTelefono = '';
 /* ══ REGISTRO EXPRESS — Flujo por pasos ═══════════════════════════════
    Mini-SPA hermana de ../inscripcion/ (mismo patrón de pasos/CSS), pero sin
    Google Sign-In: solo nombre + PIN. Por eso vive con sus propias copias
@@ -189,11 +190,14 @@ function reTogglePinVis(inputId, icoId) {
 function reContinuar2() {
   var nombre = (document.getElementById('re-nombre').value || '').trim();
   var pin = (document.getElementById('re-pin').value || '').trim();
-  var pin2 = (document.getElementById('re-pin-confirm').value || '').trim();
+    var pin2 = (document.getElementById('re-pin-confirm').value || '').trim();
+  var tel = (document.getElementById('re-telefono').value || '').replace(/[^0-9+]/g, '');
   if (!nombre || !/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$/.test(nombre)) { errMsg('err-re-2', 'Ingresa un nombre válido (solo letras y espacios).'); return; }
+    if (tel.replace(/\D/g, '').length < 8) { errMsg('err-re-2', 'Escribe tu número de WhatsApp con el código de país.'); return; }
   if (!/^\d{4}$/.test(pin)) { errMsg('err-re-2', 'El PIN debe tener exactamente 4 dígitos.'); return; }
   if (pin !== pin2) { errMsg('err-re-2', 'Los 2 PIN no coinciden.'); return; }
-  _reNombre = nombre;
+    _reNombre = nombre;
+  _reTelefono = tel;
   _rePin = pin;
   reMostrarPaso(3, false);
 }
@@ -226,7 +230,8 @@ function reEnviar() {
     apiPost({
       action: 'inscribirPersonaExpress',
       nombre: _reNombre,
-      pinHash: hash,
+            pinHash: hash,
+      telefono: _reTelefono,
       necesitaPatines: _reNecesitaPatines,
       necesitaProtecciones: _reNecesitaProtecciones,
     }, function(res) {

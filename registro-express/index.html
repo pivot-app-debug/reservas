@@ -90,7 +90,7 @@
   <!-- ── PASO 1: Selección de reserva ── -->
   <div class="insc-step" id="re-step-1">
     <div class="insc-scroll">
-      <h2>Elegí tu reserva</h2>
+      <h2>Elige tu reserva</h2>
 
       <div id="re-paso1-clase" style="display:none;">
         <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">Seleccioná una o más fechas disponibles.</p>
@@ -113,10 +113,15 @@
   <!-- ── PASO 2: Crear cuenta ── -->
   <div class="insc-step" id="re-step-2">
     <div class="insc-scroll">
-      <h2>Creá tu cuenta</h2>
+      <h2>Crea tu cuenta</h2>
       <div class="campo">
         <label>Tu nombre en el equipo <span style="color:var(--brand);">*</span></label>
-        <input type="text" id="re-nombre" placeholder="Como te llaman">
+                <input type="text" id="re-nombre" placeholder="Como te llaman">
+      </div>
+
+      <div class="campo" style="margin-top:14px;">
+        <label>Tu WhatsApp (con código de país) <span style="color:var(--brand);">*</span></label>
+        <input type="tel" id="re-telefono" inputmode="tel" placeholder="+593 99 123 4567">
       </div>
 
       <div class="campo" style="margin-top:14px;">
@@ -133,7 +138,7 @@
       </div>
 
       <div class="campo" style="margin-top:14px;">
-        <label>Confirmá tu PIN <span style="color:var(--brand);">*</span></label>
+        <label>Confirma tu PIN <span style="color:var(--brand);">*</span></label>
         <div style="position:relative;margin-bottom:6px;">
           <input type="password" id="re-pin-confirm" inputmode="numeric" pattern="[0-9]*" maxlength="4"
             placeholder="• • • •"
@@ -155,7 +160,7 @@
   <!-- ── PASO 3: Confirmar y registrarse ── -->
   <div class="insc-step" id="re-step-3">
     <div class="insc-scroll">
-      <h2>Confirmá tu registro</h2>
+      <h2>Confirma tu registro</h2>
       <div class="aj-group" id="re-resumen"></div>
       <div class="error-msg" id="err-re-3"></div>
       <div class="cta-footer-spacer"></div>

@@ -93,9 +93,9 @@ Reglas de siempre:
      - Fechas de inicio rígidas o flexibles, clases a mano o por CSV.
      - Curso de principiantes (freshmeat) con **try out** al final para pasar a un equipo.
    - **Inscripción rápida**:
-     - Con nombre y teléfono; un cupón por teléfono.
+     - [x] Con nombre y teléfono; un cupón por teléfono (2026-11-16). El contacto por WhatsApp está en su ficha.
      - Botón de WhatsApp para contactar a quien se inscribió.
-   - **Cupones manuales a una persona**: 10, 15, 25, 50 o 100 %, en la pantalla de precios y cupones.
+   - [x] **Cupones manuales a una persona**: 10, 15, 25, 50 o 100 %, desde su ficha (2026-11-16).
 7. [x] **Animaciones de inicio** (2026-11-12): logo como pantalla nativa, bucle Lottie mientras carga, intro con revelado y carga de datos en paralelo.
 8. [ ] **Base para varias ligas** (`liga_id`, aislamiento por liga), inicio con Google, revisión legal.
 9. [ ] **Crear tu liga** (asistente, PENDIENTES H):

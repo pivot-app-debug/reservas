@@ -1725,20 +1725,30 @@ async function inscribirPersonaExpress(params: Record<string, any>): Promise<Rec
   const necesitaPatines = params.necesitaPatines ?? '';
   const talla = params.talla ?? '';
   const necesitaProtecciones = params.necesitaProtecciones ?? '';
-  const pinHash = (params.pinHash ?? '').toString();
+    const pinHash = (params.pinHash ?? '').toString();
+  // Inscripción rápida con WhatsApp (Victor, 2026-11-16): la clase gratis
+  // de bienvenida es una por teléfono, aunque se cree otra cuenta.
+  const telCrudo = String(params.telefono ?? '').replace(/[^0-9+]/g, '').slice(0, 20);
+  const telDigitos = telCrudo.replace(/\D/g, '');
 
   if (!nombre) return { exito: false, error: 'El nombre es obligatorio.' };
   if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]+$/.test(nombre)) return { exito: false, error: 'El nombre solo puede contener letras y espacios.' };
   if (pinHash.length !== 64) return { exito: false, error: 'PIN inválido.' };
+  let telefonoYaUso = false;
+  if (telDigitos.length >= 8) {
+    const fin = telDigitos.slice(-9);
+    const { data: mismos } = await supabase.from('equipo').select('username').ilike('telefono', `%${fin}`).limit(1);
+    telefonoYaUso = !!mismos?.length;
+  }
 
   const { data: nombreExiste } = await supabase.from('equipo').select('username').ilike('username', nombre).maybeSingle();
   if (nombreExiste) return { exito: false, error: 'Este nombre de usuario ya está en uso.' };
 
   const row: Record<string, any> = {
-    username: nombre, email: '', pronombres, prefijo: '', telefono: '',
+        username: nombre, email: '', pronombres, prefijo: telCrudo.startsWith('+') ? '+' : '', telefono: telCrudo.replace('+', ''),
     necesita_patines: necesitaPatines, talla, necesita_protecciones: necesitaProtecciones,
-    // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16).
-    cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false, permisos_configurados: true,
+    // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16), una por teléfono.
+    cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false && !telefonoYaUso, permisos_configurados: true,
     fecha_registro: new Date().toISOString(), pin_hash: pinHash,
   };
 
