@@ -203,6 +203,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - **Eventos para quienes pagan por clase:** la web ya no tiene una pantalla aparte de "próximas clases"; ven el mismo timeline y reservan desde el detalle o el "+" (igual en la app).
 - Pendiente: cambiar el equipamiento del club desde la app.
 
+## Deuda sin reserva y gracia (2026-11-16)
+- `_deudaVinoSinReserva(nombre, idEvento)` (desde `_deudaSiVinoSinPago`, al marcar o rectificar a horario/tarde): sin ninguna reserva para el evento, Entrenamiento desde `DEUDA_SIN_RESERVA_DESDE` (2026-11-16), equipo sin `graciaClases` (paga por clase), no exentx ni Técnico, mes del evento 'debe' → cargo 'con_cuota' por el valor por clase y reserva Cancelada con `motivo_rechazo` `VINO_SIN_RESERVA` y `saldo_movimiento_id`. `_anularDeudaSinReserva` la deshace si la marca deja de ser presente.
+- App `motivoSinAsistire`: gracia = asistencias confirmadas del mes + Asistiré por venir < N; Lesionadx ya no está exentx de esta regla.
+- Tareas archivadas: `TareasRepo.eliminarArchivada` → `adminEliminarTareaArchivada` (resta los puntos).
+
 ## Recompensas por pagar a tiempo (2026-11-15)
 - `reglas_liga.recompensaPago = { activa, puntos (0–10), claseGratis, saldo (0–1000) }`; por defecto 1 punto. Servidor: `_recompensaPago()`, `_textoRecompensa()`. Al aprobar una cuota enviada hasta `_diaPuntoExtra()` se da: puntos (`_acreditarPuntosExtra`), clase gratis (`equipo.cupon_disponible`, solo si no tenía una) y saldo a favor (`saldos_movimientos` abono 'aparte'). Lo dado queda en `reservas.recompensa` (migración `20261115193000_reservas_recompensa.sql`); al cancelar se revierte eso (sin `recompensa`, 1 punto como antes).
 - App: `pivots/recompensas_screen.dart` (`RecompensasPagoScreen`, `textoRecompensa`, `resumenRecompensa`); `ConfigLiga.diaFechaLimite` y `recompensaPago`.

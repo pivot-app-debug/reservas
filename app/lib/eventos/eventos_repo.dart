@@ -369,8 +369,10 @@ class EventosRepo extends ChangeNotifier {
   /// Sin señal queda en la cola y se sube después: devuelve true.
   /// Clase de gracia de Quindes (misma regla que `_quindesGraciaAgotada()`
   /// de la web, bug del 2026-11-13: la app no la aplicaba). Sin el mes
-  /// pagado, se puede marcar Asistiré hasta 2 veces o hasta 1 asistencia
-  /// confirmada en el mes; después hay que pagar. null = puede marcar.
+  /// pagado, cada clase de gracia es 1 asistencia (a horario o tarde) en el
+  /// mes (Victor, 2026-11-15). Se puede marcar Asistiré por adelantado solo
+  /// en tantas clases como gracia quede; después hay que pagar. Estar
+  /// Lesionadx o De viaje no exime: al venir, usa la gracia. null = puede.
   String? motivoSinAsistire(Evento ev) {
     if (_esAdminActivo || ev.tipo != 'Entrenamiento') return null;
     final d = sesion.datos;
@@ -380,13 +382,16 @@ class EventosRepo extends ChangeNotifier {
     final c = _cuota;
     if (c == null) return null;
     if (d['exenta_cuota'] == true || d['exenta_cuota'] == 'true') return null;
-    if (d['estado_miembro'] == 'Técnico' || d['estado_miembro'] == 'Lesionadx') return null;
+    if (d['estado_miembro'] == 'Técnico') return null;
     if (c.alDia || c.mesPagado(ev.fecha.month, ev.fecha.year)) return null;
     final yo = (sesion.nombre ?? '').trim().toUpperCase();
     final delMes = eventos.where((e) => e.id != ev.id && e.tipo == 'Entrenamiento' && e.fecha.year == ev.fecha.year && e.fecha.month == ev.fecha.month);
     final confirmadas = delMes.where((e) => e.asistentes.any((a) => a.persona.username.trim().toUpperCase() == yo)).length;
-    final asistire = delMes.where((e) => e.miEstado == EstadoRsvp.asistire).length;
-    if (n > 0 && confirmadas < n && asistire < 2 * n) return null;
+    final h = DateTime.now(), hoy = DateTime(h.year, h.month, h.day);
+    final porVenir = delMes
+        .where((e) => e.miEstado == EstadoRsvp.asistire && !e.fecha.isBefore(hoy) && !e.asistentes.any((a) => a.persona.username.trim().toUpperCase() == yo))
+        .length;
+    if (n > 0 && confirmadas + porVenir < n) return null;
     if (n == 0) return 'Para marcar Asistiré, paga primero tu cuota de ${Fechas.mes(ev.fecha)}.';
     return 'Ya usaste ${n == 1 ? 'tu clase' : 'tus $n clases'} de gracia de ${Fechas.mes(ev.fecha)}. Paga tu cuota para marcar Asistiré.';
   }

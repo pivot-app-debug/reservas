@@ -175,7 +175,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
                         ? 'No usa: sigue su regla de pago'
                         : (gracia[e] == 0
                               ? 'Paga antes de marcar Asistiré'
-                              : '${gracia[e]} ${gracia[e] == 1 ? 'clase' : 'clases'} al mes sin haber pagado; después pide pagar'),
+                              : '${gracia[e]} ${gracia[e] == 1 ? 'clase' : 'clases'} al mes sin haber pagado (cuenta al venir a horario o tarde); después pide pagar'),
                     equipo: e,
                     editar: () => editarGracia(context, s, c, soloEquipo: e),
                   ),

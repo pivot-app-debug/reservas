@@ -219,7 +219,11 @@ class TareasRepo extends ChangeNotifier {
   /// restan esos puntos (corrige un error del Pivot; web "Desvalidar").
   Future<void> quitarAprobacion(PersonaTarea p) => _accion('adminDesvalidarTarea', {..._admin, 'idAsignacion': p.idAsignacion});
 
-  /// Tareas archivadas con quién las hizo (solo lectura).
+  /// Borra una tarea archivada como si nunca hubiera existido: se quitan
+  /// los puntos que dio (Victor, 2026-11-15: último recurso).
+  Future<void> eliminarArchivada(Object idTarea) => _accion('adminEliminarTareaArchivada', {..._admin, 'idTarea': idTarea});
+
+  /// Tareas archivadas con quién las hizo.
   Future<List<Map<String, dynamic>>> archivadas() async {
     final l = await _api.getLista('getTareasArchivadas', _admin);
     return [

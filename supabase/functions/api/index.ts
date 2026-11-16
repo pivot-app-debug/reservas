@@ -4131,8 +4131,10 @@ async function adminMarcarAsistencia(params: Record<string, any>): Promise<Recor
   // no-corrección, así que re-marcar a alguien (corrección) nunca lo
   // reactivaba.
     if (estado === 'A tiempo' || estado === 'Tarde') {
-    await _reactivarPorAsistencia(nombre, idEvento);
+        await _reactivarPorAsistencia(nombre, idEvento);
     try { await _deudaSiVinoSinPago(nombre, idEvento); } catch (e) { console.error('[deuda] al marcar:', e); }
+  } else {
+    try { await _anularDeudaSinReserva(nombre, idEvento, 'automático'); } catch (e) { console.error('[deuda] anular:', e); }
   }
 
   // Batch 8 (ver MANIFEST.md): recalcula los stats de ESTA persona apenas
@@ -4429,8 +4431,10 @@ async function _aplicarRectificacion(idEvento: string, nombre: string, estadoSol
   // Una rectificación aprobada a 'A tiempo'/'Tarde' es una marca real de
   // presente, mismo efecto que en adminMarcarAsistencia().
     if (estadoSolicitado === 'A tiempo' || estadoSolicitado === 'Tarde') {
-    await _reactivarPorAsistencia(nombre, idEvento);
+        await _reactivarPorAsistencia(nombre, idEvento);
     try { await _deudaSiVinoSinPago(nombre, idEvento); } catch (e) { console.error('[deuda] rectificación:', e); }
+  } else {
+    try { await _anularDeudaSinReserva(nombre, idEvento, 'automático'); } catch (e) { console.error('[deuda] anular:', e); }
   }
 }
 
@@ -5315,16 +5319,65 @@ async function _cerrarReservasVencidas(ahora: number): Promise<void> {
   }
 }
 
-/** Al marcar presente: si su reserva de esa clase se canceló por no aprobarse, queda la deuda. */
+/** Al marcar presente: si su reserva de esa clase se canceló por no aprobarse, queda la deuda.
+ *  Sin ninguna reserva, también, si debía pagar esa clase (`_deudaVinoSinReserva`). */
 async function _deudaSiVinoSinPago(nombre: string, idEvento: string): Promise<void> {
   const { data: r } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, monto, id_evento')
     .eq('nombre_usuario', nombre).eq('id_evento', idEvento).eq('estado', 'Cancelada').eq('motivo_rechazo', SIN_APROBAR).limit(1).maybeSingle();
+  if (!r) { await _deudaVinoSinReserva(nombre, idEvento); return; }
   const monto = _num2(Number(r?.monto) || 0);
-  if (!r || !(monto > 0)) return;
+  if (!(monto > 0)) return;
   const { data: e } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
   await _pasarADeuda(r, e?.fecha ? `Clase del ${_fechaCorta(e.fecha)}` : 'Clase', monto, 'automático');
 }
 
+
+
+
+// Vino sin reserva (Victor, 2026-11-15): quien debía pagar esa clase y vino
+// sin reservar queda debiendo el valor por clase. "Debía pagar" = su equipo
+// no tiene clases de gracia (esos pagan por mes), no está exentx ni es
+// Técnico, no tiene pagado el mes del evento y el evento es un
+// Entrenamiento. Estar Lesionadx o De viaje no exime. Solo eventos desde el
+// 2026-11-16: corregir listas viejas no crea deudas hacia atrás. Queda una
+// reserva cancelada con `VINO_SIN_RESERVA` que guarda el cargo para poder
+// anularlo si después se corrige la asistencia.
+const VINO_SIN_RESERVA = 'Vino sin reserva';
+const DEUDA_SIN_RESERVA_DESDE = '2026-11-16';
+async function _deudaVinoSinReserva(nombre: string, idEvento: string): Promise<void> {
+  const { data: ya } = await supabase.from('reservas').select('id').eq('nombre_usuario', nombre).eq('id_evento', idEvento).limit(1);
+  if (ya?.length) return; // cualquier reserva (pagada, pendiente, con cupón o ya pasada a deuda)
+  const { data: e } = await supabase.from('asistencias').select('fecha, tipo_evento').eq('id_evento', idEvento).maybeSingle();
+  if (!e?.fecha || e.tipo_evento !== 'Entrenamiento' || String(e.fecha) < DEUDA_SIN_RESERVA_DESDE) return;
+  const { data: p } = await supabase.from('equipo').select('categoria, exenta_cuota, estado_miembro').eq('username', nombre).maybeSingle();
+  if (!p || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return;
+  const gracia = (await _reglasLiga()).graciaClases ?? {};
+  if (gracia[String(p.categoria ?? '')] !== undefined) return; // paga por mes (clases de gracia)
+  const mes = String(e.fecha).slice(0, 7);
+  if ((await _estadosCuotaMes([nombre], mes))[nombre] !== 'debe') return;
+  const monto = _num2(Number((await getPreciosClases()).precioPorClase) || 0);
+  if (!(monto > 0)) return;
+  const que = `Clase del ${_fechaCorta(e.fecha)}`;
+  const { data: mov } = await supabase.from('saldos_movimientos').insert({
+    username: nombre, persona_nombre: await _nombrePersona(nombre), fecha: _hoyEcuadorISO(),
+    monto: -monto, tipo: 'cargo', aplicar: 'con_cuota', concepto: `${que}: vino sin reserva`, por: 'automático',
+  }).select('id').maybeSingle();
+  await supabase.from('reservas').insert({
+    nombre_usuario: nombre, id_evento: idEvento, tipo: 'clase', estado: 'Cancelada', motivo_rechazo: VINO_SIN_RESERVA,
+    monto, fecha_pago: e.fecha, saldo_movimiento_id: mov?.id ?? null,
+  });
+  await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Quedó una deuda' },
+    contents: { es: `Viniste a la ${que.toLowerCase()} sin reserva, así que quedó una deuda de ${'$'}${monto}. Se cobra junto con tu próximo pago.` }, url: APP_URL }).catch(() => {});
+}
+
+/** Si se corrige la asistencia (ya no vino), se anula la deuda de "vino sin reserva". */
+async function _anularDeudaSinReserva(nombre: string, idEvento: string, por: string): Promise<void> {
+  const { data: r } = await supabase.from('reservas').select('id, saldo_movimiento_id').eq('nombre_usuario', nombre).eq('id_evento', idEvento)
+    .eq('estado', 'Cancelada').eq('motivo_rechazo', VINO_SIN_RESERVA).limit(1).maybeSingle();
+  if (!r) return;
+  if (r.saldo_movimiento_id) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: por }).eq('id', r.saldo_movimiento_id);
+  await supabase.from('reservas').delete().eq('id', r.id);
+}
 
 async function _saldoPersonas(username?: string): Promise<Record<string, number>> {
   let q = supabase.from('saldos_movimientos').select('username, monto').eq('anulado', false);
@@ -8308,7 +8361,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'cambio_estado_miembro', nombre: 'Cambios de estado del equipo', descripcion: 'Cuando alguien queda de viaje, lesionadx o ausente por un tiempo.', categoria: 'Equipo' },
   { clave: 'integrante_nuevo', nombre: 'Nuevo integrante', descripcion: 'Cuando alguien se une al equipo.', categoria: 'Equipo' },
         { clave: 'comprobante_pendiente', nombre: 'Comprobante pendiente', descripcion: 'Si hiciste una reserva y falta subir el comprobante de pago.', categoria: 'Cuenta' },
-    { clave: 'cuota_pendiente', nombre: 'Recordatorios de cuota', descripcion: 'El día 1, el 14 (último día para el punto extra), el 16 y después de tu clase de gracia, solo si aún no pagaste. No llegan si ya pagaste o tu pago está en revisión.', categoria: 'Cuenta' },
+    { clave: 'cuota_pendiente', nombre: 'Recordatorios de cuota', descripcion: 'El día 1, el día antes de la fecha límite, el día después y después de tu clase de gracia, solo si aún no pagaste. No llegan si ya pagaste o tu pago está en revisión.', categoria: 'Cuenta' },
     { clave: 'cambio_categoria', nombre: 'Cambio de categoría', descripcion: 'Cuando cambia tu categoría (Mirlxs/Quindes).', categoria: 'Cuenta' },
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
       { clave: 'tarea_nueva', nombre: 'Tareas nuevas', descripcion: 'Cuando se publica una tarea que puedes tomar.', categoria: 'Tareas' },

@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (respuestas de Victor, parte 1)
+- **Clase de gracia = 1 asistencia** (a horario o tarde) en el mes, como decía la app. Ya no vale "2 Asistiré". Se puede marcar Asistiré por adelantado solo en tantas clases como gracia quede. Estar Lesionadx no exime: al venir, usa la gracia y vuelve a Activx.
+- **Borrar una tarea archivada** (Tareas archivadas → papelera): como último recurso; se quitan los puntos que dio, con confirmación.
+- **Deuda al venir sin reserva:** quien debía pagar esa clase (su equipo no paga por mes, no tiene el mes pagado, no está exentx) y se le marca a horario o tarde sin ninguna reserva queda debiendo el valor por clase, con aviso. Si se corrige la asistencia, la deuda se anula. Solo desde el 16 de noviembre de 2026, nunca hacia atrás.
+
 ## 2026-11-15 (recompensas por pagar a tiempo)
 - **Fecha límite de pago de la liga: día 15** (guardada; antes no había ninguna y se usaba 15 por defecto). Se edita en Reglas → Fecha límite de pago.
 - **Recompensas por pagar a tiempo** (Reglas → Cobros): encender o apagar, y qué se recibe, combinable: puntos extra (1, 2, 3 o 5), clase gratis (no se acumula) y saldo a favor (monto). Se gana pagando hasta la fecha límite incluida. Rige para los pagos que se aprueben desde que se guarda; si el pago se cancela, se quita exactamente lo que se dio (`reservas.recompensa`). Los avisos de cuota dicen la recompensa elegida.

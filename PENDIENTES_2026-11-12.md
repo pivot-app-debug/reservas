@@ -531,7 +531,7 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Salud y seguros: pantalla propia (`pivots/salud_liga_screen.dart`) con tarjetas, agregar, editar nombre y teléfono, quitar.
 - [x] Vencimiento de la cuota: pantalla explicativa (`pivots/vencimiento_screen.dart`) con el mes día a día, ejemplos que cambian con los valores y recomendación (recargo apagado). Hoy el vencimiento solo decide el recargo.
 - [x] Reservas de clase nunca aprobadas: 2 h después de que termina la clase se cancelan solas con aviso del motivo; si la lista marca a la persona presente, queda la deuda de esa clase (también si la lista se toma después). `_cerrarReservasVencidas` en el cron horario, `_deudaSiVinoSinPago` al marcar presente o aprobar una rectificación.
-- [ ] Quien vino a una clase por la que debía pagar y no tenía reserva: ¿también queda deuda? Preguntado a Victor (depende de las reglas de cobro por equipo).
+- [x] Quien vino sin reserva a una clase que debía pagar queda con deuda (Victor, 2026-11-15). Hecho 2026-11-16, solo eventos desde esa fecha.
 - [x] $495 sin importar (Pichincha $265, $35 sin medio, $195 de reservas sin medio): quedan fuera de las cuentas hasta que Victor revise las cuentas.
 
 ## R. Revisión de Victor (2026-11-15, 00:45)
@@ -544,7 +544,7 @@ Abajo, **Avanzado**: cada opción una por una, con una explicación clara de qu�
 - [x] Web de prueba en /nueva/ (workflow App Web).
 - [x] Notificaciones en la web (2026-11-15). Ojo en iPhone: solo con la app agregada a la pantalla de inicio (iOS 16.4+) y el permiso puede requerir tocar un botón; probar.
 - [x] Faltantes respecto de la web vieja (2026-11-14): Avisos al equipo (ahora o programados, `avisos_programados`), Quién recibe avisos, clase gratis (cupón) en la ficha, personas archivadas con restaurar, ver y borrar asistencias externas, quitar aprobación de una tarea, tareas archivadas (solo lectura), Enviar comentarios (WhatsApp o correo), cambiar talla o protecciones de una reserva.
-- [ ] Borrar una tarea archivada: la web la borra y resta los puntos ya ganados. Choca con la regla de oro (no tocar puntajes anteriores); preguntar a Victor antes de pasarlo.
+- [x] Borrar una tarea archivada resta sus puntos (Victor, 2026-11-15: último recurso). Hecho 2026-11-16.
 - [x] Seguridad (2026-11-14): `getReservasPersona` solo devuelve las reservas propias (o a un Pivot); `actualizarTallaReserva` exige sesión y además ahora sí guarda (la web mandaba otros nombres de campos y nunca se guardaba).
 - [ ] Probar en teléfonos reales (velocidad, desenfoque, iPhone agregado a la pantalla de inicio).
 - [ ] Cambiar la dirección principal a Flutter web y dejar la vieja congelada unas semanas.

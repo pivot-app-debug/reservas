@@ -7,7 +7,8 @@ import '../core/tema.dart';
 import '../core/vidrio.dart';
 import 'tareas_repo.dart';
 
-/// Tareas archivadas (Pivots, solo lectura): quién las hizo y cómo quedó.
+/// Tareas archivadas (Pivots): quién las hizo y cómo quedó. Se pueden
+/// borrar como último recurso; eso quita los puntos que dieron.
 class TareasArchivadasScreen extends StatefulWidget {
   const TareasArchivadasScreen({super.key, required this.repo});
   final TareasRepo repo;
@@ -31,6 +32,38 @@ class _TareasArchivadasScreenState extends State<TareasArchivadasScreen> {
         .catchError((Object e) {
           if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
         });
+  }
+
+  Future<void> _eliminar(Map<String, dynamic> t) async {
+    final p = context.pivot;
+    final aprobadas = (t['personas'] as List? ?? const []).where((x) => x is Map && x['estado'] == 'aprobada').length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('¿Borrar esta tarea?'),
+        content: Text(
+          aprobadas == 0
+              ? 'Será como si nunca hubiera existido. No se puede deshacer.'
+              : 'Será como si nunca hubiera existido: se quitarán los ${t['puntos'] ?? 0} puntos a ${aprobadas == 1 ? 'la persona que la hizo' : 'las $aprobadas personas que la hicieron'}. No se puede deshacer. Si solo quieres que no se vea, déjala archivada.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: Text('Borrar', style: TextStyle(color: p.marcaTexto)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final m = ScaffoldMessenger.of(context);
+    try {
+      await widget.repo.eliminarArchivada(t['idTarea'] as Object);
+      if (mounted) setState(() => _l = [...?_l]..remove(t));
+      m.showSnackBar(const SnackBar(content: Text('Tarea borrada.')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo borrar. Revisa tu conexión.')));
+    }
   }
 
   String _fecha(Object? iso) {
@@ -75,9 +108,21 @@ class _TareasArchivadasScreenState extends State<TareasArchivadasScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '${t['titulo']}',
-                                style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${t['titulo']}',
+                                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Borrar',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: Icon(Icons.delete_outline_rounded, color: p.textoSecundario),
+                                    onPressed: () => _eliminar(t),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 2),
                               Text(
