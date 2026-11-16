@@ -60,6 +60,9 @@ class Integrante {
 
   /// Clase gratis de bienvenida disponible (solo llega a Pivots).
   bool get cuponDisponible => m['cuponDisponible'] == true;
+
+  /// Cupón manual de descuento para su próximo pago (%), o null.
+  int? get cuponDescuento => (m['cuponDescuento'] as num?)?.toInt();
   bool get esAdminMiembro => m['esAdminMiembro'] == true;
   bool get solicitudLesionPendiente => m['solicitudLesionPendiente'] == true;
 

@@ -200,7 +200,7 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
@@ -1996,15 +1996,21 @@ async function getPreciosClases(params: Record<string, any> = {}, equipo?: strin
   (data ?? []).forEach((r: any) => { map[r.key] = r.value; });
     const r = await _reglasLiga();
   // Precio propio del equipo (de quien pregunta, o el que se pase).
-  let eq = equipo;
+    let eq = equipo;
+  let descuentoPct = 0;
   if (eq === undefined && params?.token) {
     const yo = await _validarToken(params.token);
-    if (yo) eq = (await supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle()).data?.categoria ?? null;
+    if (yo) {
+      const f = (await supabase.from('equipo').select('categoria, cupon_descuento').eq('username', yo).maybeSingle()).data;
+      eq = f?.categoria ?? null;
+      descuentoPct = Number(f?.cupon_descuento) || 0;
+    }
   }
   const cobro = _cobroEquipo(r, eq);
   return {
     precioPorClase: cobro.precioClase ?? map['precio_por_clase'] ?? null, precioMensual: cobro.precioMensual ?? map['precio_mensual'] ?? null,
-    modoCobro: cobro.modo,
+        modoCobro: cobro.modo,
+    descuentoPct,
     cuota: { venceDia: Number(r.cuotaVenceDia) || 0, graciaDias: Number(r.cuotaGraciaDias) || 0, recargo: Number(r.cuotaRecargo) || 0, recargoTipo: r.cuotaRecargoTipo === 'porcentaje' ? 'porcentaje' : 'fijo', recargoModo: r.cuotaRecargoModo === 'mensual' ? 'mensual' : 'unico' },
   };
 }
@@ -5078,7 +5084,23 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
   if (esMensual) {
     const vig = _vigenciaMensualISO(fecha, new Date().toISOString().substring(0, 10), anioMes);
     recargo = vig ? _recargoCuota(vig.slice(0, 7), _hoyEcuadorISO(), await _reglasLiga(), montoFinal) : 0;
-                montoFinal += recargo;
+                                montoFinal += recargo;
+  }
+  // Cupón manual de descuento (Victor, 2026-11-16): un % para el próximo
+  // pago, una sola vez. Vuelve si se cancela esa reserva.
+  let descuentoPct: number | null = null, descuentoMonto: number | null = null;
+  const pideGratis0 = params.monto === undefined || Number(params.monto) === 0;
+  if (montoFinal > 0 && !pideGratis0 && (await _validarToken(String(params.token ?? ''))) === nombre) {
+    const { data: cu } = await supabase.from('equipo').select('cupon_descuento').eq('username', nombre).maybeSingle();
+    const pct = Number(cu?.cupon_descuento) || 0;
+    if (pct > 0) {
+      const { data: tomado } = await supabase.from('equipo').update({ cupon_descuento: null }).eq('username', nombre).eq('cupon_descuento', pct).select('username');
+      if (tomado?.length) {
+        descuentoPct = pct;
+        descuentoMonto = _num2(montoFinal * pct / 100);
+        montoFinal = _num2(montoFinal - descuentoMonto);
+      }
+    }
   }
   // Saldo con el equipo (cuotas y clases). 'usar' descuenta el saldo a favor
   // (solo cuotas); 'pagar' suma la deuda. Las clases que pasaron a deuda
@@ -5121,7 +5143,8 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     mes_texto: esMensual ? fecha : null, talla: talla ?? null, protecciones: protecciones ?? null,
                                 estado: 'Pendiente', monto: montoFinal, fecha_pago: _hoyEcuadorISO(), email: email ?? null, saldo_aplicado: saldoAplicado,
                 validez_hasta: esMensual ? _vigenciaMensualISO(fecha, hoyISO, anioMes) : null,
-    uso_cupon: usoCupon,
+        uso_cupon: usoCupon,
+    descuento_pct: descuentoPct, descuento_monto: descuentoMonto,
     // Dónde dice que pagó (2026-11-13), para que el Pivot sepa dónde revisar.
         medio_pago: /^[a-z0-9_-]{1,40}$/.test(String(params.medio ?? '')) ? String(params.medio) : null,
         medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
@@ -5253,6 +5276,8 @@ async function cancelarReserva(params: Record<string, any>): Promise<Record<stri
     await supabase.from('equipo').update({ cupon_disponible: true }).eq('username', nombre);
     cuponRestaurado = true;
   }
+    // El descuento manual vuelve si no tiene otro.
+  if (r.descuento_pct) await supabase.from('equipo').update({ cupon_descuento: r.descuento_pct }).eq('username', nombre).is('cupon_descuento', null);
   await _notificarReservaMensualCambio(r, nombre, 'cancelar');
   return { exito: true, cuponRestaurado };
 }
@@ -7479,6 +7504,25 @@ async function adminBorrarDatosPersona(params: Record<string, any>): Promise<Rec
   return { exito: true };
 }
 
+/** Cupón manual a una persona: 10, 15, 25, 50 o 100 % para su próximo pago (0 = quitar). */
+async function adminCuponDescuento(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const nombre = String(params.nombre ?? '');
+  const pct = Number(params.pct) || 0;
+  if (pct !== 0 && ![10, 15, 25, 50, 100].includes(pct)) return { exito: false, error: 'Descuento inválido.' };
+  const { error } = await supabase.from('equipo').update({ cupon_descuento: pct || null }).eq('username', nombre);
+  if (error) return { exito: false, error: error.message };
+  await _registrarAjuste('cuponDescuento', null, { nombre, pct }, email);
+  if (pct) {
+    await sendPush({
+      tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Tienes un descuento' },
+      contents: { es: pct === 100 ? 'Tu próximo pago es gratis. Se aplica solo al reservar.' : `Tienes ${pct} % de descuento en tu próximo pago. Se aplica solo al reservar.` }, url: APP_URL + '/',
+    }).catch(() => {});
+  }
+  return { exito: true };
+}
+
 async function adminGetAdmins(): Promise<any[]> {
   const { data } = await supabase.from('admins').select('email, invitado_por, fecha').order('email');
   const out: any[] = [{ email: ADMIN_PRINCIPAL, principal: true }];
@@ -7609,7 +7653,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   // (token de usuarix, o sin token) recibe el roster SIN esas claves.
   const vistaAdmin = params.adminToken ? !!(await _validarAdminToken(String(params.adminToken))) : false;
   const { data: filas } = await supabase.from('equipo')
-        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible')
+        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible, cupon_descuento')
     .is('eliminado_en', null)
     .order('username');
   const personas = filas ?? [];
@@ -8011,6 +8055,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
       solicitudLesionPendiente: r.solicitud_lesion_pendiente === true,
             exentaCuota: r.exenta_cuota === true,
       cuponDisponible: r.cupon_disponible === true,
+      cuponDescuento: r.cupon_descuento ?? null,
       esAdminMiembro: adminEmails.has(String(r.email ?? '').toLowerCase()),
     } : {}),
         // Roles en el equipo y cumpleaños (solo "mm-dd" y solo si es público).
@@ -10703,7 +10748,8 @@ Deno.serve(async (req: Request) => {
                         case 'adminReglasLiga':                 return json(await adminReglasLiga(params));
       case 'adminRecompensas':                return json(await adminRecompensas(params));
                                                 case 'adminCambiosEquipo':              return json(await adminCambiosEquipo(params));
-      case 'adminResolverRevisionEquipo':     return json(await adminResolverRevisionEquipo(params));
+            case 'adminResolverRevisionEquipo':     return json(await adminResolverRevisionEquipo(params));
+      case 'adminCuponDescuento':             return json(await adminCuponDescuento(params));
       case 'responderCambioEquipo':           return json(await responderCambioEquipo(params));
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));

@@ -659,6 +659,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
       if (t.cobradas > 0)
         '${t.cobradas} ${_esMes ? (t.cobradas == 1 ? 'mes' : 'meses') : (t.cobradas == 1 ? 'clase' : 'clases')} × ${ReservasRepo.dinero(t.precio)}',
       if (t.recargos > 0) 'recargo por pagar tarde ${ReservasRepo.dinero(t.recargo)}',
+      if (t.descuento > 0) 'descuento de ${ReservasRepo.dinero(t.descuento)}',
       if (t.saldo < 0) '${ReservasRepo.dinero(-t.saldo)} pendientes de antes',
 
       if (t.aFavor > 0) '${t.aFavor} a favor',

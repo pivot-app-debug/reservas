@@ -52,7 +52,11 @@ class Precios {
     this.recargo = 0,
     this.recargoPorcentaje = false,
     this.recargoMensual = false,
+    this.descuentoPct = 0,
   });
+
+  /// Cupón manual de un Pivot: % para el próximo pago (Victor, 2026-11-16).
+  final int descuentoPct;
   final double porClase;
   final double mensual;
 
@@ -94,7 +98,11 @@ class Total {
     this.recargos = 0,
     this.recargo = 0,
     this.saldo = 0,
+    this.descuento = 0,
   });
+
+  /// Cupón manual aplicado (monto), en la primera cuota o clase cobrada.
+  final double descuento;
 
   /// Saldo con el equipo aplicado: positivo = a favor usado (descuenta),
   /// negativo = deuda que se paga junto con la cuota (suma).
@@ -286,6 +294,7 @@ class ReservasRepo {
       recargo: n(c['recargo']),
       recargoPorcentaje: c['recargoTipo'] == 'porcentaje',
       recargoMensual: c['recargoModo'] == 'mensual',
+      descuentoPct: (r['descuentoPct'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -388,18 +397,22 @@ class ReservasRepo {
       final suma = rec.fold<double>(0, (a, b) => a + b);
       final base = cantidad * p.mensual + suma;
       // Sin elegir usar o pagar el saldo, igual se suma lo que pasó a deuda.
+      final primero = meses.isEmpty ? 0.0 : p.mensual + p.recargoPara(meses.first, h);
+      final desc = cantidad == 0 ? 0.0 : double.parse((primero * p.descuentoPct / 100).toStringAsFixed(2));
       final s = saldo == 0 && deudaObligatoria > 0 ? -deudaObligatoria : saldo;
-      final aplicado = cantidad == 0 ? 0.0 : (s > 0 ? (s < base ? s : base) : s);
+      final resto = base - desc;
+      final aplicado = cantidad == 0 ? 0.0 : (s > 0 ? (s < resto ? s : resto) : s);
       return Total(
         cantidad: cantidad,
         aFavor: 0,
         cupon: 0,
         cobradas: cantidad,
-        monto: double.parse((base - aplicado).toStringAsFixed(2)),
+        monto: double.parse((resto - aplicado).toStringAsFixed(2)),
         precio: p.mensual,
         recargos: rec.length,
         recargo: suma,
         saldo: aplicado,
+        descuento: desc,
       );
     }
     final aFavor = creditos < cantidad ? creditos : cantidad;
@@ -407,14 +420,16 @@ class ReservasRepo {
     final cobradas = cantidad - aFavor - conCupon;
     // Clases que pasaron a deuda: se pagan con la primera clase cobrada.
     final deuda = cobradas > 0 ? deudaObligatoria : 0.0;
+    final desc = cobradas > 0 ? double.parse((p.porClase * p.descuentoPct / 100).toStringAsFixed(2)) : 0.0;
     return Total(
       cantidad: cantidad,
       aFavor: aFavor,
       cupon: conCupon,
       cobradas: cobradas,
-      monto: double.parse((cobradas * p.porClase + deuda).toStringAsFixed(2)),
+      monto: double.parse((cobradas * p.porClase + deuda - desc).toStringAsFixed(2)),
       precio: p.porClase,
       saldo: -deuda,
+      descuento: desc,
     );
   }
 

@@ -297,6 +297,43 @@ class _AdministracionState extends State<_Administracion> {
     return [DateTime(h.year, h.month - 1), DateTime(h.year, h.month), DateTime(h.year, h.month + 1)];
   }
 
+  /// Cupón manual: elegir el % o quitarlo.
+  Future<void> _elegirDescuento(Integrante p) async {
+    final pct = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Descuento para ${p.nombreMostrar}', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('Se aplica solo en su próximo pago y se usa una vez. Le llega un aviso.', style: TextStyle(color: h.pivot.textoSecundario)),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final n in const [10, 15, 25, 50, 100])
+                    ChoiceChip(label: Text(n == 100 ? 'Gratis' : '$n %'), selected: p.cuponDescuento == n, onSelected: (_) => Navigator.of(h).pop(n)),
+                ],
+              ),
+              if (p.cuponDescuento != null) ...[
+                const SizedBox(height: 8),
+                TextButton(onPressed: () => Navigator.of(h).pop(0), child: const Text('Quitar descuento')),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    if (pct == null) return;
+    await _hacer(() => widget.repo.cuponDescuento(p, pct), pct == 0 ? 'Descuento quitado' : 'Descuento de $pct % listo');
+  }
+
   Future<void> _registrarPago() async {
     final p = widget.p;
     final precio = await widget.repo.precioMensual().catchError((_) => 0.0);
@@ -639,6 +676,16 @@ class _AdministracionState extends State<_Administracion> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                // Cupón manual (Victor, 2026-11-16).
+                if (!p.exentaCuota)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.local_offer_outlined, color: pal.marcaTexto),
+                    title: Text(p.cuponDescuento == null ? 'Dar un descuento' : 'Descuento de ${p.cuponDescuento} %'),
+                    subtitle: Text(p.cuponDescuento == null ? 'Para su próximo pago, una sola vez' : 'Se aplica en su próximo pago'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => _elegirDescuento(p),
+                  ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Paga cuota'),
