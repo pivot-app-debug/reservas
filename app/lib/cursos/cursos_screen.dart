@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../core/selector_hora.dart';
 
 import 'package:flutter/material.dart';
@@ -18,10 +20,13 @@ import '../pivots/formas_pago_screen.dart' show LogoMedio;
 import '../reservas/reserva_screen.dart' show ReservaExitoScreen;
 import '../reservas/reservas_repo.dart';
 import '../sesion/sesion.dart';
+import '../core/asistente.dart';
+import '../coach/coach_screen.dart' show EscalaDiez;
 
-/// Cursos con try out (Victor, 2026-11-16): varias fechas con precio propio
-/// e inscripción con cupo. La última fecha es el try out; al aprobarlo, el
-/// Pivot elige a qué equipo pasa la persona.
+part 'asistente_curso.dart';
+
+/// Cursos y clínicas (Victor, 2026-11-16/17): clases con temas, precio
+/// propio, inscripción con cupo y una evaluación por temas opcional.
 class Curso {
   Curso(this.m);
   final Map<String, dynamic> m;
@@ -38,6 +43,15 @@ class Curso {
   int get inscritos => (m['inscritos'] as num?)?.toInt() ?? 0;
   String get estado => '${m['estado'] ?? 'abierto'}';
   String? get equipoDestino => m['equipoDestino'] as String?;
+
+  /// Al aprobar, ¿cambia de equipo? (Victor, 2026-11-17: por defecto no).
+  bool get cambiaEquipo => m['cambiaEquipo'] == true;
+
+  /// Temas de la evaluación con su mínimo (1 a 10).
+  List<Map<String, dynamic>> get temasEvaluacion => [
+    for (final t in ((m['evaluacion'] as Map?)?['temas'] as List? ?? const []))
+      if (t is Map) {'nombre': '${t['nombre']}', 'minimo': (t['minimo'] as num?)?.toInt() ?? 5},
+  ];
   List<Map<String, dynamic>> get fechas => [for (final f in (m['fechas'] as List? ?? const [])) Map<String, dynamic>.from(f as Map)];
   Map? get mia => m['miInscripcion'] as Map?;
   List<Map<String, dynamic>> get personas => [for (final x in (m['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
@@ -93,7 +107,7 @@ class _QueEsUnCurso extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Un grupo de clases con inscripción: para quienes empiezan o para practicar algo más avanzado. Si quieres, termina con una evaluación final para entrar a un equipo.',
+            'Un grupo de clases con inscripción, para quienes empiezan o para practicar algo más avanzado. Cada clase tiene sus temas y, al final, puede haber una evaluación.',
             style: TextStyle(height: 1.35, color: p.sobreSuave),
           ),
           paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
@@ -101,7 +115,7 @@ class _QueEsUnCurso extends StatelessWidget {
             Icons.payments_outlined,
             'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
           ),
-          paso(Icons.emoji_events_outlined, 'Si tiene evaluación final, ese día marcas quién aprobó y a qué equipo pasa.'),
+          paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ese día evalúas a cada persona en los temas de las clases.'),
         ],
       ),
     );
@@ -145,6 +159,15 @@ class _Fechas extends StatelessWidget {
                     style: TextStyle(fontSize: 14, color: p.texto),
                   ),
                 ),
+                if ((l[i]['temas'] as List? ?? const []).isNotEmpty && Curso.tipoFecha(l, i) != 'evaluacion')
+                  Flexible(
+                    child: Text(
+                      (l[i]['temas'] as List).join(', '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: p.textoSecundario),
+                    ),
+                  ),
                 if (Curso.tipoFecha(l, i) != 'clase' && !curso.esClinica)
                   Text(
                     Curso.tipoFecha(l, i) == 'evaluacion' ? 'Evaluación final' : '${l[i]['titulo'] ?? 'Clínica'}',
@@ -366,6 +389,7 @@ class _CursosScreenState extends State<CursosScreen> {
   List<Curso>? _cursos;
   List<String> _equipos = const [];
   List<String> _lugares = const [];
+  List<Map<String, dynamic>> _habilidades = const [];
   String? _error;
   Sesion get s => widget.sesion;
 
@@ -385,7 +409,12 @@ class _CursosScreenState extends State<CursosScreen> {
     try {
       final r = await s.api.post('adminCursos', {'adminToken': s.adminToken, ...q});
       if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar.'}');
-      if (mounted) setState(() => _cursos = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))]);
+      if (mounted) {
+        setState(() {
+          _cursos = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))];
+          _habilidades = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)];
+        });
+      }
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -401,7 +430,7 @@ class _CursosScreenState extends State<CursosScreen> {
   Future<void> _editar([Curso? c]) async {
     final ok = await Navigator.of(context).push<Map<String, Object?>>(
       MaterialPageRoute(
-        builder: (_) => _EditorCurso(curso: c, equipos: _equipos, lugares: _lugares),
+        builder: (_) => _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades),
       ),
     );
     if (ok == null) return;
@@ -493,6 +522,93 @@ class _DetalleCursoState extends State<_DetalleCurso> {
 
   Future<void> _estado(String e) async {
     await widget.llamar({'accion': 'estado', 'id': widget.id, 'estado': e});
+    if (mounted) setState(() {});
+  }
+
+  /// Evaluación por temas, del 1 al 10 (Victor, 2026-11-17). Aprueba quien
+  /// llega al mínimo en cada tema; el resultado queda en su ficha deportiva.
+  Future<void> _evaluar(Curso curso, Map<String, dynamic> x) async {
+    final temas = curso.temasEvaluacion;
+    final notas = <String, int?>{for (final t in temas) '${t['nombre']}': ((x['notas'] as Map?)?['${t['nombre']}'] as num?)?.toInt()};
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) {
+          final p = h.pivot;
+          final aprueba = temas.every((t) => (notas['${t['nombre']}'] ?? 0) >= (t['minimo'] as int));
+          final completas = notas.values.every((n) => n != null);
+          return SafeArea(
+            child: SizedBox(
+              height: MediaQuery.sizeOf(h).height * 0.85,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text('Evaluación de ${x['nombreMostrar']}', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      children: [
+                        for (final t in temas) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text('${t['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                              ),
+                              Text('Mínimo ${t['minimo']}', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          EscalaDiez(valor: notas['${t['nombre']}'], alCambiar: (n) => set(() => notas['${t['nombre']}'] = n)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            key: ValueKey('$completas$aprueba'),
+                            !completas
+                                ? 'Faltan temas por evaluar.'
+                                : (aprueba ? 'Aprueba: llega al mínimo en todos los temas.' : 'No aprueba: hay temas por debajo del mínimo.'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: completas && aprueba ? p.texto : p.marcaTexto),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          onPressed: notas.values.any((n) => n != null) ? () => Navigator.of(h).pop(true) : null,
+                          child: const Text('Guardar evaluación'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (ok != true) return;
+    await widget.llamar({
+      'accion': 'evaluar',
+      'inscripcionId': x['id'],
+      'notas': jsonEncode({
+        for (final e in notas.entries)
+          if (e.value != null) e.key: e.value,
+      }),
+    });
     if (mounted) setState(() {});
   }
 
@@ -645,7 +761,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
             [
               _precio(curso.precio),
               curso.cupo == null ? 'sin límite de cupo' : 'cupo de ${curso.cupo}',
-              if (curso.equipoDestino != null) 'pasan a ${curso.equipoDestino}',
+              if (curso.cambiaEquipo && curso.equipoDestino != null) 'al aprobar pasan a ${curso.equipoDestino}',
             ].join(' · '),
             style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
           ),
@@ -677,381 +793,18 @@ class _DetalleCursoState extends State<_DetalleCurso> {
                 (_, 'no_aprobado') => 'No aprobó la evaluación',
                 _ => 'Inscripción confirmada',
               }),
-              trailing: x['estado'] == 'confirmada' && yaFueTryOut
-                  ? TextButton(onPressed: () => _resultado(x), child: Text(x['resultado'] == null ? 'Resultado' : 'Cambiar'))
+              trailing: x['estado'] == 'confirmada' && (yaFueTryOut || (tryOut == null && curso.temasEvaluacion.isNotEmpty))
+                  ? TextButton(
+                      onPressed: () => curso.temasEvaluacion.isEmpty ? _resultado(x) : _evaluar(curso, x),
+                      child: Text(x['resultado'] == null ? 'Evaluar' : 'Cambiar'),
+                    )
                   : null,
             ),
           if (tryOut != null && !yaFueTryOut && curso.personas.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'El día de la evaluación final podrás marcar quién aprobó y a qué equipo pasa.',
-                style: TextStyle(fontSize: 13, color: p.textoSecundario),
-              ),
+              child: Text('Ese día podrás evaluar a cada persona en los temas de las clases.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EditorCurso extends StatefulWidget {
-  const _EditorCurso({this.curso, required this.equipos, required this.lugares});
-  final Curso? curso;
-  final List<String> equipos, lugares;
-  @override
-  State<_EditorCurso> createState() => _EditorCursoState();
-}
-
-class _EditorCursoState extends State<_EditorCurso> {
-  late final o = widget.curso;
-  late final _nombre = TextEditingController(text: o?.nombre ?? '');
-  late final _descripcion = TextEditingController(text: o?.descripcion ?? '');
-  late final _precio = TextEditingController(text: o == null ? '' : '${o!.precio % 1 == 0 ? o!.precio.toInt() : o!.precio}');
-  late bool _conCupo = o?.cupo != null;
-  late int _cupo = o?.cupo ?? 20;
-  late String? _equipo = o?.equipoDestino;
-  // Curso o clínica (Victor, 2026-11-17). Clases (y clínicas en medio) y,
-  // aparte, la evaluación final opcional.
-  late String _tipo = o?.tipo ?? 'curso';
-  late final List<Map<String, dynamic>> _clases = [
-    for (var i = 0; i < (o?.fechas.length ?? 0); i++)
-      if (Curso.tipoFecha(o!.fechas, i) != 'evaluacion') {...o!.fechas[i], 'tipo': Curso.tipoFecha(o!.fechas, i)},
-  ];
-  late Map<String, dynamic>? _tryout = [
-    for (var i = 0; i < (o?.fechas.length ?? 0); i++)
-      if (Curso.tipoFecha(o!.fechas, i) == 'evaluacion') o!.fechas[i],
-  ].firstOrNull;
-  bool get _clinica => _tipo == 'clinica';
-
-  @override
-  void dispose() {
-    _nombre.dispose();
-    _descripcion.dispose();
-    _precio.dispose();
-    super.dispose();
-  }
-
-  num? get _monto => _precio.text.trim().isEmpty ? 0 : num.tryParse(_precio.text.replaceAll(',', '.'));
-
-  static String _titulo(Map f) {
-    final d = Curso.fecha(f);
-    return d == null ? '${f['fecha']}' : '${Fechas.dia(d)} ${Fechas.corta(d)}';
-  }
-
-  /// El try out va después de la última clase.
-  bool get _tryoutAntes => _tryout != null && _clases.isNotEmpty && '${_tryout!['fecha']}'.compareTo('${_clases.last['fecha']}') < 0;
-
-  /// Elige día, hora y lugar, partiendo de [previa] (o de [sugerida]).
-  Future<Map<String, dynamic>?> _elegir(Map<String, dynamic>? previa, DateTime sugerida) async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: previa == null ? sugerida : (Curso.fecha(previa) ?? sugerida),
-      firstDate: Fechas.hoy().subtract(const Duration(days: 365)),
-      lastDate: Fechas.hoy().add(const Duration(days: 730)),
-    );
-    if (d == null || !mounted) return null;
-    final base = previa ?? (_clases.isEmpty ? null : _clases.last);
-    final h0 = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch('${base?['hora'] ?? '09:00'}');
-    final h = await elegirHora(
-      context,
-      inicial: TimeOfDay(hour: int.parse(h0?.group(1) ?? '9'), minute: int.parse(h0?.group(2) ?? '0')),
-      titulo: 'Hora de la clase',
-    );
-    if (h == null || !mounted) return null;
-    var lugar = '${base?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
-    if (widget.lugares.length > 1) {
-      final l = await showModalBottomSheet<String>(
-        context: context,
-        showDragHandle: true,
-        builder: (c) => SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  '¿Dónde?',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: c.pivot.texto),
-                ),
-              ),
-              for (final x in widget.lugares)
-                ListTile(
-                  leading: Icon(x == lugar ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded),
-                  title: Text(x),
-                  onTap: () => Navigator.of(c).pop(x),
-                ),
-            ],
-          ),
-        ),
-      );
-      if (l == null) return null;
-      lugar = l;
-    }
-    return {'fecha': Fechas.iso(d), 'hora': '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}', 'lugar': lugar};
-  }
-
-  Future<void> _clase([int? i, String tipo = 'clase']) async {
-    final ultima = _clases.isEmpty ? null : Curso.fecha(_clases.last);
-    var f = await _elegir(i == null ? null : _clases[i], ultima == null ? Fechas.hoy() : ultima.add(const Duration(days: 7)));
-    if (f == null || !mounted) return;
-    final t = i == null ? tipo : '${_clases[i]['tipo'] ?? 'clase'}';
-    f = {...f, 'tipo': t};
-    // Clínica: hasta qué hora y, dentro de un curso, de qué se trata.
-    if (t == 'clinica' || _clinica) {
-      final previa = i == null ? null : _clases[i];
-      final fin = await elegirHoraTexto(context, inicial: '${previa?['termina'] ?? _sumarHoras('${f['hora']}', _clinica ? 5 : 2)}', titulo: 'Termina');
-      if (fin == null || !mounted) return;
-      f['termina'] = fin;
-      if (!_clinica) {
-        final ctl = TextEditingController(text: '${previa?['titulo'] ?? ''}');
-        final titulo = await showDialog<String>(
-          context: context,
-          builder: (d) => AlertDialog(
-            title: const Text('¿De qué es la clínica?'),
-            content: TextField(
-              controller: ctl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(hintText: 'Ej. Clínica con jugadorxs invitadxs'),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-              FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.trim()), child: const Text('Listo')),
-            ],
-          ),
-        );
-        if (titulo == null || !mounted) return;
-        if (titulo.isNotEmpty) f['titulo'] = titulo;
-      }
-    }
-    final nueva = f;
-    setState(() {
-      if (_clinica) {
-        _clases
-          ..clear()
-          ..add(nueva);
-        return;
-      }
-      if (i == null) {
-        _clases.add(nueva);
-      } else {
-        _clases[i] = nueva;
-      }
-      _clases.sort((a, b) => '${a['fecha']}'.compareTo('${b['fecha']}'));
-    });
-  }
-
-  Future<void> _elegirTryout() async {
-    final ultima = _clases.isEmpty ? null : Curso.fecha(_clases.last);
-    final f = await _elegir(_tryout, ultima == null ? Fechas.hoy() : ultima.add(const Duration(days: 7)));
-    if (f != null) setState(() => _tryout = f);
-  }
-
-  static String _sumarHoras(String hhmm, int h) {
-    final p = hhmm.split(':');
-    final x = ((int.tryParse(p.first) ?? 9) + h) % 24;
-    return '${x.toString().padLeft(2, '0')}:${p.length > 1 ? p[1] : '00'}';
-  }
-
-  Widget _filaFecha(PivotPaleta p, Map f, {required IconData icono, required VoidCallback alTocar, VoidCallback? alQuitar}) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Material(
-      color: p.tarjeta,
-      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        leading: Icon(icono, color: p.marcaTexto),
-        title: Text([_titulo(f), if ('${f['titulo'] ?? ''}'.isNotEmpty) '${f['titulo']}'].join(' · '), style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          ['${f['hora']}${'${f['termina'] ?? ''}'.isNotEmpty ? ' a ${f['termina']}' : ''}', if ('${f['lugar'] ?? ''}'.isNotEmpty) '${f['lugar']}'].join(' · '),
-        ),
-        onTap: alTocar,
-        trailing: alQuitar == null
-            ? const Icon(Icons.edit_outlined)
-            : IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: alQuitar),
-      ),
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final valido = _nombre.text.trim().isNotEmpty && _monto != null && _clases.isNotEmpty && (_clinica || !_tryoutAntes);
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: _barra(o == null ? (_clinica ? 'Nueva clínica' : 'Nuevo curso') : (_clinica ? 'Editar clínica' : 'Editar curso')),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
-        children: [
-          if (o == null) ...[const _QueEsUnCurso(), const SizedBox(height: 16)],
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'curso', icon: Icon(Icons.school_outlined), label: Text('Curso')),
-              ButtonSegment(value: 'clinica', icon: Icon(Icons.star_outline_rounded), label: Text('Clínica')),
-            ],
-            selected: {_tipo},
-            onSelectionChanged: (v) => setState(() {
-              _tipo = v.first;
-              if (_clinica && _clases.length > 1) _clases.removeRange(1, _clases.length);
-            }),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _clinica
-                ? 'Una sola sesión intensiva, por ejemplo con jugadorxs invitadxs de otra liga. Puede ser paga o gratis.'
-                : 'Varias clases con inscripción. Puede tener clínicas en medio y una evaluación final.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _nombre,
-            onChanged: (_) => setState(() {}),
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(labelText: 'Nombre', hintText: _clinica ? 'Ej. Clínica intensiva de defensa' : 'Ej. Curso de iniciación de verano'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _descripcion,
-            maxLines: 6,
-            minLines: 2,
-            maxLength: 1000,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Descripción', hintText: 'Qué se verá, quién la da, para quién es y qué se necesita'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _precio,
-            onChanged: (_) => setState(() {}),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-            decoration: InputDecoration(
-              labelText: _clinica ? 'Precio de la clínica' : 'Precio del curso',
-              prefixText: '${Moneda.s} ',
-              helperText: 'Vacío o 0: gratis',
-            ),
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Cupo limitado'), value: _conCupo, onChanged: (v) => setState(() => _conCupo = v)),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            alignment: Alignment.topCenter,
-            child: _conCupo
-                ? SelectorNumero(
-                    valor: _cupo,
-                    min: 1,
-                    max: 200,
-                    etiqueta: _cupo == 1 ? 'lugar' : 'lugares',
-                    alCambiar: (v) => setState(() => _cupo = v.toInt()),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-          if (widget.equipos.isNotEmpty && !_clinica && _tryout != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              'Equipo al que pasan si aprueban',
-              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-            ),
-            const SizedBox(height: 2),
-            Text('Lo puedes cambiar para cada persona en la evaluación final.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final e in widget.equipos) ChoiceChip(label: Text(e), selected: _equipo == e, onSelected: (v) => setState(() => _equipo = v ? e : null)),
-              ],
-            ),
-          ],
-          const SizedBox(height: 20),
-          Text(
-            _clinica ? 'Cuándo' : 'Clases',
-            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-          ),
-          const SizedBox(height: 2),
-          Text('Queda en el calendario con su día, hora y lugar. Quienes se inscriben la ven ahí.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-          const SizedBox(height: 8),
-          for (var i = 0; i < _clases.length; i++)
-            _filaFecha(
-              p,
-              _clases[i],
-              icono: _clases[i]['tipo'] == 'clinica' || _clinica ? Icons.star_outline_rounded : Icons.event_outlined,
-              alTocar: () => _clase(i),
-              alQuitar: () => setState(() => _clases.removeAt(i)),
-            ),
-          if (!_clinica || _clases.isEmpty)
-            Wrap(
-              spacing: 4,
-              children: [
-                TextButton.icon(
-                  onPressed: () => _clase(null, _clinica ? 'clinica' : 'clase'),
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(_clinica ? 'Elegir día y hora' : (_clases.isEmpty ? 'Agregar la primera clase' : 'Agregar clase')),
-                ),
-                if (!_clinica && _clases.isNotEmpty)
-                  TextButton.icon(onPressed: () => _clase(null, 'clinica'), icon: const Icon(Icons.star_outline_rounded), label: const Text('Agregar clínica')),
-              ],
-            ),
-          if (!_clinica) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Evaluación final (opcional)',
-              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-            ),
-            const SizedBox(height: 2),
-            Text('Después de la última clase. Ese día marcas quién aprobó y a qué equipo pasa.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-            const SizedBox(height: 8),
-            if (_tryout != null)
-              _filaFecha(p, _tryout!, icono: Icons.emoji_events_outlined, alTocar: _elegirTryout, alQuitar: () => setState(() => _tryout = null))
-            else
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _elegirTryout,
-                  icon: const Icon(Icons.emoji_events_outlined),
-                  label: const Text('Elegir la fecha de la evaluación final'),
-                ),
-              ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              alignment: Alignment.topCenter,
-              child: _tryoutAntes
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('La evaluación final tiene que ser después de la última clase.', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
-                    )
-                  : const SizedBox(width: double.infinity),
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: valido
-                ? () => Navigator.of(context).pop(<String, Object?>{
-                    'id': o?.id,
-                    'tipo': _tipo,
-                    'nombre': _nombre.text.trim(),
-                    'descripcion': _descripcion.text.trim(),
-                    'precio': _monto,
-                    'cupo': _conCupo ? _cupo : null,
-                    'equipoDestino': _equipo,
-                    'fechas': [
-                      for (final f in _clases)
-                        {
-                          'fecha': f['fecha'],
-                          'hora': f['hora'],
-                          'lugar': f['lugar'],
-                          'tipo': _clinica ? 'clinica' : (f['tipo'] ?? 'clase'),
-                          'termina': ?f['termina'],
-                          'titulo': ?f['titulo'],
-                        },
-                      if (!_clinica && _tryout != null)
-                        {'fecha': _tryout!['fecha'], 'hora': _tryout!['hora'], 'lugar': _tryout!['lugar'], 'tipo': 'evaluacion'},
-                    ],
-                  })
-                : null,
-            child: const Text('Guardar'),
-          ),
         ],
       ),
     );

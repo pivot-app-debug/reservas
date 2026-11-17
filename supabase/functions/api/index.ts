@@ -8734,7 +8734,8 @@ function _cursoJson(c: any, inscritos: any[], yo?: string) {
   const mia = yo ? activos.find((i: any) => i.username === yo) : null;
   return {
         id: c.id, tipo: c.tipo ?? 'curso', nombre: c.nombre, descripcion: c.descripcion ?? '', precio: Number(c.precio) || 0, cupo: c.cupo ?? null,
-    fechas: Array.isArray(c.fechas) ? c.fechas : [], equipoDestino: c.equipo_destino ?? null, estado: c.estado,
+        fechas: Array.isArray(c.fechas) ? c.fechas : [], equipoDestino: c.equipo_destino ?? null, estado: c.estado,
+    evaluacion: c.evaluacion ?? {}, cambiaEquipo: c.cambia_equipo === true,
     inscritos: activos.length, libres: c.cupo == null ? null : Math.max(0, Number(c.cupo) - activos.length),
     ...(mia ? { miInscripcion: { estado: mia.estado, resultado: mia.resultado ?? null } } : {}),
   };
@@ -8782,7 +8783,9 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     if (!nombre) return { exito: false, error: 'Ponle un nombre.' };
     const fechas = (Array.isArray(c.fechas) ? c.fechas : []).map((x: any) => ({
                         fecha: String(x?.fecha ?? '').slice(0, 10), hora: String(x?.hora ?? '').slice(0, 5), lugar: String(x?.lugar ?? '').slice(0, 80),
-      tipo: ['clase', 'clinica', 'evaluacion'].includes(String(x?.tipo)) ? String(x.tipo) : 'clase',
+            tipo: ['clase', 'clinica', 'evaluacion'].includes(String(x?.tipo)) ? String(x.tipo) : 'clase',
+      // Temas cortos de la clase (Victor, 2026-11-17): habilidades de la lista.
+      ...(Array.isArray(x?.temas) && x.temas.length ? { temas: [...new Set(x.temas.map((t: any) => String(t).trim().slice(0, 40)).filter(Boolean))].slice(0, 15) } : {}),
       ...(String(x?.titulo ?? '').trim() ? { titulo: String(x.titulo).trim().slice(0, 80) } : {}),
       ...(/^\d{2}:\d{2}$/.test(String(x?.termina ?? '')) ? { termina: String(x.termina) } : {}),
     } as any)).filter((x: any) => /^\d{4}-\d{2}-\d{2}$/.test(x.fecha)).sort((a: any, b: any) => a.fecha.localeCompare(b.fecha)).slice(0, 60);
@@ -8790,8 +8793,28 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
         const fila: Record<string, any> = {
             nombre, tipo: c.tipo === 'clinica' ? 'clinica' : 'curso', descripcion: String(c.descripcion ?? '').trim().slice(0, 1000) || null, precio: Math.max(0, _num2(Number(c.precio) || 0)),
       cupo: c.cupo == null || c.cupo === '' ? null : Math.max(1, Math.round(Number(c.cupo))), fechas,
-      equipo_destino: String(c.equipoDestino ?? '').trim().slice(0, 60) || null,
+            equipo_destino: String(c.equipoDestino ?? '').trim().slice(0, 60) || null,
+      cambia_equipo: c.cambiaEquipo === true || c.cambiaEquipo === 'true',
+      // Evaluación: temas con su mínimo para aprobar (1 a 10, 5 por defecto).
+      evaluacion: {
+        temas: (Array.isArray(c.evaluacion?.temas) ? c.evaluacion.temas : []).map((t: any) => ({
+          nombre: String(t?.nombre ?? '').trim().slice(0, 40), minimo: Math.max(1, Math.min(10, Math.round(Number(t?.minimo) || 5))),
+        })).filter((t: any) => t.nombre).slice(0, 60),
+      },
     };
+    if (!fila.cambia_equipo) fila.equipo_destino = null;
+    // Temas nuevos quedan en la lista de habilidades, para la ficha deportiva.
+    const nombresTemas = new Set<string>([...fechas.flatMap((x: any) => x.temas ?? []), ...fila.evaluacion.temas.map((t: any) => t.nombre)]);
+    if (nombresTemas.size) {
+      const { data: hab } = await supabase.from('coach_habilidades').select('nombre');
+      const ya = new Set((hab ?? []).map((h: any) => String(h.nombre).toLowerCase()));
+      const nuevos = [...nombresTemas].filter((n) => !ya.has(n.toLowerCase()));
+      if (nuevos.length) {
+        const { data: mx } = await supabase.from('coach_habilidades').select('orden').order('orden', { ascending: false }).limit(1).maybeSingle();
+        let o = (Number(mx?.orden) || 0) + 1;
+        await supabase.from('coach_habilidades').insert(nuevos.map((n) => ({ categoria: 'Temas de cursos', nombre: n, activa: true, orden: o++ })));
+      }
+    }
         // Cada fecha es un evento "Curso" del calendario. Las fechas que no
     // cambian conservan su evento (y su asistencia); las quitadas se borran.
     const { data: antes } = c.id ? await supabase.from('cursos').select('fechas').eq('id', String(c.id)).maybeSingle() : { data: null };
@@ -8818,6 +8841,41 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     const r = c.id ? await supabase.from('cursos').update(fila).eq('id', String(c.id)).select('id').single() : await supabase.from('cursos').insert(fila).select('id').single();
     if (r.error) return { exito: false, error: r.error.message };
     await _registrarAjuste('curso', null, fila, email);
+    } else if (accion === 'evaluar') {
+    // Evaluación por temas (Victor, 2026-11-17): aprueba si llega al mínimo
+    // en cada tema. Cada tema queda en la ficha deportiva (logrado o en
+    // proceso). Solo cambia de equipo si el curso lo dice.
+    const { data: i } = await supabase.from('curso_inscripciones').select('*').eq('id', String(params.inscripcionId ?? '')).maybeSingle();
+    if (!i) return { exito: false, error: 'Inscripción no encontrada.' };
+    const { data: cu } = await supabase.from('cursos').select('nombre, evaluacion, cambia_equipo, equipo_destino').eq('id', i.curso_id).maybeSingle();
+    let notas: Record<string, number> = {};
+    try { notas = typeof params.notas === 'object' ? params.notas : JSON.parse(String(params.notas ?? '{}')); } catch { notas = {}; }
+    const temas: any[] = cu?.evaluacion?.temas ?? [];
+    const limpias: Record<string, number> = {};
+    for (const t of temas) { const n = Math.round(Number(notas[t.nombre])); if (n >= 1 && n <= 10) limpias[t.nombre] = n; }
+    if (!Object.keys(limpias).length) return { exito: false, error: 'Pon al menos una nota.' };
+    const aprobado = temas.length > 0 && temas.every((t: any) => (limpias[t.nombre] ?? 0) >= (Number(t.minimo) || 5));
+    await supabase.from('curso_inscripciones').update({ notas: limpias, resultado: aprobado ? 'aprobado' : 'no_aprobado', equipo_final: aprobado && cu?.cambia_equipo ? cu?.equipo_destino ?? null : null }).eq('id', i.id);
+    const { data: hab } = await supabase.from('coach_habilidades').select('id, nombre');
+    const quienEvalua = (await supabase.from('equipo').select('username').ilike('email', email).maybeSingle()).data?.username ?? email;
+    for (const t of temas) {
+      const h = (hab ?? []).find((x: any) => String(x.nombre).toLowerCase() === String(t.nombre).toLowerCase());
+      if (!h || limpias[t.nombre] == null) continue;
+      await supabase.from('coach_evaluaciones').insert({ username: i.username, habilidad_id: h.id, nivel: limpias[t.nombre] >= (Number(t.minimo) || 5) ? 'logrado' : 'proceso', coach: quienEvalua });
+    }
+    if (aprobado && cu?.cambia_equipo && cu?.equipo_destino) {
+      const { data: f } = await supabase.from('equipo').select('categoria').eq('username', i.username).maybeSingle();
+      if (f && f.categoria !== cu.equipo_destino) {
+        await supabase.from('equipo').update({ categoria: cu.equipo_destino }).eq('username', i.username);
+        await supabase.from('historial_tier').upsert({ username: i.username, mes: _hoyEcuadorISO().slice(0, 7), tier_nombre: cu.equipo_destino }, { onConflict: 'username,mes' });
+        await _avisarCambioEquipo(i.username, f.categoria, cu.equipo_destino);
+      }
+    }
+    await sendPush({
+      tipo: 'solicitud_resuelta', include_external_user_ids: [i.username],
+      headings: { es: aprobado ? `¡Aprobaste ${cu?.nombre ?? 'el curso'}!` : `Resultado de ${cu?.nombre ?? 'tu curso'}` },
+      contents: { es: aprobado ? 'Tus habilidades quedaron en tu ficha deportiva.' : 'Mira en tu ficha deportiva qué temas quedaron en proceso.' }, url: APP_URL + '/',
+    }).catch(() => {});
   } else if (accion === 'estado') {
     const estado = ['abierto', 'cerrado', 'terminado'].includes(String(params.estado)) ? String(params.estado) : 'cerrado';
     await supabase.from('cursos').update({ estado }).eq('id', String(params.id ?? ''));
@@ -8852,9 +8910,11 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       ..._cursoJson(c, ins ?? []),
       personas: (ins ?? []).filter((i: any) => i.curso_id === c.id && i.estado !== 'cancelada').map((i: any) => {
         const e = quien[String(i.username).trim().toUpperCase()] ?? {};
-        return { id: i.id, nombre: i.username, nombreMostrar: e.nombreDerby || i.username, foto: e.fotoPerfil ?? '', estado: i.estado, resultado: i.resultado ?? null, equipo: i.equipo_final ?? null };
+                return { id: i.id, nombre: i.username, nombreMostrar: e.nombreDerby || i.username, foto: e.fotoPerfil ?? '', estado: i.estado, resultado: i.resultado ?? null, equipo: i.equipo_final ?? null, notas: i.notas ?? null };
       }),
     })),
+    // Lista de habilidades para elegir los temas de cada clase.
+    habilidades: ((await supabase.from('coach_habilidades').select('id, categoria, nombre').eq('activa', true).order('orden')).data ?? []),
   };
 }
 
