@@ -648,5 +648,6 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - [x] Anticipada: motivos sin elegir entrenamientos; "Tengo algo en ese horario"; selector de hora con ruedas; botón y explicación en el detalle.
 - [x] Comunicados con vencimiento (3 días o fecha elegida). Barras superiores arregladas en toda la app. Nota 1–10 que cabe.
 - [x] Textos neutros por deporte (cursos, apodo/número, roles, WFTDA). Ficha de la persona opción A.
-- [ ] Esperando a Victor: rediseño de Coach (evaluar a quienes vinieron, por persona deslizando); Cursos (descanso, enlace de invitación, botón Cursos en Calendario, cursos y clínicas); a quién llega el recordatorio de feedback del coach.
-- [ ] Encontrado al revisar (preguntar): asistencia anticipada solo se ofrece a equipos llamados "Quindes" o "Mirlxs" y Funciones de Pivot de la ficha tiene "Quindes/Mirlxs" fijos: en otra liga no funcionan. Equipamiento del club (patines y tallas) es propio de deportes con patines.
+- [x] Rediseño de Coach, Cursos y clínicas, aviso semanal de novedades (15:08).
+- [x] Anticipada y Funciones de Pivot con los equipos de cada liga.
+- [ ] **Equipamiento armado por cada liga** (aprobado 15:15): listas propias que se prestan (con o sin tallas) en vez de patines/protecciones fijos; tus datos, reserva de clase, requisitos de equipo y la regla "con equipamiento de la liga no puede estar en Quindes" pasan a esas listas. Quindes conserva sus listas actuales.

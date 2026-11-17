@@ -246,7 +246,13 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Coach, cursos y equipos de cada liga (2026-11-17, 15:08)
+- `getCoach.pendientes` (`_porEvaluar`: eventos terminados de 7 días con quiénes vinieron y cuántas evaluó) y `avisarNovedades`; `coachGuardar accion=ajustes`. `coaches.avisar_novedades` (migración `20261117120000`). `_avisarNovedadesFicha` en cronDiario (lunes). Se quitó `_recordarFeedbackCoach`. App: `EvaluarScreen`, `_HojaHabilidades`, `tituloPendiente` en coach_screen.dart.
+- `cursos.tipo` ('curso' | 'clinica', migración `20261117110000`); cada fecha con `tipo` ('clase' | 'clinica' | 'evaluacion'), `titulo`, `termina` (venue `finaliza`). Cursos viejos: la última de varias fechas es la evaluación (`Curso.tipoFecha`). Enlace `?curso=<id>` (main.dart → `CursosAbiertosScreen(destacado:)`). `_posponerCursos` al guardar una temporada de descanso.
+- `adminSetTierModo` acepta `tierModo='fijo'` + `equipo`. `AnticipadaRepo.disponible`: cualquier equipo cuyo cobro no sea 'clase'. `EventosRepo.actual`.
+
 ## Deporte, comunicados y hora (2026-11-17, tarde)
+
 - `getConfigLiga.deporte` (de `ligas`); app `core/deporte.dart` (`Deporte.esDerby`, `apodo`, `numero`, ejemplos). Regla: textos neutros para cualquier deporte; lo de roller derby solo si `Deporte.esDerby`.
 - `avisos_programados.vence_en` (migración `20261117100000_avisos_vence.sql`); `adminEnviarAviso.venceEn`; la bandeja muestra comunicados hasta `vence_en` o 3 días.
 - `core/selector_hora.dart`: `elegirHora` / `elegirHoraTexto` reemplazan `showTimePicker`.
