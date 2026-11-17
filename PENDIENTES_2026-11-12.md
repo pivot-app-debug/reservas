@@ -616,3 +616,5 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
   - Cada jugadorx ve su ficha deportiva en Ajustes, junto a Estadísticas.
   - Partidos: además de posiciones y line-ups, reportes por partido (faltas, puntajes) sacados del statsbook. Propuesta: importar el statsbook oficial (.xlsx de WFTDA) y leer sus hojas (puntaje por jam, penalidades, line-ups).
   - Statsbook (19:42): muchas ligas lo llevan a mano con lápiz y papel, así que además de importar el .xlsx tiene que haber una carga a mano de los stats (por jam: puntos, jammer y line-up; y penalidades por persona), que alimente el mismo reporte del partido.
+- [ ] **Tomar asistencia sin conexión (bug, 19:45):** la lista de nombres no carga sin señal (`roster(forzar: true)` falla). Guardar en el teléfono una copia del equipo (solo nombre, usuario y foto) y usarla sin señal; las marcas ya se guardan y suben al volver.
+- [ ] **Recomendados en Tomar asistencia (19:45):** arriba "Dijeron que asistirán" (marcaron Asistiré en ese evento), luego "Suelen venir los [día]" (sin repetir), luego el resto y lxs inactivxs.
