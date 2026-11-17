@@ -604,3 +604,8 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - (14) Sí: en el timeline, solo las tareas propias terminadas, el día en que se aprobaron, apagadas y con los puntos.
 - Cambios de equipo: la propuesta (ventana con números; si baja, "Entiendo" o "Pedir revisión" → Notificaciones, Mantener o Devolver), y además en Mi Liga una opción para que la lista de cambios ("Revisar antes") se apruebe sola si ningún Pivot la revisa en N días. Por defecto automático con 7 días; editable (manual o automático con los días que quiera).
 - Planes, cursos, inscripción rápida y cupón manual: aprobados tal como la propuesta.
+
+## W. Próximos cambios (Victor, 2026-11-16, 19:03) — esperar su "ok" antes de empezar
+- [ ] **Mi perfil pasa a llamarse Ajustes.** Arriba, una sección corta de perfil (foto, nombre, etc.), luego los ajustes personales y una nueva sección **Mi Liga** (sale de la barra de abajo y entra en Ajustes).
+- [ ] **Estados según pronombres** (ej. Lesionadx): solo Ella → "Lesionada"; solo Él → "Lesionado"; solo Elle → por confirmar ("Lesionado" según el mensaje, ¿o "Lesionade"?); varios pronombres o ninguno → "Lesionadx". Aplicar a todos los estados y textos que hablan de la persona.
+- [ ] **Sección Coach** (en el lugar de Mi Liga en la barra de abajo): la persona pide ser coach, un Pivot lo aprueba y le aparece la pestaña. Seguimiento completo de sus jugadorxs, cronograma de entrenamientos sobre las fechas del calendario (qué se ve cada día), notas de voz que se pasan a texto sobre cada patinadorx, y más. **Definir con Victor antes de armarla** (propuesta enviada 2026-11-16 19:03).
