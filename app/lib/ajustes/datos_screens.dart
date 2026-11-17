@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../eventos/widgets_comunes.dart' show AvatarPersona;
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../equipo/equipo_repo.dart';
@@ -40,6 +41,16 @@ class MiPerfilEditable extends StatelessWidget {
           children: [
             GrupoAjustes(
               filas: [
+                // Foto como una fila más, sin avatar arriba (Victor, 2026-11-17).
+                FilaAjuste(
+                  icono: Icons.add_a_photo_rounded,
+                  seccion: 'foto',
+                  titulo: 'Foto de perfil',
+                  valor: s.fotoPerfil.isEmpty ? 'Agrega una foto' : 'Toca para cambiarla',
+                  pendiente: s.fotoPerfil.isEmpty,
+                  derecha: s.fotoPerfil.isEmpty ? null : AvatarPersona(nombre: s.nombreMostrar, foto: s.fotoPerfil, tamano: 36),
+                  alTocar: () => cambiarFoto(context, s),
+                ),
                 FilaAjuste(
                   icono: Icons.sports_rounded,
                   seccion: 'nombre',

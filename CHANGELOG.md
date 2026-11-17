@@ -10,6 +10,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - Coach: la nota del 1 al 10 siempre cabe en el ancho.
 - **Textos para cualquier deporte:** Cursos sin freshmeat ni try out ("evaluación final", opcional); apodo y número según el deporte de la liga (`getConfigLiga.deporte`, `core/deporte.dart`); ejemplos de roles; texto de WFTDA solo en roller derby; "Alquiler del lugar".
 - **Ficha de la persona (opción A):** foto, nombre y datos centrados; WhatsApp, Llamar y Emergencia redondos; roles en tarjetas deslizables; grupo "En el equipo" (Estadísticas, Ficha deportiva, En el equipo desde) y Funciones de Pivot al final.
+- **Ajustes:** sin avatar arriba; "Foto de perfil" es una fila más, encima del apodo. Estadísticas y ficha deportiva se ven en tu ficha de Equipo, que tiene "Editar mi perfil" (lleva a Ajustes). Mi Liga: "Equipos, reglas, Pivots y comunicación".
 
 ## 2026-11-17 (ronda de pulido de la tarde)
 

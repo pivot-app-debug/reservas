@@ -1,3 +1,4 @@
+import '../core/navegacion.dart';
 import '../ajustes/componentes.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -226,6 +227,15 @@ class _FichaState extends State<_Ficha> {
                     ),
                   if (p.fechaIngreso != null)
                     FilaAjuste(icono: Icons.event_available_rounded, seccion: 'ingreso', titulo: 'En el equipo desde', valor: Fechas.corta(p.fechaIngreso!)),
+                  // Tu perfil se edita en Ajustes (Victor, 2026-11-17).
+                  if (yo)
+                    FilaAjuste(
+                      icono: Icons.edit_rounded,
+                      seccion: 'cuenta',
+                      titulo: 'Editar mi perfil',
+                      valor: 'Foto, nombre, número, roles y más',
+                      alTocar: () => Navegacion.ir.value = Pestana.perfil,
+                    ),
                 ],
               ),
               // También en tu propia ficha: un Pivot puede registrar su pago.

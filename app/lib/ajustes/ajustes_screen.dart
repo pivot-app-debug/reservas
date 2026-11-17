@@ -6,11 +6,9 @@ import '../core/datos_pendientes.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
-import '../equipo/estadisticas.dart';
 import '../equipo/equipo_repo.dart';
 import '../equipo/persona_screen.dart';
 import '../eventos/eventos_repo.dart';
-import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import 'comentarios.dart';
 import 'componentes.dart';
@@ -81,7 +79,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
             children: [
               // Mi perfil (Victor, 2026-11-12): arriba quién eres y tus datos
               // de la ficha; después pagos y datos personales; al final, la app.
-              _CabeceraPerfil(sesion: sesion),
+
               TarjetaActivarAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
               // Mi Liga dentro de Ajustes, solo para Pivots (Victor, 2026-11-16).
@@ -92,7 +90,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                       icono: Icons.stadium_rounded,
                       seccion: 'liga',
                       titulo: 'Mi Liga',
-                      valor: 'Equipos, reglas, Pivots, comunicación y datos de la liga',
+                      valor: 'Equipos, reglas, Pivots y comunicación',
                       alTocar: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: sesion, pestana: true)),
                     ),
                   ],
@@ -182,96 +180,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-/// Foto, nombre y número, con acceso a tu ficha (estadísticas).
-class _CabeceraPerfil extends StatelessWidget {
-  const _CabeceraPerfil({required this.sesion});
-  final Sesion sesion;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final numero = '${sesion.datos['numeroDerby'] ?? ''}'.trim();
-    final pron = '${sesion.datos['pronombres'] ?? ''}'.trim();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 20),
-      child: Row(
-        children: [
-          // Toda el área del avatar cambia la foto; la cámara lo indica
-          // (Victor, 2026-11-12).
-          Semantics(
-            button: true,
-            label: 'Cambiar foto de perfil',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => cambiarFoto(context, sesion),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  HeroAvatar(
-                    tag: 'avatar-${sesion.nombre}',
-                    child: AvatarPersona(nombre: sesion.nombreMostrar, foto: sesion.fotoPerfil, tamano: 72),
-                  ),
-                  Positioned(
-                    right: -4,
-                    bottom: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: p.marca,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.fondo, width: 2.5),
-                      ),
-                      child: Icon(Icons.photo_camera_rounded, size: 14, color: p.sobreMarca),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  sesion.nombreMostrar,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: p.texto),
-                ),
-                if (numero.isNotEmpty || pron.isNotEmpty)
-                  Text([if (numero.isNotEmpty) '#$numero', if (pron.isNotEmpty) pron].join(' · '), style: TextStyle(fontSize: 14, color: p.textoSecundario)),
-                const SizedBox(height: 8),
-                if (sesion.datos.isNotEmpty)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                        onPressed: () => SubAjustes.abrir(
-                          context,
-                          EstadisticasScreen(repo: EquipoRepo.de(sesion), username: sesion.nombre ?? '', nombre: sesion.nombreMostrar),
-                        ),
-                        icon: const Icon(Icons.insights_rounded, size: 18),
-                        label: const Text('Mis estadísticas'),
-                      ),
-                      // Ficha deportiva junto a Estadísticas (Victor, 2026-11-16).
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                        onPressed: () => SubAjustes.abrir(context, FichaDeportivaScreen(sesion: sesion)),
-                        icon: const Icon(Icons.sports_score_rounded, size: 18),
-                        label: const Text('Mi ficha deportiva'),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
