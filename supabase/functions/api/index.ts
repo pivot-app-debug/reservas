@@ -11554,7 +11554,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'marcarCuponUsado':                return json(await marcarCuponUsado(params));
             case 'getNombres':                      return json(await getNombres());
       // Diagnóstico de varias ligas (sin datos personales).
-      case 'estadoLigas':                     return json({ exito: true, porLiga: !!PIVOT_JWT_SECRET && !!SUPABASE_ANON_KEY_LIGAS, secreto: !!PIVOT_JWT_SECRET, anon: !!SUPABASE_ANON_KEY_LIGAS, liga: _ligaEnCurso() });
+      case 'estadoLigas':                     return json({ exito: true, porLiga: !!PIVOT_JWT_SECRET && !!SUPABASE_ANON_KEY_LIGAS, secreto: !!PIVOT_JWT_SECRET, anon: !!SUPABASE_ANON_KEY_LIGAS, liga: _ligaEnCurso(), pedida: await _ligaDelPedido(params), claves: Object.keys(params) });
       case 'verificarEmailDisponible':        return json(await verificarEmailDisponible(params));
       case 'verificarNombreDisponible':       return json(await verificarNombreDisponible(params));
       case 'verificarGoogle':                 return json(await verificarGoogle(params));
