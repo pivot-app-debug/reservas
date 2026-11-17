@@ -8741,6 +8741,28 @@ function _cursoJson(c: any, inscritos: any[], yo?: string) {
   };
 }
 
+/// Plantillas de la liga y, en roller derby, Freshmeat armado con las
+/// habilidades básicas: una clase por grupo y la evaluación con todas.
+async function _plantillasCursos(): Promise<any[]> {
+  const { data } = await supabase.from('curso_plantillas').select('*').order('created_at', { ascending: false });
+  const out: any[] = (data ?? []).map((p: any) => ({ id: p.id, nombre: p.nombre, tipo: p.tipo, descripcion: p.descripcion ?? '', clases: p.clases ?? [], evaluacion: p.evaluacion ?? {} }));
+  const deporte = (await supabaseServicio.from('ligas').select('deporte').eq('id', _ligaEnCurso()).maybeSingle()).data?.deporte ?? 'roller_derby';
+  if (deporte === 'roller_derby') {
+    const { data: hab } = await supabase.from('coach_habilidades').select('categoria, nombre, orden, nivel').eq('activa', true).eq('nivel', 'basica').neq('categoria', 'Temas de cursos').order('orden');
+    const grupos: Record<string, string[]> = {};
+    for (const h of hab ?? []) (grupos[h.categoria] ??= []).push(String(h.nombre).slice(0, 40));
+    if (Object.keys(grupos).length) {
+      out.unshift({
+        id: 'freshmeat', nombre: 'Freshmeat', tipo: 'curso', sistema: true,
+        descripcion: 'Curso para quienes empiezan: las habilidades mínimas para jugar roller derby (WFTDA), con evaluación al final.',
+        clases: Object.entries(grupos).map(([, temas]) => ({ tipo: 'clase', temas })),
+        evaluacion: { temas: Object.values(grupos).flat().map((n) => ({ nombre: n, minimo: 5 })) },
+      });
+    }
+  }
+  return out;
+}
+
 async function getCursos(params: Record<string, any>): Promise<Record<string, any>> {
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
@@ -8841,7 +8863,21 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     const r = c.id ? await supabase.from('cursos').update(fila).eq('id', String(c.id)).select('id').single() : await supabase.from('cursos').insert(fila).select('id').single();
     if (r.error) return { exito: false, error: r.error.message };
     await _registrarAjuste('curso', null, fila, email);
-    } else if (accion === 'evaluar') {
+      } else if (accion === 'guardarPlantilla') {
+    // Plantilla: las clases (sin fechas) con sus temas y la evaluación (Victor, 2026-11-17).
+    let pl: any = params.plantilla;
+    if (typeof pl === 'string') { try { pl = JSON.parse(pl); } catch { pl = null; } }
+    const nombre = String(pl?.nombre ?? '').trim().slice(0, 60);
+    if (!nombre) return { exito: false, error: 'Ponle un nombre a la plantilla.' };
+    const clases = (Array.isArray(pl?.clases) ? pl.clases : []).slice(0, 60).map((x: any) => ({
+      tipo: x?.tipo === 'clinica' ? 'clinica' : 'clase',
+      temas: (Array.isArray(x?.temas) ? x.temas : []).map((t: any) => String(t).trim().slice(0, 40)).filter(Boolean).slice(0, 15),
+    }));
+    const evaluacion = { temas: (Array.isArray(pl?.evaluacion?.temas) ? pl.evaluacion.temas : []).map((t: any) => ({ nombre: String(t?.nombre ?? '').trim().slice(0, 40), minimo: Math.max(1, Math.min(10, Math.round(Number(t?.minimo) || 5))) })).filter((t: any) => t.nombre) };
+    await supabase.from('curso_plantillas').insert({ nombre, tipo: pl?.tipo === 'clinica' ? 'clinica' : 'curso', descripcion: String(pl?.descripcion ?? '').trim().slice(0, 1000) || null, clases, evaluacion, creado_por: email });
+  } else if (accion === 'borrarPlantilla') {
+    await supabase.from('curso_plantillas').delete().eq('id', String(params.id ?? ''));
+  } else if (accion === 'evaluar') {
     // Evaluación por temas (Victor, 2026-11-17): aprueba si llega al mínimo
     // en cada tema. Cada tema queda en la ficha deportiva (logrado o en
     // proceso). Solo cambia de equipo si el curso lo dice.
@@ -8913,8 +8949,9 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
                 return { id: i.id, nombre: i.username, nombreMostrar: e.nombreDerby || i.username, foto: e.fotoPerfil ?? '', estado: i.estado, resultado: i.resultado ?? null, equipo: i.equipo_final ?? null, notas: i.notas ?? null };
       }),
     })),
-    // Lista de habilidades para elegir los temas de cada clase.
-    habilidades: ((await supabase.from('coach_habilidades').select('id, categoria, nombre').eq('activa', true).order('orden')).data ?? []),
+        // Lista de habilidades para elegir los temas de cada clase.
+    habilidades: ((await supabase.from('coach_habilidades').select('id, categoria, nombre, nivel').eq('activa', true).order('orden')).data ?? []),
+    plantillas: await _plantillasCursos(),
   };
 }
 

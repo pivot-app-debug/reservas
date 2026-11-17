@@ -4,20 +4,26 @@ part of 'cursos_screen.dart';
 /// sus temas, evaluación (se arma sola con los temas), equipo al aprobar,
 /// precio y resumen. Los temas son habilidades de la lista de la liga (o
 /// nuevas, cortas), así la evaluación llega a la ficha deportiva.
-enum _PasoCurso { tipo, nombre, clases, evaluacion, equipo, precio, resumen }
+enum _PasoCurso { origen, tipo, nombre, clases, evaluacion, equipo, precio, resumen }
 
 class _AsistenteCurso extends StatefulWidget {
-  const _AsistenteCurso({this.curso, required this.equipos, required this.lugares, required this.habilidades});
+  const _AsistenteCurso({this.curso, required this.equipos, required this.lugares, required this.habilidades, this.plantillas = const []});
   final Curso? curso;
   final List<String> equipos, lugares;
   final List<Map<String, dynamic>> habilidades;
+
+  /// Cursos prearmados (Freshmeat en roller derby y los que guarda la liga).
+  final List<Map<String, dynamic>> plantillas;
   @override
   State<_AsistenteCurso> createState() => _AsistenteCursoState();
 }
 
 class _AsistenteCursoState extends State<_AsistenteCurso> {
   late final o = widget.curso;
-  _PasoCurso _paso = _PasoCurso.tipo;
+  late _PasoCurso _paso = o == null && widget.plantillas.isNotEmpty ? _PasoCurso.origen : _PasoCurso.tipo;
+
+  /// Clases de la plantilla elegida, sin fechas todavía.
+  List<Map<String, dynamic>>? _dePlantilla;
   bool _adelante = true;
 
   late String _tipo = o?.tipo ?? 'curso';
@@ -55,6 +61,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   num? get _monto => _precio.text.trim().isEmpty ? 0 : num.tryParse(_precio.text.replaceAll(',', '.'));
 
   List<_PasoCurso> get _pasos => [
+    if (o == null && widget.plantillas.isNotEmpty) _PasoCurso.origen,
     _PasoCurso.tipo,
     _PasoCurso.nombre,
     _PasoCurso.clases,
@@ -86,7 +93,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   bool get _evalAntes => _evalFecha != null && _clases.isNotEmpty && '${_evalFecha!['fecha']}'.compareTo('${_clases.last['fecha']}') < 0;
 
   bool get _valido => switch (_paso) {
-    _PasoCurso.tipo => true,
+    _PasoCurso.origen || _PasoCurso.tipo => true,
     _PasoCurso.nombre => _nombre.text.trim().isNotEmpty,
     _PasoCurso.clases => _clases.isNotEmpty,
     _PasoCurso.evaluacion => !_conEvaluacion || (!_evalAntes && _evalTemas.isNotEmpty),
@@ -205,6 +212,70 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
 
   // ── Pasos ───────────────────────────────────────────────────────────────
 
+  void _usarPlantilla(Map<String, dynamic>? pl) {
+    setState(() {
+      if (pl == null) {
+        _dePlantilla = null;
+      } else {
+        _tipo = '${pl['tipo'] ?? 'curso'}';
+        _nombre.text = '${pl['nombre']}';
+        _descripcion.text = '${pl['descripcion'] ?? ''}';
+        _dePlantilla = [for (final c in (pl['clases'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+        _clases.clear();
+        _evalTemas
+          ..clear()
+          ..addAll([
+            for (final t in ((pl['evaluacion'] as Map?)?['temas'] as List? ?? const []))
+              {'nombre': '${(t as Map)['nombre']}', 'minimo': (t['minimo'] as num?)?.toInt() ?? 5},
+          ]);
+        _conEvaluacion = _evalTemas.isNotEmpty;
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 180), () => mounted ? _ir(1) : null);
+  }
+
+  /// Fechas para las clases de la plantilla: una por semana desde el día elegido.
+  Future<void> _fechasPlantilla() async {
+    final f = await _elegirFecha(null, Fechas.hoy().add(const Duration(days: 7)), tituloHora: 'Empieza');
+    if (f == null || !mounted) return;
+    final inicio = Curso.fecha(f)!;
+    setState(() {
+      _clases
+        ..clear()
+        ..addAll([
+          for (final (i, c) in (_dePlantilla ?? const <Map<String, dynamic>>[]).indexed)
+            {
+              ...f,
+              'fecha': Fechas.iso(inicio.add(Duration(days: 7 * i))),
+              'tipo': c['tipo'] ?? 'clase',
+              if ((c['temas'] as List? ?? const []).isNotEmpty) 'temas': c['temas'],
+            },
+        ]);
+      _dePlantilla = null;
+    });
+  }
+
+  Widget _pasoOrigen(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      OpcionAsistente(
+        icono: Icons.edit_note_rounded,
+        titulo: 'Desde cero',
+        texto: 'Armas las clases y los temas.',
+        activa: _dePlantilla == null && _nombre.text.isEmpty,
+        alTocar: () => _usarPlantilla(null),
+      ),
+      for (final pl in widget.plantillas)
+        OpcionAsistente(
+          icono: pl['sistema'] == true ? Icons.verified_outlined : Icons.bookmark_outline_rounded,
+          titulo: '${pl['nombre']}',
+          texto: [if ('${pl['descripcion'] ?? ''}'.isNotEmpty) '${pl['descripcion']}', '${(pl['clases'] as List? ?? const []).length} clases'].join(' · '),
+          activa: _nombre.text == '${pl['nombre']}',
+          alTocar: () => _usarPlantilla(pl),
+        ),
+    ],
+  );
+
   Widget _pasoTipo(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
@@ -315,6 +386,30 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Plantilla elegida: falta decir cuándo empieza.
+        if (_dePlantilla != null) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${_dePlantilla!.length} clases con sus temas. ¿Cuándo empieza?',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Se crea una clase por semana, el mismo día y a la misma hora. Después puedes cambiar cualquiera.',
+                  style: TextStyle(fontSize: 13, color: p.sobreSuave),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(onPressed: _fechasPlantilla, icon: const Icon(Icons.event_rounded), label: const Text('Elegir el primer día')),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // Excel para no cargar clase por clase (Victor, 2026-11-17).
         if (!_clinica) ...[
           Row(
@@ -643,6 +738,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       indice: i,
       total: l.length,
       tituloPaso: switch (_paso) {
+        _PasoCurso.origen => '¿Cómo empiezas?',
         _PasoCurso.tipo => '¿Qué vas a armar?',
         _PasoCurso.nombre => '¿Cómo se llama?',
         _PasoCurso.clases => _clinica ? '¿Cuándo es?' : 'Clases y temas',
@@ -660,6 +756,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       adelante: _adelante,
       alAtras: () => _ir(-1),
       cuerpo: switch (_paso) {
+        _PasoCurso.origen => _pasoOrigen(context),
         _PasoCurso.tipo => _pasoTipo(context),
         _PasoCurso.nombre => _pasoNombre(context),
         _PasoCurso.clases => _pasoClases(context),
@@ -668,7 +765,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         _PasoCurso.precio => _pasoPrecio(context),
         _PasoCurso.resumen => _pasoResumen(context),
       },
-      textoBoton: _paso == _PasoCurso.tipo ? (o != null ? 'Siguiente' : null) : (ultimo ? 'Guardar' : 'Siguiente'),
+      textoBoton: _paso == _PasoCurso.origen || (_paso == _PasoCurso.tipo && o == null) ? null : (ultimo ? 'Guardar' : 'Siguiente'),
       alContinuar: !_valido ? null : (ultimo ? () => Navigator.of(context).pop(_resultado) : () => _ir(1)),
     );
   }

@@ -392,6 +392,7 @@ class _CursosScreenState extends State<CursosScreen> {
   List<String> _equipos = const [];
   List<String> _lugares = const [];
   List<Map<String, dynamic>> _habilidades = const [];
+  List<Map<String, dynamic>> _plantillas = const [];
   String? _error;
   Sesion get s => widget.sesion;
 
@@ -415,6 +416,7 @@ class _CursosScreenState extends State<CursosScreen> {
         setState(() {
           _cursos = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))];
           _habilidades = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)];
+          _plantillas = [for (final x in (r['plantillas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
         });
       }
       return true;
@@ -432,7 +434,7 @@ class _CursosScreenState extends State<CursosScreen> {
   Future<void> _editar([Curso? c]) async {
     final ok = await Navigator.of(context).push<Map<String, Object?>>(
       MaterialPageRoute(
-        builder: (_) => _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades),
+        builder: (_) => _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades, plantillas: _plantillas),
       ),
     );
     if (ok == null) return;
@@ -686,6 +688,30 @@ class _DetalleCursoState extends State<_DetalleCurso> {
             onPressed: () async {
               await widget.editar(curso);
               if (mounted) setState(() {});
+            },
+          ),
+          // Para repetirlo (Victor, 2026-11-17).
+          IconButton(
+            tooltip: 'Guardar como plantilla',
+            icon: const Icon(Icons.bookmark_add_outlined),
+            onPressed: () async {
+              final ok = await widget.llamar({
+                'accion': 'guardarPlantilla',
+                'plantilla': jsonEncode({
+                  'nombre': curso.nombre,
+                  'tipo': curso.tipo,
+                  'descripcion': curso.descripcion,
+                  'clases': [
+                    for (var i = 0; i < curso.fechas.length; i++)
+                      if (Curso.tipoFecha(curso.fechas, i) != 'evaluacion')
+                        {'tipo': Curso.tipoFecha(curso.fechas, i), 'temas': curso.fechas[i]['temas'] ?? const []},
+                  ],
+                  'evaluacion': {'temas': curso.temasEvaluacion},
+                }),
+              });
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plantilla guardada: aparece al crear un curso nuevo.')));
+              }
             },
           ),
         ],
