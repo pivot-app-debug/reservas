@@ -39,6 +39,10 @@ class _TomarAsistenciaScreenState extends State<TomarAsistenciaScreen> {
 
   Future<void> _cargar() async {
     setState(() => _error = null);
+    // Primero la lista guardada en el teléfono: aparece al instante aunque no
+    // haya señal (bug, Victor 2026-11-16: sin conexión no cargaba).
+    final guardado = await widget.repo.rosterGuardado();
+    if (guardado != null && mounted && _roster == null) setState(() => _roster = guardado);
     try {
       final r = await widget.repo.roster(forzar: true);
       if (mounted) setState(() => _roster = r);
@@ -48,7 +52,10 @@ class _TomarAsistenciaScreenState extends State<TomarAsistenciaScreen> {
         if (mounted) setState(() => _sugeridos = s);
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'No se pudo cargar el equipo.');
+      // Con la lista guardada en pantalla, se sigue; sin ella, el error.
+      if (mounted && _roster == null) {
+        setState(() => _error = 'Sin señal y todavía no hay una lista guardada del equipo. Abre la app una vez con conexión.');
+      }
     }
   }
 
@@ -141,11 +148,17 @@ class _TomarAsistenciaScreenState extends State<TomarAsistenciaScreen> {
     final q = _busqueda.trim().toLowerCase();
     bool coincide(MiembroRoster m) => q.isEmpty || m.persona.nombreMostrar.toLowerCase().contains(q) || m.persona.username.toLowerCase().contains(q);
     bool sugerido(MiembroRoster m) => _sugeridos.contains(m.persona.username.trim().toUpperCase());
-    // Arriba, quienes suelen venir ese día de la semana (Victor, 2026-11-12).
-    final suelen = q.isEmpty ? _roster!.where((m) => sugerido(m) && coincide(m)).toList() : const <MiembroRoster>[];
-    final activos = _roster!.where((m) => !m.inactivo && coincide(m) && !suelen.contains(m)).toList();
-    final inactivos = _roster!.where((m) => m.inactivo && coincide(m)).toList();
-    if (suelen.isEmpty && activos.isEmpty && inactivos.isEmpty) {
+    // Arriba, quienes dijeron "Asistiré" a este evento y después quienes
+    // suelen venir ese día de la semana (Victor, 2026-11-12 y 2026-11-16).
+    final dijeron = {
+      for (final r in ev.rsvps)
+        if (r.estado == EstadoRsvp.asistire) r.persona.username.trim().toUpperCase(),
+    };
+    final asistiran = q.isEmpty ? _roster!.where((m) => dijeron.contains(m.persona.username.trim().toUpperCase())).toList() : const <MiembroRoster>[];
+    final suelen = q.isEmpty ? _roster!.where((m) => sugerido(m) && coincide(m) && !asistiran.contains(m)).toList() : const <MiembroRoster>[];
+    final activos = _roster!.where((m) => !m.inactivo && coincide(m) && !suelen.contains(m) && !asistiran.contains(m)).toList();
+    final inactivos = _roster!.where((m) => m.inactivo && coincide(m) && !asistiran.contains(m)).toList();
+    if (asistiran.isEmpty && suelen.isEmpty && activos.isEmpty && inactivos.isEmpty) {
       return Center(
         child: Text('Sin resultados.', style: TextStyle(color: p.textoSecundario)),
       );
@@ -153,11 +166,12 @@ class _TomarAsistenciaScreenState extends State<TomarAsistenciaScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       children: [
+        if (asistiran.isNotEmpty) ...[_separador(p, 'Dijeron que asistirán'), for (final m in asistiran) _fila(context, ev, m, marcados)],
         if (suelen.isNotEmpty) ...[
           _separador(p, 'Suelen venir los ${Fechas.dia(ev.fecha).toLowerCase()}'),
           for (final m in suelen) _fila(context, ev, m, marcados),
-          _separador(p, 'Resto del equipo'),
         ],
+        if (asistiran.isNotEmpty || suelen.isNotEmpty) _separador(p, 'Resto del equipo'),
         for (final m in activos) _fila(context, ev, m, marcados),
         if (inactivos.isNotEmpty) ...[
           Padding(

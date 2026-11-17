@@ -8530,7 +8530,7 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
     supabase.from('puntos_mensuales').select('mes, puntos_asistencia, puntos_tareas, puntos_bonificacion, puntos_extra, puntos_total')
       .eq('nombre_usuario', username).eq('anio', anio),
     supabase.from('puntos_mensuales').select('anio').eq('nombre_usuario', username),
-    supabase.from('equipo').select('categoria, tier_modo, estado_miembro, necesita_patines, necesita_protecciones, meses_consecutivos_cumplidos, tier_riesgo_hasta, tier_riesgo_objetivo, fecha_ingreso')
+    supabase.from('equipo').select('categoria, tier_modo, estado_miembro, pronombres, necesita_patines, necesita_protecciones, meses_consecutivos_cumplidos, tier_riesgo_hasta, tier_riesgo_objetivo, fecha_ingreso')
       .eq('username', username).maybeSingle(),
     supabase.from('config_tiers').select('*').order('orden', { ascending: true }),
   ]);
@@ -8606,7 +8606,9 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
     progreso: {
       categoria: fila.categoria ?? null,
       modo: fila.tier_modo ?? 'auto',
-      estado: fila.estado_miembro ?? null,
+            estado: fila.estado_miembro ?? null,
+      pronombres: fila.pronombres ?? null,
+
             usaEquipo: !permiso?.length && (usa(fila.necesita_patines) || usa(fila.necesita_protecciones)),
       mesesSeguidos: Number(fila.meses_consecutivos_cumplidos) || 0,
       riesgoHasta: fila.tier_riesgo_hasta ?? null,
@@ -9343,6 +9345,36 @@ async function eliminarDispositivoPush(params: Record<string, any>): Promise<Rec
 // ver `_adminDestinatariosPush()`) no tiene preferencia que mirar y se
 // manda igual. Lotes de 1000 (OneSignal acepta hasta 2000 por request) --
 // "en lotes si hace falta", pedido explícito.
+// ─── Palabras según pronombres (Victor, 2026-11-16) ──────────────────────
+// Solo Ella → a ("Lesionada"); solo Él → o; solo Elle → e; varios o ninguno
+// → x. Solo en textos para o sobre una persona. Misma lista que la app
+// (core/pronombres.dart).
+function _generoDe(pronombres: any): 'a' | 'o' | 'e' | 'x' {
+  const s = String(pronombres ?? '').toLowerCase();
+  const ella = /\bella\b/.test(s);
+  const el = /(^|[^a-záéíóúñ])(él|el)([^a-záéíóúñ]|$)/.test(s);
+  const elle = /\belle\b/.test(s);
+  if ([ella, el, elle].filter(Boolean).length !== 1) return 'x';
+  return ella ? 'a' : el ? 'o' : 'e';
+}
+const _IRREGULARES_X: Record<string, [string, string, string]> = {
+  unx: ['una', 'un', 'une'],
+  administradorx: ['administradora', 'administrador', 'administradore'],
+};
+const _REGULARES_X = new Set(['lesionadx', 'inactivx', 'activx', 'nuevx', 'marcadx', 'inscritx', 'archivadx', 'bienvenidx', 'hermanx', 'listx', 'invitadx',
+  'aprobadx', 'pausadx', 'anotadx', 'elegidx', 'seleccionadx', 'confirmadx', 'retiradx', 'cansadx', 'ausentadx']);
+function _conPronombres(texto: string, pronombres: any): string {
+  const g = _generoDe(pronombres);
+  if (g === 'x' || !texto) return texto;
+  const i = g === 'a' ? 0 : g === 'o' ? 1 : 2;
+  return texto.replace(/[A-Za-zÁÉÍÓÚáéíóúÑñ]+x\b/g, (w) => {
+    const b = w.toLowerCase();
+    const nueva = _IRREGULARES_X[b]?.[i] ?? (_REGULARES_X.has(b) ? b.slice(0, -1) + 'aoe'[i] : null);
+    if (!nueva) return w;
+    return w[0] === w[0].toUpperCase() ? nueva[0].toUpperCase() + nueva.slice(1) : nueva;
+  });
+}
+
 async function sendPush(payload: {
   tipo: string;
   include_external_user_ids?: string[];
@@ -9378,10 +9410,19 @@ async function sendPush(payload: {
     // fila directamente no volvería y `porUsername[u]` quedaría
     // `undefined`, cayendo al MISMO default "sin fila = mandar igual" que
     // un alias admin -- justo lo que no se quiere acá.
-    const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en').in('username', usernames);
+        const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en, pronombres').in('username', usernames);
     const porUsername: Record<string, any> = {};
     (filas ?? []).forEach((r: any) => { porUsername[r.username] = r; });
-    destinatarios = usernames.filter((u) => !_estaArchivado(porUsername[u]) && _personaQuierePush(porUsername[u], payload.tipo));
+        destinatarios = usernames.filter((u) => !_estaArchivado(porUsername[u]) && _personaQuierePush(porUsername[u], payload.tipo));
+    // Un aviso para una sola persona habla según sus pronombres (Victor, 2026-11-16).
+    if (destinatarios.length === 1) {
+      const pr = porUsername[destinatarios[0]]?.pronombres;
+      payload = {
+        ...payload,
+        headings: { ...payload.headings, es: _conPronombres(payload.headings.es, pr) },
+        contents: { ...payload.contents, es: _conPronombres(payload.contents.es, pr) },
+      };
+    }
   }
   if (!destinatarios.length) return;
 

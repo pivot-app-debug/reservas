@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/pronombres.dart';
 import '../core/asistente.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -861,7 +862,13 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
       padding: const EdgeInsets.all(16),
       children: [
         for (final m in MotivoAusencia.todos)
-          OpcionAsistente(icono: m.icono, titulo: m.valor, texto: m.ayuda, activa: _motivo == m.valor, alTocar: () => _elegirYSeguir(() => _motivo = m.valor)),
+          OpcionAsistente(
+            icono: m.icono,
+            titulo: conPronombres(m.valor, widget.repo.sesion.datos['pronombres']),
+            texto: m.ayuda,
+            activa: _motivo == m.valor,
+            alTocar: () => _elegirYSeguir(() => _motivo = m.valor),
+          ),
       ],
     );
   }

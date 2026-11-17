@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../ajustes/componentes.dart';
+import '../core/pronombres.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -538,7 +539,7 @@ class _ProgresoCategoria extends StatelessWidget {
     } else if (progreso['estado'] == 'Lesionadx' || progreso['estado'] == 'De viaje') {
       lineas.add((
         Icons.pause_circle_outline_rounded,
-        'Mientras esté como ${progreso['estado'] == 'Lesionadx' ? 'lesionadx' : 'de viaje'}, el equipo no cambia.',
+        'Mientras esté como ${progreso['estado'] == 'Lesionadx' ? conPronombres('lesionadx', progreso['pronombres']) : 'de viaje'}, el equipo no cambia.',
       ));
     } else if (meta != null) {
       final minC = (meta['minClases'] as num).toInt(), minP = (meta['minPuntos'] as num).toInt();

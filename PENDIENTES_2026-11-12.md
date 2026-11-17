@@ -606,8 +606,8 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - Planes, cursos, inscripción rápida y cupón manual: aprobados tal como la propuesta.
 
 ## W. Próximos cambios (Victor, 2026-11-16, 19:03) — esperar su "ok" antes de empezar
-- [ ] **Mi perfil pasa a llamarse Ajustes.** Arriba, una sección corta de perfil (foto, nombre, etc.), luego los ajustes personales y una nueva sección **Mi Liga** (sale de la barra de abajo y entra en Ajustes; solo la ven los Pivots, confirmado 19:36).
-- [ ] **Estados según pronombres** (ej. Lesionadx): solo Ella → "Lesionada"; solo Él → "Lesionado"; solo Elle → "Lesionade" (confirmado 19:36); varios pronombres o ninguno → "Lesionadx". Aplicar a todos los estados y textos que hablan de la persona.
+- [x] **Mi perfil pasa a llamarse Ajustes.** (hecho 2026-11-16) Arriba, una sección corta de perfil (foto, nombre, etc.), luego los ajustes personales y una nueva sección **Mi Liga** (sale de la barra de abajo y entra en Ajustes; solo la ven los Pivots, confirmado 19:36).
+- [x] **Estados según pronombres** (hecho 2026-11-16: estados en Equipo, ficha, estadísticas, Asistencia anticipada, Cursos y avisos a una sola persona) (ej. Lesionadx): solo Ella → "Lesionada"; solo Él → "Lesionado"; solo Elle → "Lesionade" (confirmado 19:36); varios pronombres o ninguno → "Lesionadx". Aplicar a todos los estados y textos que hablan de la persona.
 - [ ] **Sección Coach** (en el lugar de Mi Liga en la barra de abajo): la persona pide ser coach, un Pivot lo aprueba y le aparece la pestaña. Seguimiento completo de sus jugadorxs, cronograma de entrenamientos sobre las fechas del calendario (qué se ve cada día), notas de voz que se pasan a texto sobre cada patinadorx, y más. **Definir con Victor antes de armarla** (propuesta enviada 2026-11-16 19:03).
 - **Coach, respuestas de Victor (19:36):**
   - Ficha deportiva con las habilidades de WFTDA para roller derby, editable por la liga (agregar o cambiar). Otros deportes: lista base por deporte, a definir cuando la app sea para más deportes.
@@ -616,11 +616,12 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
   - Cada jugadorx ve su ficha deportiva en Ajustes, junto a Estadísticas.
   - Partidos: además de posiciones y line-ups, reportes por partido (faltas, puntajes) sacados del statsbook. Propuesta: importar el statsbook oficial (.xlsx de WFTDA) y leer sus hojas (puntaje por jam, penalidades, line-ups).
   - Statsbook (19:42): muchas ligas lo llevan a mano con lápiz y papel, así que además de importar el .xlsx tiene que haber una carga a mano de los stats (por jam: puntos, jammer y line-up; y penalidades por persona), que alimente el mismo reporte del partido.
-- [ ] **Tomar asistencia sin conexión (bug, 19:45):** la lista de nombres no carga sin señal (`roster(forzar: true)` falla). Guardar en el teléfono una copia del equipo (solo nombre, usuario y foto) y usarla sin señal; las marcas ya se guardan y suben al volver.
-- [ ] **Recomendados en Tomar asistencia (19:45):** arriba "Dijeron que asistirán" (marcaron Asistiré en ese evento), luego "Suelen venir los [día]" (sin repetir), luego el resto y lxs inactivxs.
+- [x] **Tomar asistencia sin conexión (bug, 19:45):** (hecho 2026-11-16) la lista de nombres no carga sin señal (`roster(forzar: true)` falla). Guardar en el teléfono una copia del equipo (solo nombre, usuario y foto) y usarla sin señal; las marcas ya se guardan y suben al volver.
+- [x] **Recomendados en Tomar asistencia (19:45):** (hecho 2026-11-16) arriba "Dijeron que asistirán" (marcaron Asistiré en ese evento), luego "Suelen venir los [día]" (sin repetir), luego el resto y lxs inactivxs.
 - **Coach, rutinas y feedback (Victor, 19:51):**
   - Pruebas por persona que se repiten: ej. "5 minutos, contar vueltas" en cada clase; se guarda el número y se ve la curva de progreso (mejor marca, última vs. anterior).
   - Rutinas por clase que van cambiando (ej. clase de frenos), armadas sobre el cronograma.
   - Al final de cada clase, feedback por persona: nota del 1 al 10 y comentario (texto o voz) por tema de la clase; se compara con clases anteriores del mismo tema y la ficha muestra si mejora o empeora.
   - Recordatorio al coach si no dejó el feedback: 2 horas después del entrenamiento y, si sigue pendiente, al día siguiente (último aviso).
   - (19:53) Quién ve las notas del 1 al 10 y las pruebas: lo decide el coach (misma regla que las notas). Rutinas, pruebas, feedback y recordatorios sirven para cualquier evento del timeline (práctica, scrimmage, partido, curso), no solo clases.
+- **Respuestas de Victor (21:57):** pronombres también en los textos para una persona (los de grupo siguen con x); coach: lo pide la persona y un Pivot aprueba, o un Pivot lo nombra directo, eligiendo sus equipos; se hace por etapas (1: asistencia, Ajustes, pronombres; 2: Coach base; 3: rutinas, pruebas, feedback y recordatorios); partidos y statsbook van con la etapa de partidos y torneos.

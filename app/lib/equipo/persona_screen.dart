@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../core/pronombres.dart';
 import '../core/sincroniza.dart';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -572,7 +573,7 @@ class _AdministracionState extends State<_Administracion> {
               for (final x in _estados.entries)
                 ListTile(
                   leading: Icon(x.value.$1, color: x.key == p.estado ? pal.marcaTexto : pal.textoSecundario),
-                  title: Text(x.key, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  title: Text(conPronombres(x.key, p.pronombres), style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(x.value.$2),
                   trailing: x.key == p.estado ? Icon(Icons.check_rounded, color: pal.marcaTexto) : null,
                   onTap: () => Navigator.of(c).pop(x.key),
@@ -584,7 +585,7 @@ class _AdministracionState extends State<_Administracion> {
       },
     );
     if (e == null || e == p.estado || !mounted) return;
-    if (!await _confirmar('¿Cambiar el estado?', '${p.nombreMostrar} pasa de ${p.estado} a $e.', 'Cambiar')) return;
+    if (!await _confirmar('¿Cambiar el estado?', '${p.nombreMostrar} pasa de ${p.estadoMostrar} a ${conPronombres(e, p.pronombres)}.', 'Cambiar')) return;
     await _hacer(() => widget.repo.cambiarEstado(p, e), 'Estado actualizado');
   }
 
@@ -668,7 +669,7 @@ class _AdministracionState extends State<_Administracion> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              p.estado,
+                              p.estadoMostrar,
                               style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: pal.sobreSuave),
                             ),
                           ),
@@ -724,7 +725,13 @@ class _AdministracionState extends State<_Administracion> {
                     title: Text(_textoViaje(p)),
                     trailing: TextButton(
                       onPressed: () async {
-                        if (!await _confirmar('¿Cancelar el viaje?', '${p.nombreMostrar} vuelve a quedar Activx.', 'Cancelar viaje')) return;
+                        if (!await _confirmar(
+                          '¿Cancelar el viaje?',
+                          conPronombres('${p.nombreMostrar} vuelve a quedar Activx.', p.pronombres),
+                          'Cancelar viaje',
+                        )) {
+                          return;
+                        }
                         await _hacer(() => repo.cancelarViaje(p), 'Viaje cancelado');
                       },
                       child: const Text('Cancelar'),
@@ -789,7 +796,7 @@ class _AdministracionState extends State<_Administracion> {
                     onTap: () async {
                       final nav = Navigator.of(context);
                       if (!await _confirmar('¿Archivar?', 'No se puede archivar si tiene reservas activas o cuotas pendientes.', 'Archivar')) return;
-                      await _hacer(() => repo.archivar(p), 'Archivadx');
+                      await _hacer(() => repo.archivar(p), conPronombres('Archivadx', p.pronombres));
                       if (repo.persona(p.username) == null) nav.pop();
                     },
                   ),

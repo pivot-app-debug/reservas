@@ -181,6 +181,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   void initState() {
     super.initState();
     repo.cargar();
+    // Pivots: deja guardada la lista del equipo para tomar asistencia sin señal.
+    if (repo.sesion.esAdmin) unawaited(repo.roster().then((_) {}, onError: (_) {}));
+
     _posiciones.itemPositions.addListener(_alDesplazar);
     widget.irAHoy?.addListener(_irAHoy);
     _cargarFiltros();

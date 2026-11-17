@@ -246,6 +246,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Etapa 1 (2026-11-16, noche)
+- Nav: Calendario, Equipo, (Finanzas), Ajustes. `AjustesScreen` (título "Ajustes") abre `AjustesLigaScreen(pestana: true)` con `SubAjustes.abrir` para Pivots.
+- `core/pronombres.dart`: `generoDe`, `conPronombres(texto, pronombres)` (lista blanca de palabras de una persona; plurales con xs no cambian). Server: `_generoDe`/`_conPronombres` en `api/index.ts`; `sendPush` adapta títulos y textos cuando hay un solo destinatario. Test `test/pronombres_test.dart`.
+- `EventosRepo.rosterGuardado()` (copia en SharedPreferences `eventos.roster`) y precarga desde el timeline para Pivots. Tomar asistencia: grupos Dijeron que asistirán → Suelen venir → Resto → Inactivxs.
+
 ## Revisión 18:02 (2026-11-16)
 - `core/sincroniza.dart` (`Sincroniza`): reemplaza a `RefreshIndicator` en toda la app; vuelve a pedir los datos al volver a la app (más de 30 s) y, con `alAbrir`, al abrirse. No usar `RefreshIndicator` en pantallas nuevas.
 - Listas horizontales dentro de un padding: `clipBehavior: Clip.none` para que lleguen al borde.

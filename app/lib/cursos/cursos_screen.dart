@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/pronombres.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/esqueleto.dart';
@@ -300,7 +301,10 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: switch (c.mia?['estado']) {
-                              'confirmada' => FilledButton.tonal(onPressed: null, child: Text(_textoResultado(c.mia?['resultado']))),
+                              'confirmada' => FilledButton.tonal(
+                                onPressed: null,
+                                child: Text(conPronombres(_textoResultado(c.mia?['resultado']), s.datos['pronombres'])),
+                              ),
                               'pendiente' => const FilledButton.tonal(onPressed: null, child: Text('Inscripción por confirmar')),
                               _ => FilledButton(
                                 onPressed: _guardando || c.libres == 0 ? null : () => _inscribirme(c),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/pronombres.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
 
@@ -23,6 +24,9 @@ class Integrante {
   String get telefono => '${m['telefono'] ?? ''}'.replaceAll(RegExp(r'[^0-9]'), '');
   String get email => '${m['email'] ?? ''}';
   String get estado => '${m['estado'] ?? 'Activx'}';
+
+  /// El estado como se muestra, según sus pronombres ("Lesionada").
+  String get estadoMostrar => conPronombres(estado, pronombres);
   String get tierModo => '${m['tierModo'] ?? 'auto'}';
   DateTime? get viajeDesde => Fechas.desdeIso(m['viajeDesde']);
   DateTime? get viajeHasta => Fechas.desdeIso(m['viajeHasta']);
@@ -136,7 +140,7 @@ List<DatoFila> datosRelevantes(Integrante p, DateTime hoy, {String periodo = 'es
     final h = p.viajeHasta;
     return [DatoFila(Icons.flight_takeoff_rounded, h == null ? 'De viaje' : 'De viaje hasta el ${h.day}/${h.month}', fijo: true)];
   }
-  if (p.lesionadx) return const [DatoFila(Icons.healing_rounded, 'Lesionadx', fijo: true)];
+  if (p.lesionadx) return [DatoFila(Icons.healing_rounded, conPronombres('Lesionadx', p.pronombres), fijo: true)];
   if (p.fueraConMotivo) return const [DatoFila(Icons.event_busy_rounded, 'Fuera por un tiempo', fijo: true)];
   final res = <DatoFila>[];
   String enDias(int d) => d == 0 ? 'hoy' : (d == 1 ? 'mañana' : 'en $d días');

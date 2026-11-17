@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (etapa 1: Ajustes, pronombres y asistencia sin señal)
+- **Mi perfil se llama Ajustes.** Arriba tu perfil (foto, nombre, datos), después tus ajustes personales y, para Pivots, **Mi Liga** (ya no está en la barra de abajo).
+- **Palabras según pronombres:** solo Ella → "Lesionada", solo Él → "Lesionado", solo Elle → "Lesionade", varios o ninguno → "Lesionadx". En el estado de la ficha y de la lista de Equipo, al cambiar el estado, en Estadísticas, en Asistencia anticipada, en Cursos y en los avisos que van a una sola persona. Los textos de grupo siguen con x.
+- **Tomar asistencia sin señal:** la lista del equipo se guarda en el teléfono al abrir el Calendario (Pivots) y aparece al instante, con o sin señal.
+- **Recomendados arriba:** "Dijeron que asistirán" (marcaron Asistiré), después "Suelen venir los [día]", luego el resto.
+
 ## 2026-11-16 (Calendario abre en hoy; Cursos en el calendario)
 - **Bug:** al abrir la app, el Calendario podía quedar en el mes anterior (el inicio de lo cargado). Ahora va a hoy e insiste hasta que la lista y la barra estén listas, y vuelve a hoy si llegan datos nuevos, mientras nadie lo haya movido.
 - **Cursos pasan al calendario:** "+" → Nuevo evento → **Curso** (después de Temporada de descanso). Ya no están en Finanzas → Cobros. Tarjeta "¿Qué es un curso?" que explica los pasos. El editor separa **Clases** (cada una en el calendario) y **Try out** (fecha aparte, después de la última clase). Al volver, el calendario se actualiza.

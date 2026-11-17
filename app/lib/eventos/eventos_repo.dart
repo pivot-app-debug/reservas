@@ -561,8 +561,24 @@ class EventosRepo extends ChangeNotifier {
       }
       res = jsonDecode(raw) as Map<String, dynamic>;
     }
+    return _roster = _armarRoster(res);
+  }
+
+  /// La copia guardada en el teléfono, para mostrar la lista al instante
+  /// (sin señal o con señal lenta; Victor, 2026-11-16). Null si no hay.
+  Future<List<MiembroRoster>?> rosterGuardado() async {
+    if (_roster != null) return _roster;
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString('eventos.roster');
+      return raw == null ? null : _armarRoster(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<MiembroRoster> _armarRoster(Map<String, dynamic> res) {
     final hoy = DateTime.now();
-    _roster = [
+    return [
       for (final p in (res['personas'] as List? ?? const []))
         if (p is Map<String, dynamic>)
           MiembroRoster(
@@ -577,7 +593,6 @@ class EventosRepo extends ChangeNotifier {
             }(),
           ),
     ]..sort((a, b) => a.persona.nombreMostrar.toLowerCase().compareTo(b.persona.nombreMostrar.toLowerCase()));
-    return _roster!;
   }
 
   /// Marca (o quita, con null) la asistencia real de una persona. Optimista:

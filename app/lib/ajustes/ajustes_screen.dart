@@ -23,6 +23,7 @@ import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
 import 'recorte_foto.dart';
 import '../push/activar_avisos.dart';
+import '../pivots/ajustes_liga_screen.dart';
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
 /// ajustes de la app, de seguridad y de emergencia; lo que ve el resto del
@@ -60,7 +61,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text('Mi perfil', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        title: Text('Ajustes', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([sesion, eventos]),
@@ -82,6 +83,20 @@ class _AjustesScreenState extends State<AjustesScreen> {
               _CabeceraPerfil(sesion: sesion),
               TarjetaActivarAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
+              // Mi Liga dentro de Ajustes, solo para Pivots (Victor, 2026-11-16).
+              if (sesion.esAdmin && sesion.adminToken != null)
+                GrupoAjustes(
+                  filas: [
+                    FilaAjuste(
+                      icono: Icons.stadium_rounded,
+                      seccion: 'liga',
+                      titulo: 'Mi Liga',
+                      valor: 'Equipos, reglas, Pivots, comunicación y datos de la liga',
+                      alTocar: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: sesion, pestana: true)),
+                    ),
+                  ],
+                ),
+
               GrupoAjustes(
                 filas: [
                   if (pagos)
@@ -125,7 +140,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     ),
                   ],
                 ),
-              // Ajustes de la liga y Tesorería viven en la pestaña Mi Liga (2026-11-13).
+
               GrupoAjustes(
                 filas: [
                   if (conFicha)
