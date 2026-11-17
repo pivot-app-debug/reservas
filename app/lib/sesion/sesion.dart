@@ -55,6 +55,35 @@ class Sesion extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Coach (Victor, 2026-11-16): 'pendiente', 'aprobado', 'rechazado' o null.
+  /// Aprobado, aparece la pestaña Coach. Se recuerda en el teléfono para que
+  /// la pestaña no salte sin señal.
+  String? coachEstado;
+  List<String> coachEquipos = const [];
+  bool get esCoach => coachEstado == 'aprobado';
+
+  Future<void> cargarCoach() async {
+    if (nombre == null) return;
+    final clave = 'coach.$nombre';
+    if (coachEstado == null) {
+      try {
+        final g = await _almacen.read(key: clave);
+        if (g != null && g.isNotEmpty) {
+          coachEstado = g;
+          notifyListeners();
+        }
+      } catch (_) {}
+    }
+    try {
+      final r = await api.get('getMiCoach');
+      if (r['exito'] == false) return;
+      coachEstado = r['estado'] as String?;
+      coachEquipos = [for (final e in (r['equipos'] as List? ?? const [])) '$e'];
+      notifyListeners();
+      await _almacen.write(key: clave, value: coachEstado ?? '');
+    } catch (_) {}
+  }
+
   Map<String, dynamic> datos = const {};
   bool cargando = true;
 
@@ -233,6 +262,8 @@ class Sesion extends ChangeNotifier {
     nombre = null;
     adminToken = null;
     esAdmin = false;
+    coachEstado = null;
+    coachEquipos = const [];
     areasPivot = const [];
     datos = const {};
     await _almacen.delete(key: 'sesion');
@@ -359,6 +390,7 @@ class Sesion extends ChangeNotifier {
     esAdmin = res['esAdmin'] == true;
     adminToken = res['adminToken'] as String?;
     cargarAreas();
+    cargarCoach();
     _paisCargado = false;
     cargarPaisEquipo();
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../coach/coach_screen.dart';
 import '../core/datos_pendientes.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -160,6 +161,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                       valor: 'Qué avisos recibes',
                       alTocar: () => SubAjustes.abrir(context, NotificacionesScreen(sesion: sesion)),
                     ),
+                  if (conFicha) FilaSerCoach(sesion: sesion),
                   FilaAjuste(
                     icono: Icons.manage_accounts_rounded,
                     seccion: 'cuenta',
@@ -244,12 +246,27 @@ class _CabeceraPerfil extends StatelessWidget {
                   Text([if (numero.isNotEmpty) '#$numero', if (pron.isNotEmpty) pron].join(' · '), style: TextStyle(fontSize: 14, color: p.textoSecundario)),
                 const SizedBox(height: 8),
                 if (sesion.datos.isNotEmpty)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                    onPressed: () =>
-                        SubAjustes.abrir(context, EstadisticasScreen(repo: EquipoRepo.de(sesion), username: sesion.nombre ?? '', nombre: sesion.nombreMostrar)),
-                    icon: const Icon(Icons.insights_rounded, size: 18),
-                    label: const Text('Mis estadísticas'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                        onPressed: () => SubAjustes.abrir(
+                          context,
+                          EstadisticasScreen(repo: EquipoRepo.de(sesion), username: sesion.nombre ?? '', nombre: sesion.nombreMostrar),
+                        ),
+                        icon: const Icon(Icons.insights_rounded, size: 18),
+                        label: const Text('Mis estadísticas'),
+                      ),
+                      // Ficha deportiva junto a Estadísticas (Victor, 2026-11-16).
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                        onPressed: () => SubAjustes.abrir(context, FichaDeportivaScreen(sesion: sesion)),
+                        icon: const Icon(Icons.sports_score_rounded, size: 18),
+                        label: const Text('Mi ficha deportiva'),
+                      ),
+                    ],
                   ),
               ],
             ),

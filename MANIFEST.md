@@ -246,6 +246,12 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Coach (etapa 2, 2026-11-16)
+- Migración `20261117020000_coach.sql`: `coaches` (estado pendiente/aprobado/rechazado, equipos text[] vacío = todos), `coach_habilidades` (lista base WFTDA), `coach_evaluaciones` (historial de niveles no/proceso/logrado), `coach_notas` (visible yo/coaches/pivots/jugadorx, por_voz), `coach_planes` (por id_evento, bloques jsonb, compartido). RLS sin políticas: solo el servidor.
+- API: `pedirCoach`, `getMiCoach`, `adminCoaches` (área equipo: listar/aprobar/nombrar/equipos/rechazar/quitar), `getCoach`, `getFichaDeportiva` (coach de sus equipos, Pivot o la propia persona; filtra notas por `visible`), `coachGuardar` (evaluar/nota/borrarNota/plan/habilidad), `getHabilidades`, `getPlanEvento`, `coachMarcarAsistencia` (llama a `adminMarcarAsistencia(params, porCoach)`; el segundo argumento no llega desde la petición). Bandeja: `coaches` (área equipo) → `TipoPedido.coach`.
+- App: `coach/coach_screen.dart` (`CoachScreen`, `PlanEventoScreen`, `PlanEnEvento` en el detalle del evento, `FichaDeportivaScreen`, `HabilidadesScreen`, `CoachesScreen`, `elegirEquiposCoach`, `FilaSerCoach`). `Sesion.coachEstado`/`esCoach`/`cargarCoach()` (se recuerda cifrado). `EventosRepo.roster()`/`marcarReal()` usan las acciones de coach si no hay adminToken. Dictado con `speech_to_text` (permiso RECORD_AUDIO).
+- Falta (etapa 3): pruebas por persona, rutinas por evento, feedback 1–10 al terminar y recordatorios.
+
 ## Etapa 1 (2026-11-16, noche)
 - Nav: Calendario, Equipo, (Finanzas), Ajustes. `AjustesScreen` (título "Ajustes") abre `AjustesLigaScreen(pestana: true)` con `SubAjustes.abrir` para Pivots.
 - `core/pronombres.dart`: `generoDe`, `conPronombres(texto, pronombres)` (lista blanca de palabras de una persona; plurales con xs no cambian). Server: `_generoDe`/`_conPronombres` en `api/index.ts`; `sendPush` adapta títulos y textos cuando hay un solo destinatario. Test `test/pronombres_test.dart`.

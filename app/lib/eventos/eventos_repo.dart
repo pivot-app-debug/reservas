@@ -550,7 +550,19 @@ class EventosRepo extends ChangeNotifier {
     if (_roster != null && !forzar) return _roster!;
     Map<String, dynamic> res;
     try {
-      res = await _api.get('adminGetRosterEquipo', {'adminToken': _adminToken});
+      if (sesion.adminToken == null && sesion.esCoach) {
+        // Coach sin ser Pivot: sus jugadorxs (Victor, 2026-11-16).
+        final c = await _api.get('getCoach');
+        if (c['exito'] == false) throw ApiException('${c['error']}');
+        res = {
+          'personas': [
+            for (final p in (c['jugadorxs'] as List? ?? const []))
+              if (p is Map) {'nombre': p['username'], 'nombreDerby': p['nombre'], 'fotoPerfil': p['foto']},
+          ],
+        };
+      } else {
+        res = await _api.get('adminGetRosterEquipo', {'adminToken': _adminToken});
+      }
       // Copia para tomar asistencia sin señal (nombres y fotos).
       unawaited(SharedPreferences.getInstance().then((p) => p.setString('eventos.roster', jsonEncode(res))));
     } catch (e) {
@@ -598,26 +610,24 @@ class EventosRepo extends ChangeNotifier {
   /// Marca (o quita, con null) la asistencia real de una persona. Optimista:
   /// si el servidor falla, vuelve atrás y lanza (`_evMarcarAsistenciaAdmin()`).
   Future<bool> marcarReal(Evento ev, Persona persona, EstadoReal? estado) async {
-    final token = _adminToken;
+    final token = sesion.adminToken;
+    if (token == null && !sesion.esCoach) throw ApiException('Esta acción es solo para administradorxs.');
     final clave = persona.username.trim().toUpperCase();
     final anterior = List<AsistenciaReal>.of(ev.asistentes);
     ev.asistentes.removeWhere((a) => a.persona.username.trim().toUpperCase() == clave);
     if (estado != null) ev.asistentes.add(AsistenciaReal(persona: persona, estado: estado));
     notifyListeners();
+    // Coach sin ser Pivot: su propia acción, con su sesión (Victor, 2026-11-16).
+    final accion = token == null && sesion.esCoach ? 'coachMarcarAsistencia' : 'adminMarcarAsistencia';
     try {
-      final res = await _api.post('adminMarcarAsistencia', {
-        'adminToken': token,
-        'idEvento': ev.id,
-        'nombre': persona.username,
-        'estado': estado?.valor ?? 'Ninguno',
-      });
+      final res = await _api.post(accion, {'adminToken': token, 'idEvento': ev.id, 'nombre': persona.username, 'estado': estado?.valor ?? 'Ninguno'});
       if (res['exito'] == false) throw ApiException((res['error'] ?? 'No se pudo guardar la asistencia.').toString());
       cola.hayConexion();
       return false;
     } catch (e) {
       // Sin señal en el entrenamiento: queda guardada y se sube después.
       if (ColaOffline.esDeRed(e)) {
-        await cola.encolar('adminMarcarAsistencia', {
+        await cola.encolar(accion, {
           'adminToken': token,
           'idEvento': ev.id,
           'nombre': persona.username,

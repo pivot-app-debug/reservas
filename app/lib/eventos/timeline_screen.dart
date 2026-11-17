@@ -182,7 +182,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     super.initState();
     repo.cargar();
     // Pivots: deja guardada la lista del equipo para tomar asistencia sin señal.
-    if (repo.sesion.esAdmin) unawaited(repo.roster().then((_) {}, onError: (_) {}));
+    if (repo.sesion.esAdmin || repo.sesion.esCoach) unawaited(repo.roster().then((_) {}, onError: (_) {}));
 
     _posiciones.itemPositions.addListener(_alDesplazar);
     widget.irAHoy?.addListener(_irAHoy);
@@ -1663,7 +1663,8 @@ class _TarjetaEvento extends StatelessWidget {
         : null;
     final asisten = reales ? ev.asistentes.map((a) => a.persona).toList() : ev.con(EstadoRsvp.asistire).map((r) => r.persona).toList();
     final esAdmin = repo.sesion.esAdmin && repo.sesion.adminToken != null;
-    final tomarAsistencia = esAdmin && ev.sePuedeTomarAsistencia;
+    // Coaches también toman asistencia de sus equipos (Victor, 2026-11-16).
+    final tomarAsistencia = (esAdmin || repo.sesion.esCoach) && ev.sePuedeTomarAsistencia;
     // Reserva de esta clase (Mirlxs): estado y "Cancelar o reagendar", como la web.
     final filaReserva = repo.reservaDe(ev);
     final reserva = filaReserva == null ? null : ReservaActiva.desde(filaReserva);

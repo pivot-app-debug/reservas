@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../coach/coach_screen.dart';
 import '../core/sincroniza.dart';
 
 import '../ajustes/campos.dart';
@@ -341,6 +342,18 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                         titulo: 'Pivots y permisos',
                         valor: 'Quién es Pivot, qué áreas gestiona y cómo se aprueban sus pedidos',
                         alTocar: () => _abrir(PivotsScreen(sesion: sesion)),
+                      ),
+                    ),
+                    // Coaches (Victor, 2026-11-16).
+                    Resaltable(
+                      id: 'coaches',
+                      resaltado: _resaltado,
+                      child: FilaAjuste(
+                        icono: Icons.sports_rounded,
+                        seccion: 'entrenamientos',
+                        titulo: 'Coaches',
+                        valor: 'Quién es coach y qué equipos lleva',
+                        alTocar: () => _abrir(CoachesScreen(sesion: sesion)),
                       ),
                     ),
                     Resaltable(

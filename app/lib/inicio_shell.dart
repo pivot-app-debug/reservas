@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'coach/coach_screen.dart';
 import 'core/config_liga.dart';
 import 'core/fechas.dart';
 import 'core/tema.dart';
@@ -42,6 +43,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Navegacion.ir.addListener(_irAPestana);
+    // Coach: la pestaña aparece al aprobarse (Victor, 2026-11-16).
+    widget.sesion.addListener(_alCambiarSesion);
+    widget.sesion.cargarCoach();
     // Ajustes y reglas de la liga (inactividad, tolerancia…) desde el inicio.
     ConfigLiga.de(widget.sesion);
 
@@ -59,6 +63,11 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     await DatosPendientes.recordarSiCorresponde(context, widget.sesion, abrir: (clave) => abrirPendiente(context, widget.sesion, clave));
   }
 
+  bool _eraCoach = false;
+  void _alCambiarSesion() {
+    if (mounted && widget.sesion.esCoach != _eraCoach) setState(() => _eraCoach = widget.sesion.esCoach);
+  }
+
   /// Otra pantalla pidió abrir una pestaña (ej. Mi perfil desde tu ficha).
   void _irAPestana() {
     final p = Navegacion.ir.value;
@@ -69,13 +78,14 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       () => _indice = switch (p) {
         Pestana.calendario => 0,
         Pestana.equipo => 1,
-        Pestana.perfil => 1 + (widget.sesion.tieneArea('finanzas') ? 1 : 0) + 1,
+        Pestana.perfil => 1 + (widget.sesion.tieneArea('finanzas') ? 1 : 0) + (widget.sesion.esCoach ? 1 : 0) + 1,
       },
     );
   }
 
   @override
   void dispose() {
+    widget.sesion.removeListener(_alCambiarSesion);
     Navegacion.ir.removeListener(_irAPestana);
     WidgetsBinding.instance.removeObserver(this);
     _irAHoy.dispose();
@@ -134,6 +144,12 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           TesoreriaScreen(sesion: widget.sesion),
         ),
       // Mi Liga ya no es una pestaña: vive dentro de Ajustes (Victor, 2026-11-16).
+      // En su lugar, Coach para quien un Pivot aprobó como coach.
+      if (widget.sesion.esCoach)
+        (
+          const NavigationDestination(icon: Icon(Icons.sports_outlined), selectedIcon: Icon(Icons.sports), label: 'Coach'),
+          CoachScreen(sesion: widget.sesion, eventos: widget.repo),
+        ),
       // Ajustes (antes Mi perfil; Victor, 2026-11-16), con tu avatar.
       (
         NavigationDestination(

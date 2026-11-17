@@ -2,6 +2,7 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../coach/coach_screen.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/reloj.dart';
@@ -262,7 +263,9 @@ class _DetalleScreenState extends State<DetalleScreen> {
             padding: EdgeInsets.fromLTRB(0, 8 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
               KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
-              if (_esAdmin && ev.sePuedeTomarAsistencia)
+              // Plan del coach: "Qué veremos" si lo compartió (Victor, 2026-11-16).
+              PlanEnEvento(sesion: repo.sesion, evento: ev),
+              if ((_esAdmin || repo.sesion.esCoach) && ev.sePuedeTomarAsistencia)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: FilledButton.icon(

@@ -2,6 +2,16 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-16 (etapa 2: Coach)
+- **Ser coach:** en Ajustes, "Quiero ser coach" (con mensaje opcional). Llega a Notificaciones de los Pivots ("Pedidos para ser coach"); al aprobar se eligen sus equipos (o todos). Un Pivot también puede nombrar coaches en Ajustes → Mi Liga → Coaches, cambiar sus equipos o quitarlxs.
+- **Pestaña Coach** (donde estaba Mi Liga) para coaches aprobadxs:
+  - **Jugadorxs:** lxs de sus equipos con estado (sin motivos de salud), asistencias en 30 días y habilidades logradas; buscador.
+  - **Ficha deportiva:** habilidades de WFTDA por grupo con nivel Aún no / En proceso / Logrado (cada cambio queda en el historial) y **notas escritas o dictadas** (el micrófono pasa la voz a texto). El coach decide quién más ve cada nota: solo yo, coaches, coaches y Pivots, o también lx jugadorx.
+  - **Lista de habilidades editable** (agregar, renombrar, apagar), parte de las de WFTDA.
+  - **Cronograma:** los eventos de las próximas semanas; en cada uno, bloques en orden con duración y detalle, copiar el plan de otro evento y compartirlo para que el equipo vea "Qué veremos" en el detalle del evento.
+  - **Tomar asistencia** de sus equipos sin ser Pivot (también sin señal).
+- Cada persona ve **Mi ficha deportiva** en Ajustes, junto a Mis estadísticas (las notas que el coach compartió con ella).
+
 ## 2026-11-16 (etapa 1: Ajustes, pronombres y asistencia sin señal)
 - **Mi perfil se llama Ajustes.** Arriba tu perfil (foto, nombre, datos), después tus ajustes personales y, para Pivots, **Mi Liga** (ya no está en la barra de abajo).
 - **Palabras según pronombres:** solo Ella → "Lesionada", solo Él → "Lesionado", solo Elle → "Lesionade", varios o ninguno → "Lesionadx". En el estado de la ficha y de la lista de Equipo, al cambiar el estado, en Estadísticas, en Asistencia anticipada, en Cursos y en los avisos que van a una sola persona. Los textos de grupo siguen con x.

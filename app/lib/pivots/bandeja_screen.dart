@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
+import '../coach/coach_screen.dart';
 import '../core/sincroniza.dart';
 
 import '../core/config_liga.dart';
@@ -247,6 +250,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     (TipoPedido.prestamo, 'Equipamiento', Icons.content_paste_rounded),
     (TipoPedido.equipo, 'Cambios de equipo', Icons.swap_vert_rounded),
     (TipoPedido.revisionEquipo, 'Revisión de cambios de equipo', Icons.rate_review_outlined),
+    (TipoPedido.coach, 'Pedidos para ser coach', Icons.sports_rounded),
   ];
 
   Future<void> _resolver(Pedido p, bool aprobar) async {
@@ -277,6 +281,12 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
       final c = await _elegirCuenta(p);
       if (c == false || !mounted) return;
       if (c is String) extra = {'cuentaId': c};
+    }
+    // Coach: el Pivot elige qué equipos lleva (Victor, 2026-11-16).
+    if (aprobar && p.tipo == TipoPedido.coach) {
+      final eq = await elegirEquiposCoach(context, repo.sesion, const []);
+      if (eq == null || !mounted) return;
+      extra = {'equipos': jsonEncode(eq)};
     }
     // Pedido para usar equipamiento: cuánto tiempo y cómo se entrega.
     if (aprobar && p.tipo == TipoPedido.prestamo && p.m['tipo'] == 'uso') {
@@ -749,6 +759,8 @@ class _CuentaCorte extends StatelessWidget {
         'Pide revisar su cambio de ${v('de')} a ${v('a')}',
         v('mensaje').isEmpty ? 'Mantener deja el cambio. Devolver lo regresa y queda fijo hasta el próximo corte.' : 'Mensaje: ${v('mensaje')}',
       );
+    case TipoPedido.coach:
+      return ('Pidió ser coach', v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparece la sección Coach.' : 'Mensaje: ${v('mensaje')}');
     case TipoPedido.tarea:
       final t = x.tarea;
       return (

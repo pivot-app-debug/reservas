@@ -5,7 +5,7 @@ import '../core/api.dart';
 import '../sesion/sesion.dart';
 
 /// Tipos de pedido que esperan a un Pivot.
-enum TipoPedido { reserva, rectificacion, excepcion, lesion, tarea, prestamo, equipo, revisionEquipo }
+enum TipoPedido { reserva, rectificacion, excepcion, lesion, tarea, prestamo, equipo, revisionEquipo, coach }
 
 /// Un pedido de la Bandeja de Pivots (`adminBandeja`).
 class Pedido {
@@ -194,6 +194,7 @@ class BandejaRepo extends ChangeNotifier {
       ...lista('prestamos', TipoPedido.prestamo),
       ...lista('cambiosEquipo', TipoPedido.equipo),
       ...lista('revisionesEquipo', TipoPedido.revisionEquipo),
+      ...lista('coaches', TipoPedido.coach),
     ];
     cargado = true;
     error = null;
@@ -270,6 +271,7 @@ class BandejaRepo extends ChangeNotifier {
           'nombre': p.nombre,
           'decision': aprobar ? 'mantener' : 'devolver',
         }),
+        TipoPedido.coach => await _api.post('adminCoaches', {'adminToken': token, 'accion': aprobar ? 'aprobar' : 'rechazar', 'username': p.nombre, ...extra}),
         TipoPedido.prestamo => await _api.post('adminPrestamo', {'adminToken': token, 'accion': aprobar ? 'aprobar' : 'rechazar', 'id': p.id, ...extra}),
         TipoPedido.lesion => await _api.post(aprobar ? 'adminAprobarLesion' : 'adminRechazarLesion', {'adminToken': token, 'nombre': p.nombre}),
         TipoPedido.tarea => await _api.post('adminValidarTarea', {
