@@ -64,6 +64,8 @@ dependencies:
   font_awesome_flutter: ^11.0.0
   share_plus: ^13.3.1
   speech_to_text: ^7.5.0
+  file_picker: ^13.4.0
+  archive: ^4.0.0
 
 
 

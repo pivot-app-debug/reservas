@@ -42,7 +42,7 @@ void main() {
     expect(find.byType(PanelCalendario), findsNothing);
     // El filtro guardado se cargó: la lupa tiene el punto.
     expect(find.byType(Badge), findsWidgets);
-        // Atrás con el buscador abierto lo cierra (no sale de la app). Buscar
+    // Atrás con el buscador abierto lo cierra (no sale de la app). Buscar
     // está en el menú ⋯ (2026-11-17).
     await t.tap(find.byIcon(Icons.more_vert_rounded));
     await t.pumpAndSettle();

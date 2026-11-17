@@ -256,11 +256,80 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     ],
   );
 
+  /// Clases desde un Excel o .csv: se ven antes de agregarlas.
+  Future<void> _subirExcel() async {
+    final m = ScaffoldMessenger.of(context);
+    ClasesImportadas? r;
+    try {
+      r = await importarClases();
+    } catch (_) {
+      m.showSnackBar(const SnackBar(content: Text('No se pudo leer el archivo. Usa la plantilla (Excel o .csv).')));
+      return;
+    }
+    if (r == null || !mounted) return;
+    if (r.clases.isEmpty) {
+      m.showSnackBar(const SnackBar(content: Text('No encontramos clases. Revisa que la primera fila diga Fecha, Hora, Lugar y Temas.')));
+      return;
+    }
+    final l = r.clases, saltadas = r.saltadas;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(l.length == 1 ? '1 clase encontrada' : '${l.length} clases encontradas'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final c in l)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${c['tipo'] == 'clinica' ? 'Clínica' : 'Clase'} · ${c['fecha']} · ${c['hora']}'),
+                  subtitle: Text([if ('${c['lugar']}'.isNotEmpty) '${c['lugar']}', ...((c['temas'] as List?) ?? const []).map((x) => '$x')].join(' · ')),
+                ),
+              if (saltadas > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(saltadas == 1 ? '1 fila sin fecha válida no se agregó.' : '$saltadas filas sin fecha válida no se agregaron.'),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: Text(l.length == 1 ? 'Agregar' : 'Agregar ${l.length}')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _clases
+        ..addAll(l)
+        ..sort((a, b) => '${a['fecha']}'.compareTo('${b['fecha']}'));
+    });
+  }
+
   Widget _pasoClases(BuildContext context) {
     final p = context.pivot;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Excel para no cargar clase por clase (Victor, 2026-11-17).
+        if (!_clinica) ...[
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(onPressed: _subirExcel, icon: const Icon(Icons.upload_file_rounded), label: const Text('Subir Excel')),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextButton.icon(onPressed: compartirPlantilla, icon: const Icon(Icons.download_rounded), label: const Text('Plantilla')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
         for (var i = 0; i < _clases.length; i++)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),

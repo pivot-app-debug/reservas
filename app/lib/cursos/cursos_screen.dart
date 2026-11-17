@@ -23,6 +23,8 @@ import '../sesion/sesion.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
 
+import 'importar_clases.dart';
+
 part 'asistente_curso.dart';
 
 /// Cursos y clínicas (Victor, 2026-11-16/17): clases con temas, precio
