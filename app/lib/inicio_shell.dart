@@ -20,8 +20,6 @@ import 'core/navegacion.dart';
 import 'finanzas/tesoreria_screen.dart';
 import 'core/aviso_cambio_equipo.dart';
 
-import 'eventos/widgets_comunes.dart';
-
 /// Estructura principal con la barra de navegación inferior. En esta
 /// primera versión solo Eventos es nativo; el resto abre la web mientras se
 /// migra (decisión 2026-11-06, ver MANIFEST.md "App Android").
@@ -150,15 +148,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           const NavigationDestination(icon: Icon(Icons.sports_outlined), selectedIcon: Icon(Icons.sports), label: 'Coach'),
           CoachScreen(sesion: widget.sesion, eventos: widget.repo),
         ),
-      // Ajustes (antes Mi perfil; Victor, 2026-11-16), con tu avatar.
+      // Ajustes (antes Mi perfil): ícono de engranaje (Victor, 2026-11-16).
       (
-        NavigationDestination(
-          icon: ListenableBuilder(
-            listenable: widget.sesion,
-            builder: (context, _) => AvatarPersona(nombre: widget.sesion.nombreMostrar, foto: widget.sesion.fotoPerfil, tamano: 26),
-          ),
-          label: 'Ajustes',
-        ),
+        const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Ajustes'),
         AjustesScreen(sesion: widget.sesion, eventos: widget.repo),
       ),
     ];

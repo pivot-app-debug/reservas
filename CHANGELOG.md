@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (Ajustes con engranaje; planes para personas)
+- La pestaña Ajustes usa el ícono de engranaje en vez de tu avatar.
+- **Planes de pago para personas específicas:** en el editor del plan, "Para quién" combina equipos y "Personas específicas" (lista con buscador). La tarjeta del plan muestra los nombres.
+
 ## 2026-11-16 (etapa 3: pruebas, feedback y recordatorios de Coach)
 - **Pruebas** (Coach → Pruebas): algo que se mide cada vez, como "vueltas en 5 minutos". Se elige en qué se mide, si más es mejor, a quiénes se les hace y quién ve los resultados. En la ficha de cada persona: "Anotar" el resultado de hoy, última y mejor marca, diferencia con la vez anterior y una curva del progreso.
 - **Feedback al terminar un evento** (cualquier evento del timeline): desde el detalle del evento ("Dar feedback") o desde el Cronograma. Por tema (los bloques del plan, "General" u otro), nota del 1 al 10 y comentario escrito o dictado por persona que vino de sus equipos; el coach elige quién más lo ve.

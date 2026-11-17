@@ -23,6 +23,9 @@ class PlanesScreen extends StatefulWidget {
 class _PlanesScreenState extends State<PlanesScreen> {
   List<Map<String, dynamic>>? _planes;
   List<String> _equipos = const [];
+
+  /// Personas de la liga (usuario → nombre), para planes de algunas personas.
+  Map<String, String> _gente = const {};
   String? _error;
 
   Sesion get s => widget.sesion;
@@ -33,6 +36,15 @@ class _PlanesScreenState extends State<PlanesScreen> {
     _llamar({'accion': 'listar'});
     s.api.get('getTiers', {'adminToken': s.adminToken}).then((r) {
       if (mounted) setState(() => _equipos = [for (final t in (r['tiers'] as List? ?? const [])) '${(t as Map)['nombre']}']);
+    }, onError: (_) {});
+    s.api.get('adminGetRosterEquipo', {'adminToken': s.adminToken}).then((r) {
+      if (!mounted) return;
+      setState(() {
+        _gente = {
+          for (final x in (r['personas'] as List? ?? const []))
+            if (x is Map) '${x['nombre']}': '${(x['nombreDerby'] ?? '').toString().isEmpty ? x['nombre'] : x['nombreDerby']}',
+        };
+      });
     }, onError: (_) {});
   }
 
@@ -63,7 +75,7 @@ class _PlanesScreenState extends State<PlanesScreen> {
   Future<void> _editar([Map<String, dynamic>? x]) async {
     final ok = await Navigator.of(context).push<Map<String, Object?>>(
       MaterialPageRoute(
-        builder: (_) => _EditorPlan(plan: x, equipos: _equipos),
+        builder: (_) => _EditorPlan(plan: x, equipos: _equipos, gente: _gente),
       ),
     );
     if (ok == null) return;
@@ -87,11 +99,11 @@ class _PlanesScreenState extends State<PlanesScreen> {
     if (si == true) await _llamar({'accion': 'borrar', 'id': x['id']});
   }
 
-  static String _detalle(Map<String, dynamic> x) {
+  String _detalle(Map<String, dynamic> x) {
     final n = (x['cantidad'] as num?)?.toInt() ?? 1;
     final precio = (x['precio'] as num?) ?? 0;
     final clases = x['tipo'] == 'clases';
-    final para = [...((x['equipos'] as List?) ?? const []), ...((x['personas'] as List?) ?? const [])];
+    final para = [...((x['equipos'] as List?) ?? const []), for (final u in ((x['personas'] as List?) ?? const [])) _gente['$u'] ?? '$u'];
     return [
       clases ? '$n ${n == 1 ? 'clase' : 'clases'}' : '$n ${n == 1 ? 'mes' : 'meses'}',
       '${Moneda.s}${precio % 1 == 0 ? precio.toInt() : precio}',
@@ -162,9 +174,10 @@ class _PlanesScreenState extends State<PlanesScreen> {
 }
 
 class _EditorPlan extends StatefulWidget {
-  const _EditorPlan({this.plan, required this.equipos});
+  const _EditorPlan({this.plan, required this.equipos, this.gente = const {}});
   final Map<String, dynamic>? plan;
   final List<String> equipos;
+  final Map<String, String> gente;
 
   @override
   State<_EditorPlan> createState() => _EditorPlanState();
@@ -177,6 +190,68 @@ class _EditorPlanState extends State<_EditorPlan> {
   late String _tipo = '${o['tipo'] ?? 'meses'}';
   late int _cantidad = (o['cantidad'] as num?)?.toInt() ?? 3, _vence = (o['venceMeses'] as num?)?.toInt() ?? 3;
   late final Set<String> _equipos = {...((o['equipos'] as List?) ?? const []).map((e) => '$e')};
+  late final Set<String> _personas = {...((o['personas'] as List?) ?? const []).map((e) => '$e')};
+
+  /// Elegir personas con buscador (Victor, 2026-11-17).
+  Future<void> _elegirPersonas() async {
+    final sel = {..._personas};
+    var q = '';
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) {
+          final l = widget.gente.entries.where((e) => '${e.value} ${e.key}'.toLowerCase().contains(q.toLowerCase())).toList()
+            ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+          return SizedBox(
+            height: MediaQuery.sizeOf(c).height * 0.8,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: TextField(
+                    onChanged: (v) => set(() => q = v),
+                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar persona'),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final e in l)
+                        CheckboxListTile(
+                          value: sel.contains(e.key),
+                          title: Text(e.value),
+                          subtitle: e.value == e.key ? null : Text('@${e.key}'),
+                          onChanged: (v) => set(() => v == true ? sel.add(e.key) : sel.remove(e.key)),
+                        ),
+                    ],
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(sel.isEmpty ? 'Sin personas' : 'Listo (${sel.length})')),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (ok == true) {
+      setState(() {
+        _personas
+          ..clear()
+          ..addAll(sel);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -257,23 +332,41 @@ class _EditorPlanState extends State<_EditorPlan> {
             ),
             SelectorNumero(valor: _vence, min: 1, max: 24, etiqueta: _vence == 1 ? 'mes' : 'meses', alCambiar: (v) => setState(() => _vence = v.toInt())),
           ],
-          if (widget.equipos.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text(
-              'Para quién',
-              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ChoiceChip(label: const Text('Todos'), selected: _equipos.isEmpty, onSelected: (_) => setState(_equipos.clear)),
-                for (final e in widget.equipos)
-                  FilterChip(label: Text(e), selected: _equipos.contains(e), onSelected: (v) => setState(() => v ? _equipos.add(e) : _equipos.remove(e))),
-              ],
-            ),
-          ],
+          const SizedBox(height: 14),
+          Text(
+            'Para quién',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+          ),
+          const SizedBox(height: 2),
+          Text('Sin elegir nada, es para todos. Puedes combinar equipos y personas.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Todos'),
+                selected: _equipos.isEmpty && _personas.isEmpty,
+                onSelected: (_) => setState(() {
+                  _equipos.clear();
+                  _personas.clear();
+                }),
+              ),
+              for (final e in widget.equipos)
+                FilterChip(label: Text(e), selected: _equipos.contains(e), onSelected: (v) => setState(() => v ? _equipos.add(e) : _equipos.remove(e))),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person_search_rounded),
+            title: Text(_personas.isEmpty ? 'Personas específicas' : '${_personas.length} ${_personas.length == 1 ? 'persona' : 'personas'}'),
+            subtitle: _personas.isEmpty
+                ? const Text('Para darle este plan solo a algunas personas')
+                : Text([for (final u in _personas) widget.gente[u] ?? u].join(', '), maxLines: 2, overflow: TextOverflow.ellipsis),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: widget.gente.isEmpty ? null : _elegirPersonas,
+          ),
           const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
@@ -296,7 +389,7 @@ class _EditorPlanState extends State<_EditorPlan> {
                     'precio': _monto,
                     'venceMeses': _vence,
                     'equipos': _equipos.toList(),
-                    'personas': (o['personas'] as List?) ?? const [],
+                    'personas': _personas.toList(),
                   })
                 : null,
             child: const Text('Guardar'),
