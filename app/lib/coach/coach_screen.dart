@@ -95,6 +95,8 @@ class _CoachScreenState extends State<CoachScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
+                  // Por evaluar primero (Victor, 2026-11-17).
+                  ..._porEvaluar(context),
                   SegmentedButton<String>(
                     showSelectedIcon: false,
                     segments: const [
@@ -118,6 +120,55 @@ class _CoachScreenState extends State<CoachScreen> {
               ),
       ),
     );
+  }
+
+  List<Widget> _porEvaluar(BuildContext context) {
+    final p = context.pivot;
+    final l = [
+      for (final x in (_d?['pendientes'] as List? ?? const []))
+        if (((x as Map)['evaluados'] as num? ?? 0) < (x['total'] as num? ?? 0)) Map<String, dynamic>.from(x),
+    ];
+    if (l.isEmpty) return const [];
+    final x = l.first;
+    final faltan = (x['total'] as num).toInt() - (x['evaluados'] as num? ?? 0).toInt();
+    Future<void> evaluar(Map<String, dynamic> y) async {
+      await EvaluarScreen.abrir(context, s, y);
+      _cargar();
+    }
+
+    return [
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              tituloPendiente(x),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.sobreSuave),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${x['total'] == 1 ? 'Vino 1 persona' : 'Vinieron ${x['total']} personas'} de tus equipos. '
+              '${faltan == x['total'] ? '¿Las evaluamos?' : 'Faltan $faltan por evaluar.'}',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.25, color: p.sobreSuave),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(onPressed: () => evaluar(x), icon: const Icon(Icons.rate_review_rounded), label: const Text('Evaluar')),
+          ],
+        ),
+      ),
+      for (final y in l.skip(1))
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: const Icon(Icons.history_rounded),
+          title: Text(tituloPendiente(y)),
+          subtitle: Text('${(y['total'] as num).toInt() - (y['evaluados'] as num? ?? 0).toInt()} sin evaluar'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => evaluar(y),
+        ),
+      const SizedBox(height: 16),
+    ];
   }
 
   Widget _listaJugadorxs(BuildContext context) {
@@ -2089,6 +2140,504 @@ class EscalaDiez extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ─── Evaluar a quienes vinieron (Victor, 2026-11-17) ────────────────────────
+// Una persona por pantalla, deslizando: qué trabajó, cómo le fue (1 a 10),
+// comentario por voz o texto, prueba del día y habilidades. Pocos toques.
+
+const _quienVe = {'yo': 'Solo yo', 'coaches': 'Coaches', 'pivots': 'Coaches y Pivots', 'jugadorx': 'También la persona'};
+
+class EvaluarScreen extends StatefulWidget {
+  const EvaluarScreen({super.key, required this.sesion, required this.idEvento, required this.fecha, required this.titulo});
+  final Sesion sesion;
+  final String idEvento, fecha, titulo;
+
+  static Future<void> abrir(BuildContext context, Sesion s, Map<String, dynamic> pend) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => EvaluarScreen(sesion: s, idEvento: '${pend['idEvento']}', fecha: '${pend['fecha']}', titulo: tituloPendiente(pend)),
+    ),
+  );
+
+  @override
+  State<EvaluarScreen> createState() => _EvaluarScreenState();
+}
+
+/// "Ayer · Entrenamiento", "Lunes 16 · Scrimmage".
+String tituloPendiente(Map<String, dynamic> x) {
+  final f = DateTime.tryParse('${x['fecha']}');
+  final hoy = Fechas.hoy();
+  final dia = f == null
+      ? ''
+      : (Fechas.iso(f) == Fechas.iso(hoy) ? 'Hoy' : (Fechas.iso(f) == Fechas.iso(hoy.subtract(const Duration(days: 1))) ? 'Ayer' : Fechas.corta(f)));
+  return [dia, if ('${x['tipo'] ?? ''}'.isNotEmpty) '${x['tipo']}'].join(' · ');
+}
+
+class _EvaluarScreenState extends State<EvaluarScreen> {
+  Sesion get s => widget.sesion;
+  final _pagina = PageController();
+  int _i = 0;
+  bool _cargando = true, _guardando = false;
+  String? _error_;
+  List<Map<String, dynamic>> _personas = [];
+  List<String> _temas = [];
+  List<Map<String, dynamic>> _pruebas = [];
+  final Set<String> _hechos = {};
+  String _visible = 'jugadorx';
+
+  // Lo de cada persona.
+  final Map<String, Set<String>> _temasDe = {};
+  final Map<String, int?> _nota = {};
+  final Map<String, TextEditingController> _com = {};
+  final Set<String> _porVoz = {};
+  final Map<String, Map<String, String>> _marcas = {}; // persona → prueba → valor
+  final Map<String, Map<String, String>> _niveles = {}; // persona → habilidad → nivel nuevo
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  @override
+  void dispose() {
+    _pagina.dispose();
+    for (final c in _com.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _cargar() async {
+    try {
+      final res = await Future.wait([
+        s.api.get('coachFeedbackEvento', {'idEvento': widget.idEvento}),
+        s.api.get('coachPruebas', {'accion': 'listar'}).catchError((_) => <String, dynamic>{}),
+      ]);
+      final r = res[0];
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      final hecho = {for (final h in (r['hecho'] as List? ?? const [])) '${(h as Map)['username']}'};
+      final personas = [for (final x in (r['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+      // Primero quienes faltan evaluar.
+      personas.sort((a, b) => (hecho.contains(a['username']) ? 1 : 0).compareTo(hecho.contains(b['username']) ? 1 : 0));
+      if (!mounted) return;
+      setState(() {
+        _personas = personas;
+        _hechos.addAll(hecho);
+        _temas = [for (final t in (r['temas'] as List? ?? const [])) '$t'];
+        _pruebas = [
+          for (final p in (res[1]['pruebas'] as List? ?? const []))
+            if ((p as Map)['activa'] != false) Map<String, dynamic>.from(p),
+        ];
+        _cargando = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error_ = _error(e));
+    }
+  }
+
+  TextEditingController _c(String u) => _com[u] ??= TextEditingController();
+
+  bool _tieneAlgo(String u) =>
+      _nota[u] != null || _c(u).text.trim().isNotEmpty || (_marcas[u]?.values.any((v) => v.trim().isNotEmpty) ?? false) || (_niveles[u]?.isNotEmpty ?? false);
+
+  Future<void> _dictar(String u) async {
+    final r = await showModalBottomSheet<(String, bool, String)>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => const _EditorNota(conVisible: false, titulo: 'Comentario'),
+    );
+    if (r == null || !mounted) return;
+    setState(() {
+      final antes = _c(u).text.trim();
+      _c(u).text = antes.isEmpty ? r.$1 : '$antes ${r.$1}';
+      if (r.$2) _porVoz.add(u);
+    });
+  }
+
+  Future<void> _habilidades(Map<String, dynamic> x) async {
+    final u = '${x['username']}';
+    final elegidas = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _HojaHabilidades(sesion: s, username: u, nombre: '${x['nombre']}', cambios: {...?_niveles[u]}),
+    );
+    if (elegidas != null && mounted) setState(() => _niveles[u] = elegidas);
+  }
+
+  /// Guarda lo de esta persona y pasa a la siguiente.
+  Future<void> _guardarYSeguir() async {
+    final x = _personas[_i];
+    final u = '${x['username']}';
+    if (_tieneAlgo(u)) {
+      setState(() => _guardando = true);
+      final m = ScaffoldMessenger.of(context);
+      try {
+        final temas = (_temasDe[u]?.isNotEmpty ?? false) ? _temasDe[u]!.toList() : ['General'];
+        final com = _c(u).text.trim();
+        if (_nota[u] != null || com.isNotEmpty) {
+          final r = await s.api.post('coachFeedbackEvento', {
+            'accion': 'guardar',
+            'idEvento': widget.idEvento,
+            'fecha': widget.fecha,
+            'visible': _visible,
+            'items': jsonEncode([
+              for (final (i, t) in temas.indexed) {'username': u, 'tema': t, 'nota': _nota[u], 'comentario': i == 0 ? com : '', 'porVoz': _porVoz.contains(u)},
+            ]),
+          });
+          if (r['exito'] == false) throw ApiException('${r['error']}');
+        }
+        for (final e in (_marcas[u] ?? const <String, String>{}).entries) {
+          if (e.value.trim().isEmpty) continue;
+          final r = await s.api.post('coachPruebas', {
+            'accion': 'marca',
+            'pruebaId': e.key,
+            'username': u,
+            'valor': e.value.trim(),
+            'idEvento': widget.idEvento,
+            'fecha': widget.fecha,
+          });
+          if (r['exito'] == false) throw ApiException('${r['error']}');
+        }
+        for (final e in (_niveles[u] ?? const <String, String>{}).entries) {
+          await s.api.post('coachGuardar', {'accion': 'evaluar', 'username': u, 'habilidadId': e.key, 'nivel': e.value});
+        }
+        _hechos.add(u);
+        _marcas.remove(u);
+        _niveles.remove(u);
+      } catch (e) {
+        m.showSnackBar(SnackBar(content: Text(_error(e))));
+        if (mounted) setState(() => _guardando = false);
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _guardando = false);
+    }
+    _siguiente();
+  }
+
+  void _siguiente() {
+    if (_i < _personas.length - 1) {
+      _pagina.nextPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+    } else {
+      final n = _hechos.length;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Listo: $n de ${_personas.length} ${_personas.length == 1 ? 'persona evaluada' : 'personas evaluadas'}.')));
+    }
+  }
+
+  Future<void> _elegirVisible() async {
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('¿Quién ve las notas de hoy?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            ),
+            for (final e in _quienVe.entries)
+              ListTile(
+                title: Text(e.value),
+                trailing: e.key == _visible ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                onTap: () => Navigator.of(h).pop(e.key),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (v != null) setState(() => _visible = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+        actions: [TextButton.icon(onPressed: _elegirVisible, icon: const Icon(Icons.visibility_outlined, size: 18), label: Text(_quienVe[_visible]!))],
+      ),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _cargando
+            ? (_error_ == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error_!)))
+            : _personas.isEmpty
+            ? Center(
+                key: const ValueKey('v'),
+                child: Text('Nadie de tus equipos vino a este evento.', style: TextStyle(color: p.textoSecundario)),
+              )
+            : Column(
+                key: const ValueKey('l'),
+                children: [
+                  // Progreso: una rayita por persona.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Row(
+                      children: [
+                        for (var k = 0; k < _personas.length; k++)
+                          Expanded(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              height: 4,
+                              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                              decoration: BoxDecoration(
+                                color: _hechos.contains(_personas[k]['username']) ? p.marca : (k == _i ? p.sobreSuave : p.suave),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pagina,
+                      itemCount: _personas.length,
+                      onPageChanged: (k) => setState(() => _i = k),
+                      itemBuilder: (context, k) => _persona(context, _personas[k]),
+                    ),
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      child: Row(
+                        children: [
+                          TextButton(onPressed: _guardando ? null : _siguiente, child: const Text('Saltar')),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: _guardando ? null : _guardarYSeguir,
+                              child: _guardando
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : Text(_i == _personas.length - 1 ? 'Guardar y terminar' : 'Guardar y seguir'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _persona(BuildContext context, Map<String, dynamic> x) {
+    final p = context.pivot;
+    final u = '${x['username']}';
+    final temas = {..._temas, ...?_temasDe[u]}.toList();
+    final pruebas = [
+      for (final pr in _pruebas)
+        if ((pr['personas'] as List? ?? const []).isEmpty || (pr['personas'] as List).contains(u)) pr,
+    ];
+    Widget titulo(String t) => Padding(
+      padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+      ),
+    );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        Row(
+          children: [
+            AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 56),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${x['nombre']}',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: p.texto),
+                  ),
+                  Text(
+                    '${_i + 1} de ${_personas.length}${_hechos.contains(u) ? ' · ya evaluada hoy' : ''}',
+                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        titulo('¿QUÉ TRABAJÓ?'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in temas)
+              FilterChip(
+                label: Text(t),
+                selected: _temasDe[u]?.contains(t) ?? false,
+                onSelected: (v) => setState(() => v ? (_temasDe[u] ??= {}).add(t) : _temasDe[u]?.remove(t)),
+              ),
+            ActionChip(
+              avatar: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Otro tema'),
+              onPressed: () async {
+                final ctl = TextEditingController();
+                final t = await showDialog<String>(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    title: const Text('Otro tema'),
+                    content: TextField(
+                      controller: ctl,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(hintText: 'Ej. Frenos'),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
+                      FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.trim()), child: const Text('Agregar')),
+                    ],
+                  ),
+                );
+                if (t != null && t.isNotEmpty) setState(() => (_temasDe[u] ??= {}).add(t));
+              },
+            ),
+          ],
+        ),
+        titulo('¿CÓMO LE FUE?'),
+        EscalaDiez(valor: _nota[u], alCambiar: (n) => setState(() => _nota[u] = n)),
+        titulo('COMENTARIO'),
+        TextField(
+          controller: _c(u),
+          minLines: 2,
+          maxLines: 6,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Escribe o dicta',
+            suffixIcon: IconButton(tooltip: 'Dictar', icon: const Icon(Icons.mic_rounded), onPressed: () => _dictar(u)),
+          ),
+        ),
+        if (pruebas.isNotEmpty) ...[
+          titulo('PRUEBAS DE HOY'),
+          for (final pr in pruebas)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (v) => (_marcas[u] ??= {})['${pr['id']}'] = v,
+                decoration: InputDecoration(labelText: '${pr['nombre']}', suffixText: '${pr['unidad'] ?? ''}', helperText: 'Vacío si no la hizo'),
+              ),
+            ),
+        ],
+        titulo('HABILIDADES'),
+        OutlinedButton.icon(
+          onPressed: () => _habilidades(x),
+          icon: const Icon(Icons.checklist_rounded),
+          label: Text((_niveles[u]?.isEmpty ?? true) ? 'Marcar habilidades' : '${_niveles[u]!.length} habilidades marcadas'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Habilidades de una persona: tocar cambia Aún no → En proceso → Logrado.
+class _HojaHabilidades extends StatefulWidget {
+  const _HojaHabilidades({required this.sesion, required this.username, required this.nombre, required this.cambios});
+  final Sesion sesion;
+  final String username, nombre;
+  final Map<String, String> cambios;
+  @override
+  State<_HojaHabilidades> createState() => _HojaHabilidadesState();
+}
+
+class _HojaHabilidadesState extends State<_HojaHabilidades> {
+  List<Map<String, dynamic>>? _habs;
+  late final Map<String, String> _cambios = widget.cambios;
+  String _q = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.sesion.api
+        .get('getFichaDeportiva', {'username': widget.username})
+        .then(
+          (r) {
+            if (mounted) setState(() => _habs = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)]);
+          },
+          onError: (_) {
+            if (mounted) setState(() => _habs = const []);
+          },
+        );
+  }
+
+  String? _nivel(Map<String, dynamic> h) => _cambios['${h['id']}'] ?? (h['nivel'] as String?);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final q = _q.trim().toLowerCase();
+    final l = (_habs ?? const <Map<String, dynamic>>[]).where((h) => q.isEmpty || '${h['nombre']} ${h['categoria']}'.toLowerCase().contains(q)).toList();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.8,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Habilidades de ${widget.nombre}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                onChanged: (v) => setState(() => _q = v),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar habilidad'),
+              ),
+            ),
+            Expanded(
+              child: _habs == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      children: [
+                        for (final h in l)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('${h['nombre']}'),
+                            subtitle: Text('${h['categoria']}'),
+                            trailing: SegmentedButton<String>(
+                              showSelectedIcon: false,
+                              emptySelectionAllowed: true,
+                              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                              segments: const [
+                                ButtonSegment(value: 'no', label: Text('No')),
+                                ButtonSegment(value: 'proceso', label: Text('Proceso')),
+                                ButtonSegment(value: 'logrado', label: Text('Sí')),
+                              ],
+                              selected: {?_nivel(h)},
+                              onSelectionChanged: (v) => setState(() {
+                                if (v.isNotEmpty) _cambios['${h['id']}'] = v.first;
+                              }),
+                            ),
+                          ),
+                        if (l.isEmpty)
+                          Center(
+                            child: Text('No hay habilidades.', style: TextStyle(color: p.textoSecundario)),
+                          ),
+                      ],
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: FilledButton(onPressed: () => Navigator.of(context).pop(_cambios), child: const Text('Listo')),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

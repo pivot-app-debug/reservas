@@ -4826,9 +4826,10 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
   }
   const habs = (await _habilidades()).filter((h: any) => h.activa);
   const hoy = _hoyEcuadorISO();
-  const { data: planes } = await supabase.from('coach_planes').select('id_evento, fecha, coach, bloques, compartido').gte('fecha', hoy).order('fecha').limit(60);
+    const { data: planes } = await supabase.from('coach_planes').select('id_evento, fecha, coach, bloques, compartido').gte('fecha', hoy).order('fecha').limit(60);
   return {
     exito: true,
+    pendientes: await _porEvaluar(c),
     equipos: c.equipos,
     totalHabilidades: habs.length,
     jugadorxs: personas.map((p: any) => ({
@@ -4839,6 +4840,29 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
     })),
     planes: planes ?? [],
   };
+}
+
+/// Eventos de los últimos 7 días que ya terminaron, con quiénes de sus
+/// equipos vinieron y a cuántas ya evaluó (Victor, 2026-11-17: abrir Coach
+/// y ver "vinieron ayer estas personas, ¿las evaluamos?").
+async function _porEvaluar(c: { user: string; equipos: string[] }): Promise<any[]> {
+  const hoy = _hoyEcuadorISO();
+  const desde = new Date(Date.parse(hoy + 'T12:00:00-05:00') - 7 * 86400000).toISOString().slice(0, 10);
+  const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina, tipo_evento, estado').gte('fecha', desde).lte('fecha', hoy).order('fecha', { ascending: false });
+  const ahora = Date.now();
+  const out: any[] = [];
+  for (const ev of evs ?? []) {
+    if (['Cancelado', 'Sin entrenamiento'].includes(String(ev.estado))) continue;
+    const hora = String(ev.termina || ev.inicia || '23:00').slice(0, 5);
+    if (Date.parse(`${String(ev.fecha).slice(0, 10)}T${hora}:00-05:00`) > ahora) continue;
+    const vinieron = await _vinieron(String(ev.id_evento), c);
+    if (!vinieron.length) continue;
+    const { data: hecho } = await supabase.from('coach_feedback').select('username').eq('id_evento', ev.id_evento).eq('coach', c.user);
+    const evaluados = new Set((hecho ?? []).map((x: any) => x.username)).size;
+    out.push({ idEvento: ev.id_evento, fecha: String(ev.fecha).slice(0, 10), inicia: String(ev.inicia ?? '').slice(0, 5), tipo: ev.tipo_evento ?? '', total: vinieron.length, evaluados });
+    if (out.length >= 7) break;
+  }
+  return out;
 }
 
 // Ficha deportiva: la ve el coach, un Pivot o la propia persona.
