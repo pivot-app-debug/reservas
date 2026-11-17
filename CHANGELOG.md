@@ -2,7 +2,18 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (cursos y niveles, 18:19)
+- Nuevo evento ya no tiene "Curso": se entra desde ⋯ → Cursos y clínicas.
+- **Nuevo curso paso a paso:** cómo empiezas (desde cero o una plantilla), tipo (curso, curso abierto o clínica), nombre, para quién (toda la liga, equipos, un nivel o personas específicas), clases con sus temas, evaluación, equipo al aprobar (por defecto no cambia), precio y resumen.
+- **Temas = habilidades:** cada clase tiene temas cortos (2 a 4 palabras) de la lista de habilidades; los nuevos quedan en la lista. La evaluación se arma sola con los temas y se puede editar; nota del 1 al 10 y mínimo por tema (5 por defecto). Aprueba quien llega al mínimo en todos; cada tema queda en la ficha deportiva (logrado o en proceso).
+- **Excel:** "Subir Excel" (.xlsx o .csv) con vista previa y "Plantilla" para completar (Fecha, Hora, Termina, Lugar, Temas, Clínica).
+- **Plantillas:** Freshmeat (roller derby, con las habilidades básicas: una clase por grupo y la evaluación con todas) y "Guardar como plantilla" en cualquier curso. Al usar una, se elige el primer día y se crea una clase por semana.
+- **Curso abierto:** se repite cada semana (días, hora, lugar, temas) hasta que se marca Terminado; se evalúa cuando se quiera.
+- **Curso individual / para personas:** solo lo ven esas personas y les llega la invitación.
+- **Coach con niveles:** Aprendiendo lo básico, Habilidades básicas (80 % de las básicas) y Habilidades avanzadas (además alguna avanzada), calculados o a mano (mantener presionada la persona). Filtro por nivel, "Marcar habilidades" a varias personas de una vez (incluye "Todas las básicas (Freshmeat)") y, para Pivots, acceso a armar un curso. Cada habilidad es básica o avanzada.
+
 ## 2026-11-17 (ronda de las 17:45)
+
 - **Calendario:** arriba la campana primero, Tareas y un menú ⋯ con Buscar, Filtros y Cursos y clínicas. Punto rojo en la pestaña Calendario cuando hay novedades en Notificaciones.
 - Detalle del evento: el botón dice siempre "Asistencia anticipada", sin texto debajo.
 - **Plan del evento:** siempre visible en el detalle (no se expande al abrir). Uno por equipo dentro del mismo evento: coach de un equipo arma el de su equipo; coach de toda la liga, el de toda la liga o el de cada equipo. Cada plan dice quién lo da. Lo ven quienes son de ese equipo si se comparte.

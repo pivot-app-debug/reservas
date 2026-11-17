@@ -246,7 +246,14 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Cursos con temas, plantillas y niveles (2026-11-17, 18:19)
+- Migraciones `20261117150000_cursos_evaluacion` (cursos.evaluacion {temas:[{nombre, minimo}]}, cursos.cambia_equipo, curso_inscripciones.notas), `20261117160000_curso_plantillas_y_niveles` (tabla curso_plantillas, coach_habilidades.nivel 'basica'|'avanzada', equipo.nivel_coach), `20261117170000_cursos_para_y_abiertos` (cursos.para {tipo, valores}, abierto, repite, venue_repite, temas).
+- adminCursos: `guardar` (fechas[].temas, evaluacion, cambiaEquipo, para, abierto+repite → venue "Días de la semana" tipo_icono Curso; temas nuevos a coach_habilidades 'Temas de cursos'; invitación push a personas), `evaluar` (notas por tema → resultado, coach_evaluaciones), `guardarPlantilla`, `borrarPlantilla`, `estado=terminado` borra el venue repetido. `listar` devuelve habilidades y plantillas (`_plantillasCursos`: Freshmeat virtual en roller derby). `getCursos` filtra por `para` (`_nivelDe`).
+- Coach: `getCoach.jugadorxs[].nivel`/`nivelAMano`, `habilidades`; `coachGuardar accion=nivel|marcarGrupo`, `habilidad` con `nivel`.
+- App: `cursos/asistente_curso.dart` (part de cursos_screen: `_AsistenteCurso`, `_HojaTemas`), `cursos/importar_clases.dart` (xlsx mínimo con `archive`, csv, plantilla), `_MarcarGrupoScreen`, `nivelesCoach`. Paquetes nuevos: file_picker, archive.
+
 ## Planes por equipo y quién ve (2026-11-17, 17:45)
+
 - `coach_planes`: PK `id` (uuid), `equipo` ('' = toda la liga), `da` text[]; único (liga_id, id_evento, equipo); `id_evento` null = sin fecha (migración `20261117140000`). `coachGuardar accion=plan` con `equipo` y `da`; `accion=asignarPlan`. `getPlanEvento.planes`, `equiposPlan`, `deTodaLaLiga`. `getCoach.sinFecha`, `coaches`. `moverPlanesEvento` (Pivot o coach; `soloContar`).
 - Quién ve (notas, feedback, pruebas): lista con comas de 'jugadorx', 'pivots', 'coaches' ('yo' = solo quien la escribe); un solo valor lleva coma final. Los valores viejos sin coma son escalonados (`_visSet`/`quienVeDe`). App: `QuienVe`, `textoQuienVe`, `BotonDictar` (mantener presionado).
 - `_otrasDeLiga(nombre, equipo)` acepta el equipamiento solo para esta reserva (`equipo` en `getFechasDisponibles` y `guardarReserva`); `ReservasRepo.equipoEsta`. `getMiEquipoLiga` devuelve `sistema` por lista.

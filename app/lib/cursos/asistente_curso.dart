@@ -4,10 +4,20 @@ part of 'cursos_screen.dart';
 /// sus temas, evaluación (se arma sola con los temas), equipo al aprobar,
 /// precio y resumen. Los temas son habilidades de la lista de la liga (o
 /// nuevas, cortas), así la evaluación llega a la ficha deportiva.
-enum _PasoCurso { origen, tipo, nombre, clases, evaluacion, equipo, precio, resumen }
+enum _PasoCurso { origen, tipo, nombre, para, clases, evaluacion, equipo, precio, resumen }
 
 class _AsistenteCurso extends StatefulWidget {
-  const _AsistenteCurso({this.curso, required this.equipos, required this.lugares, required this.habilidades, this.plantillas = const []});
+  const _AsistenteCurso({
+    this.curso,
+    required this.equipos,
+    required this.lugares,
+    required this.habilidades,
+    this.plantillas = const [],
+    this.personas = const [],
+  });
+
+  /// Gente de la liga, para cursos individuales: (username, nombre).
+  final List<(String, String)> personas;
   final Curso? curso;
   final List<String> equipos, lugares;
   final List<Map<String, dynamic>> habilidades;
@@ -27,6 +37,18 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   bool _adelante = true;
 
   late String _tipo = o?.tipo ?? 'curso';
+
+  // Curso abierto: se repite cada semana hasta que se termina (Victor, 2026-11-17).
+  late bool _abierto = o?.abierto ?? false;
+  late final Set<String> _dias = {for (final d in (o?.repite?['dias'] as List? ?? const [])) '$d'};
+  late String _hora = '${o?.repite?['hora'] ?? '19:00'}';
+  late String? _termina = o?.repite?['termina'] as String?;
+  late String _lugar = '${o?.repite?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
+  late final List<String> _temasCurso = [...?o?.temasCurso];
+
+  // Para quién: toda la liga, equipos, un nivel o personas.
+  late String _paraTipo = '${o?.para['tipo'] ?? 'todos'}';
+  late final Set<String> _paraValores = {for (final v in (o?.para['valores'] as List? ?? const [])) '$v'};
   bool get _clinica => _tipo == 'clinica';
   late final _nombre = TextEditingController(text: o?.nombre ?? '');
   late final _descripcion = TextEditingController(text: o?.descripcion ?? '');
@@ -64,6 +86,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     if (o == null && widget.plantillas.isNotEmpty) _PasoCurso.origen,
     _PasoCurso.tipo,
     _PasoCurso.nombre,
+    _PasoCurso.para,
     _PasoCurso.clases,
     _PasoCurso.evaluacion,
     if (_conEvaluacion && widget.equipos.isNotEmpty) _PasoCurso.equipo,
@@ -73,7 +96,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
 
   /// Temas de todas las clases, en orden y sin repetir.
   List<String> get _temasClases {
-    final out = <String>[];
+    final out = <String>[if (_abierto) ..._temasCurso];
     for (final c in _clases) {
       for (final t in (c['temas'] as List? ?? const [])) {
         if (!out.any((x) => x.toLowerCase() == '$t'.toLowerCase())) out.add('$t');
@@ -95,7 +118,8 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   bool get _valido => switch (_paso) {
     _PasoCurso.origen || _PasoCurso.tipo => true,
     _PasoCurso.nombre => _nombre.text.trim().isNotEmpty,
-    _PasoCurso.clases => _clases.isNotEmpty,
+    _PasoCurso.para => _paraTipo == 'todos' || _paraValores.isNotEmpty,
+    _PasoCurso.clases => _abierto ? _dias.isNotEmpty : _clases.isNotEmpty,
     _PasoCurso.evaluacion => !_conEvaluacion || (!_evalAntes && _evalTemas.isNotEmpty),
     _PasoCurso.equipo => !_cambiaEquipo || _equipo != null,
     _PasoCurso.precio => _monto != null,
@@ -283,9 +307,25 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         icono: Icons.school_outlined,
         titulo: 'Curso',
         texto: 'Varias clases con inscripción. Puede tener clínicas en medio y una evaluación final.',
-        activa: _tipo == 'curso',
+        activa: _tipo == 'curso' && !_abierto,
         alTocar: () {
-          setState(() => _tipo = 'curso');
+          setState(() {
+            _tipo = 'curso';
+            _abierto = false;
+          });
+          Future.delayed(const Duration(milliseconds: 180), () => mounted ? _ir(1) : null);
+        },
+      ),
+      OpcionAsistente(
+        icono: Icons.all_inclusive_rounded,
+        titulo: 'Curso abierto',
+        texto: 'Se repite cada semana hasta que lo terminas. Sirve para pulir habilidades: evalúas cuando quieras.',
+        activa: _tipo == 'curso' && _abierto,
+        alTocar: () {
+          setState(() {
+            _tipo = 'curso';
+            _abierto = true;
+          });
           Future.delayed(const Duration(milliseconds: 180), () => mounted ? _ir(1) : null);
         },
       ),
@@ -297,6 +337,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         alTocar: () {
           setState(() {
             _tipo = 'clinica';
+            _abierto = false;
             if (_clases.length > 1) _clases.removeRange(1, _clases.length);
           });
           Future.delayed(const Duration(milliseconds: 180), () => mounted ? _ir(1) : null);
@@ -381,7 +422,141 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     });
   }
 
+  Widget _pasoPara(BuildContext context) {
+    const opciones = [
+      ('todos', Icons.groups_rounded, 'Toda la liga', 'Aparece para todxs en Cursos.'),
+      ('equipos', Icons.group_outlined, 'Ciertos equipos', 'Solo lo ven esos equipos.'),
+      ('nivel', Icons.stacked_bar_chart_rounded, 'Un nivel', 'Según sus habilidades en Coach.'),
+      (
+        'personas',
+        Icons.person_outline_rounded,
+        'Personas específicas',
+        'Un curso individual o para unas pocas personas, sin importar su equipo. Les llega la invitación.',
+      ),
+    ];
+    final valores = switch (_paraTipo) {
+      'equipos' => [for (final e in widget.equipos) (e, e)],
+      'nivel' => [('sin', 'Aprendiendo lo básico'), ('basicas', 'Habilidades básicas'), ('avanzadas', 'Habilidades avanzadas')],
+      'personas' => widget.personas,
+      _ => const <(String, String)>[],
+    };
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final (k, i, t, d) in opciones)
+          OpcionAsistente(
+            icono: i,
+            titulo: t,
+            texto: d,
+            activa: _paraTipo == k,
+            alTocar: () => setState(() {
+              if (_paraTipo != k) _paraValores.clear();
+              _paraTipo = k;
+            }),
+          ),
+        if (valores.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (v, t) in valores)
+                FilterChip(
+                  label: Text(t),
+                  selected: _paraValores.contains(v),
+                  onSelected: (s) => setState(() => s ? _paraValores.add(v) : _paraValores.remove(v)),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Curso abierto: qué días, a qué hora, dónde y sus temas.
+  Widget _pasoRepite(BuildContext context) {
+    final p = context.pivot;
+    const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Se repite los',
+          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final d in dias)
+              FilterChip(label: Text(d), selected: _dias.contains(d), onSelected: (v) => setState(() => v ? _dias.add(d) : _dias.remove(d))),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () async {
+                  final h = await elegirHoraTexto(context, inicial: _hora, titulo: 'Empieza');
+                  if (h != null) setState(() => _hora = h);
+                },
+                child: Text('Empieza ${horaAmPm(_hora)}'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () async {
+                  final h = await elegirHoraTexto(context, inicial: _termina ?? _sumarHoras(_hora, 2), titulo: 'Termina');
+                  if (h != null) setState(() => _termina = h);
+                },
+                child: Text(_termina == null ? 'Termina' : 'Termina ${horaAmPm(_termina!)}'),
+              ),
+            ),
+          ],
+        ),
+        if (widget.lugares.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(
+            'Dónde',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [for (final l in widget.lugares) ChoiceChip(label: Text(l), selected: _lugar == l, onSelected: (_) => setState(() => _lugar = l))],
+          ),
+        ],
+        const SizedBox(height: 16),
+        Text(
+          'Temas del curso',
+          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final t in _temasCurso) InputChip(label: Text(t), onDeleted: () => setState(() => _temasCurso.remove(t))),
+            ActionChip(
+              avatar: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Tema'),
+              onPressed: () async {
+                final t = await _elegirTema(ya: {for (final x in _temasCurso) x.toLowerCase()});
+                if (t != null) setState(() => _temasCurso.add(t));
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _pasoClases(BuildContext context) {
+    if (_abierto) return _pasoRepite(context);
     final p = context.pivot;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -518,7 +693,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
           onChanged: (v) => setState(() => _conEvaluacion = v),
         ),
         if (_conEvaluacion) ...[
-          if (!_clinica) ...[
+          if (!_clinica && !_abierto) ...[
             const SizedBox(height: 4),
             Material(
               color: p.tarjeta,
@@ -684,9 +859,17 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       padding: const EdgeInsets.all(16),
       children: [
         fila(_clinica ? 'Clínica' : 'Curso', _nombre.text.trim(), _PasoCurso.nombre),
+        fila('Para quién', switch (_paraTipo) {
+          'equipos' => _paraValores.join(', '),
+          'nivel' => _paraValores.map((v) => const {'sin': 'Aprendiendo lo básico', 'basicas': 'Básicas', 'avanzadas': 'Avanzadas'}[v] ?? v).join(', '),
+          'personas' => '${_paraValores.length} ${_paraValores.length == 1 ? 'persona' : 'personas'}',
+          _ => 'Toda la liga',
+        }, _PasoCurso.para),
         fila(
           _clinica ? 'Cuándo' : 'Clases',
-          _clinica ? (n == 0 ? '' : '${_clases.first['fecha']} · ${_clases.first['hora']}') : '$n ${n == 1 ? 'clase' : 'clases'}',
+          _abierto
+              ? 'Cada ${_dias.join(', ').toLowerCase()} · ${horaAmPm(_hora)}'
+              : (_clinica ? (n == 0 ? '' : '${_clases.first['fecha']} · ${_clases.first['hora']}') : '$n ${n == 1 ? 'clase' : 'clases'}'),
           _PasoCurso.clases,
         ),
         fila(
@@ -709,6 +892,10 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     'descripcion': _descripcion.text.trim(),
     'precio': _monto,
     'cupo': _conCupo ? _cupo : null,
+    'para': {'tipo': _paraTipo, 'valores': _paraValores.toList()},
+    'abierto': _abierto,
+    if (_abierto) 'repite': {'dias': _dias.toList(), 'hora': _hora, 'termina': _termina, 'lugar': _lugar},
+    'temas': _abierto ? _temasCurso : const <String>[],
     'cambiaEquipo': _conEvaluacion && _cambiaEquipo,
     'equipoDestino': _conEvaluacion && _cambiaEquipo ? _equipo : null,
     'evaluacion': {'temas': _conEvaluacion ? _evalTemas : const []},
@@ -741,14 +928,18 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         _PasoCurso.origen => '¿Cómo empiezas?',
         _PasoCurso.tipo => '¿Qué vas a armar?',
         _PasoCurso.nombre => '¿Cómo se llama?',
-        _PasoCurso.clases => _clinica ? '¿Cuándo es?' : 'Clases y temas',
+        _PasoCurso.para => '¿Para quién es?',
+        _PasoCurso.clases => _clinica ? '¿Cuándo es?' : (_abierto ? '¿Cuándo se repite?' : 'Clases y temas'),
         _PasoCurso.evaluacion => 'Evaluación',
         _PasoCurso.equipo => 'Al aprobar',
         _PasoCurso.precio => 'Precio y cupo',
         _PasoCurso.resumen => 'Revisa y guarda',
       },
       ayuda: switch (_paso) {
-        _PasoCurso.clases => 'Cada clase queda en el calendario. Agrega los temas de cada una (2 a 4 palabras): la evaluación se arma con ellos.',
+        _PasoCurso.clases =>
+          _abierto
+              ? 'Aparece en el calendario cada semana hasta que termines el curso. Los temas (2 a 4 palabras) arman la evaluación.'
+              : 'Cada clase queda en el calendario. Agrega los temas de cada una (2 a 4 palabras): la evaluación se arma con ellos.',
         _PasoCurso.resumen => 'Toca un punto para cambiarlo.',
         _ => null,
       },
@@ -759,6 +950,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         _PasoCurso.origen => _pasoOrigen(context),
         _PasoCurso.tipo => _pasoTipo(context),
         _PasoCurso.nombre => _pasoNombre(context),
+        _PasoCurso.para => _pasoPara(context),
         _PasoCurso.clases => _pasoClases(context),
         _PasoCurso.evaluacion => _pasoEvaluacion(context),
         _PasoCurso.equipo => _pasoEquipo(context),

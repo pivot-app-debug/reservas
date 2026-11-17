@@ -20,6 +20,8 @@ import '../pivots/formas_pago_screen.dart' show LogoMedio;
 import '../reservas/reserva_screen.dart' show ReservaExitoScreen;
 import '../reservas/reservas_repo.dart';
 import '../sesion/sesion.dart';
+import '../eventos/anticipada.dart' show horaAmPm;
+import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
 
@@ -46,6 +48,14 @@ class Curso {
   String get estado => '${m['estado'] ?? 'abierto'}';
   String? get equipoDestino => m['equipoDestino'] as String?;
 
+  /// Para quién: {tipo: todos | equipos | nivel | personas, valores}.
+  Map<String, dynamic> get para => (m['para'] as Map?)?.cast<String, dynamic>() ?? const {'tipo': 'todos'};
+
+  /// Curso abierto: se repite cada semana ({dias, hora, termina, lugar}).
+  bool get abierto => m['abierto'] == true;
+  Map<String, dynamic>? get repite => (m['repite'] as Map?)?.cast<String, dynamic>();
+  List<String> get temasCurso => [for (final t in (m['temas'] as List? ?? const [])) '$t'];
+
   /// Al aprobar, ¿cambia de equipo? (Victor, 2026-11-17: por defecto no).
   bool get cambiaEquipo => m['cambiaEquipo'] == true;
 
@@ -71,6 +81,9 @@ class Curso {
 
   /// "3 fechas, del 5 de diciembre al 20 de diciembre".
   String get resumenFechas {
+    if (abierto && repite != null) {
+      return 'Cada ${[for (final d in (repite!['dias'] as List? ?? const [])) '$d'.toLowerCase()].join(', ')} · ${horaAmPm('${repite!['hora']}')}';
+    }
     final l = [for (final f in fechas) ?fecha(f)];
     if (l.isEmpty) return 'Sin fechas';
     if (l.length == 1) return Fechas.corta(l.first);
@@ -393,6 +406,7 @@ class _CursosScreenState extends State<CursosScreen> {
   List<String> _lugares = const [];
   List<Map<String, dynamic>> _habilidades = const [];
   List<Map<String, dynamic>> _plantillas = const [];
+  List<(String, String)> _personas = const [];
   String? _error;
   Sesion get s => widget.sesion;
 
@@ -402,6 +416,10 @@ class _CursosScreenState extends State<CursosScreen> {
     _llamar({'accion': 'listar'});
     s.api.get('getTiers', {'adminToken': s.adminToken}).then((r) {
       if (mounted) setState(() => _equipos = [for (final t in (r['tiers'] as List? ?? const [])) '${(t as Map)['nombre']}']);
+    }, onError: (_) {});
+    final eq = EquipoRepo.de(s);
+    eq.cargar().then((_) {
+      if (mounted) setState(() => _personas = [for (final x in eq.personas ?? const []) (x.username, x.nombreMostrar)]);
     }, onError: (_) {});
     s.api.restGet('venues?select=lugar&order=lugar.asc').then((f) {
       if (mounted) setState(() => _lugares = {for (final x in f) '${(x as Map)['lugar'] ?? ''}'}.where((x) => x.isNotEmpty).toList());
@@ -434,7 +452,8 @@ class _CursosScreenState extends State<CursosScreen> {
   Future<void> _editar([Curso? c]) async {
     final ok = await Navigator.of(context).push<Map<String, Object?>>(
       MaterialPageRoute(
-        builder: (_) => _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades, plantillas: _plantillas),
+        builder: (_) =>
+            _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades, plantillas: _plantillas, personas: _personas),
       ),
     );
     if (ok == null) return;

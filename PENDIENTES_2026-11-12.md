@@ -657,3 +657,7 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 
 ## AA. Ronda de las 17:45 (Victor, 2026-11-17) — hecha
 - [x] Barra del Calendario (campana, Tareas, ⋯), punto en la pestaña, botón Asistencia anticipada fijo, plan del evento siempre visible y por equipo con quién lo da, cancelación con plan, feedback con Plan del evento y quién lo ve por separado, dictado manteniendo presionado, Tareas sin vista rota.
+
+## AB. Cursos y niveles (Victor, 2026-11-17, 18:09–18:19) — hecho
+- [x] Sin Curso en Nuevo evento; asistente paso a paso; temas por clase (habilidades); evaluación automática con mínimo por tema; Excel; plantillas y Freshmeat; niveles en Coach; marcar habilidades en grupo; cursos para personas o niveles; cursos abiertos.
+- [ ] Ideas para después: requisito de equipo "tener aprobado tal curso"; plan del evento para un nivel (hoy por equipo).

@@ -8764,7 +8764,8 @@ function _cursoJson(c: any, inscritos: any[], yo?: string) {
   return {
         id: c.id, tipo: c.tipo ?? 'curso', nombre: c.nombre, descripcion: c.descripcion ?? '', precio: Number(c.precio) || 0, cupo: c.cupo ?? null,
         fechas: Array.isArray(c.fechas) ? c.fechas : [], equipoDestino: c.equipo_destino ?? null, estado: c.estado,
-    evaluacion: c.evaluacion ?? {}, cambiaEquipo: c.cambia_equipo === true,
+        evaluacion: c.evaluacion ?? {}, cambiaEquipo: c.cambia_equipo === true,
+    para: c.para ?? { tipo: 'todos' }, abierto: c.abierto === true, repite: c.repite ?? null, temas: c.temas ?? [],
     inscritos: activos.length, libres: c.cupo == null ? null : Math.max(0, Number(c.cupo) - activos.length),
     ...(mia ? { miInscripcion: { estado: mia.estado, resultado: mia.resultado ?? null } } : {}),
   };
@@ -8792,6 +8793,17 @@ async function _plantillasCursos(): Promise<any[]> {
   return out;
 }
 
+/// Nivel de Coach calculado de una persona (mismo criterio que getCoach).
+async function _nivelDe(username: string): Promise<string> {
+  const habs = (await _habilidades()).filter((h: any) => h.activa);
+  const { data: evs } = await supabase.from('coach_evaluaciones').select('habilidad_id, nivel, creado_en').eq('username', username).order('creado_en', { ascending: false });
+  const vistas = new Set<string>(), l = new Set<string>();
+  for (const e of evs ?? []) { if (vistas.has(e.habilidad_id)) continue; vistas.add(e.habilidad_id); if (e.nivel === 'logrado') l.add(e.habilidad_id); }
+  const bas = habs.filter((h: any) => (h.nivel ?? 'basica') === 'basica'), av = habs.filter((h: any) => h.nivel === 'avanzada');
+  if (!(bas.length > 0 && bas.filter((h: any) => l.has(h.id)).length >= Math.ceil(bas.length * 0.8))) return 'sin';
+  return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
+}
+
 async function getCursos(params: Record<string, any>): Promise<Record<string, any>> {
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
@@ -8799,7 +8811,25 @@ async function getCursos(params: Record<string, any>): Promise<Record<string, an
     supabase.from('cursos').select('*').in('estado', ['abierto', 'cerrado']).order('created_at'),
     supabase.from('curso_inscripciones').select('curso_id, username, estado, resultado'),
   ]);
-  return { exito: true, cursos: (cursos ?? []).map((c: any) => _cursoJson(c, ins ?? [], yo)).filter((c: any) => c.estado === 'abierto' || c.miInscripcion) };
+    // Solo los cursos para mí: toda la liga, mi equipo, mi nivel o invitación (Victor, 2026-11-17).
+  const { data: yoFila } = await supabase.from('equipo').select('categoria, nivel_coach').eq('username', yo).maybeSingle();
+  let miNivel: string | null = yoFila?.nivel_coach ?? null;
+  const paraMi = async (c: any) => {
+    const p = c.para ?? { tipo: 'todos' }, v: string[] = p.valores ?? [];
+    if (p.tipo === 'equipos') return v.includes(yoFila?.categoria ?? '');
+    if (p.tipo === 'personas') return v.includes(yo);
+    if (p.tipo === 'nivel') {
+      miNivel ??= await _nivelDe(yo);
+      return v.includes(miNivel);
+    }
+    return true;
+  };
+  const out: any[] = [];
+  for (const c of cursos ?? []) {
+    const j = _cursoJson(c, ins ?? [], yo);
+    if (j.miInscripcion || (c.estado === 'abierto' && await paraMi(c))) out.push(j);
+  }
+  return { exito: true, cursos: out };
 }
 
 async function inscribirseCurso(params: Record<string, any>): Promise<Record<string, any>> {
@@ -8840,7 +8870,8 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       ...(String(x?.titulo ?? '').trim() ? { titulo: String(x.titulo).trim().slice(0, 80) } : {}),
       ...(/^\d{2}:\d{2}$/.test(String(x?.termina ?? '')) ? { termina: String(x.termina) } : {}),
     } as any)).filter((x: any) => /^\d{4}-\d{2}-\d{2}$/.test(x.fecha)).sort((a: any, b: any) => a.fecha.localeCompare(b.fecha)).slice(0, 60);
-    if (!fechas.length) return { exito: false, error: 'Agrega al menos una fecha.' };
+        const abierto = c.abierto === true || c.abierto === 'true';
+    if (!fechas.length && !abierto) return { exito: false, error: 'Agrega al menos una fecha.' };
         const fila: Record<string, any> = {
             nombre, tipo: c.tipo === 'clinica' ? 'clinica' : 'curso', descripcion: String(c.descripcion ?? '').trim().slice(0, 1000) || null, precio: Math.max(0, _num2(Number(c.precio) || 0)),
       cupo: c.cupo == null || c.cupo === '' ? null : Math.max(1, Math.round(Number(c.cupo))), fechas,
@@ -8888,10 +8919,51 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     const hoyC = _hoyEcuadorISO();
     const quitados = ((antes?.fechas as any[]) ?? []).filter((x: any) => x.venueId && !usados.has(String(x.venueId)) && String(x.fecha) >= hoyC).map((x: any) => x.venueId);
     if (quitados.length) await supabase.from('venues').delete().in('id', quitados);
+        // Para quién (Victor, 2026-11-17): toda la liga, equipos, un nivel o personas.
+    const pTipo = ['todos', 'equipos', 'nivel', 'personas'].includes(String(c.para?.tipo)) ? String(c.para.tipo) : 'todos';
+    fila.para = { tipo: pTipo, valores: pTipo === 'todos' ? [] : (Array.isArray(c.para?.valores) ? c.para.valores : []).map(String).slice(0, 100) };
+    fila.temas = (Array.isArray(c.temas) ? c.temas : []).map((t: any) => String(t).trim().slice(0, 40)).filter(Boolean).slice(0, 30);
+    // Curso abierto: se repite cada semana hasta que se termina.
+    fila.abierto = abierto;
+    const { data: antesAb } = c.id ? await supabase.from('cursos').select('venue_repite').eq('id', String(c.id)).maybeSingle() : { data: null };
+    if (abierto) {
+      const diasOk = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+      const rep = c.repite ?? {};
+      const dias = (Array.isArray(rep.dias) ? rep.dias : []).map(String).filter((d: string) => diasOk.includes(d));
+      if (!dias.length) return { exito: false, error: 'Elige qué días se repite.' };
+      fila.repite = {
+        dias, hora: /^\d{2}:\d{2}$/.test(String(rep.hora)) ? rep.hora : '19:00', termina: /^\d{2}:\d{2}$/.test(String(rep.termina)) ? rep.termina : null,
+        lugar: String(rep.lugar ?? '').trim().slice(0, 80),
+      };
+      const ref = (lugares ?? []).find((l: any) => l.lugar === fila.repite.lugar);
+      const venue = {
+        lugar: fila.repite.lugar || 'Por definir', dias: dias.join(', '), inicia: fila.repite.hora, ...(fila.repite.termina ? { finaliza: fila.repite.termina } : {}),
+        tipo: 'Días de la semana', tipo_icono: 'Curso', requiere_reserva: false, info_adicional: nombre,
+        google_maps: ref?.google_maps ?? null, video_instructivo: ref?.video_instructivo ?? null,
+      };
+      if (antesAb?.venue_repite) {
+        await supabase.from('venues').update(venue).eq('id', antesAb.venue_repite);
+        fila.venue_repite = antesAb.venue_repite;
+      } else {
+        const { data: v } = await supabase.from('venues').insert(venue).select('id').maybeSingle();
+        fila.venue_repite = v?.id ?? null;
+      }
+    } else if (antesAb?.venue_repite) {
+      await supabase.from('venues').delete().eq('id', antesAb.venue_repite);
+      fila.venue_repite = null;
+      fila.repite = null;
+    }
     await supabase.rpc('regenerar_ventana_asistencias');
     const r = c.id ? await supabase.from('cursos').update(fila).eq('id', String(c.id)).select('id').single() : await supabase.from('cursos').insert(fila).select('id').single();
     if (r.error) return { exito: false, error: r.error.message };
     await _registrarAjuste('curso', null, fila, email);
+    // Curso individual o para personas: les llega la invitación al crearlo.
+    if (!c.id && pTipo === 'personas' && fila.para.valores.length) {
+      await sendPush({
+        tipo: 'solicitud_resuelta', include_external_user_ids: fila.para.valores,
+        headings: { es: `Te invitaron a ${nombre}` }, contents: { es: 'Mira el curso y, si quieres, inscríbete.' }, url: APP_URL + '/?curso=' + r.data.id,
+      }).catch(() => {});
+    }
       } else if (accion === 'guardarPlantilla') {
     // Plantilla: las clases (sin fechas) con sus temas y la evaluación (Victor, 2026-11-17).
     let pl: any = params.plantilla;
@@ -8941,8 +9013,17 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       headings: { es: aprobado ? `¡Aprobaste ${cu?.nombre ?? 'el curso'}!` : `Resultado de ${cu?.nombre ?? 'tu curso'}` },
       contents: { es: aprobado ? 'Tus habilidades quedaron en tu ficha deportiva.' : 'Mira en tu ficha deportiva qué temas quedaron en proceso.' }, url: APP_URL + '/',
     }).catch(() => {});
-  } else if (accion === 'estado') {
+    } else if (accion === 'estado') {
     const estado = ['abierto', 'cerrado', 'terminado'].includes(String(params.estado)) ? String(params.estado) : 'cerrado';
+    // Terminar un curso abierto: deja de repetirse.
+    if (estado === 'terminado') {
+      const { data: cu } = await supabase.from('cursos').select('venue_repite').eq('id', String(params.id ?? '')).maybeSingle();
+      if (cu?.venue_repite) {
+        await supabase.from('venues').delete().eq('id', cu.venue_repite);
+        await supabase.from('cursos').update({ venue_repite: null }).eq('id', String(params.id ?? ''));
+        await supabase.rpc('regenerar_ventana_asistencias');
+      }
+    }
     await supabase.from('cursos').update({ estado }).eq('id', String(params.id ?? ''));
   } else if (accion === 'resultado') {
     // Try out: aprobado pasa al equipo elegido (queda en su historial y le llega la ventana de celebración).
