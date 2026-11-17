@@ -606,6 +606,12 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - Planes, cursos, inscripción rápida y cupón manual: aprobados tal como la propuesta.
 
 ## W. Próximos cambios (Victor, 2026-11-16, 19:03) — esperar su "ok" antes de empezar
-- [ ] **Mi perfil pasa a llamarse Ajustes.** Arriba, una sección corta de perfil (foto, nombre, etc.), luego los ajustes personales y una nueva sección **Mi Liga** (sale de la barra de abajo y entra en Ajustes).
-- [ ] **Estados según pronombres** (ej. Lesionadx): solo Ella → "Lesionada"; solo Él → "Lesionado"; solo Elle → por confirmar ("Lesionado" según el mensaje, ¿o "Lesionade"?); varios pronombres o ninguno → "Lesionadx". Aplicar a todos los estados y textos que hablan de la persona.
+- [ ] **Mi perfil pasa a llamarse Ajustes.** Arriba, una sección corta de perfil (foto, nombre, etc.), luego los ajustes personales y una nueva sección **Mi Liga** (sale de la barra de abajo y entra en Ajustes; solo la ven los Pivots, confirmado 19:36).
+- [ ] **Estados según pronombres** (ej. Lesionadx): solo Ella → "Lesionada"; solo Él → "Lesionado"; solo Elle → "Lesionade" (confirmado 19:36); varios pronombres o ninguno → "Lesionadx". Aplicar a todos los estados y textos que hablan de la persona.
 - [ ] **Sección Coach** (en el lugar de Mi Liga en la barra de abajo): la persona pide ser coach, un Pivot lo aprueba y le aparece la pestaña. Seguimiento completo de sus jugadorxs, cronograma de entrenamientos sobre las fechas del calendario (qué se ve cada día), notas de voz que se pasan a texto sobre cada patinadorx, y más. **Definir con Victor antes de armarla** (propuesta enviada 2026-11-16 19:03).
+- **Coach, respuestas de Victor (19:36):**
+  - Ficha deportiva con las habilidades de WFTDA para roller derby, editable por la liga (agregar o cambiar). Otros deportes: lista base por deporte, a definir cuando la app sea para más deportes.
+  - Notas: el coach decide si las ven otros coaches, los Pivots, o nadie más.
+  - El coach solo toma asistencia; si además es Pivot con el permiso, crea eventos.
+  - Cada jugadorx ve su ficha deportiva en Ajustes, junto a Estadísticas.
+  - Partidos: además de posiciones y line-ups, reportes por partido (faltas, puntajes) sacados del statsbook. Propuesta: importar el statsbook oficial (.xlsx de WFTDA) y leer sus hojas (puntaje por jam, penalidades, line-ups).
