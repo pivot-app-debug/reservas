@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (aviso de datos)
+- El aviso para completar tus datos (emergencia, salud, foto, etc.) ya no depende de haber visto el recorrido del Calendario: aparece siempre que falte algo (si hay un recorrido abierto, espera a que termine).
+
 ## 2026-11-17 (varias ligas encendido)
 - Servidor por liga encendido (secreto configurado por Victor): cada pedido solo ve los datos de su liga. Probado: una liga de prueba no ve a nadie de Quindes y Quindes sigue igual.
 - **Arreglo importante:** Coach, Cursos, Planes de pago y Recompensas automáticas no funcionaban porque el servidor no tenía permiso sobre sus tablas (este proyecto no da permisos por defecto a tablas nuevas). Ya tienen permiso, también las que se creen de ahora en más.

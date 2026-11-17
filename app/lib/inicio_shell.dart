@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'coach/coach_screen.dart';
 import 'core/config_liga.dart';
@@ -52,9 +51,12 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   }
 
   Future<void> _recordarDatos() async {
+    // Ya no depende de haber visto el recorrido del Calendario (Victor,
+    // 2026-11-17): si hay un recorrido en pantalla, espera a que termine.
+    for (var i = 0; i < 60 && mounted && Tour.activo; i++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
     if (!mounted || Tour.activo) return;
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('tour.calendario.v2') != true || !mounted) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);
     if (!mounted) return;

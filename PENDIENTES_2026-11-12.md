@@ -625,3 +625,12 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
   - Recordatorio al coach si no dejó el feedback: 2 horas después del entrenamiento y, si sigue pendiente, al día siguiente (último aviso).
   - (19:53) Quién ve las notas del 1 al 10 y las pruebas: lo decide el coach (misma regla que las notas). Rutinas, pruebas, feedback y recordatorios sirven para cualquier evento del timeline (práctica, scrimmage, partido, curso), no solo clases.
 - **Respuestas de Victor (21:57):** pronombres también en los textos para una persona (los de grupo siguen con x); coach: lo pide la persona y un Pivot aprueba, o un Pivot lo nombra directo, eligiendo sus equipos; se hace por etapas (1: asistencia, Ajustes, pronombres; 2: Coach base; 3: rutinas, pruebas, feedback y recordatorios); partidos y statsbook van con la etapa de partidos y torneos.
+
+## X. Asistente para crear una liga (Victor, 2026-11-17)
+- Entrada en el inicio de sesión ("Crea tu liga"). Cuenta con Google, o con correo y contraseña verificando el correo con un código (por confirmar: no avanzar hasta verificar).
+- Paso 1 básico: nombre, logo, deporte (lista de deportes de equipo; solo roller derby habilitado, el resto "Próximamente"), país, moneda y zona horaria tomados del teléfono y editables.
+- Nombres repetidos permitidos: enlace único con número oculto (`-2`); si ya existe una liga con ese nombre **del mismo deporte**, preguntar "¿Es la tuya? Pide unirte".
+- Paso 2: Rápido (valores por defecto) o Paso a paso (equipos, cuota y si es igual para todos, vencimiento, recargo, clases sueltas, medios de pago, entrenamientos, puntos y cambios de equipo, equipamiento, premios, **roles del deporte editables**), cada pregunta con "Lo veo después" y "Terminar ahora".
+- Resumen antes de crear (también con "Terminar ahora"), cada punto editable. Después tu perfil (datos, roles; quedas Pivot) y bienvenida como Pivot.
+- Camino rápido: al entrar, "¿Armamos tus equipos y reglas?" — Omitir no vuelve a preguntar; Recordar más tarde a los 5 días. Lista de Primeros pasos en Mi Liga.
+- Cualquiera puede crear una liga. Panel del dueño de Pivot (todas las ligas) y directorio "Ligas en Pivot" con información básica visible por defecto (cada liga elige qué más mostrar: contacto, comunidad); invitar a partidos y torneos desde ahí, más adelante.
