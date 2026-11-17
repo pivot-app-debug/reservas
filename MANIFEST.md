@@ -114,6 +114,8 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 
 ### Etapa 3 (parte 1): Calendario + tareas + Mi perfil (2026-11-12)
 - Nav: Calendario · Equipo · Mi Liga (Pivots, web) · Mi perfil (ícono = tu avatar). Sin pestaña Tareas. `core/navegacion.dart` (`Navegacion.ir`) permite que otra pantalla cambie de pestaña (ej. "Editar mi perfil" desde tu ficha).
+- **Navegación por pestaña (2026-11-17):** `inicio_shell.dart` envuelve cada pestaña en su propio `Navigator` (`_navs`, `_pestana`, `NavigatorPopHandler`), así las subsecciones se abren con la barra de abajo visible. Tocar la pestaña actual o cambiar de pestaña vuelve al inicio de la pestaña. Todos los `showModalBottomSheet` llevan `useRootNavigator: true` (por encima de la barra). Para algo a pantalla completa sin barra, usar `Navigator.of(context, rootNavigator: true)`.
+- **Barra del Calendario (2026-11-17):** campana, Tareas, Cursos (solo Pivots y coaches) y ⋯ (Buscar y Filtros, `PopupMenuPosition.under`, `iconColor` = `onSurfaceVariant`). Sin ser Pivot ni coach, Cursos está en el + si hay cursos abiertos.
 - Timeline (`eventos/timeline_screen.dart`):
   - `_Item.mia` (mi tarea en su fecha, `_TarjetaMiTarea`) y `_Item.grupo` (tareas de otras personas por día, `_GrupoTareas` desplegable). Ordenan con `hora` = 23:59 (vencen al final del día) y llevan punto cuadrado.
   - `_cabeceraTareas`: atrasadas (hasta 2, rojas) y "Para tomar" (línea en Todo, `_FranjaParaTomar` en Tareas). Ícono de tareas con número junto a la lupa → `TareasScreen`.
@@ -137,7 +139,7 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Decidido: "Pivot"/"Pivots" reemplaza a admin/administradorxs en toda la app (etapa 4).
 
 ### Próxima ronda
-- Lista de cambios pedidos el 2026-11-08 en `PENDIENTES_2026-11-12.md` (se trabaja desde el jueves 2026-11-12, 17:00). Al terminarla, borrar ese archivo y pasar lo hecho a este MANIFEST.
+- `PENDIENTES_2026-11-12.md`: lista al día de lo que falta (reescrita el 2026-11-17). El historial de rondas está en `PENDIENTES_HISTORIAL.md`.
 
 ### Tareas nativa (entrega 2, 2026-11-08)
 - Pestaña Tareas en Android (`lib/tareas/`): `TareasRepo` (una llamada, `getTareasApp`) y `TareasScreen` con el lenguaje de Ajustes. Orden: tarjeta del mes (puntos contra la meta del primer tier que pide puntos, y tareas activas contra el límite), Mis tareas (vence antes arriba, vencidas en rojo, en revisión al final), Sugeridas para ti (solo si faltan puntos y no repite toda la lista), Disponibles con filtro por área, Sin cupos y Baúl.

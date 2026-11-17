@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (navegación y barra del Calendario, 18:45)
+- **La barra de abajo ya no desaparece:** cada pestaña tiene su propia navegación, así que Cursos, Tareas, fichas y demás subsecciones se abren con la barra visible. Tocar la pestaña en la que estás vuelve a su inicio. Las hojas que suben desde abajo se abren por encima de la barra.
+- **Calendario:** el menú ⋯ tiene solo Buscar y Filtros, con el mismo color que la campana y Tareas, y se abre debajo del botón. Cursos queda al lado de Tareas solo para Pivots y coaches; el resto entra a los cursos abiertos desde el + cuando hay alguno.
+- PENDIENTES reescrito con lo que falta de verdad; el historial quedó en `PENDIENTES_HISTORIAL.md`.
+
 ## 2026-11-17 (cursos y niveles, 18:19)
 - Nuevo evento ya no tiene "Curso": se entra desde ⋯ → Cursos y clínicas.
 - **Nuevo curso paso a paso:** cómo empiezas (desde cero o una plantilla), tipo (curso, curso abierto o clínica), nombre, para quién (toda la liga, equipos, un nivel o personas específicas), clases con sus temas, evaluación, equipo al aprobar (por defecto no cambia), precio y resumen.
