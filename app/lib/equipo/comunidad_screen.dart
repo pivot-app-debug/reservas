@@ -184,6 +184,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
   Future<void> _opciones(int i) async {
     final e = repo.enlaces[i];
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) => SafeArea(
@@ -415,6 +416,7 @@ Future<EnlaceComunidad?> mostrarHojaEnlace(BuildContext context, {EnlaceComunida
   var red = actual?.red ?? 'otro';
   var nombreTocado = actual != null;
   return showModalBottomSheet<EnlaceComunidad>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

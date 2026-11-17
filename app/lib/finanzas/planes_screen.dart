@@ -197,6 +197,7 @@ class _EditorPlanState extends State<_EditorPlan> {
     final sel = {..._personas};
     var q = '';
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

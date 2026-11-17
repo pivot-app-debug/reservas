@@ -170,6 +170,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         }
         final p = context.pivot;
         final elegida = await showModalBottomSheet<String>(
+          useRootNavigator: true,
           context: context,
           showDragHandle: true,
           isScrollControlled: true,
@@ -348,6 +349,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         cuentas.where((c) => c['tipo'] == tipoMedio).map((c) => c['id'] as String).firstOrNull ??
         cuentas.first['id'] as String;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => StatefulBuilder(
@@ -396,6 +398,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     String? motivo;
     final razon = TextEditingController(), mensaje = TextEditingController();
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -894,6 +897,7 @@ Future<Map<String, Object?>?> elegirDuracionExcepcion(BuildContext context, Pedi
   final economica = p.m['tipo'] != 'ausencias';
   String clave(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
   return showModalBottomSheet<Map<String, Object?>>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

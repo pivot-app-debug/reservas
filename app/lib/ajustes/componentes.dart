@@ -218,6 +218,7 @@ Future<String?> editarTexto(
   String? Function(String)? validar,
 }) {
   return showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -301,6 +302,7 @@ Future<String?> elegirOpciones(
   (String, VoidCallback)? secundaria,
 }) {
   return showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

@@ -131,6 +131,7 @@ class CuentaScreen extends StatelessWidget {
 
   Future<void> _contrasena(BuildContext context, bool tiene) async {
     final r = await showModalBottomSheet<(String, String)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -165,6 +166,7 @@ class CuentaScreen extends StatelessWidget {
   /// Pide escribir el nombre de usuario para confirmar (web `mecValidar()`).
   Future<void> _eliminarCuenta(BuildContext context) async {
     final si = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

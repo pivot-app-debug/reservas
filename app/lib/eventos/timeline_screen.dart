@@ -898,9 +898,27 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
             onPressed: _abrirTablero,
           ),
+          // Cursos al lado de Tareas, solo para Pivots y coaches (Victor,
+          // 2026-11-17); el resto entra desde el "+" si hay cursos abiertos.
+          if (_esAdmin || repo.sesion.esCoach)
+            IconButton(
+              tooltip: 'Cursos y clínicas',
+              icon: const Icon(Icons.school_outlined),
+              onPressed: () {
+                _cerrarCalendario();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
+                  ),
+                );
+              },
+            ),
           PopupMenuButton<String>(
             key: _kFiltros,
             tooltip: 'Más opciones',
+            // Mismo color que los otros íconos y el menú se abre debajo.
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            position: PopupMenuPosition.under,
             icon: Badge(
               isLabelVisible: _cantidadFiltros > 0 || _consulta.trim().isNotEmpty,
               smallSize: 9,
@@ -915,12 +933,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                   WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
                 case 'filtros':
                   _abrirFiltros();
-                case 'cursos':
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
-                    ),
-                  );
               }
             },
             itemBuilder: (_) => [
@@ -942,11 +954,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                   subtitle: _cantidadFiltros > 0 ? Text(_cantidadFiltros == 1 ? '1 activo' : '$_cantidadFiltros activos') : null,
                 ),
               ),
-              if (_hayCursos || _esAdmin)
-                const PopupMenuItem(
-                  value: 'cursos',
-                  child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.school_outlined), title: Text('Cursos y clínicas')),
-                ),
             ],
           ),
           const SizedBox(width: 4),
@@ -1036,6 +1043,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   Future<void> _abrirFiltros() async {
     FocusScope.of(context).unfocus();
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1469,7 +1477,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(
           clave: _kFiltros,
           titulo: 'Busca y filtra',
-          texto: 'En este menú buscas eventos, tareas, cumpleaños o lugares, eliges qué ver (eventos o tareas, tipo, lugar o área) y abres los cursos.',
+          texto: 'En este menú buscas eventos, tareas, cumpleaños o lugares y eliges qué ver: eventos o tareas, tipo, lugar o área.',
         ),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, cambiar tu respuesta y ver cómo llegar.'),
         PasoTour(
@@ -1504,7 +1512,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
-    // Cursos: botón propio arriba (Victor, 2026-11-17).
+    // Cursos: Pivots y coaches tienen su botón arriba; el resto, aquí si hay abiertos.
+    if (_hayCursos && !_esAdmin && !repo.sesion.esCoach)
+      _Accion(Icons.school_outlined, 'Cursos', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosAbiertosScreen(sesion: repo.sesion)))),
 
     // Asistencia anticipada pasó al detalle del evento (Victor, 2026-11-17).
   ];
@@ -1899,6 +1909,7 @@ class _TarjetaDescanso extends StatelessWidget {
 
   Future<void> _acciones(BuildContext context) async {
     final accion = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(

@@ -104,6 +104,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
 
   Future<void> _menuAdmin(Evento ev) async {
     final accion = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       builder: (c) => SafeArea(
         child: Column(
@@ -187,6 +188,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
     final sugerido = proximos.where((e) => e.tipo == ev.tipo).firstOrNull;
     String titulo(Evento e) => '${e.tipo} · ${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}';
     final destino = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -476,6 +478,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
   /// Clase de gracia usada y el mes sin pagar: ofrece ir a pagar.
   Future<void> _pagarCuota(CuotaPendiente e) async {
     final ir = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -688,6 +691,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
   Future<void> _cambiarRespuesta(Evento ev, Persona per) async {
     final actual = ev.rsvps.where((r) => r.persona.username == per.username).firstOrNull?.estado;
     final elegido = await showModalBottomSheet<(EstadoRsvp?,)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(
@@ -724,6 +728,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
   /// Pivots: cambiar cómo llegó alguien sin abrir la toma de asistencia.
   Future<void> _cambiarReal(Evento ev, AsistenciaReal a) async {
     final elegido = await showModalBottomSheet<(EstadoReal?,)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) => SafeArea(

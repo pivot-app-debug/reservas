@@ -42,6 +42,7 @@ Future<Integrante?> elegirPersona(BuildContext context, Sesion s, {String titulo
   final equipo = EquipoRepo.de(s)..cargar();
   var q = '';
   return showModalBottomSheet<Integrante>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -173,6 +174,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     var fecha = DateTime.tryParse('${c?['fechaInicial'] ?? ''}') ?? Fechas.hoy();
     var activa = c?['activa'] != false;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -316,6 +318,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
 
   Future<void> _opcionesCuenta(Map<String, dynamic> c) async {
     final a = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -387,6 +390,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   Future<void> _archivadas() async {
     final l = _todas.where((c) => c['archivada'] == true).toList();
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -440,6 +444,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     String? cuenta = _cuentas.isEmpty ? null : '${_cuentas.first['id']}';
     final monto = TextEditingController(), concepto = TextEditingController(text: devolver ? 'Devolución' : '');
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1013,6 +1018,7 @@ Future<void> detalleMovimiento(
     return;
   }
   final a = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (h) => SafeArea(
@@ -1101,6 +1107,7 @@ Future<bool?> abrirFormularioMovimiento(
     _ => 'Transferencia entre cuentas',
   };
   return showModalBottomSheet<bool>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -1341,6 +1348,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
       'Este año': DateTimeRange(start: DateTime(h.year, 1, 1), end: h),
     };
     final v = await showModalBottomSheet<Object>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (s) => SafeArea(
@@ -1370,6 +1378,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
 
   Future<void> _elegir(String titulo, Map<String?, String> opciones, void Function(String?) alElegir) async {
     final v = await showModalBottomSheet<(String?,)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1658,6 +1667,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
     var aplicar = 'aparte';
     final activas = widget.cuentas.where((c) => c['activa'] != false).toList();
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

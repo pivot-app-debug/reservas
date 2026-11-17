@@ -111,6 +111,7 @@ class _CoachScreenState extends State<CoachScreen> {
         if (!e.cancelado && !e.fecha.isBefore(hoy)) e,
     ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
     final e = await showModalBottomSheet<Evento>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -198,6 +199,7 @@ class _CoachScreenState extends State<CoachScreen> {
   Future<void> _ajustes() async {
     var avisar = _d?['avisarNovedades'] != false;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => StatefulBuilder(
@@ -288,6 +290,7 @@ class _CoachScreenState extends State<CoachScreen> {
   /// Nivel a mano (o volver a calcularlo). Se abre manteniendo presionada la fila.
   Future<void> _cambiarNivel(Map<String, dynamic> x) async {
     final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -576,6 +579,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
     final detalle = TextEditingController(text: '${b?['detalle'] ?? ''}');
     var minutos = (b?['minutos'] as num?)?.toInt() ?? 15;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -635,6 +639,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
   Future<void> _copiar() async {
     final otros = widget.otros.where((x) => x['id_evento'] != widget.evento.id || '${x['equipo'] ?? ''}' != widget.equipo).toList();
     final x = await showModalBottomSheet<Map<String, dynamic>>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(
@@ -810,6 +815,7 @@ Future<String?> elegirEquipoPlan(BuildContext context, Map<String, dynamic> d, L
   if (opciones.length == 1) return opciones.first;
   final hay = {for (final x in hechos) '${x['equipo'] ?? ''}'};
   return showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (h) => SafeArea(
@@ -1079,6 +1085,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
 
   Future<void> _evaluar(Map h) async {
     final n = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(
@@ -1107,6 +1114,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
   Future<void> _nuevaMarca(Map<String, dynamic> pr) async {
     final c = TextEditingController();
     final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1151,6 +1159,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
 
   Future<void> _nuevaNota() async {
     final r = await showModalBottomSheet<(String, bool, String)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1426,6 +1435,7 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
     var activa = h?['activa'] != false;
     var nivel = '${h?['nivel'] ?? 'basica'}';
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1574,6 +1584,7 @@ Future<List<String>?> elegirEquiposCoach(BuildContext context, Sesion s, List<St
   if (!context.mounted) return null;
   final sel = {...actuales};
   return showModalBottomSheet<List<String>>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (c) => StatefulBuilder(
@@ -1652,6 +1663,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
     if (!mounted) return;
     var q = '';
     final elegida = await showModalBottomSheet<Map<String, dynamic>>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1697,6 +1709,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
 
   Future<void> _opciones(Map<String, dynamic> c) async {
     final a = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -1785,6 +1798,7 @@ class FilaSerCoach extends StatelessWidget {
   Future<void> _pedir(BuildContext context) async {
     final mensaje = TextEditingController();
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -2066,6 +2080,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
       ...[for (final u in (x?['personas'] as List? ?? const [])) '$u'],
     };
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -2546,6 +2561,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   Future<void> _habilidades(Map<String, dynamic> x) async {
     final u = '${x['username']}';
     final elegidas = await showModalBottomSheet<Map<String, String>>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -2618,6 +2634,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
 
   Future<void> _elegirVisible() async {
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => StatefulBuilder(

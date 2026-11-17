@@ -134,6 +134,7 @@ class _PagosScreenState extends State<PagosScreen> {
       if (r['tipo'] == 'mensual' && '${r['validezHasta'] ?? ''}'.isNotEmpty) ('Vigente hasta', '${r['validezHasta']}'),
     ];
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => HojaBase(

@@ -376,6 +376,7 @@ class _AdministracionState extends State<_Administracion> {
       return;
     }
     final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -418,6 +419,7 @@ class _AdministracionState extends State<_Administracion> {
   /// Cupón manual: elegir el % o quitarlo.
   Future<void> _elegirDescuento(Integrante p) async {
     final pct = await showModalBottomSheet<int>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -461,6 +463,7 @@ class _AdministracionState extends State<_Administracion> {
     final monto = TextEditingController(text: precio > 0 ? precio.toStringAsFixed(2) : '');
     final notas = TextEditingController();
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -530,6 +533,7 @@ class _AdministracionState extends State<_Administracion> {
   Future<void> _noPagaMes() async {
     final p = widget.p;
     final mes = await showModalBottomSheet<DateTime>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) => SafeArea(
@@ -599,6 +603,7 @@ class _AdministracionState extends State<_Administracion> {
     }
     if (!mounted) return;
     await showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -650,6 +655,7 @@ class _AdministracionState extends State<_Administracion> {
 
   Future<void> _asistenciaExterna() async {
     final res = await showModalBottomSheet<(DateTime, String)>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -671,6 +677,7 @@ class _AdministracionState extends State<_Administracion> {
   Future<void> _elegirEstado() async {
     final p = widget.p;
     final e = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) {

@@ -72,6 +72,7 @@ Future<void> elegirCampo(
 Future<void> editarTelefono(BuildContext context, Sesion s, String campoPrefijo, String campoTel, String titulo) async {
   unawaited(s.cargarPaisEquipo());
   final r = await showModalBottomSheet<(String, String)>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -90,6 +91,7 @@ Future<void> editarTelefono(BuildContext context, Sesion s, String campoPrefijo,
 /// del equipo primero.
 Future<Pais?> elegirPais(BuildContext context, {required String paisEquipo, Pais? actual, String titulo = 'País', bool conPrefijo = false}) {
   return showModalBottomSheet<Pais>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

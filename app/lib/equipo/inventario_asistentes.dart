@@ -489,6 +489,7 @@ Future<Map<String, Object?>?> elegirPlazoPrestamo(
   var en = entrega;
   String iso(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   return showModalBottomSheet<Map<String, Object?>>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

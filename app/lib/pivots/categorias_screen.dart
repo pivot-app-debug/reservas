@@ -727,6 +727,7 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
   Future<void> _elegirPeriodo() async {
     final anios = [for (var a = DateTime.now().year; a >= _desdeAnio; a--) a];
     final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (s) => SafeArea(
@@ -1091,6 +1092,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   Future<void> _reglaPropia(BuildContext context, ConfigLiga c, String titulo, List<String> claves, Widget Function() pantalla) async {
     final propia = ConfigEquipo.propias(c, _nombre).keys.any(claves.contains);
     final v = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(

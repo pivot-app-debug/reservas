@@ -73,6 +73,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
     DateTime? vence; // null = 3 días en Notificaciones
 
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

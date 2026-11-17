@@ -91,6 +91,7 @@ class _EditarEventoScreenState extends State<EditarEventoScreen> {
   /// Hoja con buscador para cambiar de lugar (en vez del desplegable).
   Future<void> _elegirLugar() async {
     final elegido = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

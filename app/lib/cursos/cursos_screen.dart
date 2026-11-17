@@ -254,6 +254,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
     if (c.precio > 0) {
       final medios = ConfigLiga.de(s).mediosActivos;
       medio = await showModalBottomSheet<MedioPago>(
+        useRootNavigator: true,
         context: context,
         showDragHandle: true,
         builder: (h) => SafeArea(
@@ -554,6 +555,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
     final temas = curso.temasEvaluacion;
     final notas = <String, int?>{for (final t in temas) '${t['nombre']}': ((x['notas'] as Map?)?['${t['nombre']}'] as num?)?.toInt()};
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -640,6 +642,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
     if (curso == null) return;
     var equipo = x['equipo'] as String? ?? curso.equipoDestino ?? (widget.equipos.isEmpty ? null : widget.equipos.first);
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

@@ -468,6 +468,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
   void _abrirFiltros() {
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

@@ -211,6 +211,7 @@ String fechaLarga(Object? iso) {
 Future<void> cambiarFoto(BuildContext context, Sesion sesion) async {
   final tiene = sesion.fotoPerfil.isNotEmpty;
   final opcion = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (c) => SafeArea(

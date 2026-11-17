@@ -144,6 +144,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
 
   Future<void> _opcionesPrestamo(Prestamo pr) async {
     final a = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(
@@ -679,6 +680,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
   Future<void> _seUso(StockFila f) async {
     var n = 1;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => StatefulBuilder(
@@ -1091,6 +1093,7 @@ class _ReglasPrestamoScreenState extends State<ReglasPrestamoScreen> {
     final listas = repo.listas.where((l) => l.seccion == 'equipamiento').toList();
     String iso(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     final res = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

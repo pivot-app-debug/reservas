@@ -348,6 +348,7 @@ class _ExcepcionScreenState extends State<ExcepcionScreen> {
 
   Future<void> _crearTarea() async {
     final t = await showModalBottomSheet<_TareaNueva>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

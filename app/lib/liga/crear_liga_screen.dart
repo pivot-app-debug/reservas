@@ -961,6 +961,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
     final nombre = TextEditingController(text: tipo == 'efectivo' ? 'Efectivo' : '');
     final enlace = TextEditingController();
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1003,6 +1004,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
     final lugar = TextEditingController();
     String h(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

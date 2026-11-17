@@ -355,6 +355,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
     final usa = Map<String, String>.of(_r.equipoEsta ?? mio);
     var guardar = false;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -560,6 +561,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
   /// `abrirSheetTallaNuevaReserva()`).
   Future<String?> _elegirTalla(FechaClase c) {
     return showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (context) => FutureBuilder<List<String>>(
@@ -1007,6 +1009,7 @@ class _ReservaExitoScreenState extends State<ReservaExitoScreen> with WidgetsBin
   Future<void> _preguntarAlVolver() async {
     _preguntando = true;
     final si = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (h) => SafeArea(

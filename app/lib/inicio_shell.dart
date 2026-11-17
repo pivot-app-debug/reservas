@@ -40,6 +40,29 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   int _indice = 0;
   final _irAHoy = SenalHoy();
 
+  // Cada pestaña con su propio Navigator (Victor, 2026-11-17): al entrar a una
+  // subsección (Cursos, Tareas, una ficha…) la barra de abajo sigue visible.
+  final _navs = <int, GlobalKey<NavigatorState>>{};
+  final _heroes = <int, HeroController>{};
+  GlobalKey<NavigatorState> _nav(int i) => _navs[i] ??= GlobalKey<NavigatorState>(debugLabel: 'pestana-$i');
+
+  Widget _pestana(int i, Widget pagina) => NavigatorPopHandler(
+    onPopWithResult: (_) => _nav(i).currentState?.maybePop(),
+    child: Navigator(
+      key: _nav(i),
+      observers: [_heroes[i] ??= HeroController()],
+      onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => pagina),
+    ),
+  );
+
+  /// Vuelve al inicio de la pestaña actual (si había entrado a una subsección).
+  bool _alInicioDePestana() {
+    final n = _nav(_indice).currentState;
+    if (n == null || !n.canPop()) return false;
+    n.popUntil((r) => r.isFirst);
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +109,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     if (p == null || !mounted) return;
     Navegacion.ir.value = null;
     Navigator.of(context).popUntil((r) => r.isFirst);
+    _alInicioDePestana();
     setState(
       () => _indice = switch (p) {
         Pestana.calendario => 0,
@@ -192,7 +216,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
               data: mq.copyWith(viewPadding: mq.viewPadding.copyWith(bottom: mq.padding.bottom)),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                child: KeyedSubtree(key: ValueKey(indice), child: destinos[indice].$2),
+                child: KeyedSubtree(key: ValueKey(indice), child: _pestana(indice, destinos[indice].$2)),
               ),
             );
           },
@@ -210,6 +234,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                 key: ClavesTour.navegacion,
                 selectedIndex: indice,
                 onDestinationSelected: (i) {
+                  // Tocar la pestaña en la que estás vuelve a su inicio.
+                  if (i == indice && _alInicioDePestana()) return;
                   if (i == 0 && indice == 0) {
                     _irAHoy.disparar();
                   } else {

@@ -494,6 +494,7 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
     var n = _cadaN;
     var u = _unidad;
     final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) => StatefulBuilder(
@@ -741,6 +742,7 @@ class _ListaPersonasState extends State<_ListaPersonas> {
 Future<Set<String>?> elegirPersonas(BuildContext context, {required TareasRepo repo, required Set<String> iniciales, required int maximo}) {
   final elegidas = {...iniciales};
   return showModalBottomSheet<Set<String>>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

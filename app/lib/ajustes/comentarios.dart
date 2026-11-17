@@ -10,6 +10,7 @@ Future<void> enviarComentarios(BuildContext context) async {
   var tipo = 'Sugerencia';
   final texto = TextEditingController();
   await showModalBottomSheet<void>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

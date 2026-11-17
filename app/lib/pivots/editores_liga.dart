@@ -35,6 +35,7 @@ Future<void> elegirZonaLiga(BuildContext context, ConfigLiga c) async {
       .replaceAll(RegExp('[óò]'), 'o')
       .replaceAll(RegExp('[úü]'), 'u');
   final v = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -78,6 +79,7 @@ Future<void> elegirZonaLiga(BuildContext context, ConfigLiga c) async {
 
 Future<void> elegirLiga(BuildContext context, ConfigLiga c, String titulo, Map<String, String> opciones, String actual, String clave, {String? ayuda}) async {
   final v = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -135,6 +137,7 @@ Future<void> precioLiga(BuildContext context, ConfigLiga c, String titulo, num? 
 Future<void> numeroLiga(BuildContext context, ConfigLiga c, String titulo, String clave, int actual, int min, int max, String etiqueta) async {
   var v = actual;
   final ok = await showModalBottomSheet<bool>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (h) => StatefulBuilder(
@@ -314,6 +317,7 @@ Future<void> elegirMonedaLiga(BuildContext context, ConfigLiga c) async {
       .replaceAll(RegExp('[óò]'), 'o')
       .replaceAll(RegExp('[úü]'), 'u');
   final v = await showModalBottomSheet<(String, String)>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

@@ -16,6 +16,7 @@ import '../core/esqueleto.dart';
 /// lista de fechas o meses disponibles.
 Future<void> gestionarReserva(BuildContext context, EventosRepo repo, ReservaActiva r) async {
   final accion = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

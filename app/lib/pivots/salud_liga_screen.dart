@@ -42,6 +42,7 @@ class _SaludLigaScreenState extends State<SaludLigaScreen> {
     final tel = TextEditingController(text: actual == null ? '' : (_tels[actual] ?? ''));
     final fija = actual == _fija;
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

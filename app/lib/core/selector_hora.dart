@@ -9,6 +9,7 @@ import 'tema.dart';
 Future<TimeOfDay?> elegirHora(BuildContext context, {TimeOfDay? inicial, String titulo = 'Elige la hora', int pasoMinutos = 5}) {
   final base = inicial ?? const TimeOfDay(hour: 19, minute: 0);
   return showModalBottomSheet<TimeOfDay>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (h) => _SelectorHora(inicial: base, titulo: titulo, paso: pasoMinutos),

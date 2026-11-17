@@ -82,6 +82,7 @@ class _TareaScreenState extends State<TareaScreen> {
 
   /// Recurrente: ¿solo la de este período o también las siguientes?
   Future<bool?> _alcance() => showModalBottomSheet<bool>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     builder: (c) => HojaBase(

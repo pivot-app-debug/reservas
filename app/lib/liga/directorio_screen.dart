@@ -55,6 +55,7 @@ class _DirectorioLigasScreenState extends State<DirectorioLigasScreen> {
     final contacto = Map<String, dynamic>.from(l['contacto'] as Map? ?? const {});
     final comunidad = [for (final c in (l['comunidad'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(
@@ -366,6 +367,7 @@ class SugerenciaReglas {
     if (prefs.getBool(_clave) != true) return;
     if (DateTime.now().millisecondsSinceEpoch < (prefs.getInt(_hasta) ?? 0) || !context.mounted) return;
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(

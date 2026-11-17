@@ -73,6 +73,7 @@ class DatosPendientes {
     if (DateTime.now().millisecondsSinceEpoch < hasta || !context.mounted) return;
     _mostradoEnSesion = true;
     final r = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

@@ -205,6 +205,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
 
   Future<void> _elegirMes() async {
     final m = await showModalBottomSheet<int>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => SafeArea(

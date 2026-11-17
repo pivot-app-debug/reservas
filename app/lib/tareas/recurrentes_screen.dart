@@ -31,6 +31,7 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
 
   Future<void> _opciones(Recurrente r) async {
     final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (c) => HojaBase(

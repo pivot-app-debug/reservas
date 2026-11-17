@@ -157,6 +157,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     var lugar = '${base?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
     if (widget.lugares.length > 1) {
       final l = await showModalBottomSheet<String>(
+        useRootNavigator: true,
         context: context,
         showDragHandle: true,
         builder: (c) => SafeArea(
@@ -217,6 +218,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
 
   /// Elige temas de la lista de habilidades o crea uno corto.
   Future<String?> _elegirTema({Set<String> ya = const {}}) => showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

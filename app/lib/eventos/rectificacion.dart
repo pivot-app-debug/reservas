@@ -37,6 +37,7 @@ class BotonRectificacion extends StatelessWidget {
       null => 'Sin registrar',
     };
     final elegido = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) => SafeArea(
@@ -80,6 +81,7 @@ class BotonRectificacion extends StatelessWidget {
     final pendiente = r['decision'] == 'Pendiente';
     final dias = (r['diasQuedan'] as num?)?.toInt() ?? 0;
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (hoja) {
