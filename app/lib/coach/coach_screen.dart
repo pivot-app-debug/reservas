@@ -16,6 +16,7 @@ import '../core/vidrio.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
 import '../eventos/widgets_comunes.dart';
+import '../cursos/cursos_screen.dart' show CursosScreen;
 import '../sesion/sesion.dart';
 
 /// Sección Coach (Victor, 2026-11-16): sus jugadorxs con su ficha deportiva
@@ -50,6 +51,7 @@ class _CoachScreenState extends State<CoachScreen> {
   String? _error_;
   String _vista = 'jugadorxs';
   String _q = '';
+  String? _nivel; // filtro por nivel (Victor, 2026-11-17)
   Sesion get s => widget.sesion;
 
   @override
@@ -283,16 +285,109 @@ class _CoachScreenState extends State<CoachScreen> {
     ];
   }
 
+  /// Nivel a mano (o volver a calcularlo). Se abre manteniendo presionada la fila.
+  Future<void> _cambiarNivel(Map<String, dynamic> x) async {
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Nivel de ${x['nombre']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_mode_rounded),
+              title: const Text('Calcularlo con sus habilidades'),
+              trailing: x['nivelAMano'] != true ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+              onTap: () => Navigator.of(h).pop(''),
+            ),
+            for (final e in nivelesCoach.entries)
+              ListTile(
+                title: Text(e.value),
+                trailing: x['nivelAMano'] == true && x['nivel'] == e.key ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                onTap: () => Navigator.of(h).pop(e.key),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (v == null) return;
+    try {
+      await s.api.post('coachGuardar', {'accion': 'nivel', 'username': '${x['username']}', 'nivel': v});
+      _cargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
+  /// Varias personas y habilidades logradas de una vez (Victor, 2026-11-17).
+  Future<void> _marcarGrupo() async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => _MarcarGrupoScreen(
+          sesion: s,
+          personas: _jugadorxs,
+          habilidades: [for (final h in (_d?['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)],
+        ),
+      ),
+    );
+    if (ok == true) _cargar();
+  }
+
   Widget _listaJugadorxs(BuildContext context) {
     final p = context.pivot;
     final total = (_d?['totalHabilidades'] as num?)?.toInt() ?? 0;
     final q = _q.trim().toLowerCase();
-    final l = _jugadorxs.where((x) => q.isEmpty || '${x['nombre']} ${x['username']}'.toLowerCase().contains(q)).toList();
+    final todos = _jugadorxs;
+    final l = todos
+        .where((x) => (_nivel == null || x['nivel'] == _nivel) && (q.isEmpty || '${x['nombre']} ${x['username']}'.toLowerCase().contains(q)))
+        .toList();
     final equipos = [for (final e in (_d?['equipos'] as List? ?? const [])) '$e'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · '), style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+        const SizedBox(height: 8),
+        // Por nivel (Victor, 2026-11-17).
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              for (final (k, t) in [(null, 'Todxs'), ...nivelesCoach.entries.map((e) => (e.key, e.value))])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text('$t (${k == null ? todos.length : todos.where((x) => x['nivel'] == k).length})'),
+                    selected: _nivel == k,
+                    onSelected: (_) => setState(() => _nivel = k),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(onPressed: _marcarGrupo, icon: const Icon(Icons.done_all_rounded), label: const Text('Marcar habilidades')),
+            ),
+            if (s.esAdmin && s.adminToken != null) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CursosScreen(sesion: s))),
+                  icon: const Icon(Icons.school_outlined),
+                  label: Text(_nivel == null ? 'Armar curso' : 'Curso para este grupo'),
+                ),
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 8),
         TextField(
           onChanged: (v) => setState(() => _q = v),
@@ -311,9 +406,11 @@ class _CoachScreenState extends State<CoachScreen> {
             contentPadding: EdgeInsets.zero,
             leading: AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 44),
             title: Text('${x['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            onLongPress: () => _cambiarNivel(x),
             subtitle: Text(
               [
                 '${x['equipo']}',
+                nivelesCoach['${x['nivel']}'] ?? '',
                 if ('${x['estado']}' != 'Activx') conPronombres('${x['estado']}', x['pronombres']),
                 '${x['asistencias30']} ${x['asistencias30'] == 1 ? 'asistencia' : 'asistencias'} en 30 días',
                 if (total > 0) '${x['logradas']} de $total habilidades',
@@ -1327,6 +1424,7 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
     final nombre = TextEditingController(text: '${h?['nombre'] ?? ''}');
     final cat = TextEditingController(text: '${h?['categoria'] ?? categoria ?? ''}');
     var activa = h?['activa'] != false;
+    var nivel = '${h?['nivel'] ?? 'basica'}';
     final ok = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -1351,6 +1449,15 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
                 controller: cat,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(labelText: 'Grupo', hintText: 'Ej. Frenos'),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'basica', label: Text('Básica')),
+                  ButtonSegment(value: 'avanzada', label: Text('Avanzada')),
+                ],
+                selected: {nivel},
+                onSelectionChanged: (v) => set(() => nivel = v.first),
               ),
               if (h != null)
                 SwitchListTile(
@@ -1378,6 +1485,7 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
         'nombre': nombre.text.trim(),
         'categoria': cat.text.trim(),
         'activa': activa,
+        'nivel': nivel,
       });
       if (r['exito'] == false) throw ApiException('${r['error']}');
       _cargar();
@@ -1441,6 +1549,7 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
                           decoration: h['activa'] == false ? TextDecoration.lineThrough : null,
                         ),
                       ),
+                      subtitle: h['nivel'] == 'avanzada' ? const Text('Avanzada') : null,
                       trailing: const Icon(Icons.edit_outlined, size: 18),
                       onTap: () => _editar(h),
                     ),
@@ -2904,6 +3013,141 @@ class _BotonDictarState extends State<BotonDictar> {
           height: _escuchando ? 48 : 40,
           decoration: BoxDecoration(color: _escuchando ? p.marca : p.suave, shape: BoxShape.circle),
           child: Icon(Icons.mic_rounded, color: _escuchando ? p.sobreMarca : p.sobreSuave),
+        ),
+      ),
+    );
+  }
+}
+
+/// Niveles en Coach (Victor, 2026-11-17).
+const nivelesCoach = {'sin': 'Aprendiendo lo básico', 'basicas': 'Habilidades básicas', 'avanzadas': 'Habilidades avanzadas'};
+
+/// Marcar habilidades logradas a varias personas de una vez: por ejemplo,
+/// quienes ya pasaron Freshmeat antes de usar la app.
+class _MarcarGrupoScreen extends StatefulWidget {
+  const _MarcarGrupoScreen({required this.sesion, required this.personas, required this.habilidades});
+  final Sesion sesion;
+  final List<Map<String, dynamic>> personas, habilidades;
+  @override
+  State<_MarcarGrupoScreen> createState() => _MarcarGrupoScreenState();
+}
+
+class _MarcarGrupoScreenState extends State<_MarcarGrupoScreen> {
+  final Set<String> _personas = {}, _habs = {};
+  bool _paso2 = false, _guardando = false;
+  String _q = '';
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    try {
+      final r = await widget.sesion.api.post('coachGuardar', {
+        'accion': 'marcarGrupo',
+        'personas': jsonEncode(_personas.toList()),
+        'habilidades': jsonEncode(_habs.toList()),
+      });
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Listo: ${_habs.length} habilidades logradas para ${_personas.length} ${_personas.length == 1 ? 'persona' : 'personas'}.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final grupos = <String, List<Map<String, dynamic>>>{};
+    for (final h in widget.habilidades) {
+      (grupos['${h['categoria']}'] ??= []).add(h);
+    }
+    final basicas = widget.habilidades.where((h) => h['nivel'] != 'avanzada').map((h) => '${h['id']}').toSet();
+    final q = _q.trim().toLowerCase();
+    return PopScope(
+      canPop: !_paso2,
+      onPopInvokedWithResult: (hecho, _) {
+        if (!hecho) setState(() => _paso2 = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_paso2 ? '¿Qué habilidades?' : '¿A quiénes?', style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          child: !_paso2
+              ? ListView(
+                  key: const ValueKey('p'),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    TextField(
+                      onChanged: (v) => setState(() => _q = v),
+                      decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar'),
+                    ),
+                    for (final x in widget.personas.where((x) => q.isEmpty || '${x['nombre']}'.toLowerCase().contains(q)))
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 36),
+                        title: Text('${x['nombre']}'),
+                        subtitle: Text('${x['equipo']} · ${nivelesCoach['${x['nivel']}'] ?? ''}'),
+                        value: _personas.contains('${x['username']}'),
+                        onChanged: (v) => setState(() => v == true ? _personas.add('${x['username']}') : _personas.remove('${x['username']}')),
+                      ),
+                  ],
+                )
+              : ListView(
+                  key: const ValueKey('h'),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (basicas.isNotEmpty)
+                      Material(
+                        color: p.suave,
+                        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                        clipBehavior: Clip.antiAlias,
+                        child: CheckboxListTile(
+                          title: Text(
+                            Deporte.esDerby ? 'Todas las básicas (Freshmeat)' : 'Todas las básicas',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                          ),
+                          value: basicas.every(_habs.contains),
+                          onChanged: (v) => setState(() => v == true ? _habs.addAll(basicas) : _habs.removeAll(basicas)),
+                        ),
+                      ),
+                    for (final g in grupos.entries) ...[
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          g.key.toUpperCase(),
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                        ),
+                        value: g.value.every((h) => _habs.contains('${h['id']}')),
+                        onChanged: (v) =>
+                            setState(() => v == true ? _habs.addAll(g.value.map((h) => '${h['id']}')) : _habs.removeAll(g.value.map((h) => '${h['id']}'))),
+                      ),
+                      for (final h in g.value)
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.only(left: 16),
+                          title: Text('${h['nombre']}'),
+                          value: _habs.contains('${h['id']}'),
+                          onChanged: (v) => setState(() => v == true ? _habs.add('${h['id']}') : _habs.remove('${h['id']}')),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              onPressed: _guardando ? null : (!_paso2 ? (_personas.isEmpty ? null : () => setState(() => _paso2 = true)) : (_habs.isEmpty ? null : _guardar)),
+              child: Text(!_paso2 ? 'Siguiente (${_personas.length})' : 'Marcar como logradas (${_habs.length})'),
+            ),
+          ),
         ),
       ),
     );

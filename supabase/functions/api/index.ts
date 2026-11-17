@@ -4835,7 +4835,7 @@ async function _coachDe(token: string): Promise<{ user: string; equipos: string[
 }
 
 async function _jugadorxsDe(equipos: string[]): Promise<any[]> {
-  let q = supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, estado_miembro, pronombres').is('eliminado_en', null);
+    let q = supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, estado_miembro, pronombres, nivel_coach').is('eliminado_en', null);
   if (equipos.length) q = q.in('categoria', equipos);
   const { data } = await q.order('username');
   return data ?? [];
@@ -4860,7 +4860,7 @@ async function _asistencias30(usernames: string[]): Promise<Record<string, numbe
 }
 
 async function _habilidades(): Promise<any[]> {
-  const { data } = await supabase.from('coach_habilidades').select('id, categoria, nombre, orden, activa').order('orden');
+    const { data } = await supabase.from('coach_habilidades').select('id, categoria, nombre, orden, activa, nivel').order('orden');
   return data ?? [];
 }
 
@@ -4977,8 +4977,19 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
       username: p.username, nombre: p.nombre_derby || p.username, foto: p.foto_perfil ?? '', equipo: p.categoria ?? '',
       // Solo el estado visible para el equipo: los motivos de salud quedan para admins.
       estado: ['Enfermedad', 'Situación personal', 'Otro'].includes(p.estado_miembro) ? 'Fuera por un tiempo' : (p.estado_miembro ?? 'Activx'),
-      pronombres: p.pronombres ?? '', asistencias30: asis[p.username] ?? 0, logradas: logradas[p.username]?.size ?? 0,
+            pronombres: p.pronombres ?? '', asistencias30: asis[p.username] ?? 0, logradas: logradas[p.username]?.size ?? 0,
+      // Nivel (Victor, 2026-11-17): a mano o según lo logrado. Básicas con el
+      // 80 % de las habilidades básicas; avanzadas, además, alguna avanzada.
+      nivel: p.nivel_coach ?? (() => {
+        const l = logradas[p.username] ?? new Set();
+        const bas = habs.filter((h: any) => (h.nivel ?? 'basica') === 'basica'), av = habs.filter((h: any) => h.nivel === 'avanzada');
+        const okBas = bas.length > 0 && bas.filter((h: any) => l.has(h.id)).length >= Math.ceil(bas.length * 0.8);
+        if (!okBas) return 'sin';
+        return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
+      })(),
+      nivelAMano: !!p.nivel_coach,
     })),
+    habilidades: habs.map((h: any) => ({ id: h.id, categoria: h.categoria, nombre: h.nombre, nivel: h.nivel ?? 'basica' })),
     planes: planes ?? [],
   };
 }
@@ -5045,7 +5056,7 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
   if (!c) return { exito: false, error: 'No eres coach.' };
   const accion = String(params.accion ?? '');
   const username = String(params.username ?? '').trim();
-  if (['evaluar', 'nota', 'borrarNota'].includes(accion) && !(await _puedeVer(c, username))) return { exito: false, error: 'Esa persona no está en tus equipos.' };
+  if (['evaluar', 'nota', 'borrarNota', 'nivel'].includes(accion) && !(await _puedeVer(c, username))) return { exito: false, error: 'Esa persona no está en tus equipos.' };
   if (accion === 'evaluar') {
     const nivel = String(params.nivel ?? '');
     if (!['no', 'proceso', 'logrado'].includes(nivel)) return { exito: false, error: 'Nivel inválido.' };
@@ -5087,12 +5098,30 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
         const { data: ya } = await supabase.from('coach_planes').select('id').eq('id_evento', idEvento).eq('equipo', pl.equipo).maybeSingle();
     if (ya) return { exito: false, error: 'Ese evento ya tiene un plan para ese equipo.' };
     await supabase.from('coach_planes').update({ id_evento: idEvento, fecha }).eq('id', id);
-    } else if (accion === 'ajustes') {
+      } else if (accion === 'nivel') {
+    // Nivel de una persona en Coach a mano (null = calculado).
+    const nivel = ['sin', 'basicas', 'avanzadas'].includes(String(params.nivel)) ? String(params.nivel) : null;
+    await supabase.from('equipo').update({ nivel_coach: nivel }).eq('username', username);
+  } else if (accion === 'marcarGrupo') {
+    // Varias personas y varias habilidades logradas de una vez (quienes ya
+    // pasaron un curso antes de la app, Victor 2026-11-17).
+    let personas: string[] = [], habs: string[] = [];
+    try { personas = JSON.parse(String(params.personas ?? '[]')).map(String).slice(0, 200); } catch { personas = []; }
+    try { habs = JSON.parse(String(params.habilidades ?? '[]')).map(String).slice(0, 200); } catch { habs = []; }
+    const ok: string[] = [];
+    for (const u of personas) if (await _puedeVer(c, u)) ok.push(u);
+    if (!ok.length || !habs.length) return { exito: false, error: 'Elige personas y habilidades.' };
+    const filas = ok.flatMap((u) => habs.map((h) => ({ username: u, habilidad_id: h, nivel: 'logrado', coach: c.user })));
+    for (let i = 0; i < filas.length; i += 500) await supabase.from('coach_evaluaciones').insert(filas.slice(i, i + 500));
+    return { exito: true, marcadas: filas.length };
+  } else if (accion === 'ajustes') {
     await supabase.from('coaches').update({ avisar_novedades: params.avisarNovedades !== false && params.avisarNovedades !== 'false' }).eq('username', c.user);
   } else if (accion === 'habilidad') {
     // Agregar, renombrar o apagar una habilidad de la lista de la liga.
     const id = String(params.id ?? '');
-    const fila = { categoria: String(params.categoria ?? '').trim().slice(0, 60), nombre: String(params.nombre ?? '').trim().slice(0, 100), activa: params.activa !== false && params.activa !== 'false' };
+        const fila: Record<string, any> = { categoria: String(params.categoria ?? '').trim().slice(0, 60), nombre: String(params.nombre ?? '').trim().slice(0, 100), activa: params.activa !== false && params.activa !== 'false' };
+    // Básica o avanzada (Victor, 2026-11-17).
+    if (params.nivel != null) fila.nivel = params.nivel === 'avanzada' ? 'avanzada' : 'basica';
     if (!fila.nombre || !fila.categoria) return { exito: false, error: 'Falta el nombre o la categoría.' };
     if (id) await supabase.from('coach_habilidades').update(fila).eq('id', id);
     else {
