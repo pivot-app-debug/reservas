@@ -14,6 +14,7 @@ import '../equipo/emergencia_screen.dart';
 import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
 import '../equipo/persona_screen.dart';
+import 'anticipada_screen.dart';
 import 'editar_evento_screen.dart';
 import 'eventos_repo.dart';
 import 'tomar_asistencia_screen.dart';
@@ -485,6 +486,18 @@ class _DetalleScreenState extends State<DetalleScreen> {
             motivo ?? repo.motivoSinAsistire(ev) ?? 'Puedes cambiarla hasta 10 minutos antes de que empiece.',
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
+          // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
+          if (repo.anticipada.disponible) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AnticipadaScreen(repo: repo, abrirNueva: true))),
+                icon: const Icon(Icons.event_repeat_rounded),
+                label: const Text('Avisar por adelantado para varias fechas'),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../core/sincroniza.dart';
 
 import 'package:flutter/rendering.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,7 +17,6 @@ import '../core/tour.dart';
 import '../reservas/gestionar_reserva.dart';
 import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
-import 'anticipada_screen.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
 import 'detalle_screen.dart';
@@ -711,6 +709,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           child: Scaffold(
             floatingActionButton: _acciones.isEmpty || _buscando
                 ? null
+                // Con una sola opción, el botón dice cuál es (Victor, 2026-11-17).
+                : _acciones.length == 1
+                ? FloatingActionButton.extended(key: _kMas, onPressed: _abrirAcciones, icon: Icon(_acciones.first.icono), label: Text(_acciones.first.texto))
                 : FloatingActionButton(key: _kMas, tooltip: 'Crear', onPressed: _abrirAcciones, child: const Icon(Icons.add_rounded)),
             // Barra de vidrio (Victor, 2026-11-13): el timeline pasa por detrás
             // de la barra desenfocado; el calendario es sólido y baja debajo.
@@ -1489,12 +1490,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     if (_hayCursos)
       _Accion(Icons.school_outlined, 'Cursos', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosAbiertosScreen(sesion: repo.sesion)))),
 
-    if (repo.anticipada.disponible)
-      _Accion(
-        Symbols.event_upcoming_rounded,
-        'Asistencia anticipada',
-        () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AnticipadaScreen(repo: repo, abrirNueva: true))),
-      ),
+    // Asistencia anticipada pasó al detalle del evento (Victor, 2026-11-17).
   ];
 
   /// Con una sola acción, el "+" la abre directo; con más, despliega el menú

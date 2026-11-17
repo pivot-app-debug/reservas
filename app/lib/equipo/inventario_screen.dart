@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
-import '../core/menu_acciones.dart';
 import '../core/tema.dart';
 import '../ajustes/ajustes_screen.dart' show textoEquipamiento;
 import '../ajustes/componentes.dart' show SubAjustes;
@@ -93,18 +92,55 @@ class _InventarioScreenState extends State<InventarioScreen> {
     ModoPrestamo.uso => 'Pedido enviado. Un Pivot decidirá por cuánto tiempo.',
   });
 
-  /// El "+" (como en Calendario): opciones que suben desde el botón.
-  Future<void> _mas() => MenuAcciones.abrir(context, [
-    if (_pivot) ...[
-      AccionMenu(Icons.rule_rounded, 'Reglas de préstamo', () => _abrir(ReglasPrestamoScreen(repo: repo), 'Guardado')),
-      AccionMenu(Icons.assignment_ind_outlined, 'Alguien tiene algo del equipo', () => _prestamo(ModoPrestamo.registrar)),
-      AccionMenu(Icons.playlist_add_rounded, 'Nueva lista', () => _abrir(NuevaListaAsistente(repo: repo), 'Lista creada')),
-    ] else ...[
-      if (repo.reglaPrestamo != 'no' && tieneEquipoPropio(widget.sesion.datos))
-        AccionMenu(Icons.inventory_2_outlined, 'Equipamiento de emergencia', () => _prestamo(ModoPrestamo.uso)),
-      AccionMenu(Icons.back_hand_outlined, 'Me llevé algo del equipo', () => _prestamo(ModoPrestamo.salida)),
-    ],
-  ]);
+  /// Atajos de la portada: lo que antes estaba en el "+".
+  Widget _atajos(BuildContext context) {
+    final p = context.pivot;
+    final l = <(IconData, String, VoidCallback)>[
+      if (_pivot) ...[
+        (Icons.assignment_ind_outlined, 'Alguien tiene algo', () => _prestamo(ModoPrestamo.registrar)),
+        (Icons.rule_rounded, 'Reglas de préstamo', () => _abrir(ReglasPrestamoScreen(repo: repo), 'Guardado')),
+      ] else ...[
+        (Icons.back_hand_outlined, 'Me llevé algo', () => _prestamo(ModoPrestamo.salida)),
+        if (repo.reglaPrestamo != 'no' && tieneEquipoPropio(widget.sesion.datos))
+          (Icons.inventory_2_outlined, 'Pedir equipamiento', () => _prestamo(ModoPrestamo.uso)),
+      ],
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          for (var i = 0; i < l.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(
+              child: Material(
+                color: p.tarjeta,
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _guardando ? null : l[i].$3,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    child: Row(
+                      children: [
+                        Icon(l[i].$1, color: p.marcaTexto),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l[i].$2,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Future<void> _opcionesPrestamo(Prestamo pr) async {
     final a = await showModalBottomSheet<String>(
@@ -200,6 +236,8 @@ class _InventarioScreenState extends State<InventarioScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
+            // Atajos en la portada en vez del "+" (Victor, 2026-11-17).
+            _atajos(context),
             // Recordatorio a la persona: "¿Ya lo devolviste?" (se renueva cada 7 días).
             for (final pr in preguntarme)
               _Aviso(
@@ -331,10 +369,14 @@ class _InventarioScreenState extends State<InventarioScreen> {
           ),
         ),
       ),
-      // Solo el ícono (Victor, 2026-11-13); las opciones se eligen al tocarlo.
-      floatingActionButton: !_cargado
+      // Pivots: "Nueva lista" con texto; lo demás son atajos en la portada (Victor, 2026-11-17).
+      floatingActionButton: !_cargado || !_pivot
           ? null
-          : FloatingActionButton(tooltip: _pivot ? 'Agregar' : 'Avisar o pedir', onPressed: _guardando ? null : _mas, child: const Icon(Icons.add_rounded)),
+          : FloatingActionButton.extended(
+              onPressed: _guardando ? null : () => _abrir(NuevaListaAsistente(repo: repo), 'Lista creada'),
+              icon: const Icon(Icons.playlist_add_rounded),
+              label: const Text('Nueva lista'),
+            ),
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: cuerpo),
     );
   }
