@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
+import '../core/config_liga.dart';
 import '../core/fechas.dart';
 import '../sesion/sesion.dart';
 import 'modelos.dart';
@@ -391,7 +392,10 @@ class AnticipadaRepo {
       return t.isNotEmpty && t != 'no';
     }
 
-    return (cat == 'quindes' || cat == 'mirlxs') && !usa(d['necesitaPatines']) && !usa(d['necesitaProtecciones']);
+    // Cualquier equipo de la liga que no reserve clase por clase (Victor,
+    // 2026-11-17: antes solo "Quindes" y "Mirlxs").
+    final modo = '${ConfigLiga.de(sesion).cobroEquipo('${d['categoria'] ?? ''}')['modo']}';
+    return cat.isNotEmpty && modo != 'clase' && !usa(d['necesitaPatines']) && !usa(d['necesitaProtecciones']);
   }
 
   /// Cuántas reglas tienes (null = sin cargar); el botón del detalle del evento

@@ -348,6 +348,56 @@ class _AdministracionState extends State<_Administracion> {
     return 'De viaje del ${Fechas.corta(d)} al ${Fechas.corta(h)}';
   }
 
+  /// Automático (según puntos) o fijo en un equipo de la liga.
+  Future<void> _elegirEquipo() async {
+    final p = widget.p;
+    List<String> equipos = const [];
+    try {
+      final r = await widget.repo.sesion.api.get('getTiers', {'adminToken': widget.repo.sesion.adminToken});
+      equipos = [
+        for (final t in (r['tiers'] as List? ?? const []))
+          if (t is Map) '${t['nombre']}',
+      ];
+    } catch (_) {}
+    if (!mounted) return;
+    if (equipos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudieron cargar los equipos. Revisa tu conexión.')));
+      return;
+    }
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Equipo de ${p.nombreMostrar}', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_mode_rounded),
+              title: const Text('Automático'),
+              subtitle: const Text('Sube o baja según los requisitos de cada equipo'),
+              trailing: p.tierModo == 'auto' ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+              onTap: () => Navigator.of(h).pop(''),
+            ),
+            for (final e in equipos)
+              ListTile(
+                leading: const Icon(Icons.push_pin_outlined),
+                title: Text('Fijo en $e'),
+                trailing: p.tierModo != 'auto' && p.categoria == e ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                onTap: () => Navigator.of(h).pop(e),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (v == null || !mounted) return;
+    await _hacer(() => widget.repo.cambiarTier(p, v.isEmpty ? 'auto' : 'fijo', equipo: v), 'Equipo actualizado');
+  }
+
   /// Mes anterior, este y el siguiente.
   static List<DateTime> _mesesCerca() {
     final h = Fechas.hoy();
@@ -693,14 +743,30 @@ class _AdministracionState extends State<_Administracion> {
                 const SizedBox(height: 14),
                 Text('Equipo', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
                 const SizedBox(height: 6),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'auto', label: Text('Auto')),
-                    ButtonSegment(value: 'quinde', label: Text('Quindes')),
-                    ButtonSegment(value: 'mirlxs', label: Text('Mirlxs')),
-                  ],
-                  selected: {p.tierModo},
-                  onSelectionChanged: (s) => _hacer(() => repo.cambiarTier(p, s.first), 'Equipo actualizada'),
+                // Equipos de la liga, no fijos (Victor, 2026-11-17).
+                Material(
+                  color: pal.suave,
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                    onTap: _ocupado ? null : _elegirEquipo,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(p.tierModo == 'auto' ? Icons.auto_mode_rounded : Icons.push_pin_outlined, color: pal.sobreSuave),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              p.tierModo == 'auto' ? 'Automático · ahora en ${p.categoria}' : 'Fijo en ${p.categoria}',
+                              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: pal.sobreSuave),
+                            ),
+                          ),
+                          Icon(Icons.unfold_more_rounded, color: pal.sobreSuave),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 // Selector tipo desplegable (más claro que las pills) y con

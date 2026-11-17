@@ -188,7 +188,8 @@ class EquipoRepo extends ChangeNotifier {
   }
 
   /// 'auto', 'quinde' o 'mirlxs' (web `_eqCambiarTier()`).
-  Future<void> cambiarTier(Integrante p, String modo) => _admin('adminSetTierModo', {'nombre': p.username, 'tierModo': modo});
+  Future<void> cambiarTier(Integrante p, String modo, {String? equipo}) =>
+      _admin('adminSetTierModo', {'nombre': p.username, 'tierModo': modo, if (equipo != null && equipo.isNotEmpty) 'equipo': equipo});
   Future<void> cambiarPagaCuota(Integrante p, bool paga) => _admin('adminSetExentaCuota', {'nombre': p.username, 'valor': !paga});
 
   /// Cupón manual: 10, 15, 25, 50 o 100 % para su próximo pago (0 = quitar).

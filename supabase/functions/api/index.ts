@@ -914,7 +914,7 @@ async function actualizarEquipamientoPersona(params: Record<string, any>): Promi
   if (!fila) return { exito: false, error: 'Usuarix no encontradx.' };
   const update: Record<string, any> = { necesita_patines: params.necesitaPatines, talla: params.talla, necesita_protecciones: params.necesitaProtecciones };
   let categoriaCambiada = false;
-  if (_necesitaEquipoClub(params.necesitaPatines, params.necesitaProtecciones) && fila.tier_modo !== 'quinde') {
+  if (_necesitaEquipoClub(params.necesitaPatines, params.necesitaProtecciones) && (!fila.tier_modo || fila.tier_modo === 'auto' || fila.tier_modo === 'mirlxs')) {
     if (fila.categoria === 'Quindes') { update.categoria = 'Mirlxs'; categoriaCambiada = true; }
     if (fila.categoria_pre_lesion === 'Quindes') update.categoria_pre_lesion = 'Mirlxs';
   }
@@ -7464,11 +7464,19 @@ async function adminCancelarViaje(params: Record<string, any>): Promise<Record<s
 async function adminSetTierModo(params: Record<string, any>): Promise<Record<string, any>> {
   const adminEmail = await _validarAdminToken(params.adminToken);
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
-  const { nombre, tierModo } = params;
-  if (!nombre || !['auto', 'quinde', 'mirlxs'].includes(tierModo)) return { exito: false, error: 'Parámetros inválidos.' };
+    const { nombre, tierModo } = params;
+  // Cualquier liga (Victor, 2026-11-17): 'fijo' + `equipo` (nombre de un
+  // equipo de la liga). 'quinde'/'mirlxs' quedan por compatibilidad.
+  if (!nombre || !['auto', 'quinde', 'mirlxs', 'fijo'].includes(tierModo)) return { exito: false, error: 'Parámetros inválidos.' };
   const update: Record<string, any> = { tier_modo: tierModo };
   if (tierModo === 'quinde') update.categoria = 'Quindes';
   else if (tierModo === 'mirlxs') update.categoria = 'Mirlxs';
+  else if (tierModo === 'fijo') {
+    const equipo = String(params.equipo ?? '').trim();
+    const { data: t } = await supabase.from('config_tiers').select('nombre').eq('nombre', equipo).maybeSingle();
+    if (!t) return { exito: false, error: 'Ese equipo no existe en la liga.' };
+    update.categoria = t.nombre;
+  }
   const { error } = await supabase.from('equipo').update(update).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
   return { exito: true };
