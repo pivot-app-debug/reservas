@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/pronombres.dart';
@@ -269,9 +271,14 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
     if (_estado == EstadoRsvp.noAsistire) _Paso.motivo,
     _Paso.tipo,
     _Paso.fechas,
-    _Paso.alcance,
-    if (_soloAlgunos) ...[_Paso.criterio, if (_porDias) _Paso.dias, if (_porLugares) _Paso.lugares, if (_porHorario) _Paso.horario],
+    // 'Tengo algo en ese horario' va directo a elegir días, lugares u horas.
+    if (_estado != EstadoRsvp.noAsistire) _Paso.alcance,
+    if (_eligeAlcance && _soloAlgunos) ...[_Paso.criterio, if (_porDias) _Paso.dias, if (_porLugares) _Paso.lugares, if (_porHorario) _Paso.horario],
   ];
+
+  /// Con un motivo de ausencia (viaje, lesión, enfermedad…) no se elige a qué
+  /// entrenamientos aplica: uno no está de viaje solo los lunes (Victor, 2026-11-17).
+  bool get _eligeAlcance => _estado != EstadoRsvp.noAsistire || (MotivoAusencia.de(_motivo)?.porHorario ?? false);
 
   bool get _horarioValido => _horaDesde != null && _horaHasta != null && _horaDesde!.compareTo(_horaHasta!) <= 0;
 
@@ -367,6 +374,7 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
   Future<void> _aplicar() async {
     // Una sola indefinida para todos los eventos; con días o lugares pueden convivir varias.
     // Lo que no se eligió en "Solo algunos" no se guarda.
+    if (!_eligeAlcance) _soloAlgunos = false;
     if (!_soloAlgunos || !_porDias) _dias.clear();
     if (!_soloAlgunos || !_porLugares) _lugares.clear();
     if (!_soloAlgunos || !_porHorario) {
@@ -661,85 +669,13 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
 
   static String _ampm(String hhmm) => horaAmPm(hhmm);
 
-  /// Selector de hora con AM/PM y botones (Victor, 2026-11-14: la rueda era difícil).
+  /// Ruedas de hora, minutos y a. m./p. m. (Victor, 2026-11-17).
   Future<void> _elegirHora(bool desde) async {
-    final p = context.pivot;
-    final actual = desde ? _horaDesde : _horaHasta;
-    final partes = (actual ?? (desde ? '10:00' : '19:00')).split(':');
-    var h24 = int.parse(partes[0]), min = int.parse(partes[1]);
-    min = (min ~/ 15) * 15;
-    final elegida = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final pm = h24 >= 12, h12 = h24 % 12 == 0 ? 12 : h24 % 12;
-          void hora(int x) => set(() => h24 = (x % 12) + (pm ? 12 : 0));
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(desde ? 'Desde' : 'Hasta', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text(
-                    _ampm('${h24.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}'),
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: p.marcaTexto),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<bool>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('a. m.')),
-                      ButtonSegment(value: true, label: Text('p. m.')),
-                    ],
-                    selected: {pm},
-                    onSelectionChanged: (s) => set(() => h24 = (h24 % 12) + (s.first ? 12 : 0)),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text('Hora', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (var x = 1; x <= 12; x++)
-                        ChoiceChip(
-                          showCheckmark: false,
-                          label: SizedBox(width: 22, child: Text('$x', textAlign: TextAlign.center)),
-                          selected: h12 == x,
-                          onSelected: (_) => hora(x),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  const Text('Minutos', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final x in const [0, 15, 30, 45])
-                        ChoiceChip(
-                          showCheckmark: false,
-                          label: Text(':${x.toString().padLeft(2, '0')}'),
-                          selected: min == x,
-                          onSelected: (_) => set(() => min = x),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () => Navigator.of(h).pop('${h24.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}'),
-                    child: const Text('Listo'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    final elegida = await elegirHoraTexto(
+      context,
+      inicial: (desde ? _horaDesde : _horaHasta) ?? (desde ? '10:00' : '19:00'),
+      titulo: desde ? 'Desde' : 'Hasta',
+      pasoMinutos: 15,
     );
     if (elegida == null || !mounted) return;
     setState(() => desde ? _horaDesde = elegida : _horaHasta = elegida);
@@ -867,7 +803,10 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
             titulo: conPronombres(m.valor, widget.repo.sesion.datos['pronombres']),
             texto: m.ayuda,
             activa: _motivo == m.valor,
-            alTocar: () => _elegirYSeguir(() => _motivo = m.valor),
+            alTocar: () => _elegirYSeguir(() {
+              _motivo = m.valor;
+              if (m.porHorario) _soloAlgunos = true;
+            }),
           ),
       ],
     );

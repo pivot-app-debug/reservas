@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -135,7 +137,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
                           final hoy = DateTime.now();
                           final f = await showDatePicker(context: h, firstDate: hoy, lastDate: hoy.add(const Duration(days: 365)), initialDate: cuando ?? hoy);
                           if (f == null || !h.mounted) return;
-                          final t = await showTimePicker(context: h, initialTime: TimeOfDay.fromDateTime(cuando ?? hoy.add(const Duration(hours: 1))));
+                          final t = await elegirHora(h, inicial: TimeOfDay.fromDateTime(cuando ?? hoy.add(const Duration(hours: 1))), titulo: 'Hora de envío');
                           if (t == null) return;
                           final elegido = DateTime(f.year, f.month, f.day, t.hour, t.minute);
                           if (elegido.isBefore(DateTime.now().add(const Duration(minutes: 2)))) {

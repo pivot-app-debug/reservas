@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -668,9 +670,10 @@ class _EditorCursoState extends State<_EditorCurso> {
     if (d == null || !mounted) return null;
     final base = previa ?? (_clases.isEmpty ? null : _clases.last);
     final h0 = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch('${base?['hora'] ?? '09:00'}');
-    final h = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: int.parse(h0?.group(1) ?? '9'), minute: int.parse(h0?.group(2) ?? '0')),
+    final h = await elegirHora(
+      context,
+      inicial: TimeOfDay(hour: int.parse(h0?.group(1) ?? '9'), minute: int.parse(h0?.group(2) ?? '0')),
+      titulo: 'Hora de la clase',
     );
     if (h == null || !mounted) return null;
     var lugar = '${base?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';

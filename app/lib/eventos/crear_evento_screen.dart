@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'package:flutter/material.dart';
 
 import '../cursos/cursos_screen.dart';
@@ -647,9 +649,10 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   Widget _pasoHora(BuildContext context) {
     final p = context.pivot;
     Future<void> elegir(bool inicio) async {
-      final h = await showTimePicker(
-        context: context,
-        initialTime: inicio ? _inicio : (_fin ?? _inicio.replacing(hour: (_inicio.hour + 2) % 24)),
+      final h = await elegirHora(
+        context,
+        inicial: inicio ? _inicio : (_fin ?? _inicio.replacing(hour: (_inicio.hour + 2) % 24)),
+        titulo: inicio ? 'Empieza' : 'Termina',
       );
       if (h != null) setState(() => inicio ? _inicio = h : _fin = h);
     }

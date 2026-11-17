@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1027,7 +1029,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
-                        final t = await showTimePicker(context: c, initialTime: inicia);
+                        final t = await elegirHora(c, inicial: inicia, titulo: 'Empieza');
                         if (t != null) set(() => inicia = t);
                       },
                       child: Text('Empieza ${h(inicia)}'),
@@ -1037,7 +1039,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
-                        final t = await showTimePicker(context: c, initialTime: finaliza);
+                        final t = await elegirHora(c, inicial: finaliza, titulo: 'Termina');
                         if (t != null) set(() => finaliza = t);
                       },
                       child: Text('Termina ${h(finaliza)}'),

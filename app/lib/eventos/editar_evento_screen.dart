@@ -1,3 +1,5 @@
+import '../core/selector_hora.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/asistente.dart';
@@ -80,7 +82,7 @@ class _EditarEventoScreenState extends State<EditarEventoScreen> {
     TimeOfDay? inicial;
     final p = (esInicio ? _inicio : _fin).split(':');
     if (p.length >= 2) inicial = TimeOfDay(hour: int.tryParse(p[0]) ?? 19, minute: int.tryParse(p[1]) ?? 0);
-    final h = await showTimePicker(context: context, initialTime: inicial ?? const TimeOfDay(hour: 19, minute: 0));
+    final h = await elegirHora(context, inicial: inicial, titulo: esInicio ? 'Empieza' : 'Termina');
     if (h == null) return;
     final texto = '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';
     setState(() => esInicio ? _inicio = texto : _fin = texto);
