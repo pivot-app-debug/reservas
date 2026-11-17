@@ -623,3 +623,4 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
   - Rutinas por clase que van cambiando (ej. clase de frenos), armadas sobre el cronograma.
   - Al final de cada clase, feedback por persona: nota del 1 al 10 y comentario (texto o voz) por tema de la clase; se compara con clases anteriores del mismo tema y la ficha muestra si mejora o empeora.
   - Recordatorio al coach si no dejó el feedback: 2 horas después del entrenamiento y, si sigue pendiente, al día siguiente (último aviso).
+  - (19:53) Quién ve las notas del 1 al 10 y las pruebas: lo decide el coach (misma regla que las notas). Rutinas, pruebas, feedback y recordatorios sirven para cualquier evento del timeline (práctica, scrimmage, partido, curso), no solo clases.
