@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import '../core/selector_hora.dart';
@@ -5,6 +6,7 @@ import '../core/selector_hora.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/pronombres.dart';
@@ -206,14 +208,37 @@ AppBar _barra(String titulo) => AppBar(
 
 // ─── Persona: cursos abiertos ──────────────────────────────────────────────
 
-/// ¿Hay cursos para mostrar en el "+"? Sin señal, no.
-Future<bool> hayCursos(Sesion s) async {
+/// Cursos que puedo ver ([ids]) y si hay alguno nuevo sin abrir Cursos
+/// ([nuevos], el punto rojo del botón). Sin señal, ninguno.
+class EstadoCursos {
+  const EstadoCursos(this.ids, this.nuevos);
+  final List<String> ids;
+  final bool nuevos;
+  bool get hay => ids.isNotEmpty;
+}
+
+const _kCursosVistos = 'cursos.vistos';
+
+Future<EstadoCursos> estadoCursos(Sesion s) async {
   try {
     final r = await s.api.get('getCursos', const {});
-    return (r['cursos'] as List? ?? const []).isNotEmpty;
+    final l = [for (final c in (r['cursos'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+    final pr = await SharedPreferences.getInstance();
+    final vistos = (pr.getStringList(_kCursosVistos) ?? const <String>[]).toSet();
+    final nuevos = l.any((c) => c['miInscripcion'] == null && !vistos.contains('${c['id']}'));
+    return EstadoCursos([for (final c in l) '${c['id']}'], nuevos);
   } catch (_) {
-    return false;
+    return const EstadoCursos([], false);
   }
+}
+
+/// Al entrar a Cursos se quita el punto rojo hasta que llegue otro curso nuevo.
+Future<void> marcarCursosVistos(Iterable<String> ids) async {
+  try {
+    final pr = await SharedPreferences.getInstance();
+    final l = {...?pr.getStringList(_kCursosVistos), ...ids}.toList();
+    await pr.setStringList(_kCursosVistos, l.length > 200 ? l.sublist(l.length - 200) : l);
+  } catch (_) {}
 }
 
 class CursosAbiertosScreen extends StatefulWidget {
@@ -243,6 +268,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
       final r = await s.api.get('getCursos', const {});
       final l = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))];
       l.sort((a, b) => (a.id == widget.destacado ? 0 : 1).compareTo(b.id == widget.destacado ? 0 : 1));
+      unawaited(marcarCursosVistos(l.map((c) => c.id)));
       if (mounted) setState(() => _cursos = l);
     } catch (_) {
       if (mounted) setState(() => _error = 'No se pudo cargar. Revisa tu conexión.');

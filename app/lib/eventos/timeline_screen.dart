@@ -185,9 +185,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     _bandeja.addListener(_alPasarMinuto);
     _bandeja.cargar(forzar: true);
     _bandeja.cargarMia();
-    hayCursos(repo.sesion).then((v) {
-      if (mounted && v != _hayCursos) setState(() => _hayCursos = v);
-    });
+    _cargarCursos();
   }
 
   // ─── Búsqueda y filtros guardados (pedido 2026-11-06: siempre) ─────────
@@ -873,8 +871,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
           ),
           const Spacer(),
-          // Barra (Victor, 2026-11-17): la campana primero, Tareas, y en ⋯
-          // Buscar, Filtros y Cursos (estaba muy apretada).
+          // Barra (Victor, 2026-11-17): la campana primero, Tareas, Cursos y en ⋯
+          // Buscar y Filtros (estaba muy apretada).
           IconButton(
             key: _kBandeja,
             tooltip: _bandeja.hayNovedades
@@ -898,20 +896,14 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
             onPressed: _abrirTablero,
           ),
-          // Cursos al lado de Tareas, solo para Pivots y coaches (Victor,
-          // 2026-11-17); el resto entra desde el "+" si hay cursos abiertos.
-          if (_esAdmin || repo.sesion.esCoach)
+          // Cursos al lado de Tareas (Victor, 2026-11-17): siempre para Pivots
+          // y coaches; para el resto, solo si hay cursos que puede tomar. Punto
+          // rojo con un curso nuevo hasta que se entra a Cursos.
+          if (_esAdmin || repo.sesion.esCoach || _cursos.hay)
             IconButton(
               tooltip: 'Cursos y clínicas',
-              icon: const Icon(Icons.school_outlined),
-              onPressed: () {
-                _cerrarCalendario();
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
-                  ),
-                );
-              },
+              icon: Badge(isLabelVisible: _cursos.nuevos, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.school_outlined)),
+              onPressed: _abrirCursos,
             ),
           PopupMenuButton<String>(
             key: _kFiltros,
@@ -1235,7 +1227,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       child: Sincroniza(
         key: _kLista,
         edgeOffset: _altoCabecera,
-        onRefresh: () => Future.wait([repo.cargar(forzar: true), _bandeja.cargar(forzar: true), _bandeja.cargarMia()]),
+        onRefresh: () => Future.wait([repo.cargar(forzar: true), _bandeja.cargar(forzar: true), _bandeja.cargarMia(), _cargarCursos()]),
         child: ScrollablePositionedList.builder(
           itemScrollController: _scroll,
           itemPositionsListener: _posiciones,
@@ -1473,7 +1465,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           titulo: 'Tareas del equipo',
           texto: 'Aquí ves las tareas para tomar. Las tuyas aparecen en el calendario el día que vencen, y las atrasadas, arriba en rojo.',
         ),
-        // Buscar, filtros y cursos en ⋯ (Victor, 2026-11-17).
+        // Buscar y filtros en ⋯ (Victor, 2026-11-17).
         PasoTour(
           clave: _kFiltros,
           titulo: 'Busca y filtra',
@@ -1501,8 +1493,25 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   // ─── Botón "+": menú de acciones (pedido 2026-11-06, como la web) ───────
 
-  /// Hay cursos abiertos (o en los que estoy inscritx): se ofrecen en el "+".
-  bool _hayCursos = false;
+  /// Cursos que puedo ver y si hay uno nuevo (punto rojo en el botón).
+  EstadoCursos _cursos = const EstadoCursos([], false);
+
+  Future<void> _cargarCursos() async {
+    final e = await estadoCursos(repo.sesion);
+    if (mounted) setState(() => _cursos = e);
+  }
+
+  Future<void> _abrirCursos() async {
+    _cerrarCalendario();
+    unawaited(marcarCursosVistos(_cursos.ids));
+    setState(() => _cursos = EstadoCursos(_cursos.ids, false));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
+      ),
+    );
+    unawaited(_cargarCursos());
+  }
 
   List<_Accion> get _acciones => [
     // Fase 3: reservas según el tipo de persona (`ReservasRepo.opciones`).
@@ -1512,9 +1521,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
-    // Cursos: Pivots y coaches tienen su botón arriba; el resto, aquí si hay abiertos.
-    if (_hayCursos && !_esAdmin && !repo.sesion.esCoach)
-      _Accion(Icons.school_outlined, 'Cursos', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosAbiertosScreen(sesion: repo.sesion)))),
+    // Cursos ya no va aquí: tiene su botón arriba (Victor, 2026-11-17).
 
     // Asistencia anticipada pasó al detalle del evento (Victor, 2026-11-17).
   ];

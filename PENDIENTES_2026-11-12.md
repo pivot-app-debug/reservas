@@ -24,7 +24,7 @@ Trabajar lo de esta sección y lo que Victor mande desde el 17/11 a las 18:45 (s
 - [ ] Tipos de equipo (cobro por mes o por clase, equipamiento propio obligatorio, quién marca Asistiré, cancelar/reagendar): revisar qué falta tras las reglas por equipo.
 
 **Anotado después de las 18:45 del 17/11:**
-- (nada todavía)
+- [x] 18:54 Cursos en la barra para quien puede tomarlos, aviso y punto rojo (hecho el mismo día).
 
 ## Grandes etapas que faltan (HOJA_DE_RUTA)
 - [ ] **Partidos y torneos (roller derby):** posiciones, line-ups y reportes por partido; importar el statsbook oficial (.xlsx de WFTDA) y carga a mano (por jam: puntos, jammer, line-up; penalidades por persona). Después torneos, merch y cronogramas.

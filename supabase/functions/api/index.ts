@@ -8804,6 +8804,22 @@ async function _nivelDe(username: string): Promise<string> {
   return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
 }
 
+/** Quiénes pueden tomar un curso según "para quién": toda la liga, equipos, un nivel o personas. */
+async function _destinatariosCurso(para: any, emailAutor?: string): Promise<string[]> {
+  const tipo = para?.tipo ?? 'todos', v: string[] = para?.valores ?? [];
+  if (tipo === 'personas') return v;
+  const { data } = await supabase.from('equipo').select('username, email, categoria, estado_miembro, nivel_coach').is('eliminado_en', null);
+  const out: string[] = [];
+  for (const p of data ?? []) {
+    if (/archiv/i.test(String(p.estado_miembro ?? ''))) continue;
+    if (emailAutor && String(p.email ?? '').toLowerCase() === emailAutor.toLowerCase()) continue;
+    if (tipo === 'equipos' && !v.includes(p.categoria ?? '')) continue;
+    if (tipo === 'nivel' && !v.includes(p.nivel_coach ?? await _nivelDe(p.username))) continue;
+    out.push(p.username);
+  }
+  return out;
+}
+
 async function getCursos(params: Record<string, any>): Promise<Record<string, any>> {
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
@@ -8957,12 +8973,19 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     const r = c.id ? await supabase.from('cursos').update(fila).eq('id', String(c.id)).select('id').single() : await supabase.from('cursos').insert(fila).select('id').single();
     if (r.error) return { exito: false, error: r.error.message };
     await _registrarAjuste('curso', null, fila, email);
-    // Curso individual o para personas: les llega la invitación al crearlo.
-    if (!c.id && pTipo === 'personas' && fila.para.valores.length) {
-      await sendPush({
-        tipo: 'solicitud_resuelta', include_external_user_ids: fila.para.valores,
-        headings: { es: `Te invitaron a ${nombre}` }, contents: { es: 'Mira el curso y, si quieres, inscríbete.' }, url: APP_URL + '/?curso=' + r.data.id,
-      }).catch(() => {});
+        // Curso nuevo: aviso solo a quienes pueden tomarlo (Victor, 2026-11-17).
+    // Para personas es una invitación; para el resto, "Curso nuevo".
+    if (!c.id) {
+      try {
+        const destino = await _destinatariosCurso(fila.para, email);
+        if (destino.length) {
+          await sendPush({
+            tipo: 'curso_nuevo', include_external_user_ids: destino,
+            headings: { es: pTipo === 'personas' ? `Te invitaron a ${nombre}` : `Nuevo ${fila.tipo === 'clinica' ? 'clínica' : 'curso'}: ${nombre}` },
+            contents: { es: 'Míralo en Calendario → Cursos y, si quieres, inscríbete.' }, url: APP_URL + '/?curso=' + r.data.id,
+          });
+        }
+      } catch (e) { console.error('[cursos] aviso:', e); }
     }
       } else if (accion === 'guardarPlantilla') {
     // Plantilla: las clases (sin fechas) con sus temas y la evaluación (Victor, 2026-11-17).
@@ -10442,6 +10465,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
     { clave: 'cuota_pendiente', nombre: 'Recordatorios de cuota', descripcion: 'El día 1, el día antes de la fecha límite, el día después y después de tu clase de gracia, solo si aún no pagaste. No llegan si ya pagaste o tu pago está en revisión.', categoria: 'Cuenta' },
     { clave: 'cambio_categoria', nombre: 'Cambio de categoría', descripcion: 'Cuando cambia tu categoría (Mirlxs/Quindes).', categoria: 'Cuenta' },
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
+            { clave: 'curso_nuevo', nombre: 'Cursos nuevos', descripcion: 'Cuando se abre un curso o una clínica que puedes tomar.', categoria: 'Entrenamientos' },
       { clave: 'tarea_nueva', nombre: 'Tareas nuevas', descripcion: 'Cuando se publica una tarea que puedes tomar.', categoria: 'Tareas' },
   { clave: 'tarea_vence', nombre: 'Tareas por vencer', descripcion: 'Un día antes de que venza una tarea que tomaste.', categoria: 'Tareas' },
   { clave: 'tarea_revisada', nombre: 'Revisión de tus tareas', descripcion: 'Cuando admins aprueban o devuelven una tarea que enviaste.', categoria: 'Tareas' },
