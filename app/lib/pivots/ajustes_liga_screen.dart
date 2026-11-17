@@ -104,6 +104,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
         SubAjustes.abrir(context, CobrosScreen(sesion: sesion, resaltar: e.id));
       case 'reglas':
         SubAjustes.abrir(context, ReglasScreen(sesion: sesion, resaltar: e.id));
+      case 'viajes':
+        SubAjustes.abrir(context, FondosViajeScreen(repo: _tesRepo));
       case 'pivots':
         SubAjustes.abrir(context, PivotsScreen(sesion: sesion));
       default:
@@ -134,7 +136,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
             texto: 'Toca un equipo para ver y cambiar todo lo suyo: requisitos, cobro, clases de gracia y fondos. Con "+" creas otro.',
           ),
 
-          PasoTour(clave: _kReglas, titulo: 'Reglas', texto: 'Cómo funciona la liga: cobros, asistencia, puntos y equipamiento, y a quién aplica cada regla.'),
           PasoTour(clave: _kLupa, titulo: 'Busca un ajuste', texto: 'Escribe lo que quieres cambiar (por ejemplo "tarde" o "precio") y te lleva directo.'),
         ],
       );
@@ -142,7 +143,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   }
 
   final _kEquipos = GlobalKey(debugLabel: 'tour-liga-equipos');
-  final _kReglas = GlobalKey(debugLabel: 'tour-liga-reglas');
+
   final _kLupa = GlobalKey(debugLabel: 'tour-liga-lupa');
 
   Future<void> _cargarInicio() async {
@@ -328,7 +329,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                 PrimerosPasos(
                   pasos: [
                     ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
-                    ('reglas', Icons.rule_rounded, 'Revisa las reglas: cuota, asistencia y estados', () => _abrir(ReglasScreen(sesion: sesion))),
+                    ('reglas', Icons.rule_rounded, 'Revisa las reglas de la liga: cuota, asistencia y estados', () => _abrir(ReglasScreen(sesion: sesion))),
                     ('pivots', Icons.group_add_rounded, 'Suma otro Pivot y reparte las áreas', () => _abrir(PivotsScreen(sesion: sesion))),
                   ],
                 ),
@@ -365,30 +366,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                         alTocar: () => _abrir(CoachesScreen(sesion: sesion)),
                       ),
                     ),
-                    Resaltable(
-                      id: 'reglas',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        key: _kReglas,
-                        icono: Icons.rule_folder_outlined,
-                        seccion: 'entrenamientos',
-                        titulo: 'Reglas',
-                        valor: 'Cobros, asistencia, puntos, equipamiento y privacidad',
-                        alTocar: () => _abrir(ReglasScreen(sesion: sesion)),
-                      ),
-                    ),
-                    if (sesion.tieneArea('finanzas'))
-                      Resaltable(
-                        id: 'viajes',
-                        resaltado: _resaltado,
-                        child: FilaAjuste(
-                          icono: Icons.flight_takeoff_rounded,
-                          seccion: 'notificaciones',
-                          titulo: 'Viajes',
-                          valor: 'Fondos de viaje y cómo se reparten',
-                          alTocar: () => _abrir(FondosViajeScreen(repo: _tesRepo)),
-                        ),
-                      ),
+
                     if (sesion.tieneArea('liga'))
                       Resaltable(
                         id: 'avisos',

@@ -31,6 +31,11 @@ import '../sesion/sesion.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
 import '../core/esqueleto.dart';
+import '../finanzas/tesoreria_repo.dart';
+import '../finanzas/tesoreria_screen.dart' show FondosViajeScreen;
+import 'reglas_screen.dart' show ReglasScreen;
+import 'recompensas_screen.dart' show RecompensasPagoScreen, textoRecompensa;
+import 'vencimiento_screen.dart' show VencimientoScreen;
 
 /// Persona con clases y puntos por mes calendario (`adminDatosCategorias`):
 /// índice 0 = mes en curso, 1 = último mes cerrado… hasta 12.
@@ -969,6 +974,37 @@ class _EquipoScreenState extends State<_EquipoScreen> {
             if (mounted) setState(() {});
           },
         ),
+      // Reglas propias del equipo (Victor, 2026-11-17): fecha límite y recompensa.
+      if (porMes) ...[
+        _Fila(
+          icono: Icons.event_busy_outlined,
+          titulo: 'Fecha límite de pago',
+          texto: () {
+            final pr = ConfigEquipo.propias(c, _nombre), e = ConfigEquipo(c, _nombre);
+            return 'Día ${e.diaFechaLimite} · ${pr.containsKey('cuotaVenceDia') ? 'solo para este equipo' : 'igual que en la liga'}';
+          }(),
+          alTocar: () => _reglaPropia(context, c, 'Fecha límite de pago', const [
+            'cuotaVenceDia',
+            'cuotaGraciaDias',
+            'cuotaRecargo',
+            'cuotaRecargoTipo',
+            'cuotaRecargoModo',
+          ], () => VencimientoScreen(config: ConfigEquipo(c, _nombre))),
+        ),
+        _Fila(
+          icono: Icons.workspace_premium_outlined,
+          titulo: 'Recompensa por pagar a tiempo',
+          texto: () {
+            final pr = ConfigEquipo.propias(c, _nombre), r = ConfigEquipo(c, _nombre).recompensaPago, t = textoRecompensa(r);
+            final que = r['activa'] == false || t.isEmpty ? 'Sin recompensa' : 'Recibe $t';
+            return '$que · ${pr.containsKey('recompensaPago') ? 'solo para este equipo' : 'igual que en la liga'}';
+          }(),
+          alTocar: () => _reglaPropia(context, c, 'Recompensa por pagar a tiempo', const [
+            'recompensaPago',
+          ], () => RecompensasPagoScreen(config: ConfigEquipo(c, _nombre))),
+        ),
+      ],
+
       const SizedBox(height: 8),
       const _Seccion('EQUIPAMIENTO'),
       if (!_piso)
@@ -1020,6 +1056,20 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       ),
       const SizedBox(height: 8),
       const _Seccion('DE TODA LA LIGA'),
+      _Fila(
+        icono: Icons.rule_folder_outlined,
+        titulo: 'Reglas de la liga',
+        texto: 'Cobros, asistencia, puntos, equipamiento y privacidad · cada equipo puede cambiar sus pagos',
+        alTocar: () => abrir(ReglasScreen(sesion: s)),
+      ),
+      if (s.tieneArea('finanzas'))
+        _Fila(
+          icono: Icons.flight_takeoff_rounded,
+          titulo: 'Fondos de viaje',
+          texto: 'Cuánto se da para viajar y cómo se reparte',
+          alTocar: () => abrir(FondosViajeScreen(repo: TesoreriaRepo(s))),
+        ),
+
       for (final (id, icono, titulo, texto) in const [
         ('corte', Icons.event_repeat_rounded, 'Cuándo se aplican los cambios', 'Cuándo se sube o baja de equipo'),
         ('historial', Icons.history_rounded, 'Historial de cambios', 'Últimos 6 meses'),
@@ -1037,6 +1087,58 @@ class _EquipoScreenState extends State<_EquipoScreen> {
               : editarCorteEquipos(context, s, widget.tiers),
         ),
     ];
+  }
+
+  /// "Igual que en la liga" o "Solo para este equipo" (Victor, 2026-11-17).
+  Future<void> _reglaPropia(BuildContext context, ConfigLiga c, String titulo, List<String> claves, Widget Function() pantalla) async {
+    final propia = ConfigEquipo.propias(c, _nombre).keys.any(claves.contains);
+    final v = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Cada equipo puede usar la de la liga o tener la suya. Rige desde que se guarda; los pagos y puntos anteriores no cambian.',
+                style: TextStyle(fontSize: 13.5, color: h.pivot.textoSecundario),
+              ),
+            ),
+            for (final (op, t, sub) in [
+              (false, 'Igual que en la liga', 'Si la liga la cambia, cambia aquí también'),
+              (true, 'Solo para $_nombre', 'Se elige aparte para este equipo'),
+            ])
+              ListTile(
+                title: Text(t),
+                subtitle: Text(sub),
+                trailing: op == propia ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
+                onTap: () => Navigator.of(h).pop(op),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (v == null || !context.mounted) return;
+    if (v) {
+      await SubAjustes.abrir(context, pantalla());
+    } else if (propia) {
+      final m = ScaffoldMessenger.of(context);
+      try {
+        await ConfigEquipo(c, _nombre).igualQueLaLiga(claves);
+        m.showSnackBar(const SnackBar(content: Text('Listo: usa lo de la liga desde ahora.')));
+      } catch (e) {
+        m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   String get _inicial => '${widget.tiers.firstWhere((x) => x['es_default'] == true, orElse: () => widget.tiers.last)['nombre']}';

@@ -103,6 +103,8 @@ Reglas de siempre:
     - La PWA vieja queda congelada.
     - Los datos sensibles (emergencia) no estarán en la web.
 11. [ ] **Partidos entre dos ligas**. Después torneos, merch y cronogramas: no olvidar.
+12. [ ] **Versión de escritorio** (Victor, 2026-11-17): diseño por ancho de pantalla (listas y detalle lado a lado, menú lateral, atajos de teclado, pasar el mouse), sobre la versión web que ya existe.
+
 
 ## Revisión del 16 de noviembre (PENDIENTES sección S)
 - [x] Bloque A completo (2026-11-16).

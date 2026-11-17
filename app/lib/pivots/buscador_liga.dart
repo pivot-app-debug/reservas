@@ -29,7 +29,13 @@ const entradasLiga = [
   EntradaAjuste('tesoreria', 'Finanzas', 'Barra de abajo', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
   EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Administrar', 'administradores admins áreas acceso permisos roles'),
   EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
-  EntradaAjuste('reglas', 'Reglas', 'Mi Liga › Administrar', 'reglas cobros asistencia puntos equipamiento privacidad'),
+  EntradaAjuste(
+    'reglas',
+    'Reglas de la liga',
+    'Mi Liga › Equipos › De toda la liga',
+    'reglas cobros asistencia puntos equipamiento privacidad',
+    dentro: 'reglas',
+  ),
   EntradaAjuste('avisos', 'Avisos al equipo', 'Mi Liga › Administrar', 'notificaciones mensaje enviar programar push anuncio quién recibe'),
   EntradaAjuste('archivadas', 'Personas archivadas', 'Mi Liga › Administrar', 'usuarios eliminadas restaurar volver archivo bajas'),
   EntradaAjuste('salud', 'Salud y seguros', 'Mi Liga › Datos de la liga', 'seguro médico privado salud pública emergencia atención iess msp'),
@@ -95,7 +101,7 @@ const entradasLiga = [
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
-  EntradaAjuste('viajes', 'Viajes', 'Mi Liga › Administrar', 'fondos de viaje torneo reparto asistencia'),
+  EntradaAjuste('viajes', 'Fondos de viaje', 'Mi Liga › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
   EntradaAjuste('movimientos', 'Todos los movimientos', 'Finanzas', 'ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
   EntradaAjuste('transparencia', 'Transparencia', 'Finanzas', 'equipo ve totales público', dentro: 'tesoreria'),
 ];

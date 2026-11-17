@@ -136,7 +136,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Reglas', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Reglas de la liga', style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [LupaSeccion(seccion: 'reglas', donde: 'Reglas', resaltado: _resaltado)],
       ),
       body: ListenableBuilder(

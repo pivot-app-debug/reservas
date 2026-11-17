@@ -245,3 +245,38 @@ class MedioPago {
     }),
   ];
 }
+
+/// Reglas de un equipo (Victor, 2026-11-17): las de la liga con lo que ese
+/// equipo cambió encima (`porEquipo`). Las pantallas de fecha límite y
+/// recompensa la usan tal cual; al guardar, el cambio queda solo para ese equipo.
+class ConfigEquipo extends ConfigLiga {
+  ConfigEquipo(this.base, this.equipo) : super._(base.sesion);
+  final ConfigLiga base;
+  final String equipo;
+
+  static const claves = ['cuotaVenceDia', 'cuotaGraciaDias', 'cuotaRecargo', 'cuotaRecargoTipo', 'cuotaRecargoModo', 'recompensaPago'];
+
+  /// Lo que el equipo tiene distinto de la liga (vacío = igual que la liga).
+  static Map<String, dynamic> propias(ConfigLiga c, String equipo) {
+    final o = (c.reglas['porEquipo'] as Map?)?[equipo];
+    return o is Map ? Map<String, dynamic>.from(o) : const {};
+  }
+
+  @override
+  Map<String, dynamic> get reglas => {...base.reglas, ...propias(base, equipo)};
+
+  @override
+  num? get precioMensual => num.tryParse('${base.cobroEquipo(equipo)['precioMensual']}') ?? base.precioMensual;
+
+  @override
+  Future<void> guardarReglas(Map<String, Object?> cambios) => base.guardarReglas({
+    'porEquipo': {equipo: cambios},
+  });
+
+  /// Vuelve a usar lo de la liga en las claves dadas.
+  Future<void> igualQueLaLiga(Iterable<String> cl) => base.guardarReglas({
+    'porEquipo': {
+      equipo: {for (final k in cl) k: null},
+    },
+  });
+}

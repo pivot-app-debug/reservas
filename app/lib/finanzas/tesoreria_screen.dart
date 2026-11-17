@@ -2082,7 +2082,7 @@ class _FondosViajeScreenState extends State<FondosViajeScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Viajes', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Fondos de viaje', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: l == null
           ? const Esqueleto(forma: FormaEsqueleto.lista)

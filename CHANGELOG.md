@@ -2,7 +2,18 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (ronda de pulido de la tarde)
+- **Notificaciones (campana):** lo aprobado o cancelado se va a los 3 días. Nueva sección **Del equipo**: cambios de asistencia de los eventos de hoy y mañana (uno por persona, se actualiza si cambia, se va al terminar el evento; todos ven "No asistiré", los Pivots de asistencia ven todo), cumpleaños (si la fecha es pública) y comunicados de los últimos 3 días.
+- **Tareas:** las recurrentes y archivadas cargan junto con todo (sin aparecer tarde). Carrusel con las últimas 3 archivadas y "Ver todas"; sin botón Archivadas en la barra.
+- **Ficha de la persona:** sin tour del avatar; encabezado a lo ancho y el nombre pasa a la barra al desplazar; en tu propia ficha (o si eres Pivot o coach) atajos a Estadísticas y Ficha deportiva.
+- **Equipamiento:** el botón es "Nueva lista" con texto; Alguien tiene algo del equipo y Reglas de préstamo pasan a atajos en la portada.
+- **Calendario:** la asistencia anticipada sale del + y queda en "Tu asistencia" del detalle del evento. Si el + tiene una sola opción, muestra el texto completo.
+- **Personas archivadas:** el texto dice que se quitaron del equipo por inactividad.
+- **Rol Coach fijo:** no se borra ni se renombra (app y asistente). Elegirlo manda el pedido a un Pivot; al aprobarse se elige si es coach de la liga o de equipos, y queda en la ficha.
+- **Reglas de la liga:** así se llama ahora, y junto con **Fondos de viaje** se abre desde cada equipo → De toda la liga (ya no en la portada de Mi Liga). Cada equipo puede tener su propia **fecha límite de pago** (con gracia y recargo) y **recompensa por pagar a tiempo**, o usar las de la liga. Rige desde que se guarda; pagos y puntos anteriores no cambian.
+
 ## 2026-11-17 (crear una liga)
+
 - **Crea tu liga** desde el inicio de sesión. Cuenta con Google o con tu correo (código de 6 dígitos). Lo básico: nombre, deporte (lista de deportes de equipo; por ahora solo roller derby), país, ciudad; moneda y zona horaria según el país del teléfono.
 - Si ya hay una liga del **mismo deporte** con ese nombre, pregunta "¿Es la tuya?". Nombres repetidos permitidos: el enlace lleva un número que no se ve.
 - **Rápido** (valores por defecto) o **Paso a paso**: equipos y a cuál entra la gente nueva, cuota (igual o por equipo, vencimiento, recargo), clases sueltas, medios de pago, entrenamientos (se crean en el calendario), cambios de equipo, roles editables y premio por pagar a tiempo. Cada pregunta con "Lo veo después" y "Terminar ahora".

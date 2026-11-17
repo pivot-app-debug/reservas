@@ -634,3 +634,12 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - Resumen antes de crear (también con "Terminar ahora"), cada punto editable. Después tu perfil (datos, roles; quedas Pivot) y bienvenida como Pivot.
 - Camino rápido: al entrar, "¿Armamos tus equipos y reglas?" — Omitir no vuelve a preguntar; Recordar más tarde a los 5 días. Lista de Primeros pasos en Mi Liga.
 - Cualquiera puede crear una liga. Panel del dueño de Pivot (todas las ligas) y directorio "Ligas en Pivot" con información básica visible por defecto (cada liga elige qué más mostrar: contacto, comunidad); invitar a partidos y torneos desde ahí, más adelante.
+
+## Y. Ronda de pulido (Victor, 2026-11-17, 13:58) — hecha el mismo día
+- [x] Notificaciones: lo resuelto se va a los 3 días; Del equipo con asistencia de hoy (una por persona, se va al terminar), cumpleaños y comunicados.
+- [x] Tareas: todo carga junto; carrusel de las últimas 3 archivadas + Ver todas; sin Archivadas en la barra.
+- [x] Sin tour del avatar en el detalle del evento; tu ficha con Estadísticas y Ficha deportiva; encabezado de la ficha rediseñado (cambia al desplazar).
+- [x] Equipamiento: "Nueva lista" en el botón y el resto como atajos. Calendario: anticipada en "Tu asistencia" y + con texto si hay una opción.
+- [x] Archivadas: "se quitaron por inactividad". Rol Coach fijo, con revisión y elección de liga o equipos.
+- [x] "Reglas de la liga" y Fondos de viaje en equipo → De toda la liga; fecha límite, gracia, recargo y recompensa por equipo.
+- Para después: comunicados inmediatos (push enviado al momento) no se guardan todavía, por eso la campana solo muestra los programados. Versión de escritorio (ver HOJA_DE_RUTA).
