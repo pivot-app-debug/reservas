@@ -9,15 +9,18 @@ import 'tareas_repo.dart';
 /// de Tareas (Victor, 2026-11-13: no como subsección). Tocar una la edita,
 /// pausa, reanuda o termina sin borrar el historial.
 class RecurrentesScreen extends StatefulWidget {
-  const RecurrentesScreen({super.key, required this.repo});
+  const RecurrentesScreen({super.key, required this.repo, this.inicial});
   final TareasRepo repo;
+
+  /// Ya pedidas al abrir Tareas, para que aparezcan junto con todo (2026-11-17).
+  final Future<List<Recurrente>>? inicial;
 
   @override
   State<RecurrentesScreen> createState() => _RecurrentesScreenState();
 }
 
 class _RecurrentesScreenState extends State<RecurrentesScreen> {
-  late Future<List<Recurrente>> _f = widget.repo.recurrentes();
+  late Future<List<Recurrente>> _f = widget.inicial ?? widget.repo.recurrentes();
 
   void _recargar() => setState(() => _f = widget.repo.recurrentes());
 

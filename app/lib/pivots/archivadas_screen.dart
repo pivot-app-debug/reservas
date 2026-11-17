@@ -133,7 +133,7 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
                   Text(
-                    'Quienes salieron de Equipo. Su historial se conserva. Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.',
+                    'Personas quitadas de Equipo por pasar un tiempo sin venir, por un Pivot o porque borraron su cuenta. Su historial se conserva y se pueden restaurar. Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.',
                     style: TextStyle(color: p.textoSecundario),
                   ),
                   const SizedBox(height: 8),
@@ -148,7 +148,7 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                       leading: AvatarPersona(nombre: '${x['nombreDerby']}', tamano: 40),
                       title: Text('${x['nombreDerby']}'),
                       subtitle: Text(switch (x['eliminadoPor']) {
-                        'admin' => 'Archivadx por un Pivot',
+                        'admin' => 'Quitadx del equipo',
                         'borrado' => 'Datos eliminados',
                         _ => 'Borró su cuenta',
                       }),

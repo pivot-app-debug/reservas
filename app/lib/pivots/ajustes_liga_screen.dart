@@ -409,7 +409,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                           icono: Icons.inventory_outlined,
                           seccion: 'roles',
                           titulo: 'Personas archivadas',
-                          valor: 'Ver y restaurar a quienes salieron de Equipo',
+                          valor: 'Quitadas del equipo por inactividad o por un Pivot',
                           alTocar: () => _abrir(ArchivadasScreen(repo: EquipoRepo.de(sesion))),
                         ),
                       ),

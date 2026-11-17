@@ -33,11 +33,28 @@ class _TareasScreenState extends State<TareasScreen> {
   TareasRepo get repo => widget.repo;
   String? _area; // filtro de Disponibles
 
+  // Recurrentes y archivadas se piden al abrir y la lista aparece con todo
+  // junto, sin cosas que asoman después (Victor, 2026-11-17).
+  Future<List<Recurrente>>? _recurrentes;
+  bool _extrasListos = false;
+  List<Map<String, dynamic>> _archivadas = const [];
+
   @override
   void initState() {
     super.initState();
     repo.cargar(forzar: repo.cargado);
     EquipoRepo.de(repo.sesion).cargar(); // clases del mes para la meta
+    _cargarExtras();
+  }
+
+  Future<void> _cargarExtras() async {
+    if (!repo.esAdmin) return setState(() => _extrasListos = true);
+    final rec = repo.recurrentes();
+    _recurrentes = rec;
+    try {
+      await Future.wait([rec.then((_) {}, onError: (_) {}), repo.archivadas().then((l) => _archivadas = l, onError: (_) => _archivadas = const [])]);
+    } catch (_) {}
+    if (mounted) setState(() => _extrasListos = true);
   }
 
   void _abrir(Tarea t, {MiTarea? mia}) => SubAjustes.abrir(context, TareaScreen(repo: repo, tarea: t, mia: mia));
@@ -51,25 +68,13 @@ class _TareasScreenState extends State<TareasScreen> {
     final t = Theme.of(context).textTheme;
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // Archivadas: ahora en un carrusel dentro de la lista (Victor, 2026-11-17).
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: Text('Tareas', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        // Tareas archivadas en la barra (Victor, 2026-11-16).
-        actions: [
-          if (repo.esAdmin)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: ActionChip(
-                avatar: const Icon(Icons.inventory_2_outlined, size: 18),
-                label: const Text('Archivadas'),
-                shape: const StadiumBorder(),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo))),
-              ),
-            ),
-        ],
       ),
       // Solo con tareas disponibles; si no hay, el botón está en la lista (Victor, 2026-11-16).
       floatingActionButton: ListenableBuilder(
@@ -88,7 +93,7 @@ class _TareasScreenState extends State<TareasScreen> {
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {
-          if (!repo.cargado) {
+          if (!repo.cargado || !_extrasListos) {
             return AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               child: repo.error == null
@@ -101,6 +106,84 @@ class _TareasScreenState extends State<TareasScreen> {
             child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: _lista(context)),
           );
         },
+      ),
+    );
+  }
+
+  /// Las últimas 3 archivadas, deslizables, y al final "Ver todas".
+  Widget _carruselArchivadas(BuildContext context) {
+    final p = context.pivot;
+    final l = _archivadas.take(3).toList();
+    void verTodas() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo)));
+    Widget tarjeta({required Widget child, VoidCallback? alTocar}) => Container(
+      width: 220,
+      margin: const EdgeInsets.only(right: 10),
+      child: Material(
+        color: p.tarjeta,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: alTocar,
+          child: Padding(padding: const EdgeInsets.all(14), child: child),
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+              'ARCHIVADAS',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+            ),
+          ),
+          SizedBox(
+            height: 104,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              children: [
+                for (final x in l)
+                  tarjeta(
+                    alTocar: verTodas,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${x['titulo']}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${x['puntos'] ?? 0} pts · ${(x['personas'] as List? ?? const []).length} personas',
+                          style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                        ),
+                      ],
+                    ),
+                  ),
+                tarjeta(
+                  alTocar: verTodas,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory_2_outlined, color: p.marcaTexto),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Ver todas',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -130,7 +213,8 @@ class _TareasScreenState extends State<TareasScreen> {
                 ),
             ],
           ),
-        if (repo.esAdmin) RecurrentesScreen(repo: repo),
+        if (repo.esAdmin) RecurrentesScreen(repo: repo, inicial: _recurrentes),
+        if (repo.esAdmin && _archivadas.isNotEmpty) _carruselArchivadas(context),
         if (sugeridas.isNotEmpty)
           GrupoAjustes(
             titulo: 'SUGERIDAS PARA TI',

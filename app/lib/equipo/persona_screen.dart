@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../coach/coach_screen.dart';
 import '../core/pronombres.dart';
 import '../core/sincroniza.dart';
 
@@ -10,7 +11,6 @@ import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
-import '../core/tour.dart';
 import '../eventos/widgets_comunes.dart';
 import '../pivots/pivots_screen.dart';
 import 'emergencia_screen.dart';
@@ -73,29 +73,13 @@ class _FichaState extends State<_Ficha> {
   // Tour de la ficha de una persona (Victor, 2026-11-15).
   final _kAcciones = GlobalKey(debugLabel: 'tour-ficha-acciones');
   final _kStats = GlobalKey(debugLabel: 'tour-ficha-stats');
+  bool _tituloEnBarra = false;
   final _kPivot = GlobalKey(debugLabel: 'tour-ficha-pivot');
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      final yo = repo.esYo(p);
-      Tour.mostrarSiCorresponde(
-        context,
-        preferencia: 'tour.ficha.v1',
-        pasos: [
-          if (!yo) PasoTour(clave: _kAcciones, titulo: 'Escribe o llama', texto: 'Con la app que usa la liga, sin buscar su número.'),
-          PasoTour(
-            clave: _kStats,
-            titulo: 'Estadísticas',
-            texto: 'Asistencia, puntos y cómo va con los requisitos de su equipo. Puedes ver cualquier mes y tocar un número para ver de dónde sale.',
-          ),
-          if (repo.esAdmin)
-            PasoTour(clave: _kPivot, titulo: 'Funciones de Pivot', texto: 'Cambiar su equipo o estado, registrar un pago, asistencias externas y más.'),
-        ],
-      );
-    });
+    // Sin tour en la ficha (Victor, 2026-11-17).
   }
 
   @override
@@ -112,6 +96,23 @@ class _FichaState extends State<_Ficha> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: AnimatedOpacity(
+          opacity: _tituloEnBarra ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          child: Row(
+            children: [
+              AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: 30),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  p.nombreMostrar,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
           if (!yo)
             IconButton(
@@ -128,81 +129,107 @@ class _FichaState extends State<_Ficha> {
       ),
       body: Sincroniza(
         onRefresh: () => repo.cargar(forzar: true),
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
-          children: [
-            Center(
-              child: Stack(
-                clipBehavior: Clip.none,
+        child: NotificationListener<ScrollNotification>(
+          // Al desplazar, el nombre y la foto pasan a la barra (Victor, 2026-11-17).
+          onNotification: (n) {
+            final ver = n.metrics.axis == Axis.vertical && n.metrics.pixels > 110;
+            if (ver != _tituloEnBarra) setState(() => _tituloEnBarra = ver);
+            return false;
+          },
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
+            children: [
+              // Encabezado a lo ancho: foto a la izquierda y los datos al lado
+              // (Victor, 2026-11-17: antes todo centrado y con espacio perdido).
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   HeroAvatar(
                     tag: 'avatar-${p.username}',
-                    child: AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: 104),
+                    child: AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: 92),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: p.nombreMostrar),
+                              if (p.numero.isNotEmpty)
+                                TextSpan(
+                                  text: '  #${p.numero}',
+                                  style: TextStyle(color: pal.textoSecundario),
+                                ),
+                            ],
+                          ),
+                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.1),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(['@${p.username}', if (p.pronombres.isNotEmpty) p.pronombres].join(' · '), style: TextStyle(color: pal.textoSecundario)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            Etiqueta(texto: p.categoria),
+                            for (final r in p.roles) Etiqueta(texto: r),
+                            if (estado != null) Etiqueta(texto: estado.texto),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 14),
-            Text.rich(
-              TextSpan(
+              if (p.fechaIngreso != null) ...[
+                const SizedBox(height: 10),
+                Text('En el equipo desde el ${Fechas.corta(p.fechaIngreso!)}', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
+              ],
+              const SizedBox(height: 16),
+              KeyedSubtree(key: _kAcciones, child: _acciones(context, pal, yo)),
+              const SizedBox(height: 14),
+              // Estadísticas y ficha deportiva, también en tu propia ficha
+              // (Victor, 2026-11-17).
+              Row(
                 children: [
-                  TextSpan(text: p.nombreMostrar),
-                  if (p.numero.isNotEmpty)
-                    TextSpan(
-                      text: '  #${p.numero}',
-                      style: TextStyle(color: pal.textoSecundario),
+                  Expanded(
+                    child: _Atajo(
+                      key: _kStats,
+                      icono: Icons.insights_rounded,
+                      titulo: 'Estadísticas',
+                      texto: 'Asistencia y puntos',
+                      alTocar: () => EstadisticasScreen.abrir(context, repo, p),
                     ),
+                  ),
+                  if (yo || repo.esAdmin || repo.sesion.esCoach) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _Atajo(
+                        icono: Icons.sports_score_rounded,
+                        titulo: 'Ficha deportiva',
+                        texto: 'Habilidades y notas',
+                        alTocar: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => FichaDeportivaScreen(sesion: repo.sesion, username: yo ? null : p.username, nombre: p.nombreMostrar),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              textAlign: TextAlign.center,
-              style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            Text(
-              ['@${p.username}', if (p.pronombres.isNotEmpty) p.pronombres].join(' · '),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: pal.textoSecundario),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                Etiqueta(texto: p.categoria),
-                for (final r in p.roles) Etiqueta(texto: r),
-                if (estado != null) Etiqueta(texto: estado.texto),
+              // También en tu propia ficha: un Pivot puede registrar su pago.
+              if (repo.esAdmin) ...[
+                const SizedBox(height: 18),
+                KeyedSubtree(
+                  key: _kPivot,
+                  child: _Administracion(repo: repo, p: p),
+                ),
               ],
-            ),
-            const SizedBox(height: 18),
-            KeyedSubtree(key: _kAcciones, child: _acciones(context, pal, yo)),
-            const SizedBox(height: 18),
-            // Estadísticas en su propia pantalla (Victor, 2026-11-13).
-            Center(
-              child: OutlinedButton.icon(
-                key: _kStats,
-                onPressed: () => EstadisticasScreen.abrir(context, repo, p),
-                icon: const Icon(Icons.insights_rounded, size: 18),
-                label: const Text('Ver estadísticas'),
-              ),
-            ),
-            const SizedBox(height: 14),
-            if (p.fechaIngreso != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'En el equipo desde el ${Fechas.corta(p.fechaIngreso!)}',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: pal.textoSecundario),
-              ),
             ],
-            // También en tu propia ficha: un Pivot puede registrar su pago.
-            if (repo.esAdmin) ...[
-              const SizedBox(height: 18),
-              KeyedSubtree(
-                key: _kPivot,
-                child: _Administracion(repo: repo, p: p),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -226,6 +253,47 @@ class _FichaState extends State<_Ficha> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [for (final b in botones) Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: b)],
+    );
+  }
+}
+
+class _Atajo extends StatelessWidget {
+  const _Atajo({super.key, required this.icono, required this.titulo, required this.texto, required this.alTocar});
+  final IconData icono;
+  final String titulo, texto;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Material(
+      color: p.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: alTocar,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(icono, color: p.marcaTexto),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titulo,
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                    ),
+                    Text(texto, style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
