@@ -1,3 +1,5 @@
+import 'pivots/bandeja_repo.dart' show BandejaRepo;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -122,19 +124,25 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
         NavigationDestination(
           // Lejos de hoy en el timeline: flecha hacia hoy con un puntito
           // rojo; al volver, regresa el número del día (opción A, 2026-11-16).
-          icon: ValueListenableBuilder<int>(
-            valueListenable: _irAHoy.lejos,
-            builder: (context, lejos, _) => AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              transitionBuilder: (hijo, anim) => FadeTransition(
-                opacity: anim,
-                child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(anim), child: hijo),
+          // Punto rojo si hay novedades en Notificaciones (Victor, 2026-11-17).
+          icon: ListenableBuilder(
+            listenable: BandejaRepo.de(widget.sesion),
+            builder: (context, hijo) =>
+                Badge(isLabelVisible: BandejaRepo.de(widget.sesion).hayNovedades, smallSize: 9, backgroundColor: context.pivot.marca, child: hijo),
+            child: ValueListenableBuilder<int>(
+              valueListenable: _irAHoy.lejos,
+              builder: (context, lejos, _) => AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (hijo, anim) => FadeTransition(
+                  opacity: anim,
+                  child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(anim), child: hijo),
+                ),
+                child: lejos == 0 || indiceActual != 0
+                    ? _IconoHoy(key: const ValueKey('dia'), dia: Fechas.hoy().day)
+                    : _IconoFlechaHoy(key: ValueKey(lejos), arriba: lejos < 0),
               ),
-              child: lejos == 0 || indiceActual != 0
-                  ? _IconoHoy(key: const ValueKey('dia'), dia: Fechas.hoy().day)
-                  : _IconoFlechaHoy(key: ValueKey(lejos), arriba: lejos < 0),
             ),
           ),
           label: 'Calendario',

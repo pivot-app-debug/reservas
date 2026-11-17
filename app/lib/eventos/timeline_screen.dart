@@ -156,20 +156,12 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   // Tour guiado de primera vez (como el de la web, `_EV_TOUR_PASOS_*`).
   final _kMes = GlobalKey(debugLabel: 'tour-mes');
-  final _kBuscar = GlobalKey(debugLabel: 'tour-buscar');
   final _kTareas = GlobalKey(debugLabel: 'tour-tareas');
   final _kMas = GlobalKey(debugLabel: 'tour-mas');
   final _kTarjeta = GlobalKey(debugLabel: 'tour-tarjeta');
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
   final _kBandeja = GlobalKey(debugLabel: 'tour-bandeja');
   final _kFiltros = GlobalKey(debugLabel: 'tour-filtros');
-
-  /// Rectángulo en pantalla de un widget (para unir dos botones en un paso).
-  static Rect? _rectDe(GlobalKey k) {
-    final ro = k.currentContext?.findRenderObject();
-    if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
-    return ro.localToGlobal(Offset.zero) & ro.size;
-  }
 
   String? _idTarjetaTour;
 
@@ -881,22 +873,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
           ),
           const Spacer(),
-          // Cursos arriba (Victor, 2026-11-17): Pivots los arman e invitan;
-          // el resto ve los abiertos y en los que está inscritx.
-          if (_hayCursos || _esAdmin)
-            IconButton(
-              tooltip: 'Cursos y clínicas',
-              icon: const Icon(Icons.school_outlined),
-              onPressed: () {
-                _cerrarCalendario();
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
-                  ),
-                );
-              },
-            ),
-          // Bandeja para todas las personas (2026-11-13): campana con novedades.
+          // Barra (Victor, 2026-11-17): la campana primero, Tareas, y en ⋯
+          // Buscar, Filtros y Cursos (estaba muy apretada).
           IconButton(
             key: _kBandeja,
             tooltip: _bandeja.hayNovedades
@@ -920,32 +898,56 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
             onPressed: _abrirTablero,
           ),
-          // Filtros en un solo lugar (Victor, 2026-11-12): qué mostrar, tipo
-          // y lugar de evento, área de tarea. Con el número de activos.
-          IconButton(
+          PopupMenuButton<String>(
             key: _kFiltros,
-            tooltip: _cantidadFiltros > 0 ? 'Filtros ($_cantidadFiltros activos)' : 'Filtros',
+            tooltip: 'Más opciones',
             icon: Badge(
-              isLabelVisible: _cantidadFiltros > 0,
+              isLabelVisible: _cantidadFiltros > 0 || _consulta.trim().isNotEmpty,
+              smallSize: 9,
               backgroundColor: p.marca,
-              label: Text('$_cantidadFiltros'),
-              child: const Icon(Icons.tune_rounded),
+              child: const Icon(Icons.more_vert_rounded),
             ),
-            onPressed: () {
-              _cerrarCalendario();
-              _abrirFiltros();
+            onOpened: _cerrarCalendario,
+            onSelected: (v) {
+              switch (v) {
+                case 'buscar':
+                  setState(() => _buscando = true);
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
+                case 'filtros':
+                  _abrirFiltros();
+                case 'cursos':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
+                    ),
+                  );
+              }
             },
-          ),
-          IconButton(
-            key: _kBuscar,
-            tooltip: _consulta.trim().isNotEmpty ? 'Buscar (hay una búsqueda activa)' : 'Buscar',
-            // Punto rojo: quedó una búsqueda guardada.
-            icon: Badge(isLabelVisible: _consulta.trim().isNotEmpty, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.search_rounded)),
-            onPressed: () {
-              _cerrarCalendario();
-              setState(() => _buscando = true);
-              WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
-            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'buscar',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.search_rounded),
+                  title: const Text('Buscar'),
+                  subtitle: _consulta.trim().isEmpty ? null : Text('"${_consulta.trim()}"'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'filtros',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.tune_rounded),
+                  title: const Text('Filtros'),
+                  subtitle: _cantidadFiltros > 0 ? Text(_cantidadFiltros == 1 ? '1 activo' : '$_cantidadFiltros activos') : null,
+                ),
+              ),
+              if (_hayCursos || _esAdmin)
+                const PopupMenuItem(
+                  value: 'cursos',
+                  child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.school_outlined), title: Text('Cursos y clínicas')),
+                ),
+            ],
           ),
           const SizedBox(width: 4),
         ],
@@ -1462,12 +1464,11 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           titulo: 'Tareas del equipo',
           texto: 'Aquí ves las tareas para tomar. Las tuyas aparecen en el calendario el día que vencen, y las atrasadas, arriba en rojo.',
         ),
-        // Filtros y lupa juntos en un solo recorte (Victor, 2026-11-15).
+        // Buscar, filtros y cursos en ⋯ (Victor, 2026-11-17).
         PasoTour(
           clave: _kFiltros,
-          ajuste: (r) => r.expandToInclude(_rectDe(_kBuscar) ?? r),
           titulo: 'Busca y filtra',
-          texto: 'Con la lupa buscas eventos, tareas, cumpleaños o lugares. Con el botón de al lado eliges qué ver: eventos o tareas, tipo, lugar o área.',
+          texto: 'En este menú buscas eventos, tareas, cumpleaños o lugares, eliges qué ver (eventos o tareas, tipo, lugar o área) y abres los cursos.',
         ),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, cambiar tu respuesta y ver cómo llegar.'),
         PasoTour(

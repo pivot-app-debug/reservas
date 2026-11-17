@@ -4957,10 +4957,19 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
   }
   const habs = (await _habilidades()).filter((h: any) => h.activa);
   const hoy = _hoyEcuadorISO();
-    const { data: planes } = await supabase.from('coach_planes').select('id_evento, fecha, coach, bloques, compartido').gte('fecha', hoy).order('fecha').limit(60);
+        const { data: planes } = await supabase.from('coach_planes').select('id, id_evento, fecha, coach, bloques, compartido, equipo, da').gte('fecha', hoy).order('fecha').limit(120);
+  // Planes sin fecha (de un evento cancelado) y para elegir equipo y quién lo da (Victor, 2026-11-17).
+  const { data: sinFecha } = await supabase.from('coach_planes').select('id, coach, bloques, compartido, equipo, da, actualizado_en').is('id_evento', null).order('actualizado_en', { ascending: false }).limit(30);
+  const { data: tiersC } = await supabase.from('config_tiers').select('nombre').order('orden');
+  const { data: coachesC } = await supabase.from('coaches').select('username').eq('estado', 'aprobado');
+  const quienC = await _mapaEquipoPorNombre();
   return {
     exito: true,
-        pendientes: await _porEvaluar(c),
+            pendientes: await _porEvaluar(c),
+    sinFecha: sinFecha ?? [],
+    equiposPlan: c.equipos.length ? c.equipos : (tiersC ?? []).map((t: any) => t.nombre),
+    deTodaLaLiga: !c.equipos.length,
+    coaches: (coachesC ?? []).map((x: any) => ({ username: x.username, nombre: quienC[String(x.username).toUpperCase()]?.nombreDerby || x.username })),
     avisarNovedades: (await supabase.from('coaches').select('avisar_novedades').eq('username', c.user).maybeSingle()).data?.avisar_novedades !== false,
     equipos: c.equipos,
     totalHabilidades: habs.length,
@@ -5055,11 +5064,30 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     bloques = (Array.isArray(bloques) ? bloques : []).slice(0, 40).map((b: any) => ({
       titulo: String(b?.titulo ?? '').trim().slice(0, 80), minutos: Math.max(0, Math.min(600, Math.round(Number(b?.minutos) || 0))), detalle: String(b?.detalle ?? '').trim().slice(0, 600),
     })).filter((b: any) => b.titulo);
-    const idEvento = String(params.idEvento ?? '').trim();
+        const idEvento = String(params.idEvento ?? '').trim();
     const fecha = String(params.fecha ?? '').slice(0, 10);
     if (!idEvento || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { exito: false, error: 'Falta el evento.' };
-    if (!bloques.length) await supabase.from('coach_planes').delete().eq('id_evento', idEvento);
-    else await supabase.from('coach_planes').upsert({ id_evento: idEvento, fecha, coach: c.user, bloques, compartido: params.compartido === true || params.compartido === 'true', actualizado_en: new Date().toISOString() });
+    // Un plan por equipo; '' = toda la liga, solo para coaches de toda la liga (Victor, 2026-11-17).
+    const equipo = String(params.equipo ?? '').trim().slice(0, 60);
+    if (c.equipos.length && !c.equipos.includes(equipo)) return { exito: false, error: 'Solo puedes armar planes para tus equipos.' };
+    let da: string[] = [];
+    try { da = JSON.parse(String(params.da ?? '[]')).map((x: any) => String(x)).slice(0, 10); } catch { da = []; }
+    if (!bloques.length) await supabase.from('coach_planes').delete().eq('id_evento', idEvento).eq('equipo', equipo);
+    else {
+      const { error } = await supabase.from('coach_planes').upsert(
+        { id_evento: idEvento, fecha, equipo, da, coach: c.user, bloques, compartido: params.compartido === true || params.compartido === 'true', actualizado_en: new Date().toISOString() },
+        { onConflict: 'liga_id,id_evento,equipo' },
+      );
+      if (error) return { exito: false, error: error.message };
+    }
+  } else if (accion === 'asignarPlan') {
+    // Plan sin fecha a un evento (si ese evento ya tiene plan de ese equipo, se reemplaza).
+    const id = String(params.id ?? ''), idEvento = String(params.idEvento ?? '').trim(), fecha = String(params.fecha ?? '').slice(0, 10);
+    const { data: pl } = await supabase.from('coach_planes').select('equipo').eq('id', id).maybeSingle();
+    if (!pl || !idEvento) return { exito: false, error: 'Falta el plan o el evento.' };
+        const { data: ya } = await supabase.from('coach_planes').select('id').eq('id_evento', idEvento).eq('equipo', pl.equipo).maybeSingle();
+    if (ya) return { exito: false, error: 'Ese evento ya tiene un plan para ese equipo.' };
+    await supabase.from('coach_planes').update({ id_evento: idEvento, fecha }).eq('id', id);
     } else if (accion === 'ajustes') {
     await supabase.from('coaches').update({ avisar_novedades: params.avisarNovedades !== false && params.avisarNovedades !== 'false' }).eq('username', c.user);
   } else if (accion === 'habilidad') {
@@ -5090,9 +5118,46 @@ async function getPlanEvento(params: Record<string, any>): Promise<Record<string
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
   const coach = await _coachDe(String(params.token ?? ''));
-  const { data } = await supabase.from('coach_planes').select('*').eq('id_evento', String(params.idEvento ?? '')).maybeSingle();
-  if (!data || (!coach && !data.compartido)) return { exito: true, plan: null, esCoach: !!coach };
-  return { exito: true, plan: { bloques: data.bloques ?? [], compartido: data.compartido, coach: data.coach }, esCoach: !!coach };
+    const { data } = await supabase.from('coach_planes').select('*').eq('id_evento', String(params.idEvento ?? ''));
+  // Coach: los de sus equipos (y el de toda la liga). Resto: los compartidos de
+  // su equipo o de toda la liga (Victor, 2026-11-17).
+  const { data: yoFila } = await supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle();
+  const quien = await _mapaEquipoPorNombre();
+  const ve = (p: any) => coach ? (!coach.equipos.length || p.equipo === '' || coach.equipos.includes(p.equipo)) : (p.compartido && (p.equipo === '' || p.equipo === yoFila?.categoria));
+  const planes = (data ?? []).filter(ve).sort((a: any, b: any) => String(a.equipo).localeCompare(String(b.equipo))).map((p: any) => ({
+    id: p.id, equipo: p.equipo ?? '', bloques: p.bloques ?? [], compartido: p.compartido, coach: p.coach,
+    da: (p.da ?? []).map((u: string) => ({ username: u, nombre: quien[String(u).toUpperCase()]?.nombreDerby || u })),
+  }));
+  return {
+    exito: true, planes, plan: planes[0] ?? null, esCoach: !!coach,
+    ...(coach ? { equiposPlan: coach.equipos.length ? coach.equipos : ((await supabase.from('config_tiers').select('nombre').order('orden')).data ?? []).map((t: any) => t.nombre), deTodaLaLiga: !coach.equipos.length } : {}),
+  };
+}
+
+/// Al cancelar un evento con planes (Victor, 2026-11-17): se pasan a otro
+/// evento o quedan sin fecha. Lo hace un Pivot o un coach.
+async function moverPlanesEvento(params: Record<string, any>): Promise<Record<string, any>> {
+  const esPivot = !!(params.adminToken && await _validarAdminToken(String(params.adminToken)));
+  const coach = esPivot ? null : await _coachDe(String(params.token ?? ''));
+  if (!esPivot && !coach) return { exito: false, error: 'Sin permiso.' };
+  const desde = String(params.desde ?? '').trim(), a = String(params.a ?? '').trim();
+  if (!desde) return { exito: false, error: 'Falta el evento.' };
+    const { data: planes } = await supabase.from('coach_planes').select('id, equipo').eq('id_evento', desde);
+  if (params.soloContar === true || params.soloContar === 'true') return { exito: true, cantidad: (planes ?? []).length };
+  if (!a) {
+    await supabase.from('coach_planes').update({ id_evento: null, fecha: null }).eq('id_evento', desde);
+    return { exito: true, movidos: (planes ?? []).length };
+  }
+  const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', a).maybeSingle();
+  if (!ev) return { exito: false, error: 'No existe ese evento.' };
+    // Si el evento de destino ya tiene plan de ese equipo, este queda sin fecha (no se pisa nada).
+  let sinFecha = 0;
+  for (const p of planes ?? []) {
+    const { data: ya } = await supabase.from('coach_planes').select('id').eq('id_evento', a).eq('equipo', p.equipo).maybeSingle();
+    if (ya) { await supabase.from('coach_planes').update({ id_evento: null, fecha: null }).eq('id', p.id); sinFecha++; continue; }
+    await supabase.from('coach_planes').update({ id_evento: a, fecha: String(ev.fecha).slice(0, 10) }).eq('id', p.id);
+  }
+  return { exito: true, movidos: (planes ?? []).length - sinFecha, sinFecha };
 }
 
 // ─── Coach etapa 3 (Victor, 2026-11-16): pruebas, feedback y recordatorios ──
@@ -5199,10 +5264,10 @@ async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<
   const vinieron = await _vinieron(idEvento, c);
   const quien = await _mapaEquipoPorNombre();
   const { data: hecho } = await supabase.from('coach_feedback').select('username, tema, nota, comentario').eq('id_evento', idEvento).eq('coach', c.user);
-  const { data: plan } = await supabase.from('coach_planes').select('bloques').eq('id_evento', idEvento).maybeSingle();
+    const { data: planesEv } = await supabase.from('coach_planes').select('bloques').eq('id_evento', idEvento);
   return {
     exito: true,
-    temas: ((plan?.bloques as any[]) ?? []).map((b: any) => String(b.titulo)).filter(Boolean),
+    temas: [...new Set((planesEv ?? []).flatMap((p: any) => ((p.bloques as any[]) ?? []).map((b: any) => String(b.titulo))).filter(Boolean))],
     personas: vinieron.map((u) => ({ username: u, nombre: quien[u.toUpperCase()]?.nombreDerby || u, foto: quien[u.toUpperCase()]?.fotoPerfil ?? '' })),
     hecho: hecho ?? [],
   };
@@ -12329,7 +12394,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'esDuenxPivot':                    return json(await esDuenxPivot(params));
       case 'getMiCoach':                      return json(await getMiCoach(params));
       case 'adminCoaches':                    return json(await adminCoaches(params));
-      case 'getCoach':                        return json(await getCoach(params));
+            case 'getCoach':                        return json(await getCoach(params));
+      case 'moverPlanesEvento':               return json(await moverPlanesEvento(params));
       case 'getFichaDeportiva':               return json(await getFichaDeportiva(params));
       case 'coachGuardar':                    return json(await coachGuardar(params));
       case 'getHabilidades':                  return json(await getHabilidades(params));

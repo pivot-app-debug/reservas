@@ -162,11 +162,81 @@ class _DetalleScreenState extends State<DetalleScreen> {
       si: 'Sí, cancelar',
     );
     if (!ok || !mounted) return;
+    var planes = 0;
+    try {
+      final r = await repo.sesion.api.get('moverPlanesEvento', {'adminToken': repo.sesion.adminToken, 'desde': ev.id, 'soloContar': true});
+      planes = (r['cantidad'] as num?)?.toInt() ?? 0;
+    } catch (_) {}
     try {
       await repo.cancelar(ev);
       _avisar(ev.finalizado ? 'Evento cancelado.' : 'Evento cancelado. Se avisó al equipo.');
     } catch (e) {
       _avisar(e.toString());
+      return;
+    }
+    if (planes > 0 && mounted) await _moverPlanes(ev, planes);
+  }
+
+  /// El evento cancelado tenía planes de coach: a dónde pasan (Victor,
+  /// 2026-11-17). Se sugiere el siguiente evento del mismo tipo.
+  Future<void> _moverPlanes(Evento ev, int n) async {
+    final proximos = [
+      for (final e in repo.eventos)
+        if (!e.cancelado && e.id != ev.id && e.fecha.isAfter(ev.fecha.subtract(const Duration(days: 1))) && !e.finalizado) e,
+    ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
+    final sugerido = proximos.where((e) => e.tipo == ev.tipo).firstOrNull;
+    String titulo(Evento e) => '${e.tipo} · ${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}';
+    final destino = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text(
+                n == 1 ? 'Este evento tenía un plan de coach' : 'Este evento tenía $n planes de coach',
+                style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('¿A dónde lo pasamos?', style: TextStyle(color: h.pivot.textoSecundario)),
+            ),
+            if (sugerido != null)
+              ListTile(
+                leading: Icon(Icons.east_rounded, color: h.pivot.marcaTexto),
+                title: Text('Al siguiente: ${titulo(sugerido)}'),
+                subtitle: const Text('Sugerido'),
+                onTap: () => Navigator.of(h).pop(sugerido.id),
+              ),
+            for (final e in proximos.where((e) => e != sugerido).take(6))
+              ListTile(leading: const Icon(Icons.event_outlined), title: Text(titulo(e)), onTap: () => Navigator.of(h).pop(e.id)),
+            ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: const Text('Guardarlo sin fecha'),
+              subtitle: const Text('Queda en Coach → Cronograma para asignarlo después'),
+              onTap: () => Navigator.of(h).pop(''),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (destino == null || !mounted) return;
+    try {
+      final r = await repo.sesion.api.post('moverPlanesEvento', {'adminToken': repo.sesion.adminToken, 'desde': ev.id, 'a': destino});
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      final sf = (r['sinFecha'] as num?)?.toInt() ?? 0;
+      _avisar(
+        destino.isEmpty
+            ? 'Plan guardado sin fecha.'
+            : (sf > 0 ? 'Listo. $sf quedó sin fecha porque ese evento ya tenía plan de ese equipo.' : 'Plan pasado al otro evento.'),
+      );
+    } catch (e) {
+      _avisar(e is ApiException ? e.message : 'No se pudo pasar el plan. Revisa tu conexión.');
     }
   }
 
@@ -496,7 +566,6 @@ class _DetalleScreenState extends State<DetalleScreen> {
   /// "Crea una asistencia anticipada" con su explicación; si ya tienes
   /// alguna, un botón más sutil que lleva a verlas (Victor, 2026-11-17).
   Widget _botonAnticipada(BuildContext context) {
-    final p = context.pivot;
     final a = repo.anticipada;
     if (a.cuantas.value == null) a.reglas().ignore();
     return ValueListenableBuilder<int?>(
@@ -514,23 +583,11 @@ class _DetalleScreenState extends State<DetalleScreen> {
             key: ValueKey(tiene),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Siempre "Asistencia anticipada", sin texto debajo (Victor, 2026-11-17).
               if (tiene)
-                OutlinedButton.icon(
-                  onPressed: abrir,
-                  icon: const Icon(Icons.event_repeat_rounded),
-                  label: Text(n == 1 ? 'Tu asistencia anticipada' : 'Tus $n asistencias anticipadas'),
-                )
+                OutlinedButton.icon(onPressed: abrir, icon: const Icon(Icons.event_repeat_rounded), label: const Text('Asistencia anticipada'))
               else
-                FilledButton.tonalIcon(onPressed: abrir, icon: const Icon(Icons.event_repeat_rounded), label: const Text('Crea una asistencia anticipada')),
-              const SizedBox(height: 8),
-              Text(
-                tiene
-                    ? 'Si un día no puedes venir, marca No asistiré en ese evento: tu respuesta de ese día siempre manda.'
-                    : 'Marca Asistiré, No asistiré o No jugador en muchos eventos de una vez (sin fecha de fin, por meses o entre dos fechas) '
-                          'y no tendrás que marcar evento por evento. Si un día no puedes venir, marca No asistiré en ese evento: '
-                          'tu respuesta de ese día siempre manda.',
-                style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
-              ),
+                FilledButton.tonalIcon(onPressed: abrir, icon: const Icon(Icons.event_repeat_rounded), label: const Text('Asistencia anticipada')),
             ],
           ),
         );
