@@ -2,7 +2,17 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (ronda de las 14:45)
+- **Asistencia anticipada:** con un motivo de ausencia (viaje, lesión, enfermedad, inactividad, situación personal u otro) aplica a todos los entrenamientos de esas fechas, sin elegir días ni horarios. Nuevo motivo **"Tengo algo en ese horario"**: va directo a elegir días, lugares u horas y no cambia tu estado.
+- **Selector de hora con ruedas** (hora, minutos y a. m./p. m.) en toda la app.
+- Detalle del evento: **"Crea una asistencia anticipada"** con explicación; si ya tienes alguna, el botón es sutil y dice cuántas tienes. Se aclara que tu respuesta de un día siempre manda.
+- **Comunicados:** se ven 3 días en Notificaciones, o hasta la fecha que elige el Pivot al enviarlos (máximo 30 días).
+- Coach: la nota del 1 al 10 siempre cabe en el ancho.
+- **Textos para cualquier deporte:** Cursos sin freshmeat ni try out ("evaluación final", opcional); apodo y número según el deporte de la liga (`getConfigLiga.deporte`, `core/deporte.dart`); ejemplos de roles; texto de WFTDA solo en roller derby; "Alquiler del lugar".
+- **Ficha de la persona (opción A):** foto, nombre y datos centrados; WhatsApp, Llamar y Emergencia redondos; roles en tarjetas deslizables; grupo "En el equipo" (Estadísticas, Ficha deportiva, En el equipo desde) y Funciones de Pivot al final.
+
 ## 2026-11-17 (ronda de pulido de la tarde)
+
 - **Notificaciones (campana):** lo aprobado o cancelado se va a los 3 días. Nueva sección **Del equipo**: cambios de asistencia de los eventos de hoy y mañana (uno por persona, se actualiza si cambia, se va al terminar el evento; todos ven "No asistiré", los Pivots de asistencia ven todo), cumpleaños (si la fecha es pública) y comunicados de los últimos 3 días.
 - **Tareas:** las recurrentes y archivadas cargan junto con todo (sin aparecer tarde). Carrusel con las últimas 3 archivadas y "Ver todas"; sin botón Archivadas en la barra.
 - **Ficha de la persona:** sin tour del avatar; encabezado a lo ancho y el nombre pasa a la barra al desplazar; en tu propia ficha (o si eres Pivot o coach) atajos a Estadísticas y Ficha deportiva.

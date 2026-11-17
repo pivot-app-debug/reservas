@@ -1,3 +1,5 @@
+import '../ajustes/componentes.dart';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
@@ -71,8 +73,6 @@ class _FichaState extends State<_Ficha> {
   Integrante get p => widget.p;
 
   // Tour de la ficha de una persona (Victor, 2026-11-15).
-  final _kAcciones = GlobalKey(debugLabel: 'tour-ficha-acciones');
-  final _kStats = GlobalKey(debugLabel: 'tour-ficha-stats');
   bool _tituloEnBarra = false;
   final _kPivot = GlobalKey(debugLabel: 'tour-ficha-pivot');
 
@@ -132,92 +132,100 @@ class _FichaState extends State<_Ficha> {
         child: NotificationListener<ScrollNotification>(
           // Al desplazar, el nombre y la foto pasan a la barra (Victor, 2026-11-17).
           onNotification: (n) {
-            final ver = n.metrics.axis == Axis.vertical && n.metrics.pixels > 110;
+            final ver = n.metrics.axis == Axis.vertical && n.metrics.pixels > 150;
             if (ver != _tituloEnBarra) setState(() => _tituloEnBarra = ver);
             return false;
           },
           child: ListView(
             padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
             children: [
-              // Encabezado a lo ancho: foto a la izquierda y los datos al lado
-              // (Victor, 2026-11-17: antes todo centrado y con espacio perdido).
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              // Ficha como Ajustes (Victor, 2026-11-17, opción A): lo esencial
+              // centrado, acciones redondas, roles deslizables y filas.
+              Center(
+                child: HeroAvatar(
+                  tag: 'avatar-${p.username}',
+                  child: AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: 96),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: p.nombreMostrar),
+                    if (p.numero.isNotEmpty)
+                      TextSpan(
+                        text: ' #${p.numero}',
+                        style: TextStyle(color: pal.textoSecundario),
+                      ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+                style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.1),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                ['@${p.username}', if (p.pronombres.isNotEmpty) p.pronombres].join(' · '),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: pal.textoSecundario),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                runSpacing: 6,
                 children: [
-                  HeroAvatar(
-                    tag: 'avatar-${p.username}',
-                    child: AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: 92),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: p.nombreMostrar),
-                              if (p.numero.isNotEmpty)
-                                TextSpan(
-                                  text: '  #${p.numero}',
-                                  style: TextStyle(color: pal.textoSecundario),
-                                ),
-                            ],
-                          ),
-                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.1),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(['@${p.username}', if (p.pronombres.isNotEmpty) p.pronombres].join(' · '), style: TextStyle(color: pal.textoSecundario)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            Etiqueta(texto: p.categoria),
-                            for (final r in p.roles) Etiqueta(texto: r),
-                            if (estado != null) Etiqueta(texto: estado.texto),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  Etiqueta(texto: p.categoria),
+                  if (estado != null) Etiqueta(texto: estado.texto),
                 ],
               ),
-              if (p.fechaIngreso != null) ...[
-                const SizedBox(height: 10),
-                Text('En el equipo desde el ${Fechas.corta(p.fechaIngreso!)}', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
-              ],
-              const SizedBox(height: 16),
-              KeyedSubtree(key: _kAcciones, child: _acciones(context, pal, yo)),
-              const SizedBox(height: 14),
-              // Estadísticas y ficha deportiva, también en tu propia ficha
-              // (Victor, 2026-11-17).
-              Row(
-                children: [
-                  Expanded(
-                    child: _Atajo(
-                      key: _kStats,
-                      icono: Icons.insights_rounded,
-                      titulo: 'Estadísticas',
-                      texto: 'Asistencia y puntos',
-                      alTocar: () => EstadisticasScreen.abrir(context, repo, p),
+              const SizedBox(height: 18),
+              _acciones(context, pal, yo),
+              if (p.roles.isNotEmpty) ...[
+                _tituloSeccion(pal, 'ROLES'),
+                SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    itemCount: p.roles.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: pal.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                      child: Text(
+                        p.roles[i],
+                        style: TextStyle(fontWeight: FontWeight.w700, color: pal.texto),
+                      ),
                     ),
                   ),
-                  if (yo || repo.esAdmin || repo.sesion.esCoach) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _Atajo(
-                        icono: Icons.sports_score_rounded,
-                        titulo: 'Ficha deportiva',
-                        texto: 'Habilidades y notas',
-                        alTocar: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => FichaDeportivaScreen(sesion: repo.sesion, username: yo ? null : p.username, nombre: p.nombreMostrar),
-                          ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              GrupoAjustes(
+                titulo: 'EN EL EQUIPO',
+                filas: [
+                  FilaAjuste(
+                    icono: Icons.insights_rounded,
+                    seccion: 'reservas',
+                    titulo: 'Estadísticas',
+                    valor: 'Asistencia y puntos',
+                    alTocar: () => EstadisticasScreen.abrir(context, repo, p),
+                  ),
+                  if (yo || repo.esAdmin || repo.sesion.esCoach)
+                    FilaAjuste(
+                      icono: Icons.sports_score_rounded,
+                      seccion: 'entrenamientos',
+                      titulo: 'Ficha deportiva',
+                      valor: 'Habilidades y notas',
+                      alTocar: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => FichaDeportivaScreen(sesion: repo.sesion, username: yo ? null : p.username, nombre: p.nombreMostrar),
                         ),
                       ),
                     ),
-                  ],
+                  if (p.fechaIngreso != null)
+                    FilaAjuste(icono: Icons.event_available_rounded, seccion: 'ingreso', titulo: 'En el equipo desde', valor: Fechas.corta(p.fechaIngreso!)),
                 ],
               ),
               // También en tu propia ficha: un Pivot puede registrar su pago.
@@ -234,6 +242,14 @@ class _FichaState extends State<_Ficha> {
       ),
     );
   }
+
+  Widget _tituloSeccion(PivotPaleta pal, String t) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+    child: Text(
+      t,
+      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: pal.textoSecundario),
+    ),
+  );
 
   Widget _acciones(BuildContext context, PivotPaleta pal, bool yo) {
     final canal = ConfigLiga.de(repo.sesion);
@@ -252,48 +268,7 @@ class _FichaState extends State<_Ficha> {
     if (botones.isEmpty) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [for (final b in botones) Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: b)],
-    );
-  }
-}
-
-class _Atajo extends StatelessWidget {
-  const _Atajo({super.key, required this.icono, required this.titulo, required this.texto, required this.alTocar});
-  final IconData icono;
-  final String titulo, texto;
-  final VoidCallback alTocar;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    return Material(
-      color: p.tarjeta,
-      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: alTocar,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Icon(icono, color: p.marcaTexto),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titulo,
-                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                    ),
-                    Text(texto, style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      children: [for (final b in botones) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: b)],
     );
   }
 }

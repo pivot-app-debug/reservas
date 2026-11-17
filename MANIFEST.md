@@ -246,7 +246,15 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Deporte, comunicados y hora (2026-11-17, tarde)
+- `getConfigLiga.deporte` (de `ligas`); app `core/deporte.dart` (`Deporte.esDerby`, `apodo`, `numero`, ejemplos). Regla: textos neutros para cualquier deporte; lo de roller derby solo si `Deporte.esDerby`.
+- `avisos_programados.vence_en` (migración `20261117100000_avisos_vence.sql`); `adminEnviarAviso.venceEn`; la bandeja muestra comunicados hasta `vence_en` o 3 días.
+- `core/selector_hora.dart`: `elegirHora` / `elegirHoraTexto` reemplazan `showTimePicker`.
+- `altoBarra(context)`: alto real de la barra (`Scaffold.appBarMaxHeight`) o barra de estado de la ventana + toolbar.
+- `MotivoAusencia.porHorario` ('Tengo algo en ese horario'): único motivo con días/lugares/horas; no llama `autodeclararEstado`.
+
 ## Reglas por equipo y bandeja del equipo (2026-11-17)
+
 - `reglas_liga.porEquipo = { equipo: { cuotaVenceDia, cuotaGraciaDias, cuotaRecargo, cuotaRecargoTipo, cuotaRecargoModo, recompensaPago } }` (solo lo que cambia). Servidor: `_reglasDeEquipo(equipo)` (recargo de reserva, fecha de punto extra `_diaPuntoExtra(equipo)`, `_recompensaPago(equipo)`, recordatorios de cuota por equipo). `adminReglasLiga` recibe parches `porEquipo` (null = vuelve a lo de la liga). App: `ConfigEquipo` (core/config_liga.dart) envuelve ConfigLiga y lo usan VencimientoScreen y RecompensasPagoScreen; filas en el equipo → PAGOS. Reglas de la liga y Fondos de viaje en equipo → DE TODA LA LIGA.
 - `getMiBandeja`: oculta lo resuelto hace más de 3 días; `novedades` (`_novedadesEquipo`): asistencias de eventos de hoy/mañana sin terminar (la última por persona), cumpleaños con fecha pública, `avisos_programados` enviados en 3 días. App: `_TarjetaNovedad`, sección "Del equipo".
 - Rol Coach: `ROL_COACH`, siempre en `_rolesEquipo`, protegido en `adminRolesEquipo`; `actualizarDatosPersona` lo quita hasta aprobarse y llama `pedirCoach`.

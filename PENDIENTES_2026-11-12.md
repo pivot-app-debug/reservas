@@ -643,3 +643,10 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - [x] Archivadas: "se quitaron por inactividad". Rol Coach fijo, con revisión y elección de liga o equipos.
 - [x] "Reglas de la liga" y Fondos de viaje en equipo → De toda la liga; fecha límite, gracia, recargo y recompensa por equipo.
 - Para después: comunicados inmediatos (push enviado al momento) no se guardan todavía, por eso la campana solo muestra los programados. Versión de escritorio (ver HOJA_DE_RUTA).
+
+## Z. Ronda de las 14:45 (Victor, 2026-11-17)
+- [x] Anticipada: motivos sin elegir entrenamientos; "Tengo algo en ese horario"; selector de hora con ruedas; botón y explicación en el detalle.
+- [x] Comunicados con vencimiento (3 días o fecha elegida). Barras superiores arregladas en toda la app. Nota 1–10 que cabe.
+- [x] Textos neutros por deporte (cursos, apodo/número, roles, WFTDA). Ficha de la persona opción A.
+- [ ] Esperando a Victor: rediseño de Coach (evaluar a quienes vinieron, por persona deslizando); Cursos (descanso, enlace de invitación, botón Cursos en Calendario, cursos y clínicas); a quién llega el recordatorio de feedback del coach.
+- [ ] Encontrado al revisar (preguntar): asistencia anticipada solo se ofrece a equipos llamados "Quindes" o "Mirlxs" y Funciones de Pivot de la ficha tiene "Quindes/Mirlxs" fijos: en otra liga no funcionan. Equipamiento del club (patines y tallas) es propio de deportes con patines.
