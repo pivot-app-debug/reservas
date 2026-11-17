@@ -614,14 +614,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: p.texto),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          repo.esPivot
-                              ? 'Aquí llegan pagos, rectificaciones, excepciones, lesiones, tareas por validar y equipamiento, y lo que tú pidas.'
-                              : 'Aquí verás tus pedidos (pagos, excepciones, equipamiento, tareas) y si se aprobaron.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: p.textoSecundario),
-                        ),
+
                         if (hijos.isNotEmpty) const SizedBox(height: 24),
                         ...hijos,
                       ],
