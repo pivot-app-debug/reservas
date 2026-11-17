@@ -1,3 +1,5 @@
+import '../eventos/eventos_repo.dart' show EventosRepo;
+import '../ajustes/ajustes_screen.dart' show AjustesScreen;
 import '../core/navegacion.dart';
 import '../ajustes/componentes.dart';
 
@@ -226,7 +228,8 @@ class _FichaState extends State<_Ficha> {
                       ),
                     ),
                   if (p.fechaIngreso != null)
-                    FilaAjuste(icono: Icons.event_available_rounded, seccion: 'ingreso', titulo: 'En el equipo desde', valor: Fechas.corta(p.fechaIngreso!)),
+                    // "En la liga": la persona puede cambiar de equipo (Victor, 2026-11-17).
+                    FilaAjuste(icono: Icons.event_available_rounded, seccion: 'ingreso', titulo: 'En la liga desde', valor: Fechas.corta(p.fechaIngreso!)),
                   // Tu perfil se edita en Ajustes (Victor, 2026-11-17).
                   if (yo)
                     FilaAjuste(
@@ -234,7 +237,15 @@ class _FichaState extends State<_Ficha> {
                       seccion: 'cuenta',
                       titulo: 'Editar mi perfil',
                       valor: 'Foto, nombre, número, roles y más',
-                      alTocar: () => Navegacion.ir.value = Pestana.perfil,
+                      // Se abre como una subsección, deslizando (Victor, 2026-11-17).
+                      alTocar: () {
+                        final ev = EventosRepo.actual;
+                        if (ev == null) {
+                          Navegacion.ir.value = Pestana.perfil;
+                        } else {
+                          SubAjustes.abrir(context, AjustesScreen(sesion: repo.sesion, eventos: ev));
+                        }
+                      },
                     ),
                 ],
               ),

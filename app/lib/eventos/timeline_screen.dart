@@ -881,6 +881,21 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
           ),
           const Spacer(),
+          // Cursos arriba (Victor, 2026-11-17): Pivots los arman e invitan;
+          // el resto ve los abiertos y en los que está inscritx.
+          if (_hayCursos || _esAdmin)
+            IconButton(
+              tooltip: 'Cursos y clínicas',
+              icon: const Icon(Icons.school_outlined),
+              onPressed: () {
+                _cerrarCalendario();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
+                  ),
+                );
+              },
+            ),
           // Bandeja para todas las personas (2026-11-13): campana con novedades.
           IconButton(
             key: _kBandeja,
@@ -1487,8 +1502,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
-    if (_hayCursos)
-      _Accion(Icons.school_outlined, 'Cursos', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosAbiertosScreen(sesion: repo.sesion)))),
+    // Cursos: botón propio arriba (Victor, 2026-11-17).
 
     // Asistencia anticipada pasó al detalle del evento (Victor, 2026-11-17).
   ];

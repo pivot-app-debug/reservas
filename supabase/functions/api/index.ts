@@ -8472,7 +8472,7 @@ function _cursoJson(c: any, inscritos: any[], yo?: string) {
   const activos = inscritos.filter((i: any) => i.curso_id === c.id && i.estado !== 'cancelada');
   const mia = yo ? activos.find((i: any) => i.username === yo) : null;
   return {
-    id: c.id, nombre: c.nombre, descripcion: c.descripcion ?? '', precio: Number(c.precio) || 0, cupo: c.cupo ?? null,
+        id: c.id, tipo: c.tipo ?? 'curso', nombre: c.nombre, descripcion: c.descripcion ?? '', precio: Number(c.precio) || 0, cupo: c.cupo ?? null,
     fechas: Array.isArray(c.fechas) ? c.fechas : [], equipoDestino: c.equipo_destino ?? null, estado: c.estado,
     inscritos: activos.length, libres: c.cupo == null ? null : Math.max(0, Number(c.cupo) - activos.length),
     ...(mia ? { miInscripcion: { estado: mia.estado, resultado: mia.resultado ?? null } } : {}),
@@ -8520,18 +8520,21 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     const nombre = String(c.nombre ?? '').trim().slice(0, 60);
     if (!nombre) return { exito: false, error: 'Ponle un nombre.' };
     const fechas = (Array.isArray(c.fechas) ? c.fechas : []).map((x: any) => ({
-            fecha: String(x?.fecha ?? '').slice(0, 10), hora: String(x?.hora ?? '').slice(0, 5), lugar: String(x?.lugar ?? '').slice(0, 80),
+                        fecha: String(x?.fecha ?? '').slice(0, 10), hora: String(x?.hora ?? '').slice(0, 5), lugar: String(x?.lugar ?? '').slice(0, 80),
+      tipo: ['clase', 'clinica', 'evaluacion'].includes(String(x?.tipo)) ? String(x.tipo) : 'clase',
+      ...(String(x?.titulo ?? '').trim() ? { titulo: String(x.titulo).trim().slice(0, 80) } : {}),
+      ...(/^\d{2}:\d{2}$/.test(String(x?.termina ?? '')) ? { termina: String(x.termina) } : {}),
     } as any)).filter((x: any) => /^\d{4}-\d{2}-\d{2}$/.test(x.fecha)).sort((a: any, b: any) => a.fecha.localeCompare(b.fecha)).slice(0, 60);
     if (!fechas.length) return { exito: false, error: 'Agrega al menos una fecha.' };
         const fila: Record<string, any> = {
-      nombre, descripcion: String(c.descripcion ?? '').trim().slice(0, 500) || null, precio: Math.max(0, _num2(Number(c.precio) || 0)),
+            nombre, tipo: c.tipo === 'clinica' ? 'clinica' : 'curso', descripcion: String(c.descripcion ?? '').trim().slice(0, 1000) || null, precio: Math.max(0, _num2(Number(c.precio) || 0)),
       cupo: c.cupo == null || c.cupo === '' ? null : Math.max(1, Math.round(Number(c.cupo))), fechas,
       equipo_destino: String(c.equipoDestino ?? '').trim().slice(0, 60) || null,
     };
         // Cada fecha es un evento "Curso" del calendario. Las fechas que no
     // cambian conservan su evento (y su asistencia); las quitadas se borran.
     const { data: antes } = c.id ? await supabase.from('cursos').select('fechas').eq('id', String(c.id)).maybeSingle() : { data: null };
-    const clave = (x: any) => `${x.fecha}|${x.hora}|${x.lugar}`;
+        const clave = (x: any) => `${x.fecha}|${x.hora}|${x.lugar}|${x.termina ?? ''}|${x.titulo ?? ''}`;
     const previas = new Map<string, any>(((antes?.fechas as any[]) ?? []).map((x: any) => [clave(x), x.venueId]));
     const usados = new Set<string>();
     const { data: lugares } = await supabase.from('venues').select('lugar, google_maps, video_instructivo').not('google_maps', 'is', null);
@@ -8541,7 +8544,8 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       const ref = (lugares ?? []).find((l: any) => l.lugar === x.lugar);
       const { data: v } = await supabase.from('venues').insert({
         lugar: x.lugar || 'Por definir', google_maps: ref?.google_maps ?? null, video_instructivo: ref?.video_instructivo ?? null,
-        tipo_icono: 'Curso', requiere_reserva: false, info_adicional: nombre, tipo: 'unico', fecha_referencia: x.fecha, inicia: x.hora || '09:00',
+                tipo_icono: 'Curso', requiere_reserva: false, info_adicional: x.titulo ? `${nombre} · ${x.titulo}` : (x.tipo === 'evaluacion' ? `${nombre} · Evaluación final` : nombre),
+        tipo: 'unico', fecha_referencia: x.fecha, inicia: x.hora || '09:00', ...(x.termina ? { finaliza: x.termina } : {}),
       }).select('id').maybeSingle();
       if (v?.id) x.venueId = v.id;
     }
@@ -11203,7 +11207,8 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
     if (error || !data) return { exito: false, error: error?.message ?? 'No se pudo crear la temporada.' };
     id = (data as any).id;
   }
-  const eliminados = await _eliminarEventosDescanso(id, desde, hasta);
+    const eliminados = await _eliminarEventosDescanso(id, desde, hasta);
+  const cursosMovidos = await _posponerCursos(desde, hasta);
   if (!params.id && hasta >= _hoyEcuadorISO()) {
     await sendPush({
       tipo: 'descanso_programado',
@@ -11213,7 +11218,43 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
       url: APP_URL + '/?tab=eventos',
     }).catch(() => {});
   }
-  return { exito: true, id, eliminados };
+    return { exito: true, id, eliminados, cursosMovidos };
+}
+
+/// Cursos con clases dentro de un descanso (Victor, 2026-11-17): se pausan y
+/// siguen después. Desde la primera clase afectada, todas se corren las
+/// semanas justas para quedar después del descanso (mismo día de la semana).
+async function _posponerCursos(desde: string, hasta: string): Promise<number> {
+  const hoy = _hoyEcuadorISO();
+  const { data: cursos } = await supabase.from('cursos').select('id, nombre, fechas').in('estado', ['abierto', 'cerrado']);
+  const dia = (s: string) => Date.parse(s + 'T12:00:00Z');
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  let movidos = 0;
+  for (const c of cursos ?? []) {
+    const fechas = ((c.fechas as any[]) ?? []).slice().sort((a: any, b: any) => String(a.fecha).localeCompare(String(b.fecha)));
+    const i = fechas.findIndex((x: any) => x.fecha >= hoy && x.fecha >= desde && x.fecha <= hasta);
+    if (i < 0) continue;
+    const semanas = Math.ceil((Math.round((dia(hasta) - dia(fechas[i].fecha)) / 86400000) + 1) / 7);
+    for (let j = i; j < fechas.length; j++) {
+      const nueva = iso(dia(fechas[j].fecha) + semanas * 7 * 86400000);
+      fechas[j] = { ...fechas[j], fecha: nueva };
+      if (fechas[j].venueId) await supabase.from('venues').update({ fecha_referencia: nueva }).eq('id', fechas[j].venueId);
+    }
+    await supabase.from('cursos').update({ fechas }).eq('id', c.id);
+    movidos++;
+    const { data: ins } = await supabase.from('curso_inscripciones').select('username').eq('curso_id', c.id).neq('estado', 'cancelada');
+    const quienes = (ins ?? []).map((x: any) => x.username);
+    if (quienes.length) {
+      await sendPush({
+        tipo: 'descanso_programado', include_external_user_ids: quienes,
+        headings: { es: `${c.nombre}: clases movidas` },
+        contents: { es: `Por el descanso, el curso sigue desde el ${_fechaEs(fechas[i].fecha)}. Revisa las fechas nuevas en el calendario.` },
+        url: APP_URL + '/?tab=eventos',
+      }).catch(() => {});
+    }
+  }
+  if (movidos) await supabase.rpc('regenerar_ventana_asistencias');
+  return movidos;
 }
 
 async function adminEliminarTemporadaDescanso(params: Record<string, any>): Promise<Record<string, any>> {

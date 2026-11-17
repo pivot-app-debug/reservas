@@ -32,7 +32,12 @@ class MiembroRoster {
 }
 
 class EventosRepo extends ChangeNotifier {
-  EventosRepo(this.sesion);
+  EventosRepo(this.sesion) {
+    actual = this;
+  }
+
+  /// El de la app (hay uno solo): para abrir Ajustes desde otras pantallas.
+  static EventosRepo? actual;
 
   final Sesion sesion;
   Api get _api => sesion.api;

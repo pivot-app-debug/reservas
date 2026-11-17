@@ -1,3 +1,5 @@
+import 'cursos/cursos_screen.dart' show CursosAbiertosScreen;
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -92,6 +94,12 @@ class _RaizState extends State<_Raiz> {
         _pendiente = AperturaPush(eventoId: ev, accion: q['accion']);
         _abrirPendiente();
       }
+      // Enlace de invitación a un curso (Victor, 2026-11-17).
+      final curso = q['curso'] ?? '';
+      if (curso.isNotEmpty) {
+        _cursoPendiente = curso;
+        _abrirPendiente();
+      }
     }
     widget.sesion.addListener(_alCambiarSesion);
     widget.sesion.addListener(_revisarListo);
@@ -128,7 +136,20 @@ class _RaizState extends State<_Raiz> {
   }
 
   /// Abre el evento de una notificación tocada, una vez que hay sesión.
+  String? _cursoPendiente;
+
   void _abrirPendiente() {
+    final curso = _cursoPendiente;
+    if (curso != null && widget.sesion.activa) {
+      _cursoPendiente = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navegador.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => CursosAbiertosScreen(sesion: widget.sesion, destacado: curso),
+          ),
+        );
+      });
+    }
     final a = _pendiente;
     if (a == null || !widget.sesion.activa) return;
     _pendiente = null;

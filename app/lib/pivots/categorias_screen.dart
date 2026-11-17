@@ -1023,7 +1023,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       _Fila(
         icono: Icons.handshake_outlined,
         titulo: 'Préstamo de equipamiento',
-        texto: 'Cuándo puede pedir equipamiento del club',
+        texto: 'Cuándo puede pedir equipamiento de la liga',
         alTocar: () => abrir(ReglasPrestamoScreen(repo: InventarioRepo(s))),
       ),
       const SizedBox(height: 8),

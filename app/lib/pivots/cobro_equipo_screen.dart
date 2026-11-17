@@ -18,7 +18,7 @@ const modosCobro = <String, (String, String)>{
   'mes': ('Por mes', 'Paga la mensualidad. Puede tener clases de gracia.'),
   'clase': ('Por clase', 'Reserva y paga cada clase.'),
   'elige': ('Por clase o por mes', 'Cada persona elige pagar por clase o por mes.'),
-  'segun_equipamiento': ('Según su equipamiento', 'Con equipamiento del club, solo por clase. Con equipamiento propio, elige por clase o por mes.'),
+  'segun_equipamiento': ('Según su equipamiento', 'Con equipamiento de la liga, solo por clase. Con equipamiento propio, elige por clase o por mes.'),
   'sin_cobro': ('Sin cobro', 'No paga: solo marca Asistiré.'),
 };
 

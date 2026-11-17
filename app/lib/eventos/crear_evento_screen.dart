@@ -271,7 +271,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     _Paso.frecuencia => null,
     _Paso.fecha => _recurrente == true ? 'Desde esta fecha se cuenta la frecuencia.' : null,
     _Paso.hora => null,
-    _Paso.descanso => 'Sin entrenamientos entre esas fechas: los eventos que ya existen se eliminan y se avisa al equipo.',
+    _Paso.descanso => 'Sin entrenamientos entre esas fechas: los eventos que ya existen se eliminan y se avisa al equipo. Los cursos se pausan y siguen después del descanso (se avisa a quienes están inscritxs).',
   };
 
   @override
@@ -426,8 +426,8 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
           _tarjetaOpcion(
             context,
             icono: Icons.school_outlined,
-            titulo: 'Curso',
-            texto: 'Clases con inscripción y, si quieres, una evaluación final',
+            titulo: 'Curso o clínica',
+            texto: 'Varias clases o una sesión intensiva, con inscripción',
             activa: false,
             alTocar: () async {
               await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosScreen(sesion: widget.repo.sesion)));
