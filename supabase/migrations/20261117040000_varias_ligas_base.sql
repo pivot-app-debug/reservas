@@ -1,4 +1,4 @@
--- ESTADO: todavía NO aplicada en la base (esperando la confirmación de Victor en Supabase, 2026-11-17).
+-- Aplicada 2026-11-17 (Victor aprobó en Supabase). Aislamiento probado con una liga de prueba dentro de una transacción deshecha.
 -- Base para varias ligas (Victor, 2026-11-17), fase A: aditiva y sin cambios
 -- visibles. Todo lo que existe queda en Quindes Volcánicos.
 --

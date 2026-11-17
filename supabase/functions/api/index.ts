@@ -1163,7 +1163,7 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
         },
       };
     }
-    await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'key' });
+    await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'liga_id,key' });
     for (const k of Object.keys(r)) if (JSON.stringify(antes[k]) !== JSON.stringify(r[k])) await _registrarAjuste(k, antes[k], r[k], email);
   }
   const corteNuevo = leer(params.corte);
@@ -1175,7 +1175,7 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
             avisoDias: Math.min(20, Math.max(1, Number(corteNuevo.avisoDias ?? a.avisoDias) || 7)),
       autoAprobar: corteNuevo.autoAprobar === undefined ? a.autoAprobar : corteNuevo.autoAprobar !== false && corteNuevo.autoAprobar !== 'false',
     };
-    await supabase.from('config_app').upsert({ key: 'equipos_corte', value: JSON.stringify(c) }, { onConflict: 'key' });
+    await supabase.from('config_app').upsert({ key: 'equipos_corte', value: JSON.stringify(c) }, { onConflict: 'liga_id,key' });
         await _registrarAjuste('corte', { modo: a.modo, dia: a.dia, avisoDias: a.avisoDias, autoAprobar: a.autoAprobar }, c, email);
   }
   const puntosNuevos = leer(params.puntos);
@@ -1193,7 +1193,7 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
     // empezaron nunca se tocan.
     l = (Array.isArray(l) ? l : []).filter((x) => x && (String(x.desde) <= hoy || (x.equipo ?? null) !== equipo));
     l.push(v);
-    await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l) }, { onConflict: 'key' });
+    await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l) }, { onConflict: 'liga_id,key' });
     await _registrarAjuste('puntos', _versionEn(hoy, await _versionesPuntos(), equipo), v, email);
   }
   return getReglasLiga(params);
@@ -1463,7 +1463,7 @@ async function adminGuardarConfigLiga(params: Record<string, any>): Promise<Reco
     if (u && !/^https:\/\//.test(u)) return { exito: false, error: 'Logo inválido.' };
     filas.push({ key: 'logo_liga', value: u });
   }
-  if (filas.length) await supabase.from('config_app').upsert(filas, { onConflict: 'key' });
+  if (filas.length) await supabase.from('config_app').upsert(filas, { onConflict: 'liga_id,key' });
   return getConfigLiga({ adminToken: params.adminToken });
 }
 
@@ -1907,7 +1907,7 @@ async function adminSubirLogo(params: Record<string, any>): Promise<Record<strin
     const { error } = await supabase.from('inventario_listas').update({ foto: url || null }).eq('id', destino.slice(4));
     if (error) return { exito: false, error: error.message };
   } else if (destino === 'liga') {
-    await supabase.from('config_app').upsert({ key: 'logo_liga', value: url }, { onConflict: 'key' });
+    await supabase.from('config_app').upsert({ key: 'logo_liga', value: url }, { onConflict: 'liga_id,key' });
   } else {
     const { error } = await supabase.from('config_tiers').update({ logo: url || null }).eq('id', destino);
     if (error) return { exito: false, error: error.message };
@@ -2031,7 +2031,7 @@ async function adminSetPreciosClases(params: Record<string, any>): Promise<Recor
   await supabase.from('config_app').upsert([
     { key: 'precio_por_clase', value: String(params.precioPorClase) },
     { key: 'precio_mensual',   value: String(params.precioMensual) },
-  ], { onConflict: 'key' });
+  ], { onConflict: 'liga_id,key' });
   return { exito: true };
 }
 
@@ -2055,7 +2055,7 @@ async function adminSetFondosViajeConfig(params: Record<string, any>): Promise<R
   if (!email) return { exito: false, error: 'Sesión admin inválida.' };
   const meses = Number(params.fondosViajeMeses);
   if (!Number.isFinite(meses) || meses < 0) return { exito: false, error: 'Cantidad de meses inválida.' };
-  await supabase.from('config_app').upsert({ key: 'fondos_viaje_meses', value: String(Math.round(meses)) }, { onConflict: 'key' });
+  await supabase.from('config_app').upsert({ key: 'fondos_viaje_meses', value: String(Math.round(meses)) }, { onConflict: 'liga_id,key' });
   return { exito: true };
 }
 
@@ -3506,7 +3506,7 @@ async function adminGuardarComunidad(params: Record<string, any>): Promise<Recor
     if (!nombre || !url) return { exito: false, error: 'Cada enlace necesita nombre y dirección.' };
     limpia.push({ red, nombre, url });
   }
-  const { error } = await supabase.from('config_app').upsert({ key: 'comunidad', value: JSON.stringify(limpia) }, { onConflict: 'key' });
+  const { error } = await supabase.from('config_app').upsert({ key: 'comunidad', value: JSON.stringify(limpia) }, { onConflict: 'liga_id,key' });
   if (error) return { exito: false, error: 'No se pudo guardar.' };
   return { exito: true, enlaces: limpia };
 }
@@ -3527,7 +3527,7 @@ async function _rolesEquipo(): Promise<string[]> {
 }
 
 async function _guardarRolesEquipo(roles: string[]): Promise<boolean> {
-  const { error } = await supabase.from('config_app').upsert({ key: 'roles_equipo', value: JSON.stringify(roles) }, { onConflict: 'key' });
+  const { error } = await supabase.from('config_app').upsert({ key: 'roles_equipo', value: JSON.stringify(roles) }, { onConflict: 'liga_id,key' });
   return !error;
 }
 
@@ -4923,12 +4923,12 @@ async function _renombrarEquipoEnReglas(viejo: string, nuevo: string): Promise<v
     const m = r[k];
     if (m && typeof m === 'object' && viejo in m) { m[nuevo] = m[viejo]; delete m[viejo]; cambio = true; }
   }
-  if (cambio) await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'key' });
+  if (cambio) await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'liga_id,key' });
   const { data } = await supabase.from('config_app').select('value').eq('key', 'valores_puntos').maybeSingle();
   try {
     const l = JSON.parse(String(data?.value ?? '[]'));
     if (Array.isArray(l) && l.some((v: any) => v?.equipo === viejo)) {
-      await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l.map((v: any) => (v?.equipo === viejo ? { ...v, equipo: nuevo } : v))) }, { onConflict: 'key' });
+      await supabase.from('config_app').upsert({ key: 'valores_puntos', value: JSON.stringify(l.map((v: any) => (v?.equipo === viejo ? { ...v, equipo: nuevo } : v))) }, { onConflict: 'liga_id,key' });
     }
   } catch { /* sin cambio */ }
   await supabase.from('historial_tier').update({ tier_nombre: nuevo }).eq('tier_nombre', viejo);
@@ -6411,7 +6411,7 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
 
   if (accion === 'transparencia') {
     const v = d.activa === true || d.activa === 'true';
-    await supabase.from('config_app').upsert({ key: 'tesoreria_transparencia', value: v ? 'true' : 'false' }, { onConflict: 'key' });
+    await supabase.from('config_app').upsert({ key: 'tesoreria_transparencia', value: v ? 'true' : 'false' }, { onConflict: 'liga_id,key' });
     await _registrarAjuste('transparencia', !v, v, email);
     return { exito: true, transparencia: v };
   }
