@@ -5020,13 +5020,12 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
     _habilidades(), _fichaHabilidades(username),
     supabase.from('coach_notas').select('*').eq('username', username).order('creado_en', { ascending: false }).limit(200),
   ]);
-  // Quién ve cada nota: 'yo' solo su coach; 'coaches' todos los coaches;
-  // 'pivots' coaches y Pivots; 'jugadorx' además la persona.
-  const ve = (n: any) =>
-    (coach && n.coach === coach.user) ||
-    (n.visible === 'coaches' && !!coach) ||
-    (n.visible === 'pivots' && (!!coach || !!adminEmail)) ||
-    (n.visible === 'jugadorx' && (!!coach || !!adminEmail || propia));
+    // Quién ve cada nota (Victor, 2026-11-17: se eligen por separado):
+  // 'jugadorx' la persona, 'pivots', 'coaches'; quien la escribió siempre.
+  const ve = (n: any) => {
+    const v = _visSet(n.visible);
+    return !!(coach && n.coach === coach.user) || (v.has('coaches') && !!coach) || (v.has('pivots') && !!adminEmail) || (v.has('jugadorx') && propia);
+  };
   const quien = await _mapaEquipoPorNombre();
   const asis = await _asistencias30([username]);
   return {
@@ -5054,7 +5053,7 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
   } else if (accion === 'nota') {
     const texto = String(params.texto ?? '').trim().slice(0, 4000);
     if (!texto) return { exito: false, error: 'La nota está vacía.' };
-    const visible = ['yo', 'coaches', 'pivots', 'jugadorx'].includes(String(params.visible)) ? String(params.visible) : 'yo';
+        const visible = _visibleDe(params.visible);
     await supabase.from('coach_notas').insert({ username, coach: c.user, texto, por_voz: params.porVoz === true || params.porVoz === 'true', visible, id_evento: String(params.idEvento ?? '') || null });
   } else if (accion === 'borrarNota') {
     await supabase.from('coach_notas').delete().eq('id', String(params.id ?? '')).eq('coach', c.user);
@@ -5162,7 +5161,28 @@ async function moverPlanesEvento(params: Record<string, any>): Promise<Record<st
 
 // ─── Coach etapa 3 (Victor, 2026-11-16): pruebas, feedback y recordatorios ──
 // Sirve para cualquier evento del timeline (práctica, scrimmage, partido…).
-const _VISIBLES = ['yo', 'coaches', 'pivots', 'jugadorx'];
+
+/// Quién ve una nota, feedback o prueba (Victor, 2026-11-17): lista separada
+/// por comas de 'jugadorx', 'pivots', 'coaches' (vacío o 'yo' = solo quien la
+/// escribió). Los valores viejos de uno solo eran escalonados.
+function _visSet(v: unknown): Set<string> {
+  const s = String(v ?? '').trim();
+  if (s === 'jugadorx') return new Set(['jugadorx', 'pivots', 'coaches']);
+  if (s === 'pivots') return new Set(['pivots', 'coaches']);
+  if (s === 'coaches') return new Set(['coaches']);
+  return new Set(s.split(',').map((x) => x.trim()).filter((x) => ['jugadorx', 'pivots', 'coaches'].includes(x)));
+}
+
+/// Lo que llega de la app: lista o texto; se guarda ordenado ('yo' si nada).
+function _visibleDe(v: unknown, porDefecto = 'yo'): string {
+  if (v == null || v === '') return porDefecto;
+  let l: string[] = [];
+  if (Array.isArray(v)) l = v.map(String);
+  else { try { const j = JSON.parse(String(v)); l = Array.isArray(j) ? j.map(String) : String(v).split(','); } catch { l = String(v).split(','); } }
+  const ok = ['jugadorx', 'pivots', 'coaches'].filter((x) => l.map((y) => y.trim()).includes(x));
+  // Una sola opción de las viejas se guarda con coma para no leerse escalonada.
+  return ok.length ? ok.join(',') + (ok.length === 1 ? ',' : '') : 'yo';
+}
 
 /// Quién de sus equipos vino a un evento (última marca A tiempo o Tarde).
 async function _vinieron(idEvento: string, coach: { equipos: string[] }): Promise<string[]> {
@@ -5188,7 +5208,7 @@ async function coachPruebas(params: Record<string, any>): Promise<Record<string,
       unidad: String(params.unidad ?? 'vueltas').trim().slice(0, 30) || 'vueltas',
       mas_es_mejor: params.masEsMejor !== false && params.masEsMejor !== 'false',
       personas, activa: params.activa !== false && params.activa !== 'false',
-      visible: _VISIBLES.includes(String(params.visible)) ? String(params.visible) : 'jugadorx',
+            visible: _visibleDe(params.visible, 'jugadorx,'),
     };
     if (!fila.nombre) return { exito: false, error: 'Ponle un nombre a la prueba.' };
     const id = String(params.id ?? '');
@@ -5247,7 +5267,7 @@ async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<
     let items: any[] = [];
     try { items = JSON.parse(String(params.items ?? '[]')); } catch { items = []; }
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(params.fecha ?? '')) ? String(params.fecha) : _hoyEcuadorISO();
-    const visible = _VISIBLES.includes(String(params.visible)) ? String(params.visible) : 'yo';
+        const visible = _visibleDe(params.visible);
     const filas: any[] = [];
     for (const it of (Array.isArray(items) ? items : []).slice(0, 300)) {
       const username = String(it?.username ?? '').trim();
@@ -5285,12 +5305,12 @@ async function _avisarNovedadesFicha(): Promise<number> {
   const avisan = new Set((coaches ?? []).filter((c: any) => c.avisar_novedades !== false).map((c: any) => c.username));
   if (!avisan.size) return 0;
   const [{ data: notas }, { data: fb }, { data: marcas }, { data: pruebas }] = await Promise.all([
-    supabase.from('coach_notas').select('username, coach').eq('visible', 'jugadorx').gte('creado_en', desde),
-    supabase.from('coach_feedback').select('username, coach').eq('visible', 'jugadorx').gte('creado_en', desde),
+        supabase.from('coach_notas').select('username, coach').like('visible', '%jugadorx%').gte('creado_en', desde),
+    supabase.from('coach_feedback').select('username, coach').like('visible', '%jugadorx%').gte('creado_en', desde),
     supabase.from('coach_marcas').select('username, coach, prueba_id').gte('creado_en', desde),
     supabase.from('coach_pruebas').select('id, visible'),
   ]);
-  const visibles = new Set((pruebas ?? []).filter((p: any) => p.visible === 'jugadorx').map((p: any) => p.id));
+    const visibles = new Set((pruebas ?? []).filter((p: any) => _visSet(p.visible).has('jugadorx')).map((p: any) => p.id));
   const quienes = new Set<string>();
   for (const x of [...(notas ?? []), ...(fb ?? [])]) if (avisan.has(x.coach)) quienes.add(x.username);
   for (const x of marcas ?? []) if (avisan.has(x.coach) && visibles.has(x.prueba_id)) quienes.add(x.username);

@@ -3,6 +3,7 @@ import '../core/deporte.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../ajustes/componentes.dart';
@@ -870,12 +871,69 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
 
 const _niveles = {'no': 'Aún no', 'proceso': 'En proceso', 'logrado': 'Logrado'};
 
-const _visibles = {
-  'yo': ('Solo yo', Icons.lock_outline_rounded),
-  'coaches': ('Coaches', Icons.sports_rounded),
-  'pivots': ('Coaches y Pivots', Icons.shield_outlined),
-  'jugadorx': ('También lx jugadorx', Icons.visibility_outlined),
+/// Quién ve una nota, feedback o prueba (Victor, 2026-11-17): Usuarios (la
+/// persona), Pivots, Coaches, cada uno por separado; "Yo" = solo quien la
+/// escribe. Se guarda "jugadorx,pivots" o "yo". Los valores viejos de uno
+/// solo eran escalonados.
+Set<String> quienVeDe(String v) => switch (v.trim()) {
+  'jugadorx' => {'jugadorx', 'pivots', 'coaches'},
+  'pivots' => {'pivots', 'coaches'},
+  'coaches' => {'coaches'},
+  final s => {
+    for (final x in s.split(','))
+      if (const ['jugadorx', 'pivots', 'coaches'].contains(x.trim())) x.trim(),
+  },
 };
+
+// Con una sola opción lleva coma, para no leerse como los valores viejos.
+String _codigoQuienVe(Set<String> s) => s.isEmpty ? 'yo' : '${const ['jugadorx', 'pivots', 'coaches'].where(s.contains).join(',')}${s.length == 1 ? ',' : ''}';
+
+const _opcionesQuienVe = [
+  ('jugadorx', 'Usuarios', Icons.person_outline_rounded),
+  ('pivots', 'Pivots', Icons.shield_outlined),
+  ('coaches', 'Coaches', Icons.sports_rounded),
+];
+
+/// "Usuarios y Pivots", "Solo yo".
+String textoQuienVe(String v) {
+  final s = quienVeDe(v);
+  final l = [
+    for (final o in _opcionesQuienVe)
+      if (s.contains(o.$1)) o.$2,
+  ];
+  return l.isEmpty ? 'Solo yo' : (l.length > 1 ? '${l.sublist(0, l.length - 1).join(', ')} y ${l.last}' : l.first);
+}
+
+class QuienVe extends StatelessWidget {
+  const QuienVe({super.key, required this.valor, required this.alCambiar});
+  final String valor;
+  final ValueChanged<String> alCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = quienVeDe(valor);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final o in _opcionesQuienVe)
+          FilterChip(
+            avatar: Icon(o.$3, size: 16),
+            label: Text(o.$2),
+            selected: s.contains(o.$1),
+            onSelected: (v) => alCambiar(
+              _codigoQuienVe(
+                {...s}
+                  ..removeWhere((x) => x == o.$1)
+                  ..addAll([if (v) o.$1]),
+              ),
+            ),
+          ),
+        FilterChip(avatar: const Icon(Icons.lock_outline_rounded, size: 16), label: const Text('Yo'), selected: s.isEmpty, onSelected: (_) => alCambiar('yo')),
+      ],
+    );
+  }
+}
 
 class FichaDeportivaScreen extends StatefulWidget {
   const FichaDeportivaScreen({super.key, required this.sesion, this.username, this.nombre});
@@ -1108,7 +1166,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                                   [
                                     '${n['coachNombre']}',
                                     Fechas.corta(DateTime.parse('${n['fecha']}').toLocal()),
-                                    if (_puedeEditar) _visibles['${n['visible']}']?.$1 ?? '',
+                                    if (_puedeEditar) 'Lo ven: ${textoQuienVe('${n['visible']}')}',
                                   ].join(' · '),
                                   style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
                                 ),
@@ -1180,64 +1238,20 @@ class _Nivel extends StatelessWidget {
 
 /// Nota escrita o dictada, y quién más la ve.
 class _EditorNota extends StatefulWidget {
-  const _EditorNota({this.conVisible = true, this.titulo = 'Nueva nota'});
-
-  /// En el feedback, quién lo ve se elige para todo el evento.
-  final bool conVisible;
-  final String titulo;
+  const _EditorNota();
   @override
   State<_EditorNota> createState() => _EditorNotaState();
 }
 
 class _EditorNotaState extends State<_EditorNota> {
   final _texto = TextEditingController();
-  final _voz = SpeechToText();
-  bool _escuchando = false;
   bool _porVoz = false;
-  String _visible = 'yo';
-  String _antes = '';
+  String _visible = 'jugadorx,';
 
   @override
   void dispose() {
-    _voz.cancel();
     _texto.dispose();
     super.dispose();
-  }
-
-  Future<void> _dictar() async {
-    if (_escuchando) {
-      await _voz.stop();
-      setState(() => _escuchando = false);
-      return;
-    }
-    final ok = await _voz.initialize(
-      onStatus: (s) {
-        if ((s == 'done' || s == 'notListening') && mounted) setState(() => _escuchando = false);
-      },
-      onError: (_) {
-        if (mounted) setState(() => _escuchando = false);
-      },
-    );
-    if (!ok) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este teléfono no permite dictar. Revisa el permiso del micrófono.')));
-      }
-      return;
-    }
-    _antes = _texto.text.trim();
-    setState(() {
-      _escuchando = true;
-      _porVoz = true;
-    });
-    await _voz.listen(
-      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.dictation, localeId: 'es_ES'),
-      onResult: (r) {
-        final t = r.recognizedWords;
-        _texto.text = _antes.isEmpty ? t : '$_antes $t';
-        _texto.selection = TextSelection.collapsed(offset: _texto.text.length);
-        setState(() {});
-      },
-    );
   }
 
   @override
@@ -1249,9 +1263,9 @@ class _EditorNotaState extends State<_EditorNota> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.titulo, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          const Text('Nueva nota', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text('Escríbela o toca el micrófono y habla: se pasa a texto.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          Text('Escríbela o mantén presionado el micrófono mientras hablas: se pasa a texto.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
           const SizedBox(height: 12),
           TextField(
             controller: _texto,
@@ -1261,56 +1275,21 @@ class _EditorNotaState extends State<_EditorNota> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'Ej. Mejoró el T-stop; le cuesta caer en dos rodillas.',
-              suffixIcon: IconButton(
-                tooltip: _escuchando ? 'Dejar de dictar' : 'Dictar',
-                onPressed: _dictar,
-                icon: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    _escuchando ? Icons.stop_circle_outlined : Icons.mic_none_rounded,
-                    key: ValueKey(_escuchando),
-                    color: _escuchando ? p.marcaTexto : null,
-                  ),
-                ),
-              ),
+              suffixIcon: BotonDictar(controlador: _texto, alDictar: () => setState(() => _porVoz = true)),
             ),
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            child: _escuchando
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      'Escuchando…',
-                      style: TextStyle(color: p.marcaTexto, fontWeight: FontWeight.w600),
-                    ),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-          if (widget.conVisible) ...[
+          ...[
             const SizedBox(height: 12),
-            const Text('¿Quién más la ve?', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text('¿Quién la ve?', style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final v in _visibles.entries)
-                  ChoiceChip(
-                    avatar: Icon(v.value.$2, size: 16),
-                    label: Text(v.value.$1),
-                    selected: _visible == v.key,
-                    onSelected: (_) => setState(() => _visible = v.key),
-                  ),
-              ],
-            ),
+            QuienVe(valor: _visible, alCambiar: (v) => setState(() => _visible = v)),
           ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _texto.text.trim().isEmpty ? null : () => Navigator.of(context).pop((_texto.text.trim(), _porVoz, _visible)),
-              child: Text(widget.conVisible ? 'Guardar nota' : 'Listo'),
+              child: const Text('Guardar nota'),
             ),
           ),
         ],
@@ -1973,7 +1952,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
     final unidad = TextEditingController(text: '${x?['unidad'] ?? 'vueltas'}');
     var mas = x?['masEsMejor'] != false;
     var activa = x?['activa'] != false;
-    var visible = '${x?['visible'] ?? 'jugadorx'}';
+    var visible = '${x?['visible'] ?? 'jugadorx,'}';
     final personas = <String>{
       ...[for (final u in (x?['personas'] as List? ?? const [])) '$u'],
     };
@@ -2032,14 +2011,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
                 const SizedBox(height: 12),
                 const Text('¿Quién ve los resultados?', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final v in _visibles.entries)
-                      ChoiceChip(label: Text(v.value.$1), selected: visible == v.key, onSelected: (_) => set(() => visible = v.key)),
-                  ],
-                ),
+                QuienVe(valor: visible, alCambiar: (v) => set(() => visible = v)),
                 if (x != null)
                   SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('En uso'), value: activa, onChanged: (v) => set(() => activa = v)),
                 const SizedBox(height: 12),
@@ -2091,7 +2063,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
               [
                 'En ${x['unidad']}',
                 (x['personas'] as List? ?? const []).isEmpty ? 'a todxs' : '${(x['personas'] as List).length} personas',
-                _visibles['${x['visible']}']?.$1 ?? '',
+                'Lo ven: ${textoQuienVe('${x['visible']}')}',
               ].join(' · '),
             ),
             trailing: const Icon(Icons.edit_outlined, size: 18),
@@ -2119,7 +2091,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
   Map<String, dynamic>? _d;
   String? _error_;
   String _tema = 'General';
-  String _visible = 'yo';
+  String _visible = 'jugadorx,';
   final Map<String, int?> _notas = {};
   final Map<String, TextEditingController> _comentarios = {};
   final Set<String> _porVoz = {};
@@ -2156,20 +2128,6 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
   }
 
   TextEditingController _com(String u) => _comentarios[u] ??= TextEditingController();
-
-  Future<void> _dictar(String u) async {
-    final r = await showModalBottomSheet<(String, bool, String)>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => const _EditorNota(conVisible: false, titulo: 'Comentario'),
-    );
-    if (r == null) return;
-    setState(() {
-      _com(u).text = r.$1;
-      if (r.$2) _porVoz.add(u);
-    });
-  }
 
   Future<void> _guardar() async {
     final personas = [for (final x in (_d?['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
@@ -2241,11 +2199,12 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Nota del 1 al 10 y un comentario para cada persona. Se compara con las veces anteriores del mismo tema.',
+                    'Nota del 1 al 10 y un comentario para cada persona, por cada parte del plan del evento. Se compara con las veces anteriores de esa misma parte.',
                     style: TextStyle(color: p.textoSecundario),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Tema', style: TextStyle(fontWeight: FontWeight.w700)),
+                  // "Plan del evento" en vez de "Tema" (Victor, 2026-11-17).
+                  const Text('Plan del evento', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
@@ -2254,13 +2213,13 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                       for (final t in temas) ChoiceChip(label: Text(t), selected: _tema == t, onSelected: (_) => setState(() => _tema = t)),
                       ActionChip(
                         avatar: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Otro'),
+                        label: const Text('Agregar otro'),
                         onPressed: () async {
                           final c = TextEditingController();
                           final t = await showDialog<String>(
                             context: context,
                             builder: (h) => AlertDialog(
-                              title: const Text('Nuevo tema'),
+                              title: const Text('Agregar al plan'),
                               content: TextField(
                                 controller: c,
                                 autofocus: true,
@@ -2284,16 +2243,9 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text('¿Quién más lo ve?', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const Text('¿Quién lo ve?', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final v in _visibles.entries)
-                        ChoiceChip(label: Text(v.value.$1), selected: _visible == v.key, onSelected: (_) => setState(() => _visible = v.key)),
-                    ],
-                  ),
+                  QuienVe(valor: _visible, alCambiar: (v) => setState(() => _visible = v)),
                   const SizedBox(height: 16),
                   if (personas.isEmpty)
                     Text(
@@ -2329,7 +2281,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                             onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
                               hintText: 'Comentario (opcional)',
-                              suffixIcon: IconButton(tooltip: 'Dictar', icon: const Icon(Icons.mic_none_rounded), onPressed: () => _dictar('${x['username']}')),
+                              suffixIcon: BotonDictar(controlador: _com('${x['username']}'), alDictar: () => setState(() => _porVoz.add('${x['username']}'))),
                             ),
                           ),
                         ],
@@ -2389,8 +2341,6 @@ class EscalaDiez extends StatelessWidget {
 // Una persona por pantalla, deslizando: qué trabajó, cómo le fue (1 a 10),
 // comentario por voz o texto, prueba del día y habilidades. Pocos toques.
 
-const _quienVe = {'yo': 'Solo yo', 'coaches': 'Coaches', 'pivots': 'Coaches y Pivots', 'jugadorx': 'También la persona'};
-
 class EvaluarScreen extends StatefulWidget {
   const EvaluarScreen({super.key, required this.sesion, required this.idEvento, required this.fecha, required this.titulo});
   final Sesion sesion;
@@ -2426,7 +2376,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   List<String> _temas = [];
   List<Map<String, dynamic>> _pruebas = [];
   final Set<String> _hechos = {};
-  String _visible = 'jugadorx';
+  String _visible = 'jugadorx,';
 
   // Lo de cada persona.
   final Map<String, Set<String>> _temasDe = {};
@@ -2483,21 +2433,6 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
 
   bool _tieneAlgo(String u) =>
       _nota[u] != null || _c(u).text.trim().isNotEmpty || (_marcas[u]?.values.any((v) => v.trim().isNotEmpty) ?? false) || (_niveles[u]?.isNotEmpty ?? false);
-
-  Future<void> _dictar(String u) async {
-    final r = await showModalBottomSheet<(String, bool, String)>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => const _EditorNota(conVisible: false, titulo: 'Comentario'),
-    );
-    if (r == null || !mounted) return;
-    setState(() {
-      final antes = _c(u).text.trim();
-      _c(u).text = antes.isEmpty ? r.$1 : '$antes ${r.$1}';
-      if (r.$2) _porVoz.add(u);
-    });
-  }
 
   Future<void> _habilidades(Map<String, dynamic> x) async {
     final u = '${x['username']}';
@@ -2573,29 +2508,37 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   }
 
   Future<void> _elegirVisible() async {
-    final v = await showModalBottomSheet<String>(
+    await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (h) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('¿Quién ve las notas de hoy?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('¿Quién ve las notas de hoy?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                QuienVe(
+                  valor: _visible,
+                  alCambiar: (v) {
+                    set(() {});
+                    setState(() => _visible = v);
+                  },
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(onPressed: () => Navigator.of(h).pop(), child: const Text('Listo')),
+                ),
+              ],
             ),
-            for (final e in _quienVe.entries)
-              ListTile(
-                title: Text(e.value),
-                trailing: e.key == _visible ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
-                onTap: () => Navigator.of(h).pop(e.key),
-              ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ),
       ),
     );
-    if (v != null) setState(() => _visible = v);
   }
 
   @override
@@ -2604,7 +2547,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
-        actions: [TextButton.icon(onPressed: _elegirVisible, icon: const Icon(Icons.visibility_outlined, size: 18), label: Text(_quienVe[_visible]!))],
+        actions: [TextButton.icon(onPressed: _elegirVisible, icon: const Icon(Icons.visibility_outlined, size: 18), label: Text(textoQuienVe(_visible)))],
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
@@ -2711,7 +2654,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
             ),
           ],
         ),
-        titulo('¿QUÉ TRABAJÓ?'),
+        titulo('PLAN DEL EVENTO'),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -2724,13 +2667,13 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
               ),
             ActionChip(
               avatar: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Otro tema'),
+              label: const Text('Agregar otro'),
               onPressed: () async {
                 final ctl = TextEditingController();
                 final t = await showDialog<String>(
                   context: context,
                   builder: (d) => AlertDialog(
-                    title: const Text('Otro tema'),
+                    title: const Text('Agregar al plan'),
                     content: TextField(
                       controller: ctl,
                       autofocus: true,
@@ -2758,8 +2701,8 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
           textCapitalization: TextCapitalization.sentences,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'Escribe o dicta',
-            suffixIcon: IconButton(tooltip: 'Dictar', icon: const Icon(Icons.mic_rounded), onPressed: () => _dictar(u)),
+            hintText: 'Escribe o mantén presionado el micrófono',
+            suffixIcon: BotonDictar(controlador: _c(u), alDictar: () => setState(() => _porVoz.add(u))),
           ),
         ),
         if (pruebas.isNotEmpty) ...[
@@ -2877,6 +2820,90 @@ class _HojaHabilidadesState extends State<_HojaHabilidades> {
               child: FilledButton(onPressed: () => Navigator.of(context).pop(_cambios), child: const Text('Listo')),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dictado como en WhatsApp (Victor, 2026-11-17): mientras mantienes
+/// presionado el micrófono, escucha y escribe en [controlador]; al soltar,
+/// para. Un toque solo explica cómo se usa.
+class BotonDictar extends StatefulWidget {
+  const BotonDictar({super.key, required this.controlador, this.alDictar});
+  final TextEditingController controlador;
+
+  /// Se llama al terminar de dictar (para marcar "por voz").
+  final VoidCallback? alDictar;
+  @override
+  State<BotonDictar> createState() => _BotonDictarState();
+}
+
+class _BotonDictarState extends State<BotonDictar> {
+  final _voz = SpeechToText();
+  bool _escuchando = false;
+  String _antes = '';
+
+  @override
+  void dispose() {
+    _voz.cancel();
+    super.dispose();
+  }
+
+  Future<void> _empezar() async {
+    final m = ScaffoldMessenger.of(context);
+    final ok = await _voz.initialize(
+      onStatus: (s) {
+        if ((s == 'done' || s == 'notListening') && mounted) setState(() => _escuchando = false);
+      },
+      onError: (_) {
+        if (mounted) setState(() => _escuchando = false);
+      },
+    );
+    if (!ok) {
+      m.showSnackBar(const SnackBar(content: Text('Este teléfono no permite dictar. Revisa el permiso del micrófono.')));
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    _antes = widget.controlador.text.trim();
+    if (mounted) setState(() => _escuchando = true);
+    await _voz.listen(
+      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.dictation, localeId: 'es_ES'),
+      onResult: (r) {
+        final t = r.recognizedWords;
+        widget.controlador.text = _antes.isEmpty ? t : '$_antes $t';
+        widget.controlador.selection = TextSelection.collapsed(offset: widget.controlador.text.length);
+      },
+    );
+  }
+
+  Future<void> _soltar() async {
+    await _voz.stop();
+    if (!mounted) return;
+    setState(() => _escuchando = false);
+    widget.alDictar?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Semantics(
+      button: true,
+      label: 'Mantén presionado para dictar',
+      child: GestureDetector(
+        onTap: () => ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Mantén presionado el micrófono mientras hablas.'))),
+        onLongPressStart: (_) => _empezar(),
+        onLongPressEnd: (_) => _soltar(),
+        onLongPressCancel: _soltar,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          margin: const EdgeInsets.all(4),
+          width: _escuchando ? 48 : 40,
+          height: _escuchando ? 48 : 40,
+          decoration: BoxDecoration(color: _escuchando ? p.marca : p.suave, shape: BoxShape.circle),
+          child: Icon(Icons.mic_rounded, color: _escuchando ? p.sobreMarca : p.sobreSuave),
         ),
       ),
     );
