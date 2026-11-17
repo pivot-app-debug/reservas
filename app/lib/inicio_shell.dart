@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'coach/coach_screen.dart';
+import 'liga/directorio_screen.dart';
+import 'pivots/ajustes_liga_screen.dart';
+import 'ajustes/componentes.dart';
 import 'core/config_liga.dart';
 import 'core/fechas.dart';
 import 'core/tema.dart';
@@ -59,6 +62,13 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     if (!mounted || Tour.activo) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);
+    if (!mounted) return;
+    // Liga creada por el camino rápido (Victor, 2026-11-17).
+    await SugerenciaReglas.siCorresponde(
+      context,
+      widget.sesion,
+      abrir: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: widget.sesion, pestana: true)),
+    );
     if (!mounted) return;
     await DatosPendientes.recordarSiCorresponde(context, widget.sesion, abrir: (clave) => abrirPendiente(context, widget.sesion, clave));
   }

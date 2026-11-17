@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../liga/crear_liga_screen.dart';
 import '../core/api.dart';
 import 'boton_google.dart';
 import '../core/tema.dart';
@@ -50,7 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final eventos = await widget.sesion.prepararGoogleWeb();
       _googleWeb = eventos.listen(
         (e) {
-          if (e is GoogleSignInAuthenticationEventSignIn) _ejecutar(() => widget.sesion.conCuentaGoogle(e.user));
+          if (e is! GoogleSignInAuthenticationEventSignIn) return;
+          // El asistente de crear liga está esperando esta cuenta.
+          final c = Sesion.capturaGoogle;
+          if (c != null) return c(e.user);
+          _ejecutar(() => widget.sesion.conCuentaGoogle(e.user));
         },
         onError: (Object _) {
           if (mounted) setState(() => _error = 'No se pudo iniciar sesión con Google.');
@@ -177,6 +182,18 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
         TextButton(onPressed: _ocupado ? null : () => setState(() => _modoPin = true), child: const Text('Entrar con usuario y contraseña')),
+        const SizedBox(height: 18),
+        // Crear una liga (Victor, 2026-11-17).
+        Text(
+          '¿Tu liga todavía no está en Pivot?',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: context.pivot.textoSecundario),
+        ),
+        TextButton.icon(
+          onPressed: _ocupado ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CrearLigaScreen(sesion: widget.sesion))),
+          icon: const Icon(Icons.add_circle_outline_rounded),
+          label: const Text('Crea tu liga'),
+        ),
       ],
     );
   }

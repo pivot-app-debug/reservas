@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (crear una liga)
+- **Crea tu liga** desde el inicio de sesión. Cuenta con Google o con tu correo (código de 6 dígitos). Lo básico: nombre, deporte (lista de deportes de equipo; por ahora solo roller derby), país, ciudad; moneda y zona horaria según el país del teléfono.
+- Si ya hay una liga del **mismo deporte** con ese nombre, pregunta "¿Es la tuya?". Nombres repetidos permitidos: el enlace lleva un número que no se ve.
+- **Rápido** (valores por defecto) o **Paso a paso**: equipos y a cuál entra la gente nueva, cuota (igual o por equipo, vencimiento, recargo), clases sueltas, medios de pago, entrenamientos (se crean en el calendario), cambios de equipo, roles editables y premio por pagar a tiempo. Cada pregunta con "Lo veo después" y "Terminar ahora".
+- **Resumen** editable antes de seguir, después **tu perfil** (usuario, nombre derby, número, pronombres, roles, fecha de nacimiento) y la **bienvenida como Pivot**.
+- Camino rápido: al entrar, "¿Armamos tus equipos y reglas?" (Omitir no vuelve a preguntar; Recordar más tarde, a los 5 días). Mi Liga muestra **Primeros pasos**.
+- **Ligas en Pivot** (Mi Liga → PIVOT): directorio de ligas con su contacto y comunidad si la comparten, y "Tu liga en el directorio" para elegir qué se muestra. **Panel de Pivot** para el equipo de Pivot con todas las ligas.
+- El servidor reconoce la liga de quien entra con Google, correo, usuario o enlace de inscripción.
+
 ## 2026-11-17 (aviso de datos)
 - El aviso para completar tus datos (emergencia, salud, foto, etc.) ya no depende de haber visto el recorrido del Calendario: aparece siempre que falte algo (si hay un recorrido abierto, espera a que termine).
 

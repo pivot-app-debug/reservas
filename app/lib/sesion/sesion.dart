@@ -188,6 +188,43 @@ class Sesion extends ChangeNotifier {
 
   Future<void> conCuentaGoogle(GoogleSignInAccount cuenta) => _entrarConCuentaGoogle(cuenta);
 
+  // ─── Crear una liga (Victor, 2026-11-17) ────────────────────────────────
+  /// En la web, mientras el asistente de crear liga espera la cuenta de
+  /// Google, el inicio de sesión no la usa para entrar.
+  static void Function(GoogleSignInAccount cuenta)? capturaGoogle;
+
+  /// Identidad de Google para crear la liga (teléfono), sin iniciar sesión.
+  Future<String> idTokenGoogle() async {
+    final gs = GoogleSignIn.instance;
+    await gs.initialize(serverClientId: ApiConfig.googleWebClientId);
+    try {
+      final cuenta = await gs.authenticate();
+      final t = cuenta.authentication.idToken;
+      if (t == null) throw LoginFallido('Google no devolvió la identidad de la cuenta.');
+      return t;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) throw LoginFallido('');
+      throw LoginFallido('No se pudo usar Google (${e.code.name}).');
+    }
+  }
+
+  /// Verifica el código del correo sin entrar: devuelve el token para crear
+  /// la cuenta, o un error si ese correo ya tiene cuenta.
+  Future<String> registroDeCorreo(String email, String codigo) async {
+    final res = await api.post('verificarCodigoCorreo', {'email': email.trim().toLowerCase(), 'codigo': codigo.trim()});
+    if (res['noRegistrado'] == true) return '${res['registroToken']}';
+    if (res['valido'] == true) throw LoginFallido('Ese correo ya tiene una cuenta en Pivot. Entra con él desde el inicio.');
+    throw LoginFallido('${res['error'] ?? 'No se pudo verificar el código.'}');
+  }
+
+  /// Crea la liga con todo lo elegido y entra como su Pivot.
+  Future<Map<String, dynamic>> crearLiga(Map<String, Object?> cuerpo) async {
+    final res = await api.post('crearLiga', cuerpo);
+    if (res['exito'] != true) throw LoginFallido('${res['error'] ?? 'No se pudo crear la liga.'}');
+    await _guardar(res);
+    return res;
+  }
+
   // ─── Inicio y cuenta con correo (preparado; se activa desde el servidor) ──
   /// ¿El servidor ya permite entrar con correo? (`login_correo`).
   Future<bool> loginCorreoActivo() async {

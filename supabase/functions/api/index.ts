@@ -90,19 +90,44 @@ async function _ligaDelPedido(p: Record<string, any>): Promise<string> {
     const l = await fila(s.from('sessions').select('liga_id').eq('token', String(p.token)));
     if (l) return l;
   }
-  for (const k of ['username', 'nombre', 'usuario', 'nombreUsuario']) {
-    if (typeof p[k] === 'string' && p[k].trim()) {
+    for (const k of ['username', 'nombre', 'usuario', 'nombreUsuario', 'identificador']) {
+    if (typeof p[k] === 'string' && p[k].trim() && !p[k].includes('@')) {
       const l = await fila(s.from('equipo').select('liga_id').ilike('username', p[k].trim()));
       if (l) return l;
     }
   }
-  if (p.email) {
-    const l = await fila(s.from('admins').select('liga_id').ilike('email', String(p.email).trim()));
+  // Correo: el que se escribe, o el de la cuenta de Google (solo para elegir
+  // en qué liga buscar; la identidad la verifica cada acción).
+  const correos: string[] = [];
+  for (const k of ['email', 'identificador']) if (typeof p[k] === 'string' && p[k].includes('@')) correos.push(p[k].trim().toLowerCase());
+  if (typeof p.idToken === 'string') {
+    try {
+      const b = p.idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const e = JSON.parse(atob(b + '==='.slice((b.length + 3) % 4)))?.email;
+      if (e) correos.push(String(e).toLowerCase());
+    } catch { /* token raro: se ignora */ }
+  }
+  for (const c of correos) {
+    const l = (await s.from('equipo').select('liga_id').ilike('email', c).is('eliminado_en', null).limit(1)).data?.[0]?.liga_id
+      ?? await fila(s.from('admins').select('liga_id').ilike('email', c));
     if (l) return l;
   }
-  if (p.liga) {
+    if (p.liga) {
     const l = (await s.from('ligas').select('id').eq('slug', String(p.liga)).maybeSingle()).data?.id;
     if (l) return l;
+  }
+  // Enlaces de inscripción: código del equipo o invitación.
+  for (const k of ['equipo', 'codigo', 'codigoEquipo']) {
+    if (typeof p[k] === 'string' && p[k].trim()) {
+      const l = await fila(s.from('config_tiers').select('liga_id').eq('codigo_invitacion', p[k].trim()));
+      if (l) return l;
+    }
+  }
+    for (const t of [p.inviteToken, p.token]) {
+    if (typeof t === 'string' && t) {
+      const l = await fila(s.from('invite_tokens').select('liga_id').eq('token', t));
+      if (l) return l;
+    }
   }
   return LIGA_QUINDES;
 }
@@ -4399,6 +4424,206 @@ const ESTADOS_ROLLCALL = ['A tiempo', 'Tarde', 'Ninguno'];
 // este dato). El frontend siempre la llamó vía `apiPost` con
 // `adminToken: _adminToken` (`_evMarcarAsistenciaAdmin()`/js/eventos.js),
 // así que este fix no cambia nada del flujo real existente.
+// ─── Crear una liga (Victor, 2026-11-17) ────────────────────────────────────
+// Cualquiera puede crear una liga: con Google o con su correo verificado por
+// código. La liga se crea recién al final, con todo lo elegido en el
+// asistente; quien la crea queda como Pivot con todos los permisos.
+function _slugLiga(nombre: string): string {
+  return nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'liga';
+}
+
+async function verificarNombreLiga(params: Record<string, any>): Promise<Record<string, any>> {
+  const nombre = String(params.nombre ?? '').trim();
+  const deporte = String(params.deporte ?? 'roller_derby');
+  if (!nombre) return { exito: true, existe: false };
+  const { data } = await supabaseServicio.from('ligas').select('nombre, ciudad, pais, logo').eq('deporte', deporte).ilike('nombre', nombre);
+  return { exito: true, existe: (data ?? []).length > 0, ligas: (data ?? []).map((l: any) => ({ nombre: l.nombre, ciudad: l.ciudad ?? '', pais: l.pais ?? '', logo: l.logo ?? '' })) };
+}
+
+async function crearLiga(params: Record<string, any>): Promise<Record<string, any>> {
+  const s = supabaseServicio;
+  let x: any = params.datos;
+  if (typeof x === 'string') { try { x = JSON.parse(x); } catch { x = null; } }
+  if (!x || typeof x !== 'object') return { exito: false, error: 'Faltan los datos de la liga.' };
+  // Identidad: Google o correo verificado.
+  let email = String(params.email ?? '').trim().toLowerCase();
+  let foto = '';
+  if (params.idToken) {
+    const info = await _verificarGoogleToken(String(params.idToken));
+    if (!info) return { exito: false, error: 'No se pudo verificar tu cuenta de Google. Vuelve a intentarlo.' };
+    email = String(info.email ?? '').toLowerCase();
+    foto = info.picture ?? '';
+  } else if (!email || !params.registroToken || !(await _registroValido(email, String(params.registroToken)))) {
+    return { exito: false, error: 'Verifica tu correo con el código antes de crear la liga.' };
+  }
+  const p = x.perfil ?? {};
+  const usuario = String(p.usuario ?? '').trim();
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'\-]{2,40}$/.test(usuario)) return { exito: false, error: 'Tu nombre de usuario solo puede tener letras y espacios.' };
+  const { data: yaEmail } = await s.from('equipo').select('username').ilike('email', email).is('eliminado_en', null).limit(1);
+  if ((yaEmail ?? []).length) return { exito: false, error: 'Ese correo ya tiene una cuenta en Pivot. Por ahora cada persona está en una sola liga.' };
+  const { data: yaUsuario } = await s.from('equipo').select('username').ilike('username', usuario).limit(1);
+  if ((yaUsuario ?? []).length) return { exito: false, error: 'Ese nombre de usuario ya está en uso. Prueba con otro.' };
+
+  const nombre = String(x.nombre ?? '').trim().slice(0, 80);
+  if (!nombre) return { exito: false, error: 'Ponle un nombre a tu liga.' };
+  // Enlace único: si ya existe, se suma un número que no se ve en la app.
+  const base = _slugLiga(nombre);
+  let slug = base;
+  for (let i = 2; i < 200; i++) {
+    const { data: hay } = await s.from('ligas').select('id').eq('slug', slug).maybeSingle();
+    if (!hay) break;
+    slug = `${base}-${i}`;
+  }
+  const { data: liga, error: e1 } = await s.from('ligas').insert({
+    nombre, slug, deporte: 'roller_derby', pais: String(x.pais ?? '').slice(0, 2) || null, ciudad: String(x.ciudad ?? '').trim().slice(0, 60) || null,
+    moneda: String(x.monedaCodigo ?? '').slice(0, 3) || null, zona_horaria: String(x.zonaHoraria ?? 'America/Guayaquil').slice(0, 60), logo: String(x.logo ?? '') || null, creada_por: email,
+  }).select('id, slug').single();
+  if (e1 || !liga) return { exito: false, error: 'No se pudo crear la liga: ' + (e1?.message ?? '') };
+
+  const cliente = await _clienteDeLiga(liga.id);
+  try {
+    return await _alsLiga.run({ cliente, ligaId: liga.id }, async () => {
+      // Equipos (el marcado como "entran aquí" recibe a la gente nueva).
+      const equipos = (Array.isArray(x.equipos) && x.equipos.length ? x.equipos : [{ nombre: 'Equipo principal', nuevxs: true }])
+        .slice(0, 12).map((e: any, i: number) => ({ nombre: String(e?.nombre ?? '').trim().slice(0, 40) || `Equipo ${i + 1}`, nuevxs: e?.nuevxs === true, cuota: e?.cuota }));
+      if (!equipos.some((e: any) => e.nuevxs)) equipos[equipos.length - 1].nuevxs = true;
+      await supabase.from('config_tiers').insert(equipos.map((e: any, i: number) => ({ orden: i + 1, nombre: e.nombre, es_default: e.nuevxs, puntos_fuente: 'todos' })));
+      // Reglas.
+      const c = x.cuota ?? {};
+      const cobra = c.cobra === true;
+      const cobroEquipos: Record<string, any> = {};
+      for (const e of equipos) {
+        const propio = c.igual === false ? Number(e.cuota) : null;
+        cobroEquipos[e.nombre] = cobra ? { modo: 'mes', precioMensual: propio != null && Number.isFinite(propio) ? propio : null, precioClase: null } : { modo: x.claseSuelta?.vende ? 'clase' : 'sin_cobro', precioMensual: null, precioClase: null };
+      }
+      const ec = String(x.pais ?? '') === 'EC';
+      const reglas: Record<string, any> = {
+        cuotaVenceDia: cobra ? Math.max(0, Math.min(28, Math.round(Number(c.dia) || 0))) : 0,
+        cuotaRecargo: cobra && c.recargo ? Math.max(0, Number(c.recargo) || 0) : 0,
+        cuotaRecargoTipo: c.recargoTipo === 'porcentaje' ? 'porcentaje' : 'fijo',
+        cuotaRecargoModo: c.recargoModo === 'mensual' ? 'mensual' : 'unico',
+        recompensaPago: { activa: x.premios === true, puntos: 1, claseGratis: false, saldo: 0 },
+        cobroEquipos, graciaClases: {},
+        atencionMedica: ec ? ['MSP (Ministerio de Salud Pública)', 'IESS', 'Seguro Privado'] : ['Sistema público de salud', 'Seguro Privado'],
+        segurosPrivados: ec ? ['Saludsa', 'Ecuasanitas', 'Humana', 'BMI del Ecuador', 'Confiamed', 'BUPA Ecuador', 'Pan American Life', 'CruzBlanca'] : [],
+      };
+      const filas: any[] = [
+        { key: 'reglas_liga', value: JSON.stringify(reglas) },
+        { key: 'precio_mensual', value: String(cobra ? Math.max(0, Number(c.monto) || 0) : 0) },
+        { key: 'precio_por_clase', value: String(x.claseSuelta?.vende ? Math.max(0, Number(x.claseSuelta.precio) || 0) : 0) },
+        { key: 'pais_equipo', value: String(x.pais ?? 'EC').slice(0, 2) },
+        { key: 'zona_horaria', value: String(x.zonaHoraria ?? 'America/Guayaquil') },
+        { key: 'moneda', value: String(x.moneda ?? '$').slice(0, 8) },
+        { key: 'moneda_codigo', value: String(x.monedaCodigo ?? 'USD').slice(0, 3) },
+        { key: 'logo_liga', value: String(x.logo ?? '') },
+        { key: 'login_correo', value: 'true' },
+        { key: 'solicitudes_pivots', value: 'auto' },
+        { key: 'asistente_rapido', value: x.modo === 'rapido' ? 'true' : 'false' },
+        { key: 'equipos_corte', value: JSON.stringify(x.cambiosEquipo === true ? { modo: 'revisar', dia: 1, avisoDias: 7, autoAprobar: true } : { modo: 'revisar', dia: 1, avisoDias: 7, autoAprobar: false }) },
+      ];
+      if (Array.isArray(x.roles) && x.roles.length) {
+        filas.push({ key: 'roles_equipo', value: JSON.stringify([...new Set(x.roles.map((r: any) => String(r).trim().slice(0, 30)).filter(Boolean))].slice(0, 30)) });
+      }
+      if (Array.isArray(x.medios) && x.medios.length) {
+        filas.push({ key: 'formas_pago', value: JSON.stringify({ medios: x.medios.slice(0, 10).map((m: any, i: number) => ({
+          id: `medio${i + 1}`, tipo: ['transferencia', 'efectivo', 'billetera', 'enlace'].includes(String(m?.tipo)) ? String(m.tipo) : 'transferencia',
+          nombre: String(m?.nombre ?? '').trim().slice(0, 40) || 'Pago', datos: [], enlace: String(m?.enlace ?? '').trim().slice(0, 300), activo: true, logo: '', color: '',
+        })) }) });
+      }
+      await supabase.from('config_app').upsert(filas, { onConflict: 'liga_id,key' });
+      // Entrenamientos: un evento que se repite por cada horario.
+      const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+      const ents = (Array.isArray(x.entrenamientos) ? x.entrenamientos : []).slice(0, 10).map((t: any) => ({
+        lugar: String(t?.lugar ?? '').trim().slice(0, 80) || 'Por definir',
+        dias: (Array.isArray(t?.dias) ? t.dias : []).filter((d: any) => dias.includes(String(d))).join(', '),
+        inicia: /^\d{2}:\d{2}$/.test(String(t?.inicia)) ? t.inicia : '19:00', finaliza: /^\d{2}:\d{2}$/.test(String(t?.finaliza)) ? t.finaliza : '21:00',
+        tipo: 'Días de la semana', tipo_icono: 'Entrenamiento', requiere_reserva: x.claseSuelta?.vende === true,
+      })).filter((t: any) => t.dias);
+      if (ents.length) {
+        await supabase.from('venues').insert(ents);
+        await supabase.rpc('regenerar_ventana_asistencias');
+      }
+      // Tu cuenta, y quedas Pivot con todos los permisos.
+      const ins = await inscribirPersona({
+        nombre: usuario, email, pronombres: p.pronombres ?? '', foto: p.foto || foto, fechaNac: p.fechaNac ?? '',
+        prefijo: p.prefijo ?? '', telefono: p.telefono ?? '', necesitaPatines: 'No', necesitaProtecciones: 'No',
+        ...(params.idToken ? { idToken: params.idToken } : { registroToken: params.registroToken }),
+      });
+      if (ins.exito !== true) throw new Error(String(ins.error ?? 'No se pudo crear tu cuenta.'));
+      const extra: Record<string, any> = {};
+      if (p.nombreDerby) extra.nombre_derby = String(p.nombreDerby).trim().slice(0, 40);
+      if (p.numeroDerby) extra.numero_derby = String(p.numeroDerby).trim().slice(0, 8);
+      if (Array.isArray(p.roles)) extra.roles = p.roles.map((r: any) => String(r).trim()).filter(Boolean).slice(0, 10);
+      if (Object.keys(extra).length) await supabase.from('equipo').update(extra).eq('username', usuario);
+      await supabase.from('admins').insert({ email, areas: AREAS_PIVOT, invited_by: 'creó la liga' });
+      const adminToken = await _crearAdminToken(email);
+      const fila = await _getEquipoRow(usuario);
+      return { exito: true, token: ins.token, nombre: usuario, datos: getDatosCompletos(fila), esAdmin: true, adminToken, liga: { id: liga.id, nombre, slug: liga.slug } };
+    });
+  } catch (e) {
+    // Si algo falló a mitad de camino, la liga no queda a medias.
+    await s.from('ligas').delete().eq('id', liga.id).then(() => {}, () => {});
+    return { exito: false, error: String((e as Error).message ?? e) };
+  }
+}
+
+// Directorio "Ligas en Pivot" (para Pivots) y lo que muestra tu liga.
+async function getDirectorioLigas(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const { data } = await supabaseServicio.from('ligas').select('id, nombre, slug, deporte, ciudad, pais, logo, contacto, mostrar_comunidad, visible').order('nombre');
+  const conComunidad = (data ?? []).filter((l: any) => l.visible && l.mostrar_comunidad).map((l: any) => l.id);
+  const { data: com } = conComunidad.length ? await supabaseServicio.from('config_app').select('liga_id, value').eq('key', 'comunidad').in('liga_id', conComunidad) : { data: [] };
+  const mia = _ligaEnCurso();
+  return {
+    exito: true,
+    ligas: (data ?? []).filter((l: any) => l.visible || l.id === mia).map((l: any) => {
+      let comunidad: any[] = [];
+      try { comunidad = JSON.parse((com ?? []).find((c: any) => c.liga_id === l.id)?.value ?? '[]'); } catch { comunidad = []; }
+      return { id: l.id, nombre: l.nombre, deporte: l.deporte, ciudad: l.ciudad ?? '', pais: l.pais ?? '', logo: l.logo ?? '', contacto: l.contacto ?? {}, comunidad, mia: l.id === mia };
+    }),
+  };
+}
+
+async function adminMiLigaDirectorio(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const id = _ligaEnCurso();
+  if (String(params.accion ?? '') === 'guardar') {
+    let contacto: any = params.contacto;
+    if (typeof contacto === 'string') { try { contacto = JSON.parse(contacto); } catch { contacto = {}; } }
+    const limpio: Record<string, string> = {};
+    for (const k of ['correo', 'telefono', 'web', 'instagram']) if (contacto?.[k]) limpio[k] = String(contacto[k]).trim().slice(0, 120);
+    await supabaseServicio.from('ligas').update({
+      visible: params.visible !== false && params.visible !== 'false', mostrar_comunidad: params.mostrarComunidad === true || params.mostrarComunidad === 'true',
+      contacto: limpio, ciudad: String(params.ciudad ?? '').trim().slice(0, 60) || null,
+    }).eq('id', id);
+  }
+  const { data } = await supabaseServicio.from('ligas').select('nombre, ciudad, pais, visible, contacto, mostrar_comunidad').eq('id', id).maybeSingle();
+  return { exito: true, liga: data };
+}
+
+// Panel del dueño de Pivot: todas las ligas.
+async function superLigas(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const { data: duenx } = await supabaseServicio.from('pivot_duenos').select('email').ilike('email', email).maybeSingle();
+  if (!duenx) return { exito: false, error: 'Solo para el equipo de Pivot.' };
+  const { data: ligas } = await supabaseServicio.from('ligas').select('id, nombre, slug, deporte, ciudad, pais, logo, creada_en, creada_por, visible').order('creada_en', { ascending: false });
+  const { data: gente } = await supabaseServicio.from('equipo').select('liga_id').is('eliminado_en', null);
+  const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: act } = await supabaseServicio.from('log_asistencias').select('liga_id').gte('marca_temporal', desde).limit(20000);
+  const contar = (l: any[] | null, id: string) => (l ?? []).filter((r: any) => r.liga_id === id).length;
+  return { exito: true, ligas: (ligas ?? []).map((l: any) => ({ ...l, personas: contar(gente, l.id), marcas30: contar(act, l.id) })) };
+}
+
+async function esDuenxPivot(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: true, duenx: false };
+  const { data } = await supabaseServicio.from('pivot_duenos').select('email').ilike('email', email).maybeSingle();
+  return { exito: true, duenx: !!data };
+}
+
 // ─── Coach (Victor, 2026-11-16) ─────────────────────────────────────────────
 // La persona pide ser coach (o un Pivot la nombra) y elige sus equipos. El
 // coach ve a sus jugadorxs (sin datos de salud), lleva su ficha deportiva
@@ -11704,7 +11929,13 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
                   case 'adminSugeridosAsistencia':        return json(await adminSugeridosAsistencia(params));
       case 'adminCambiarRespuesta':           return json(await adminCambiarRespuesta(params));
             case 'adminMarcarAsistencia':           return json(await adminMarcarAsistencia(params));
-      case 'pedirCoach':                      return json(await pedirCoach(params));
+            case 'pedirCoach':                      return json(await pedirCoach(params));
+      case 'verificarNombreLiga':             return json(await verificarNombreLiga(params));
+      case 'crearLiga':                       return json(await crearLiga(params));
+      case 'getDirectorioLigas':              return json(await getDirectorioLigas(params));
+      case 'adminMiLigaDirectorio':           return json(await adminMiLigaDirectorio(params));
+      case 'superLigas':                      return json(await superLigas(params));
+      case 'esDuenxPivot':                    return json(await esDuenxPivot(params));
       case 'getMiCoach':                      return json(await getMiCoach(params));
       case 'adminCoaches':                    return json(await adminCoaches(params));
       case 'getCoach':                        return json(await getCoach(params));

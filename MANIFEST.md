@@ -246,6 +246,11 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Crear una liga (2026-11-17)
+- `ligas` suma deporte, ciudad, visible, contacto jsonb, mostrar_comunidad, creada_por; `pivot_duenos` (emails del equipo de Pivot). Migración `20261117090000_ligas_directorio.sql`.
+- API: `verificarNombreLiga` (mismo nombre y deporte), `crearLiga` (idToken de Google o email + registroToken; crea liga con slug único, y dentro de su cliente: config_tiers, config_app — reglas_liga, precios, país, zona, moneda, roles, formas_pago, equipos_corte, asistente_rapido —, venues + regenerar, `inscribirPersona`, admins con AREAS_PIVOT y adminToken; si falla, borra la liga), `getDirectorioLigas`, `adminMiLigaDirectorio`, `superLigas`, `esDuenxPivot`. `_ligaDelPedido` también mira email (incluido el del idToken de Google, solo para elegir la liga), identificador, código de equipo e invitación.
+- App: `liga/crear_liga_screen.dart` (asistente; `Sesion.idTokenGoogle`, `registroDeCorreo`, `crearLiga`, `Sesion.capturaGoogle` para el botón web), `liga/directorio_screen.dart` (`DirectorioLigasScreen`, `MiLigaDirectorioScreen`, `PanelPivotScreen`, `SugerenciaReglas`, `PrimerosPasos`, `FilasDirectorio`).
+
 ## Varias ligas (base, 2026-11-17)
 - Tabla `ligas` (Quindes = `00000000-0000-4000-8000-00000000c0de`, slug `quindes`). Todas las tablas tienen `liga_id` (por defecto la del JWT, o Quindes) con índice y la política `liga_aislada` para el rol `liga_api`. `liga_actual()` lee `request.jwt.claims->>liga_id`. `config_app` tiene clave primaria `(liga_id, key)` (los upsert usan `onConflict: 'liga_id,key'`); `inventario_listas` es única por `(liga_id, sistema)`.
 - `regenerar_ventana_asistencias()` pone en cada evento la liga de su pista y solo mira descansos de esa liga.

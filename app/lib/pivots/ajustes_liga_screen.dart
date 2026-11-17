@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../coach/coach_screen.dart';
+import '../liga/directorio_screen.dart';
 import '../core/sincroniza.dart';
 
 import '../ajustes/campos.dart';
@@ -323,6 +324,14 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Liga recién creada: lo que conviene hacer primero.
+                PrimerosPasos(
+                  pasos: [
+                    ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
+                    ('reglas', Icons.rule_rounded, 'Revisa las reglas: cuota, asistencia y estados', () => _abrir(ReglasScreen(sesion: sesion))),
+                    ('pivots', Icons.group_add_rounded, 'Suma otro Pivot y reparte las áreas', () => _abrir(PivotsScreen(sesion: sesion))),
+                  ],
+                ),
                 _titulo(context, 'EQUIPOS'),
                 Resaltable(
                   id: 'equipos',
@@ -459,6 +468,9 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                     ),
                   ],
                 ),
+                // Directorio de ligas y panel de Pivot (Victor, 2026-11-17).
+                _titulo(context, 'PIVOT'),
+                FilasDirectorio(sesion: sesion),
               ],
             ),
           ),
