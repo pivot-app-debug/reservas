@@ -9623,10 +9623,12 @@ async function _novedadesEquipo(yo: string): Promise<any[]> {
     if (g.username === yo || g.fecha_publica !== 'Sí' || String(g.fecha_nacimiento).slice(5, 10) !== md) continue;
     out.push({ tipo: 'cumple', usuario: g.username, fecha: hoy + 'T05:00:00Z', titulo: `¡Hoy cumple años ${g.nombre_derby || g.username}!`, detalle: 'Escríbele un saludo.' });
   }
-  // Comunicados enviados en los últimos 3 días a todo el equipo o a ti.
-  const { data: com } = await supabase.from('avisos_programados').select('id, titulo, mensaje, destino, enviado_en')
-    .not('enviado_en', 'is', null).gte('enviado_en', new Date(ahora - 3 * 86400000).toISOString()).order('enviado_en', { ascending: false }).limit(10);
-  for (const c of com ?? []) {
+    // Comunicados a todo el equipo o a ti: hasta la fecha que eligió el Pivot
+  // o, sin fecha, 3 días desde que se envió (Victor, 2026-11-17).
+  const { data: comTodos } = await supabase.from('avisos_programados').select('id, titulo, mensaje, destino, enviado_en, vence_en')
+    .not('enviado_en', 'is', null).is('cancelado_en', null).gte('enviado_en', new Date(ahora - 31 * 86400000).toISOString()).order('enviado_en', { ascending: false }).limit(40);
+  const com = (comTodos ?? []).filter((c: any) => (c.vence_en ? Date.parse(c.vence_en) : Date.parse(c.enviado_en) + 3 * 86400000) > ahora).slice(0, 10);
+  for (const c of com) {
     const d = c.destino;
     const paraMi = !d || d === 'todos' || (Array.isArray(d) && (d.includes('todos') || d.includes(yo))) || String(d) === yo;
     if (paraMi) out.push({ tipo: 'comunicado', id: c.id, fecha: c.enviado_en, titulo: c.titulo, detalle: c.mensaje });
@@ -10783,14 +10785,18 @@ async function adminEnviarAviso(params: Record<string, any>): Promise<Record<str
   if (!titulo || !mensaje) return { exito: false, error: 'Escribe el título y el mensaje.' };
   let destino: any = 'todos';
   try { const d = JSON.parse(String(params.destino ?? '"todos"')); if (Array.isArray(d) && d.length) destino = d.map(String); } catch { /* todos */ }
-  const enviarEn = params.enviarEn ? Date.parse(String(params.enviarEn)) : NaN;
+    const enviarEn = params.enviarEn ? Date.parse(String(params.enviarEn)) : NaN;
+  // Hasta cuándo se ve en Notificaciones (máximo 30 días; sin fecha, 3 días).
+  const venceMs = params.venceEn ? Date.parse(String(params.venceEn)) : NaN;
+  const sale = Number.isFinite(enviarEn) ? enviarEn : Date.now();
+  const vence_en = Number.isFinite(venceMs) && venceMs > sale ? new Date(Math.min(venceMs, sale + 30 * 86400000)).toISOString() : null;
   if (Number.isFinite(enviarEn) && enviarEn > Date.now() + 60 * 1000) {
-    const { error } = await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date(enviarEn).toISOString(), creado_por: email });
+    const { error } = await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date(enviarEn).toISOString(), creado_por: email, vence_en });
     if (error) return { exito: false, error: 'No se pudo programar.' };
     return { exito: true, programado: true };
   }
   await _mandarAviso(titulo, mensaje, destino);
-  await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date().toISOString(), enviado_en: new Date().toISOString(), creado_por: email });
+    await supabase.from('avisos_programados').insert({ titulo, mensaje, destino, enviar_en: new Date().toISOString(), enviado_en: new Date().toISOString(), creado_por: email, vence_en });
   return { exito: true, programado: false };
 }
 

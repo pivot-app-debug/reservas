@@ -70,6 +70,8 @@ class _AvisosScreenState extends State<AvisosScreen> {
     final titulo = TextEditingController(), mensaje = TextEditingController();
     final gente = <Integrante>[];
     DateTime? cuando;
+    DateTime? vence; // null = 3 días en Notificaciones
+
     final ok = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -154,6 +156,40 @@ class _AvisosScreenState extends State<AvisosScreen> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text('Sale en un margen de 10 minutos desde esa hora.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                     ),
+                  // Hasta cuándo se ve en Notificaciones (Victor, 2026-11-17).
+                  const SizedBox(height: 16),
+                  const Text('¿Hasta cuándo se ve en Notificaciones?', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(showCheckmark: false, label: const Text('3 días'), selected: vence == null, onSelected: (_) => set(() => vence = null)),
+                      ChoiceChip(
+                        showCheckmark: false,
+                        label: Text(vence == null ? 'Elegir fecha' : 'Hasta el ${Fechas.corta(vence!)}'),
+                        selected: vence != null,
+                        onSelected: (_) async {
+                          final base = cuando ?? DateTime.now();
+                          final f = await showDatePicker(
+                            context: h,
+                            firstDate: base.add(const Duration(days: 1)),
+                            lastDate: base.add(const Duration(days: 30)),
+                            initialDate: vence ?? base.add(const Duration(days: 7)),
+                          );
+                          if (f != null) set(() => vence = f);
+                        },
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      vence == null
+                          ? 'Después se quita solo de Notificaciones. La notificación del teléfono no cambia.'
+                          : 'Se ve hasta el final de ese día (máximo 30 días).',
+                      style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   FilledButton(onPressed: listo ? () => Navigator.of(h).pop(true) : null, child: Text(cuando == null ? 'Enviar ahora' : 'Programar')),
                 ],
@@ -171,6 +207,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
         'mensaje': mensaje.text.trim(),
         'destino': jsonEncode(gente.isEmpty ? 'todos' : [for (final x in gente) x.username]),
         'enviarEn': ?cuando?.toUtc().toIso8601String(),
+        'venceEn': ?(vence == null ? null : DateTime(vence!.year, vence!.month, vence!.day, 23, 59).toUtc().toIso8601String()),
       });
       if (r['exito'] == false) throw ApiException('${r['error']}');
       _aviso(r['programado'] == true ? 'Aviso programado.' : 'Aviso enviado.');
