@@ -93,17 +93,19 @@ class _TareasScreenState extends State<TareasScreen> {
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {
-          if (!repo.cargado || !_extrasListos) {
-            return AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: repo.error == null
-                  ? const Esqueleto(forma: FormaEsqueleto.tarjetas)
-                  : _Error(texto: repo.error!, alReintentar: () => repo.cargar(forzar: true)),
-            );
-          }
-          return Sincroniza(
-            onRefresh: () => repo.cargar(forzar: true),
-            child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: _lista(context)),
+          // Un solo cambio, de la carga a la lista (Victor, 2026-11-17: se
+          // veía rota un momento al cruzarse dos listas).
+          final listo = repo.cargado && _extrasListos;
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 240),
+            child: listo
+                ? KeyedSubtree(
+                    key: const ValueKey('lista'),
+                    child: Sincroniza(onRefresh: () => repo.cargar(forzar: true), child: _lista(context)),
+                  )
+                : (repo.error == null
+                      ? const Esqueleto(key: ValueKey('carga'), forma: FormaEsqueleto.tarjetas)
+                      : _Error(key: const ValueKey('error'), texto: repo.error!, alReintentar: () => repo.cargar(forzar: true))),
           );
         },
       ),
@@ -195,7 +197,6 @@ class _TareasScreenState extends State<TareasScreen> {
       ..sort((a, b) => AreaTarea.lista.indexOf(AreaTarea.de(a)).compareTo(AreaTarea.lista.indexOf(AreaTarea.de(b))));
     final sugeridas = repo.sugeridas;
     return ListView(
-      key: ValueKey(repo.mias.length * 1000 + repo.tablero.length),
       padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
       children: [
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
@@ -456,7 +457,7 @@ class PilaAvatares extends StatelessWidget {
 }
 
 class _Error extends StatelessWidget {
-  const _Error({required this.texto, required this.alReintentar});
+  const _Error({super.key, required this.texto, required this.alReintentar});
   final String texto;
   final VoidCallback alReintentar;
 

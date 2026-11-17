@@ -1327,7 +1327,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   void _abrirTablero() {
     _cerrarCalendario();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TareasScreen(repo: _tareas)));
+    // Se abre deslizando, como una subsección (Victor, 2026-11-17).
+    SubAjustes.abrir(context, TareasScreen(repo: _tareas));
   }
 
   /// Bajo la barra: las tareas atrasadas (fijas, en rojo) y el acceso a las
