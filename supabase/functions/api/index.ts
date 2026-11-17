@@ -3,6 +3,7 @@
 // Railway son sistemas obsoletos: no queda ninguna conexión con ellos (2026-11-07).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -31,7 +32,81 @@ const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 // hardcodeado.
 const PUSH_TOKEN_SECRET = Deno.env.get('PUSH_TOKEN_SECRET') ?? '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// ─── Varias ligas (Victor, 2026-11-17) ──────────────────────────────────────
+// Cada pedido corre con un cliente que habla con la base como `liga_api` y un
+// JWT con el `liga_id` de quien pide: las políticas de RLS solo dejan ver y
+// escribir esa liga, y lo nuevo cae en ella. `supabase` (todo el código usa
+// este nombre) apunta al cliente del pedido en curso. Sin PIVOT_JWT_SECRET
+// configurado, todo sigue con la llave de servicio, como antes.
+const supabaseServicio = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const PIVOT_JWT_SECRET = Deno.env.get('PIVOT_JWT_SECRET') ?? '';
+const LIGA_QUINDES = '00000000-0000-4000-8000-00000000c0de';
+const _alsLiga = new AsyncLocalStorage<{ cliente: any; ligaId: string }>();
+const supabase: any = new Proxy({}, {
+  get(_t, k) {
+    // Archivos (storage) siempre con la llave de servicio: las rutas ya van por liga.
+    const c = k === 'storage' ? supabaseServicio : (_alsLiga.getStore()?.cliente ?? supabaseServicio);
+    const v = (c as any)[k];
+    return typeof v === 'function' ? v.bind(c) : v;
+  },
+});
+function _ligaEnCurso(): string { return _alsLiga.getStore()?.ligaId ?? LIGA_QUINDES; }
+
+function _b64url(b: Uint8Array | string): string {
+  const s = typeof b === 'string' ? btoa(unescape(encodeURIComponent(b))) : btoa(String.fromCharCode(...b));
+  return s.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+async function _jwtLiga(ligaId: string): Promise<string> {
+  const ahora = Math.floor(Date.now() / 1000);
+  const cuerpo = `${_b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${_b64url(JSON.stringify({ role: 'liga_api', liga_id: ligaId, iat: ahora, exp: ahora + 3600, iss: 'pivot' }))}`;
+  const llave = await crypto.subtle.importKey('raw', new TextEncoder().encode(PIVOT_JWT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const firma = new Uint8Array(await crypto.subtle.sign('HMAC', llave, new TextEncoder().encode(cuerpo)));
+  return `${cuerpo}.${_b64url(firma)}`;
+}
+const _clientesLiga = new Map<string, { cliente: any; vence: number }>();
+async function _clienteDeLiga(ligaId: string): Promise<any> {
+  const ya = _clientesLiga.get(ligaId);
+  if (ya && ya.vence > Date.now() + 120000) return ya.cliente;
+  const jwt = await _jwtLiga(ligaId);
+  const cliente = createClient(SUPABASE_URL, SUPABASE_ANON_KEY_LIGAS, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  _clientesLiga.set(ligaId, { cliente, vence: Date.now() + 3600000 });
+  return cliente;
+}
+const SUPABASE_ANON_KEY_LIGAS = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+/// De qué liga es el pedido: por la sesión, por el usuario que inicia sesión
+/// o por el enlace de la liga. Sin nada de eso, Quindes.
+async function _ligaDelPedido(p: Record<string, any>): Promise<string> {
+  const s = supabaseServicio;
+  const fila = async (q: any) => ((await q.maybeSingle()).data?.liga_id as string | undefined);
+  if (p.adminToken && p.adminToken !== _TOKEN_INTERNO) {
+    const l = await fila(s.from('admin_sessions').select('liga_id').eq('token', String(p.adminToken)));
+    if (l) return l;
+  }
+  if (p.token) {
+    const l = await fila(s.from('sessions').select('liga_id').eq('token', String(p.token)));
+    if (l) return l;
+  }
+  for (const k of ['username', 'nombre', 'usuario', 'nombreUsuario']) {
+    if (typeof p[k] === 'string' && p[k].trim()) {
+      const l = await fila(s.from('equipo').select('liga_id').ilike('username', p[k].trim()));
+      if (l) return l;
+    }
+  }
+  if (p.email) {
+    const l = await fila(s.from('admins').select('liga_id').ilike('email', String(p.email).trim()));
+    if (l) return l;
+  }
+  if (p.liga) {
+    const l = (await s.from('ligas').select('id').eq('slug', String(p.liga)).maybeSingle()).data?.id;
+    if (l) return l;
+  }
+  return LIGA_QUINDES;
+}
+
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -11403,9 +11478,35 @@ async function parseParams(req: Request): Promise<Record<string, any>> {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-
+  let params: Record<string, any>;
   try {
-    const params = await parseParams(req);
+    params = await parseParams(req);
+  } catch {
+    params = {};
+  }
+  if (!PIVOT_JWT_SECRET || !SUPABASE_ANON_KEY_LIGAS) return _rutear(req, params);
+  try {
+    // Tareas programadas: corren una vez por cada liga.
+    if (String(params.action ?? '').startsWith('cron')) {
+      const { data: ligas } = await supabaseServicio.from('ligas').select('id');
+      let ultima: Response = json({ exito: true });
+      for (const l of ligas ?? [{ id: LIGA_QUINDES }]) {
+        const cliente = await _clienteDeLiga(l.id);
+        ultima = await _alsLiga.run({ cliente, ligaId: l.id }, () => _rutear(req, params));
+      }
+      return ultima;
+    }
+    const ligaId = await _ligaDelPedido(params);
+    const cliente = await _clienteDeLiga(ligaId);
+    return await _alsLiga.run({ cliente, ligaId }, () => _rutear(req, params));
+  } catch (e) {
+    return json({ error: (e as Error).message ?? 'Error interno.' }, 500);
+  }
+});
+
+async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Response> {
+  try {
+    const params = paramsPre;
         const action = params.action;
 
     // Acciones de Pivots que antes no pedían sesión (revisión 2026-11-12):
@@ -11856,4 +11957,4 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     return json({ error: (e as Error).message ?? 'Error interno.' }, 500);
   }
-});
+}

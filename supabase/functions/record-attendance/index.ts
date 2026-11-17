@@ -82,7 +82,10 @@ async function _verificarTokenAccion(token: string): Promise<{ username: string;
 // Mismo criterio que _agregarFilaLogAsistencia() en supabase/functions/api/index.ts
 async function _agregarFilaLogAsistencia(idEvento: string, nombre: string, estado: string): Promise<{ error: string | null }> {
   const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
+    // Varias ligas (2026-11-17): la fila queda en la liga de la persona.
+  const { data: eqLiga } = await supabase.from('equipo').select('liga_id').eq('username', nombre).maybeSingle();
   const { error } = await supabase.from('log_asistencias').insert({
+    ...(eqLiga?.liga_id ? { liga_id: eqLiga.liga_id } : {}),
     id_evento: idEvento,
     fecha_entrenamiento: ev?.fecha ? ev.fecha + 'T00:00:00Z' : null,
     nombre_usuario: nombre,

@@ -15,12 +15,41 @@
 // "Fix meses_consecutivos_cumplidos".
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET');
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// Varias ligas (2026-11-17): el recálculo corre una vez por liga, con un
+// cliente que solo ve esa liga (rol liga_api, mismo esquema que api/index.ts).
+// Sin PIVOT_JWT_SECRET, una sola pasada con la llave de servicio, como antes.
+const supabaseServicio = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const PIVOT_JWT_SECRET = Deno.env.get('PIVOT_JWT_SECRET') ?? '';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const _als = new AsyncLocalStorage<any>();
+const supabase: any = new Proxy({}, {
+  get(_t, k) {
+    const c = _als.getStore() ?? supabaseServicio;
+    const v = (c as any)[k];
+    return typeof v === 'function' ? v.bind(c) : v;
+  },
+});
+function _b64url(b: Uint8Array | string): string {
+  const s = typeof b === 'string' ? btoa(unescape(encodeURIComponent(b))) : btoa(String.fromCharCode(...b));
+  return s.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+async function _clienteDeLiga(ligaId: string): Promise<any> {
+  const ahora = Math.floor(Date.now() / 1000);
+  const cuerpo = `${_b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${_b64url(JSON.stringify({ role: 'liga_api', liga_id: ligaId, iat: ahora, exp: ahora + 3600, iss: 'pivot' }))}`;
+  const llave = await crypto.subtle.importKey('raw', new TextEncoder().encode(PIVOT_JWT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const firma = new Uint8Array(await crypto.subtle.sign('HMAC', llave, new TextEncoder().encode(cuerpo)));
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${cuerpo}.${_b64url(firma)}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +128,20 @@ async function _validarAdminToken(token: string | null): Promise<string | null> 
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (!PIVOT_JWT_SECRET || !SUPABASE_ANON_KEY) return _manejar(req);
+  // El cuerpo se lee una sola vez: se copia para cada pasada.
+  const cuerpo = req.method === 'POST' ? await req.text() : null;
+  const { data: ligas } = await supabaseServicio.from('ligas').select('id');
+  let ultima = json({ ok: true });
+  for (const l of ligas ?? []) {
+    const r = new Request(req.url, { method: req.method, headers: req.headers, body: cuerpo });
+    ultima = await _als.run(await _clienteDeLiga(l.id), () => _manejar(r));
+  }
+  return ultima;
+});
+
+async function _manejar(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET' && req.method !== 'POST') {
     return json({ ok: false, error: 'Método no soportado.' }, 405);
@@ -687,4 +730,4 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     return json({ ok: false, error: String((err as any)?.message ?? err) }, 500);
   }
-});
+}
