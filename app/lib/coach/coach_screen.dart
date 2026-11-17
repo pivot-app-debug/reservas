@@ -98,6 +98,7 @@ class _CoachScreenState extends State<CoachScreen> {
                     segments: const [
                       ButtonSegment(value: 'jugadorxs', icon: Icon(Icons.groups_rounded), label: Text('Jugadorxs')),
                       ButtonSegment(value: 'cronograma', icon: Icon(Icons.view_timeline_outlined), label: Text('Cronograma')),
+                      ButtonSegment(value: 'pruebas', icon: Icon(Icons.timer_outlined), label: Text('Pruebas')),
                     ],
                     selected: {_vista},
                     onSelectionChanged: (v) => setState(() => _vista = v.first),
@@ -105,9 +106,11 @@ class _CoachScreenState extends State<CoachScreen> {
                   const SizedBox(height: 14),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
-                    child: _vista == 'jugadorxs'
-                        ? KeyedSubtree(key: const ValueKey('j'), child: _listaJugadorxs(context))
-                        : KeyedSubtree(key: const ValueKey('k'), child: _cronograma(context)),
+                    child: switch (_vista) {
+                      'jugadorxs' => KeyedSubtree(key: const ValueKey('j'), child: _listaJugadorxs(context)),
+                      'pruebas' => _PruebasCoach(key: const ValueKey('p'), sesion: s, jugadorxs: _jugadorxs),
+                      _ => KeyedSubtree(key: const ValueKey('k'), child: _cronograma(context)),
+                    },
                   ),
                 ],
               ),
@@ -169,9 +172,11 @@ class _CoachScreenState extends State<CoachScreen> {
     final p = context.pivot;
     final hoy = Fechas.hoy();
     final hasta = hoy.add(const Duration(days: 45));
+    // Los de los últimos 3 días también, para dar el feedback.
+    final desde = hoy.subtract(const Duration(days: 3));
     final evs = [
       for (final e in widget.eventos.eventos)
-        if (!e.cancelado && !e.fecha.isBefore(hoy) && e.fecha.isBefore(hasta)) e,
+        if (!e.cancelado && !e.fecha.isBefore(desde) && e.fecha.isBefore(hasta)) e,
     ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
     final planes = _planes;
     return Column(
@@ -203,7 +208,16 @@ class _CoachScreenState extends State<CoachScreen> {
                 ),
                 title: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}', style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text([e.tipo, e.lugar, _resumenPlan(planes[e.id])].where((x) => x.isNotEmpty).join(' · ')),
-                trailing: const Icon(Icons.chevron_right_rounded),
+                trailing: e.finalizado
+                    ? TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => FeedbackEventoScreen(sesion: s, evento: e),
+                          ),
+                        ),
+                        child: const Text('Feedback'),
+                      )
+                    : const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
                   final ok = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
@@ -536,6 +550,20 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
                         padding: const EdgeInsets.only(top: 6),
                         child: Text('Solo lo ven lxs coaches.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                       ),
+                    // Al terminar: feedback por persona (Victor, 2026-11-16).
+                    if (esCoach && widget.evento.finalizado)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => FeedbackEventoScreen(sesion: widget.sesion, evento: widget.evento),
+                            ),
+                          ),
+                          icon: const Icon(Icons.rate_review_outlined),
+                          label: const Text('Dar feedback'),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -627,6 +655,51 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
     await _guardar({'accion': 'evaluar', 'habilidadId': h['id'], 'nivel': n});
   }
 
+  Future<void> _nuevaMarca(Map<String, dynamic> pr) async {
+    final c = TextEditingController();
+    final v = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${pr['nombre']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: c,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: 'Resultado de hoy', suffixText: '${pr['unidad']}'),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(onPressed: () => Navigator.of(h).pop(c.text.trim()), child: const Text('Guardar')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (v == null || v.isEmpty) return;
+    try {
+      final r = await s.api.post('coachPruebas', {
+        'accion': 'marca',
+        'pruebaId': pr['id'],
+        'username': _d?['username'],
+        'valor': v,
+        'fecha': Fechas.iso(Fechas.hoy()),
+      });
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      await _cargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
   Future<void> _nuevaNota() async {
     final r = await showModalBottomSheet<(String, bool, String)>(
       context: context,
@@ -711,6 +784,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                         onTap: _puedeEditar ? () => _evaluar(h) : null,
                       ),
                   ],
+                  _ProgresoFicha(d: d, puedeEditar: _puedeEditar, alMarca: (pr) => _nuevaMarca(pr)),
                   const SizedBox(height: 22),
                   Text(
                     'NOTAS',
@@ -812,7 +886,11 @@ class _Nivel extends StatelessWidget {
 
 /// Nota escrita o dictada, y quién más la ve.
 class _EditorNota extends StatefulWidget {
-  const _EditorNota();
+  const _EditorNota({this.conVisible = true, this.titulo = 'Nueva nota'});
+
+  /// En el feedback, quién lo ve se elige para todo el evento.
+  final bool conVisible;
+  final String titulo;
   @override
   State<_EditorNota> createState() => _EditorNotaState();
 }
@@ -877,7 +955,7 @@ class _EditorNotaState extends State<_EditorNota> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Nueva nota', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(widget.titulo, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text('Escríbela o toca el micrófono y habla: se pasa a texto.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
           const SizedBox(height: 12),
@@ -915,28 +993,30 @@ class _EditorNotaState extends State<_EditorNota> {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          const SizedBox(height: 12),
-          const Text('¿Quién más la ve?', style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final v in _visibles.entries)
-                ChoiceChip(
-                  avatar: Icon(v.value.$2, size: 16),
-                  label: Text(v.value.$1),
-                  selected: _visible == v.key,
-                  onSelected: (_) => setState(() => _visible = v.key),
-                ),
-            ],
-          ),
+          if (widget.conVisible) ...[
+            const SizedBox(height: 12),
+            const Text('¿Quién más la ve?', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final v in _visibles.entries)
+                  ChoiceChip(
+                    avatar: Icon(v.value.$2, size: 16),
+                    label: Text(v.value.$1),
+                    selected: _visible == v.key,
+                    onSelected: (_) => setState(() => _visible = v.key),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _texto.text.trim().isEmpty ? null : () => Navigator.of(context).pop((_texto.text.trim(), _porVoz, _visible)),
-              child: const Text('Guardar nota'),
+              child: Text(widget.conVisible ? 'Guardar nota' : 'Listo'),
             ),
           ),
         ],
@@ -1379,4 +1459,606 @@ class FilaSerCoach extends StatelessWidget {
       );
     },
   );
+}
+
+// ─── Etapa 3: pruebas, progreso y feedback ─────────────────────────────────
+
+String _num(num v) => v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(1);
+
+/// Pruebas y feedback dentro de la ficha deportiva.
+class _ProgresoFicha extends StatelessWidget {
+  const _ProgresoFicha({required this.d, required this.puedeEditar, required this.alMarca});
+  final Map<String, dynamic> d;
+  final bool puedeEditar;
+  final void Function(Map<String, dynamic>) alMarca;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final pruebas = [for (final x in (d['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    final feedback = [for (final x in (d['feedback'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    Widget titulo(String t) => Padding(
+      padding: const EdgeInsets.only(top: 22, bottom: 6),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (pruebas.isNotEmpty) titulo('PRUEBAS'),
+        for (final pr in pruebas) _TarjetaPrueba(pr: pr, puedeEditar: puedeEditar, alMarca: () => alMarca(pr)),
+        if (feedback.isNotEmpty) titulo('FEEDBACK POR TEMA'),
+        for (final t in feedback) _TarjetaTema(t: t),
+      ],
+    );
+  }
+}
+
+class _TarjetaPrueba extends StatelessWidget {
+  const _TarjetaPrueba({required this.pr, required this.puedeEditar, required this.alMarca});
+  final Map<String, dynamic> pr;
+  final bool puedeEditar;
+  final VoidCallback alMarca;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final marcas = [for (final m in (pr['marcas'] as List? ?? const [])) Map<String, dynamic>.from(m as Map)];
+    final valores = [for (final m in marcas) (m['valor'] as num).toDouble()];
+    final mas = pr['masEsMejor'] != false;
+    String? cambio;
+    if (valores.length >= 2) {
+      final dif = valores.last - valores[valores.length - 2];
+      final mejora = mas ? dif > 0 : dif < 0;
+      cambio = dif == 0 ? 'Igual que la vez anterior' : '${dif > 0 ? '+' : ''}${_num(dif)} ${pr['unidad']} · ${mejora ? 'mejoró' : 'bajó'}';
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${pr['nombre']}',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                ),
+              ),
+              if (puedeEditar) TextButton.icon(onPressed: alMarca, icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Anotar')),
+            ],
+          ),
+          if (valores.isEmpty)
+            Text('Sin resultados todavía.', style: TextStyle(color: p.textoSecundario))
+          else ...[
+            Text('Última: ${_num(valores.last)} ${pr['unidad']} · Mejor: ${_num(pr['mejor'] as num)} ${pr['unidad']}', style: TextStyle(color: p.texto)),
+            if (cambio != null) Text(cambio, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+            if (valores.length >= 2)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: SizedBox(
+                  height: 56,
+                  width: double.infinity,
+                  child: CustomPaint(painter: _Curva(valores, p.marca, p.tarjetaBorde)),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Curva simple del progreso de una prueba.
+class _Curva extends CustomPainter {
+  _Curva(this.v, this.color, this.base);
+  final List<double> v;
+  final Color color, base;
+  @override
+  void paint(Canvas c, Size s) {
+    final mn = v.reduce((a, b) => a < b ? a : b), mx = v.reduce((a, b) => a > b ? a : b);
+    final rango = (mx - mn) == 0 ? 1 : mx - mn;
+    Offset pt(int i) => Offset(v.length == 1 ? s.width / 2 : i * s.width / (v.length - 1), s.height - 6 - (v[i] - mn) / rango * (s.height - 12));
+    c.drawLine(Offset(0, s.height - 1), Offset(s.width, s.height - 1), Paint()..color = base);
+    final path = Path()..moveTo(pt(0).dx, pt(0).dy);
+    for (var i = 1; i < v.length; i++) {
+      path.lineTo(pt(i).dx, pt(i).dy);
+    }
+    c.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+    for (var i = 0; i < v.length; i++) {
+      c.drawCircle(pt(i), 3.5, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Curva o) => o.v != v || o.color != color;
+}
+
+class _TarjetaTema extends StatelessWidget {
+  const _TarjetaTema({required this.t});
+  final Map<String, dynamic> t;
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final items = [for (final x in (t['items'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    final notas = [
+      for (final x in items)
+        if (x['nota'] != null) (x['nota'] as num).toInt(),
+    ];
+    String? tendencia;
+    if (notas.length >= 2) {
+      final d = notas.last - notas[notas.length - 2];
+      tendencia = d == 0 ? 'igual que la vez anterior' : (d > 0 ? 'mejoró ${d > 0 ? '+$d' : '$d'}' : 'bajó $d');
+    }
+    final ultimo = items.isEmpty ? null : items.last;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${t['tema']}',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                ),
+              ),
+              if (notas.isNotEmpty)
+                Text(
+                  '${notas.last}/10',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.marcaTexto),
+                ),
+            ],
+          ),
+          if (tendencia != null) Text('${notas.length} notas · $tendencia', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          if (ultimo != null && '${ultimo['comentario'] ?? ''}'.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('"${ultimo['comentario']}"', style: TextStyle(height: 1.35, color: p.texto)),
+            ),
+          if (ultimo != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${ultimo['coachNombre']} · ${Fechas.corta(DateTime.parse('${ultimo['fecha']}'))}',
+                style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pruebas del coach: crear, editar y a quién se le hacen.
+class _PruebasCoach extends StatefulWidget {
+  const _PruebasCoach({super.key, required this.sesion, required this.jugadorxs});
+  final Sesion sesion;
+  final List<Map<String, dynamic>> jugadorxs;
+  @override
+  State<_PruebasCoach> createState() => _PruebasCoachState();
+}
+
+class _PruebasCoachState extends State<_PruebasCoach> {
+  List<Map<String, dynamic>>? _l;
+
+  @override
+  void initState() {
+    super.initState();
+    _llamar({'accion': 'listar'});
+  }
+
+  Future<void> _llamar(Map<String, Object?> q) async {
+    try {
+      final r = await widget.sesion.api.post('coachPruebas', q);
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      if (mounted) setState(() => _l = [for (final x in (r['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)]);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
+  Future<void> _editar([Map<String, dynamic>? x]) async {
+    final nombre = TextEditingController(text: '${x?['nombre'] ?? ''}');
+    final unidad = TextEditingController(text: '${x?['unidad'] ?? 'vueltas'}');
+    var mas = x?['masEsMejor'] != false;
+    var activa = x?['activa'] != false;
+    var visible = '${x?['visible'] ?? 'jugadorx'}';
+    final personas = <String>{
+      ...[for (final u in (x?['personas'] as List? ?? const [])) '$u'],
+    };
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(x == null ? 'Nueva prueba' : 'Editar prueba', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(
+                  'Algo que se mide cada vez para ver el progreso. Ej. "5 minutos: vueltas".',
+                  style: TextStyle(fontSize: 13, color: c.pivot.textoSecundario),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nombre,
+                  autofocus: x == null,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej. Vueltas en 5 minutos'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: unidad,
+                  decoration: const InputDecoration(labelText: 'Se mide en', hintText: 'vueltas, segundos, repeticiones'),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Más es mejor'),
+                  subtitle: Text(mas ? 'Ej. más vueltas' : 'Menos es mejor, ej. menos segundos'),
+                  value: mas,
+                  onChanged: (v) => set(() => mas = v),
+                ),
+                const Text('¿A quiénes?', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(label: const Text('A todxs'), selected: personas.isEmpty, onSelected: (_) => set(personas.clear)),
+                    for (final j in widget.jugadorxs)
+                      FilterChip(
+                        label: Text('${j['nombre']}'),
+                        selected: personas.contains(j['username']),
+                        onSelected: (v) => set(() => v ? personas.add('${j['username']}') : personas.remove(j['username'])),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('¿Quién ve los resultados?', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final v in _visibles.entries)
+                      ChoiceChip(label: Text(v.value.$1), selected: visible == v.key, onSelected: (_) => set(() => visible = v.key)),
+                  ],
+                ),
+                if (x != null)
+                  SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('En uso'), value: activa, onChanged: (v) => set(() => activa = v)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Guardar')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (ok != true || nombre.text.trim().isEmpty) return;
+    await _llamar({
+      'accion': 'guardar',
+      'id': x?['id'],
+      'nombre': nombre.text.trim(),
+      'unidad': unidad.text.trim(),
+      'masEsMejor': mas,
+      'activa': activa,
+      'visible': visible,
+      'personas': jsonEncode(personas.toList()),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final l = _l;
+    if (l == null) return const EsqueletoFilas();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Pruebas que se repiten para ver el progreso, como contar vueltas en 5 minutos. Los resultados se anotan en la ficha de cada persona.',
+          style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
+        ),
+        const SizedBox(height: 10),
+        for (final x in l)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.timer_outlined, color: x['activa'] == false ? p.apagado : p.marcaTexto),
+            title: Text(
+              '${x['nombre']}',
+              style: TextStyle(fontWeight: FontWeight.w700, color: x['activa'] == false ? p.apagado : p.texto),
+            ),
+            subtitle: Text(
+              [
+                'En ${x['unidad']}',
+                (x['personas'] as List? ?? const []).isEmpty ? 'a todxs' : '${(x['personas'] as List).length} personas',
+                _visibles['${x['visible']}']?.$1 ?? '',
+              ].join(' · '),
+            ),
+            trailing: const Icon(Icons.edit_outlined, size: 18),
+            onTap: () => _editar(x),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(onPressed: _editar, icon: const Icon(Icons.add_rounded), label: const Text('Nueva prueba')),
+        ),
+      ],
+    );
+  }
+}
+
+/// Feedback al terminar un evento: nota del 1 al 10 y comentario por persona.
+class FeedbackEventoScreen extends StatefulWidget {
+  const FeedbackEventoScreen({super.key, required this.sesion, required this.evento});
+  final Sesion sesion;
+  final Evento evento;
+  @override
+  State<FeedbackEventoScreen> createState() => _FeedbackEventoScreenState();
+}
+
+class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
+  Map<String, dynamic>? _d;
+  String? _error_;
+  String _tema = 'General';
+  String _visible = 'yo';
+  final Map<String, int?> _notas = {};
+  final Map<String, TextEditingController> _comentarios = {};
+  final Set<String> _porVoz = {};
+  bool _guardando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _comentarios.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _cargar() async {
+    try {
+      final r = await widget.sesion.api.get('coachFeedbackEvento', {'idEvento': widget.evento.id});
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      final temas = [for (final t in (r['temas'] as List? ?? const [])) '$t'];
+      if (mounted) {
+        setState(() {
+          _d = r;
+          if (temas.isNotEmpty && _tema == 'General') _tema = temas.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error_ = _error(e));
+    }
+  }
+
+  TextEditingController _com(String u) => _comentarios[u] ??= TextEditingController();
+
+  Future<void> _dictar(String u) async {
+    final r = await showModalBottomSheet<(String, bool, String)>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => const _EditorNota(conVisible: false, titulo: 'Comentario'),
+    );
+    if (r == null) return;
+    setState(() {
+      _com(u).text = r.$1;
+      if (r.$2) _porVoz.add(u);
+    });
+  }
+
+  Future<void> _guardar() async {
+    final personas = [for (final x in (_d?['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    final items = [
+      for (final x in personas)
+        if (_notas['${x['username']}'] != null || _com('${x['username']}').text.trim().isNotEmpty)
+          {
+            'username': x['username'],
+            'tema': _tema,
+            'nota': _notas['${x['username']}'],
+            'comentario': _com('${x['username']}').text.trim(),
+            'porVoz': _porVoz.contains(x['username']),
+          },
+    ];
+    if (items.isEmpty) return;
+    setState(() => _guardando = true);
+    try {
+      final r = await widget.sesion.api.post('coachFeedbackEvento', {
+        'accion': 'guardar',
+        'idEvento': widget.evento.id,
+        'fecha': Fechas.iso(widget.evento.fecha),
+        'visible': _visible,
+        'items': jsonEncode(items),
+      });
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Feedback de "$_tema" guardado')));
+      setState(() {
+        _guardando = false;
+        _d = r;
+        _notas.clear();
+        for (final c in _comentarios.values) {
+          c.clear();
+        }
+        _porVoz.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final d = _d;
+    final e = widget.evento;
+    final temas = {'General', for (final t in (d?['temas'] as List? ?? const [])) '$t'};
+    final personas = [for (final x in (d?['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    final hecho = <String, Set<String>>{};
+    for (final h in (d?['hecho'] as List? ?? const [])) {
+      (hecho['${(h as Map)['username']}'] ??= {}).add('${h['tema']}');
+    }
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: _barra('Feedback'),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: d == null
+            ? (_error_ == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error_!)))
+            : ListView(
+                key: const ValueKey('l'),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
+                children: [
+                  Text(
+                    '${e.tipo} · ${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)}',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Nota del 1 al 10 y un comentario para cada persona. Se compara con las veces anteriores del mismo tema.',
+                    style: TextStyle(color: p.textoSecundario),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Tema', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in temas) ChoiceChip(label: Text(t), selected: _tema == t, onSelected: (_) => setState(() => _tema = t)),
+                      ActionChip(
+                        avatar: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Otro'),
+                        onPressed: () async {
+                          final c = TextEditingController();
+                          final t = await showDialog<String>(
+                            context: context,
+                            builder: (h) => AlertDialog(
+                              title: const Text('Nuevo tema'),
+                              content: TextField(
+                                controller: c,
+                                autofocus: true,
+                                textCapitalization: TextCapitalization.sentences,
+                                decoration: const InputDecoration(hintText: 'Ej. Frenos'),
+                              ),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.of(h).pop(), child: const Text('Cancelar')),
+                                FilledButton(onPressed: () => Navigator.of(h).pop(c.text.trim()), child: const Text('Listo')),
+                              ],
+                            ),
+                          );
+                          if (t != null && t.isNotEmpty) {
+                            setState(() {
+                              _tema = t;
+                              (d['temas'] as List?)?.add(t);
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('¿Quién más lo ve?', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final v in _visibles.entries)
+                        ChoiceChip(label: Text(v.value.$1), selected: _visible == v.key, onSelected: (_) => setState(() => _visible = v.key)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (personas.isEmpty)
+                    Text(
+                      'Nadie de tus equipos tiene asistencia marcada en este evento. Toma la asistencia primero.',
+                      style: TextStyle(color: p.textoSecundario),
+                    ),
+                  for (final x in personas)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 36),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text('${x['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                              ),
+                              if (hecho['${x['username']}']?.contains(_tema) ?? false) Icon(Icons.check_circle_rounded, color: p.marcaTexto, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            clipBehavior: Clip.none,
+                            child: Row(
+                              children: [
+                                for (var n = 1; n <= 10; n++)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text('$n'),
+                                      selected: _notas['${x['username']}'] == n,
+                                      onSelected: (v) => setState(() => _notas['${x['username']}'] = v ? n : null),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _com('${x['username']}'),
+                            minLines: 1,
+                            maxLines: 4,
+                            textCapitalization: TextCapitalization.sentences,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              hintText: 'Comentario (opcional)',
+                              suffixIcon: IconButton(tooltip: 'Dictar', icon: const Icon(Icons.mic_none_rounded), onPressed: () => _dictar('${x['username']}')),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (personas.isNotEmpty) FilledButton(onPressed: _guardando ? null : _guardar, child: Text('Guardar feedback de "$_tema"')),
+                ],
+              ),
+      ),
+    );
+  }
 }
