@@ -615,3 +615,4 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
   - El coach solo toma asistencia; si además es Pivot con el permiso, crea eventos.
   - Cada jugadorx ve su ficha deportiva en Ajustes, junto a Estadísticas.
   - Partidos: además de posiciones y line-ups, reportes por partido (faltas, puntajes) sacados del statsbook. Propuesta: importar el statsbook oficial (.xlsx de WFTDA) y leer sus hojas (puntaje por jam, penalidades, line-ups).
+  - Statsbook (19:42): muchas ligas lo llevan a mano con lápiz y papel, así que además de importar el .xlsx tiene que haber una carga a mano de los stats (por jam: puntos, jammer y line-up; y penalidades por persona), que alimente el mismo reporte del partido.
