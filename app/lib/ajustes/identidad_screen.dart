@@ -71,7 +71,7 @@ class _IdentidadScreenState extends State<IdentidadScreen> {
       return;
     }
     // Si cambiaron la dirección a mano, el pin guardado ya no corresponde.
-    if (!primeraVez && lat != null) unawaited(s.guardarDatos({'direccionLat': '', 'direccionLng': ''}).catchError((_) {}));
+    if (!primeraVez && lat != null) unawaited(s.guardarDatos({'direccionLat': '', 'direccionLng': ''}).then((_) {}, onError: (_) {}));
     if (d.isEmpty) {
       if (mounted) setState(() => _buscandoPunto = false);
       return;

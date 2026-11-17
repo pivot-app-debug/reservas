@@ -833,7 +833,11 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final r in _roles) InputChip(label: Text(r), onDeleted: () => setState(() => _roles.remove(r))),
+              // Coach es fijo: no se borra (Victor, 2026-11-17).
+              for (final r in _roles)
+                r == 'Coach'
+                    ? const InputChip(label: Text('Coach'), avatar: Icon(Icons.lock_outline_rounded, size: 16), onPressed: null)
+                    : InputChip(label: Text(r), onDeleted: () => setState(() => _roles.remove(r))),
               ActionChip(avatar: const Icon(Icons.add_rounded, size: 18), label: const Text('Agregar'), onPressed: _nuevoRol),
             ],
           ),

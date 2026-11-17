@@ -329,10 +329,19 @@ class Sesion extends ChangeNotifier {
   }
 
   /// Campos de `actualizarDatosPersona` (lista blanca del servidor).
-  Future<void> guardarDatos(Map<String, String> cambios) async {
-    _ok(await api.post('actualizarDatosPersona', {'nombre': nombre, 'datos': jsonEncode(cambios)}), 'No se pudo guardar.');
-    datos = {...datos, ...cambios};
+  /// Devuelve un aviso del servidor, si hay (ej. Coach queda en revisión).
+  Future<String?> guardarDatos(Map<String, String> cambios) async {
+    final r = _ok(await api.post('actualizarDatosPersona', {'nombre': nombre, 'datos': jsonEncode(cambios)}), 'No se pudo guardar.');
+    final aviso = r['aviso'] as String?;
+    var c = cambios;
+    // Coach pendiente: no queda en tu ficha hasta que un Pivot lo apruebe.
+    if (aviso != null && c['roles'] != null) {
+      c = {...c, 'roles': c['roles']!.split(',').map((x) => x.trim()).where((x) => x.isNotEmpty && x != 'Coach').join(',')};
+      cargarCoach();
+    }
+    datos = {...datos, ...c};
     notifyListeners();
+    return aviso;
   }
 
   /// Patines y protecciones. Devuelve true si pasó de Quindes a Mirlxs.

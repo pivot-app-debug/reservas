@@ -15,8 +15,10 @@ import 'componentes.dart';
 
 /// Guarda y recarga Equipo, para que la ficha muestre el cambio al toque.
 Future<bool> guardarCampos(BuildContext context, Sesion s, Map<String, String> cambios) async {
-  final ok = await guardarConAviso(context, () => s.guardarDatos(cambios));
+  String? aviso;
+  final ok = await guardarConAviso(context, () async => aviso = await s.guardarDatos(cambios));
   if (ok) unawaited(EquipoRepo.de(s).cargar(forzar: true));
+  if (ok && aviso != null && context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(aviso!)));
   return ok;
 }
 

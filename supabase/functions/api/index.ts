@@ -868,11 +868,25 @@ async function actualizarDatosPersona(params: Record<string, any>): Promise<Reco
   if ('roles' in update) {
     const validos = await _rolesEquipo();
     const lista = Array.isArray(update.roles) ? update.roles : String(update.roles ?? '').split(',');
-    update.roles = lista.map((x: any) => String(x).trim()).filter((x: string) => validos.includes(x));
+        update.roles = lista.map((x: any) => String(x).trim()).filter((x: string) => validos.includes(x));
+    // Coach pasa por revisión (Victor, 2026-11-17): hasta que un Pivot lo
+    // aprueba no queda en la ficha; el pedido llega a Notificaciones.
+    if (update.roles.includes(ROL_COACH)) {
+      const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
+      if (c?.estado !== 'aprobado') {
+        update.roles = update.roles.filter((r: string) => r !== ROL_COACH);
+        if (c?.estado !== 'pendiente') await pedirCoach({ token: params.token, mensaje: 'Eligió Coach en sus roles.' });
+        (params as any)._coachPendiente = true;
+      }
+    } else {
+      // Quitar Coach de tus roles deja de ser coach.
+      const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
+      if (c?.estado === 'aprobado') update.roles = [...update.roles, ROL_COACH];
+    }
   }
   if (!Object.keys(update).length) return { exito: true };
   await supabase.from('equipo').update(update).eq('username', params.nombre);
-  return { exito: true };
+  return { exito: true, ...((params as any)._coachPendiente ? { aviso: 'Pediste ser coach: un Pivot lo revisa y, al aprobarlo, aparecerá en tu ficha.' } : {}) };
 }
 
 // Equipamiento del club (patines/protecciones). `necesita_protecciones` puede
@@ -3616,12 +3630,17 @@ async function adminGuardarComunidad(params: Record<string, any>): Promise<Recor
 // roller derby. Pivots renombran (cambia en todas las fichas), crean y
 // borran (se quita de las fichas, con confirmación en la app).
 const ROLES_DEPORTE = ['Jammer', 'Pivot', 'Blocker', 'Bench', 'Coach', 'SO', 'NSO'];
+// Coach es fijo (Victor, 2026-11-17): no se borra ni se renombra, y pasa por revisión.
+const ROL_COACH = 'Coach';
 
 async function _rolesEquipo(): Promise<string[]> {
   const { data } = await supabase.from('config_app').select('value').eq('key', 'roles_equipo').maybeSingle();
   try {
     const l = JSON.parse(String(data?.value ?? ''));
-    if (Array.isArray(l)) return l.map((x: any) => String(x).trim()).filter(Boolean);
+        if (Array.isArray(l)) {
+      const r = l.map((x: any) => String(x).trim()).filter(Boolean);
+      return r.includes(ROL_COACH) ? r : [...r, ROL_COACH];
+    }
   } catch (_) { /* sin guardar */ }
   return [...ROLES_DEPORTE];
 }
@@ -3651,6 +3670,8 @@ async function adminRolesEquipo(params: Record<string, any>): Promise<Record<str
     if (!nombre || nombre.length > 30) return { exito: false, error: 'Escribe un nombre de hasta 30 letras.' };
     if (existe(nombre)) return { exito: false, error: 'Ese rol ya existe.' };
     roles.push(nombre);
+    } else if ((accion === 'renombrar' || accion === 'borrar') && nombre === ROL_COACH) {
+    return { exito: false, error: 'Coach no se puede cambiar ni borrar: es el rol de quienes entrenan y pasa por revisión.' };
   } else if (accion === 'renombrar') {
     const i = roles.indexOf(nombre);
     if (i < 0) return { exito: false, error: 'Ese rol ya no existe.' };
@@ -4521,8 +4542,8 @@ async function crearLiga(params: Record<string, any>): Promise<Record<string, an
         { key: 'asistente_rapido', value: x.modo === 'rapido' ? 'true' : 'false' },
         { key: 'equipos_corte', value: JSON.stringify(x.cambiosEquipo === true ? { modo: 'revisar', dia: 1, avisoDias: 7, autoAprobar: true } : { modo: 'revisar', dia: 1, avisoDias: 7, autoAprobar: false }) },
       ];
-      if (Array.isArray(x.roles) && x.roles.length) {
-        filas.push({ key: 'roles_equipo', value: JSON.stringify([...new Set(x.roles.map((r: any) => String(r).trim().slice(0, 30)).filter(Boolean))].slice(0, 30)) });
+            if (Array.isArray(x.roles) && x.roles.length) {
+        filas.push({ key: 'roles_equipo', value: JSON.stringify([...new Set([...x.roles.map((r: any) => String(r).trim().slice(0, 30)).filter(Boolean), ROL_COACH])].slice(0, 30)) });
       }
       if (Array.isArray(x.medios) && x.medios.length) {
         filas.push({ key: 'formas_pago', value: JSON.stringify({ medios: x.medios.slice(0, 10).map((m: any, i: number) => ({
@@ -4554,7 +4575,11 @@ async function crearLiga(params: Record<string, any>): Promise<Record<string, an
       if (p.nombreDerby) extra.nombre_derby = String(p.nombreDerby).trim().slice(0, 40);
       if (p.numeroDerby) extra.numero_derby = String(p.numeroDerby).trim().slice(0, 8);
       if (Array.isArray(p.roles)) extra.roles = p.roles.map((r: any) => String(r).trim()).filter(Boolean).slice(0, 10);
-      if (Object.keys(extra).length) await supabase.from('equipo').update(extra).eq('username', usuario);
+            if (Object.keys(extra).length) await supabase.from('equipo').update(extra).eq('username', usuario);
+      // Quien crea la liga y se pone Coach ya es coach de toda la liga.
+      if (Array.isArray(extra.roles) && extra.roles.includes(ROL_COACH)) {
+        await supabase.from('coaches').upsert({ username: usuario, estado: 'aprobado', equipos: [], resuelto_por: email, resuelto_en: new Date().toISOString() });
+      }
       await supabase.from('admins').insert({ email, areas: AREAS_PIVOT, invited_by: 'creó la liga' });
       const adminToken = await _crearAdminToken(email);
       const fila = await _getEquipoRow(usuario);
@@ -4716,12 +4741,18 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
     if (!username) return { exito: false, error: 'Falta la persona.' };
     const { data: e } = await supabase.from('equipo').select('username').eq('username', username).maybeSingle();
     if (!e) return { exito: false, error: 'No encontramos a esa persona.' };
-    await supabase.from('coaches').upsert({ username, estado: 'aprobado', equipos, resuelto_por: email, resuelto_en: new Date().toISOString() });
+        await supabase.from('coaches').upsert({ username, estado: 'aprobado', equipos, resuelto_por: email, resuelto_en: new Date().toISOString() });
+    // El rol Coach queda en su ficha.
+    const { data: f } = await supabase.from('equipo').select('roles').eq('username', username).maybeSingle();
+    const rs = Array.isArray(f?.roles) ? f!.roles : [];
+    if (!rs.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: [...rs, ROL_COACH] }).eq('username', username);
     await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: '¡Ya eres coach!' }, contents: { es: 'Tienes la sección Coach en la barra de abajo para seguir a tus jugadorxs.' }, url: APP_URL + '/' }).catch(() => {});
   } else if (accion === 'equipos') {
     await supabase.from('coaches').update({ equipos }).eq('username', username);
   } else if (accion === 'rechazar' || accion === 'quitar') {
-    await supabase.from('coaches').update({ estado: 'rechazado', resuelto_por: email, resuelto_en: new Date().toISOString() }).eq('username', username);
+        await supabase.from('coaches').update({ estado: 'rechazado', resuelto_por: email, resuelto_en: new Date().toISOString() }).eq('username', username);
+    const { data: f } = await supabase.from('equipo').select('roles').eq('username', username).maybeSingle();
+    if (Array.isArray(f?.roles) && f!.roles.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: f!.roles.filter((r: string) => r !== ROL_COACH) }).eq('username', username);
     if (accion === 'rechazar') {
       await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: 'Pedido para ser coach' }, contents: { es: 'Esta vez un Pivot no lo aprobó. Puedes hablarlo con el equipo.' }, url: APP_URL + '/' }).catch(() => {});
     }
