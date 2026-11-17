@@ -23,7 +23,7 @@ const categoriasTesoreria = {
   'merch': 'Merch',
   'evento': 'Eventos',
   'equipamiento': 'Equipamiento',
-  'alquiler': 'Alquiler de pista',
+  'alquiler': 'Alquiler del lugar',
   'viaje': 'Viajes',
   'prestamo': 'Préstamos',
   'abono': 'Abonos',

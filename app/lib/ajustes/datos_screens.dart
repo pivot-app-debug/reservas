@@ -1,3 +1,5 @@
+import '../core/deporte.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,16 +43,16 @@ class MiPerfilEditable extends StatelessWidget {
                 FilaAjuste(
                   icono: Icons.sports_rounded,
                   seccion: 'nombre',
-                  titulo: 'Nombre derby',
+                  titulo: Deporte.apodo,
                   valor: valorDe(s, 'nombreDerby'),
-                  alTocar: () => editarCampo(context, s, 'nombreDerby', 'Nombre derby', maxLength: 40),
+                  alTocar: () => editarCampo(context, s, 'nombreDerby', Deporte.apodo, maxLength: 40),
                 ),
                 FilaAjuste(
                   icono: Icons.tag_rounded,
                   seccion: 'numero',
-                  titulo: 'Número derby',
+                  titulo: Deporte.numero,
                   valor: valorDe(s, 'numeroDerby'),
-                  alTocar: () => editarCampo(context, s, 'numeroDerby', 'Número derby', maxLength: 4),
+                  alTocar: () => editarCampo(context, s, 'numeroDerby', Deporte.numero, maxLength: 4),
                 ),
                 FilaAjuste(
                   icono: Icons.record_voice_over_outlined,

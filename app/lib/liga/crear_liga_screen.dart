@@ -904,7 +904,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
           TextField(
             controller: _derby,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Nombre derby (opcional)'),
+            decoration: InputDecoration(labelText: _deporte == 'roller_derby' ? 'Nombre derby (opcional)' : 'Apodo (opcional)'),
           ),
           const SizedBox(height: 10),
           TextField(

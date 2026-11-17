@@ -79,7 +79,7 @@ class _QueEsUnCurso extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Un grupo de clases para quienes recién empiezan (por ejemplo, freshmeat), con un try out al final para entrar a un equipo.',
+            'Un grupo de clases con inscripción: para quienes empiezan o para practicar algo más avanzado. Si quieres, termina con una evaluación final para entrar a un equipo.',
             style: TextStyle(height: 1.35, color: p.sobreSuave),
           ),
           paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
@@ -87,7 +87,7 @@ class _QueEsUnCurso extends StatelessWidget {
             Icons.payments_outlined,
             'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
           ),
-          paso(Icons.emoji_events_outlined, 'El día del try out marcas quién aprobó y a qué equipo pasa.'),
+          paso(Icons.emoji_events_outlined, 'Si tiene evaluación final, ese día marcas quién aprobó y a qué equipo pasa.'),
         ],
       ),
     );
@@ -129,7 +129,7 @@ class _Fechas extends StatelessWidget {
                 ),
                 if (i == l.length - 1 && l.length > 1)
                   Text(
-                    'Try out',
+                    'Evaluación final',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.marcaTexto),
                   ),
               ],
@@ -324,7 +324,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
   }
 
   static String _textoResultado(Object? r) => switch (r) {
-    'aprobado' => '¡Aprobaste el try out!',
+    'aprobado' => '¡Aprobaste la evaluación final!',
     'no_aprobado' => 'Curso terminado',
     _ => 'Ya estás inscritx',
   };
@@ -489,7 +489,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Try out de ${x['nombreMostrar']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                Text('Evaluación de ${x['nombreMostrar']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
                 if (widget.equipos.isNotEmpty) ...[
                   const Text('Si aprueba, pasa a'),
@@ -601,8 +601,8 @@ class _DetalleCursoState extends State<_DetalleCurso> {
               title: Text('${x['nombreMostrar']}'),
               subtitle: Text(switch ((x['estado'], x['resultado'])) {
                 ('pendiente', _) => 'Pago por confirmar',
-                (_, 'aprobado') => x['equipo'] == null ? 'Aprobó el try out' : 'Aprobó · pasó a ${x['equipo']}',
-                (_, 'no_aprobado') => 'No aprobó el try out',
+                (_, 'aprobado') => x['equipo'] == null ? 'Aprobó la evaluación' : 'Aprobó · pasó a ${x['equipo']}',
+                (_, 'no_aprobado') => 'No aprobó la evaluación',
                 _ => 'Inscripción confirmada',
               }),
               trailing: x['estado'] == 'confirmada' && yaFueTryOut
@@ -612,7 +612,10 @@ class _DetalleCursoState extends State<_DetalleCurso> {
           if (!yaFueTryOut && curso.personas.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('El día del try out podrás marcar quién aprobó y a qué equipo pasa.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+              child: Text(
+                'El día de la evaluación final podrás marcar quién aprobó y a qué equipo pasa.',
+                style: TextStyle(fontSize: 13, color: p.textoSecundario),
+              ),
             ),
         ],
       ),
@@ -761,7 +764,7 @@ class _EditorCursoState extends State<_EditorCurso> {
             controller: _nombre,
             onChanged: (_) => setState(() {}),
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej. Freshmeat de verano'),
+            decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej. Curso de iniciación de verano'),
           ),
           const SizedBox(height: 10),
           TextField(
@@ -801,7 +804,7 @@ class _EditorCursoState extends State<_EditorCurso> {
               style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
             ),
             const SizedBox(height: 2),
-            Text('Lo puedes cambiar para cada persona en el try out.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+            Text('Lo puedes cambiar para cada persona en la evaluación final.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -834,21 +837,22 @@ class _EditorCursoState extends State<_EditorCurso> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Try out',
+            'Evaluación final (opcional)',
             style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
           ),
           const SizedBox(height: 2),
-          Text(
-            'La prueba final, después de la última clase. Ese día marcas quién aprobó y a qué equipo pasa.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
+          Text('Después de la última clase. Ese día marcas quién aprobó y a qué equipo pasa.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
           const SizedBox(height: 8),
           if (_tryout != null)
             _filaFecha(p, _tryout!, icono: Icons.emoji_events_outlined, alTocar: _elegirTryout)
           else
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(onPressed: _elegirTryout, icon: const Icon(Icons.emoji_events_outlined), label: const Text('Elegir la fecha del try out')),
+              child: TextButton.icon(
+                onPressed: _elegirTryout,
+                icon: const Icon(Icons.emoji_events_outlined),
+                label: const Text('Elegir la fecha de la evaluación final'),
+              ),
             ),
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
@@ -856,7 +860,7 @@ class _EditorCursoState extends State<_EditorCurso> {
             child: _tryoutAntes
                 ? Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text('El try out tiene que ser después de la última clase.', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
+                    child: Text('La evaluación final tiene que ser después de la última clase.', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
                   )
                 : const SizedBox(width: double.infinity),
           ),

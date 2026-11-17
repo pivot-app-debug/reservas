@@ -427,7 +427,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
             context,
             icono: Icons.school_outlined,
             titulo: 'Curso',
-            texto: 'Clases para quienes empiezan, con inscripción y un try out al final',
+            texto: 'Clases con inscripción y, si quieres, una evaluación final',
             activa: false,
             alTocar: () async {
               await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CursosScreen(sesion: widget.repo.sesion)));

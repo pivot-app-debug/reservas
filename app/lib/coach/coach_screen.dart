@@ -1,3 +1,5 @@
+import '../core/deporte.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -280,7 +282,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
                 controller: titulo,
                 autofocus: true,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Qué se hace', hintText: 'Ej. Calentamiento, frenos, scrimmage'),
+                decoration: const InputDecoration(labelText: 'Qué se hace', hintText: 'Ej. Calentamiento, técnica, juego'),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -1133,7 +1135,9 @@ class _HabilidadesScreenState extends State<HabilidadesScreen> {
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text(
-                  'La lista parte de las habilidades mínimas de WFTDA. Agrega, cambia o apaga las que tu liga necesite: vale para todas las fichas.',
+                  Deporte.esDerby
+                      ? 'La lista parte de las habilidades mínimas de WFTDA. Agrega, cambia o apaga las que tu liga necesite: vale para todas las fichas.'
+                      : 'Arma la lista de habilidades de tu deporte. Agrega, cambia o apaga las que tu liga necesite: vale para todas las fichas.',
                   style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
                 ),
                 for (final g in grupos.entries) ...[

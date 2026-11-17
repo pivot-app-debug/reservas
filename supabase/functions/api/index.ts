@@ -1555,7 +1555,9 @@ async function getConfigLiga(params: Record<string, any>): Promise<Record<string
         const { data: extra } = await supabase.from('config_app').select('key, value').in('key', ['logo_liga']);
   const v = (k: string) => (extra ?? []).find((r: any) => r.key === k)?.value ?? '';
   const formasPago = await _formasPago();
-  return { exito: true, ...(await _configLiga()), ...(await getPreciosClases()), reglas: await _reglasLiga(), logo: v('logo_liga'), formasPago };
+    // Deporte de la liga: la app usa palabras de ese deporte (Victor, 2026-11-17).
+  const deporte = (await supabaseServicio.from('ligas').select('deporte').eq('id', _ligaEnCurso()).maybeSingle()).data?.deporte ?? 'roller_derby';
+  return { exito: true, ...(await _configLiga()), ...(await getPreciosClases()), reglas: await _reglasLiga(), logo: v('logo_liga'), formasPago, deporte };
 }
 
 async function adminGuardarConfigLiga(params: Record<string, any>): Promise<Record<string, any>> {
@@ -8538,7 +8540,7 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       }
     }
     await sendPush({
-      tipo: 'solicitud_resuelta', include_external_user_ids: [i.username], headings: { es: aprobado ? '¡Aprobaste el try out!' : 'Resultado del try out' },
+      tipo: 'solicitud_resuelta', include_external_user_ids: [i.username], headings: { es: aprobado ? '¡Aprobaste la evaluación final!' : 'Resultado de la evaluación final' },
       contents: { es: aprobado ? (equipo ? `Desde ahora estás en ${equipo}. ¡Bienvenidx!` : '¡Felicitaciones!') : 'Esta vez no fue. Un Pivot te contará cómo seguir.' }, url: APP_URL + '/',
     }).catch(() => {});
   }

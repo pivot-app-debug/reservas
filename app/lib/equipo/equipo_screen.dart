@@ -1,3 +1,5 @@
+import '../core/deporte.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -516,7 +518,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Prueba con un nombre, un rol (jammer, blocker), un mes (diciembre), "cumple", "de viaje" o un número.',
+            'Prueba con un nombre, un rol (${Deporte.ejemploRolBusqueda}), un mes (diciembre), "cumple", "de viaje" o un número.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),

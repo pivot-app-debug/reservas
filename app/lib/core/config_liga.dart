@@ -1,3 +1,5 @@
+import 'deporte.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -143,6 +145,7 @@ class ConfigLiga extends ChangeNotifier {
     precioPorClase = num.tryParse('${r['precioPorClase']}');
     precioMensual = num.tryParse('${r['precioMensual']}');
     logo = '${r['logo'] ?? ''}';
+    if (r['deporte'] != null) Deporte.id = '${r['deporte']}';
     formasPago = r['formasPago'] is Map<String, dynamic> ? r['formasPago'] as Map<String, dynamic> : null;
     if (r['reglas'] is Map<String, dynamic>) reglas = r['reglas'] as Map<String, dynamic>;
     diasInactividad = (reglas['inactividadDias'] as num?)?.toInt() ?? 30;

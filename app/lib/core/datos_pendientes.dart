@@ -1,3 +1,5 @@
+import 'deporte.dart';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,12 +53,12 @@ class DatosPendientes {
       if (_vacio(d['fotoPerfil']))
         const DatoPendiente('foto', Icons.add_a_photo_outlined, 'Foto de perfil', 'Para que el equipo te reconozca en la lista y en los eventos.'),
       if (_vacio(d['telefono'])) const DatoPendiente('datos', Icons.phone_outlined, 'Teléfono', 'Para que el equipo pueda escribirte o llamarte.'),
-      if (_vacio(d['nombreDerby'])) const DatoPendiente('datos', Icons.sports_rounded, 'Nombre derby', 'Cómo te conoce el equipo.'),
+      if (_vacio(d['nombreDerby'])) DatoPendiente('datos', Icons.sports_rounded, Deporte.apodo, 'Cómo te conoce el equipo.'),
       if (_vacio(d['pronombres']))
         const DatoPendiente('datos', Icons.record_voice_over_outlined, 'Pronombres', 'Para que el equipo se dirija a ti como prefieres.'),
       // Solo si el servidor mandó `roles` (versiones viejas no lo mandan).
       if (d.containsKey('roles') && _vacio(d['roles'] is List ? (d['roles'] as List).join(',') : d['roles']))
-        const DatoPendiente('datos', Icons.shield_outlined, 'Roles en el equipo', 'Jammer, blocker, coach… para armar mejor los entrenamientos.'),
+        DatoPendiente('datos', Icons.shield_outlined, 'Roles en el equipo', '${Deporte.ejemplosRoles} para armar mejor los entrenamientos.'),
     ];
   }
 
