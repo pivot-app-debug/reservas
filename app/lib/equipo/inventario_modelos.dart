@@ -97,10 +97,14 @@ class ListaInventario {
       seccion = '${m['seccion'] ?? 'equipamiento'}',
       foto = '${m['foto'] ?? ''}',
       activa = m['activa'] != false,
+      paraEntrenar = m['paraEntrenar'] == true,
       setsCompletos = (m['sets']?['completos'] as num?)?.toInt() ?? 0,
       setsLibres = (m['sets']?['libres'] as num?)?.toInt() ?? 0;
   final String id, nombre, tipo, seccion, foto;
   final bool activa;
+
+  /// La persona la puede usar de la liga para entrenar (Victor, 2026-11-17).
+  final bool paraEntrenar;
   final String? icono, unidad, sistema;
   final List<Pieza> piezas;
   final List<StockFila> stock;
@@ -311,6 +315,11 @@ class InventarioRepo {
   /// Botiquín e insumos: guarda todos los renglones (nombre, cantidad, vence, mínimo).
   Future<void> guardarRenglones(ListaInventario l, List<Map<String, Object?>> renglones) =>
       _ok(_api.post('adminInventarioLista', {..._admin, 'accion': 'editar', 'id': l.id, 'stock': jsonEncode(renglones)}));
+
+  /// Se presta para entrenar: aparece en "Mi equipamiento" y en lo que cada
+  /// equipo puede pedir propio.
+  Future<void> paraEntrenar(ListaInventario l, bool si) =>
+      _ok(_api.post('adminInventarioLista', {..._admin, 'accion': 'editar', 'id': l.id, 'paraEntrenar': si}));
 
   /// Interruptor de la tarjeta: ocultar o mostrar una lista (no borra nada).
   Future<void> activarLista(ListaInventario l, bool activa) =>

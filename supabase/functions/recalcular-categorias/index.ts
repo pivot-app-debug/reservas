@@ -235,13 +235,15 @@ async function _manejar(req: Request): Promise<Response> {
       .eq('tipo', 'uso').eq('estado', 'activo').or(`hasta.is.null,hasta.gte.${new Date().toISOString().slice(0, 10)}`);
     const conPermisoEquipo = new Set((usosData ?? []).map((u: any) => u.username));
     const { data: equipoData, error: equipoError } = await supabase.from('equipo')
-                        .select('username, estado_miembro, estado_desde, tier_modo, categoria, necesita_patines, necesita_protecciones, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, meses_consecutivos_cumplidos, meses_consecutivos_ultimo_mes, equipo_fijo_hasta')
+                                                .select('username, estado_miembro, estado_desde, tier_modo, categoria, necesita_patines, necesita_protecciones, equipo_liga, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, meses_consecutivos_cumplidos, meses_consecutivos_ultimo_mes, equipo_fijo_hasta')
       .is('eliminado_en', null);
     if (equipoError) return json({ ok: false, error: equipoError.message }, 500);
     const miembros: {
             username: string; estadoMiembro: string | null; estadoDesde: string | null; tierModo: string | null; categoria: string | null;
 
-      necesitaEquipoClub: boolean;
+            necesitaEquipoClub: boolean;
+      usados: Set<string>;
+
       tierRiesgoDesde: string | null; tierRiesgoHasta: string | null; tierRiesgoObjetivo: string | null;
       mesesConsecutivosCumplidos: number; mesesUltimoMes: string | null;
     }[] = (equipoData ?? [])
@@ -251,7 +253,9 @@ async function _manejar(req: Request): Promise<Response> {
       .map((r: any) => ({
                 username: r.username, estadoMiembro: r.estado_miembro ?? null, estadoDesde: r.estado_desde ?? null, tierModo: r.tier_modo ?? 'auto',
         categoria: r.categoria ?? null,
-                necesitaEquipoClub: !conPermisoEquipo.has(r.username) && necesitaEquipoClub(r.necesita_patines, r.necesita_protecciones),
+                                necesitaEquipoClub: !conPermisoEquipo.has(r.username) && necesitaEquipoClub(r.necesita_patines, r.necesita_protecciones),
+        // Listas que usa de la liga (Victor, 2026-11-17): con permiso de uso, ninguna.
+        usados: conPermisoEquipo.has(r.username) ? new Set<string>() : new Set(Object.keys((r.equipo_liga as Record<string, string>) ?? {})),
         tierRiesgoDesde: r.tier_riesgo_desde ?? null, tierRiesgoHasta: r.tier_riesgo_hasta ?? null,
         tierRiesgoObjetivo: r.tier_riesgo_objetivo ?? null,
         mesesConsecutivosCumplidos: Number(r.meses_consecutivos_cumplidos) || 0,
@@ -523,7 +527,16 @@ async function _manejar(req: Request): Promise<Response> {
       let nuevosMesesConsecutivos: number | undefined;
       let nuevoUltimoMes: string | null | undefined; // `meses_consecutivos_ultimo_mes`, undefined = no tocar
 
-      if (m.necesitaEquipoClub) {
+            // Equipamiento por liga (Victor, 2026-11-17): cada equipo pide propio
+      // ciertas listas (`requisitos.propio`). Quien usa de la liga algo que su
+      // equipo pide propio baja al primer equipo de abajo que no lo pide.
+      const propioDe = (t: any): string[] => Array.isArray(t?.requisitos?.propio)
+        ? t.requisitos.propio.map(String)
+        : [];
+      const choca = (t: any) => !!t && propioDe(t).some((id) => m.usados.has(id));
+      const tierActualEq = tiers.find((t: any) => t.nombre === (m.categoria || tierDefault.nombre)) ?? tierDefault;
+      const porLista = tiers.some((t: any) => Array.isArray(t?.requisitos?.propio));
+      if (porLista ? choca(tierActualEq) : m.necesitaEquipoClub) {
         // Regla de negocio (2026-09-30): quien necesita patines o
         // protecciones del club NO puede ser Quindes en modo 'auto' -- queda
         // como máximo en Mirlxs, sin importar clases/puntos (y aunque sea
@@ -533,7 +546,9 @@ async function _manejar(req: Request): Promise<Response> {
         // con equipo del club no cuentan, así que al dejar de necesitarlo NO
         // sube sola -- sigue la lógica normal de puntos desde cero (N meses
         // consecutivos cumpliendo). Sin riesgo: Mirlxs es el piso.
-        categoriaAsignada = 'Mirlxs';
+                categoriaAsignada = porLista
+          ? (tiers.filter((t: any) => t.orden > tierActualEq.orden && !choca(t)).sort((a: any, b: any) => a.orden - b.orden)[0] ?? tierDefault).nombre
+          : 'Mirlxs';
         nuevosMesesConsecutivos = 0; nuevoUltimoMes = null;
         nuevoRiesgoDesde = null; nuevoRiesgoHasta = null; nuevoRiesgoObjetivo = null;
       } else {
@@ -635,12 +650,25 @@ async function _manejar(req: Request): Promise<Response> {
               nuevoRiesgoDesde = null; nuevoRiesgoHasta = null; nuevoRiesgoObjetivo = null;
             } else {
               // Sigue en período de gracia -- sin cambios, se deja como está.
-              categoriaAsignada = categoriaActual;
+                            categoriaAsignada = categoriaActual;
               nuevoRiesgoDesde = m.tierRiesgoDesde; nuevoRiesgoHasta = m.tierRiesgoHasta; nuevoRiesgoObjetivo = m.tierRiesgoObjetivo;
             }
           }
         }
+        // No sube a un equipo que pide propio lo que usa de la liga: se queda
+        // donde está y el contador para subir vuelve a 0 (como antes con Quindes).
+                const destino = tiers.find((t: any) => t.nombre === categoriaAsignada);
+        const superior = tiers.filter((t: any) => t.orden < tierActualEq.orden).sort((a: any, b: any) => b.orden - a.orden)[0];
+        if (porLista && choca(superior)) {
+          // Los meses con equipamiento de la liga no cuentan para subir.
+          nuevosMesesConsecutivos = 0; nuevoUltimoMes = null;
+          if (choca(destino) && categoriaAsignada !== tierActualEq.nombre) {
+            categoriaAsignada = tierActualEq.nombre;
+            nuevoRiesgoDesde = null; nuevoRiesgoHasta = null; nuevoRiesgoObjetivo = null;
+          }
+        }
       }
+
 
             const termometroPct = calcularTermometroPct(username);
       const update: Record<string, any> = { categoria: categoriaAsignada, termometro_pct: termometroPct };

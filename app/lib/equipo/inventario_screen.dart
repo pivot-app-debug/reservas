@@ -548,6 +548,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
   // Cantidades editadas (variante → cantidad); se guardan con "Guardar".
   late final Map<String, int> _stock = {for (final f in l.stock) f.variante: f.cantidad};
   late int _sets = l.setsCompletos;
+  late bool _paraEntrenar = l.paraEntrenar;
   // Etiquetas editadas (variante → texto), Victor 2026-11-16.
   final Map<String, String> _etiquetas = {};
   // Botiquín e insumos: un renglón por cosa (Victor, 2026-11-13).
@@ -815,11 +816,36 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
                 ),
               ),
             ),
-          if (l.sistema != null)
+          // Para entrenar (Victor, 2026-11-17): cada liga decide qué listas
+          // usan las personas de la liga para entrenar.
+          if (pivot && l.seccion == 'equipamiento')
+            Material(
+              color: p.tarjeta,
+              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              clipBehavior: Clip.antiAlias,
+              child: SwitchListTile(
+                title: const Text('Se presta para entrenar', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Cada persona dice en "Mi equipamiento" si la usa de la liga, y cada equipo puede pedirla propia.'),
+                value: _paraEntrenar,
+                onChanged: (v) async {
+                  final m = ScaffoldMessenger.of(context);
+                  setState(() => _paraEntrenar = v);
+                  try {
+                    await repo.paraEntrenar(l, v);
+                  } catch (e) {
+                    if (!mounted) return;
+                    setState(() => _paraEntrenar = !v);
+                    m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar.')));
+                  }
+                },
+              ),
+            )
+          else if (l.paraEntrenar)
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-              child: Text('Se puede reservar al confirmar asistencia a una clase.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+              child: Text('Se puede usar de la liga para entrenar.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
             ),
+          if (pivot && l.seccion == 'equipamiento') const SizedBox(height: 12),
           Material(
             color: p.tarjeta,
             borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
@@ -907,6 +933,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
 /// él: cambiar talla o protecciones, o declarar el propio.
 /// Tiene patines y protecciones propias (no usa las del equipo).
 bool tieneEquipoPropio(Map<String, dynamic> d) {
+  if (d['equipoLiga'] is Map) return (d['equipoLiga'] as Map).isEmpty;
   final pro = '${d['necesitaProtecciones'] ?? ''}'.trim();
   return '${d['necesitaPatines'] ?? ''}' != 'Sí' && (pro.isEmpty || pro == 'No');
 }
@@ -953,11 +980,7 @@ class _TuEquipamiento extends StatelessWidget {
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
                             ),
                             Text(textoEquipamiento(d), style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                            if (!propio)
-                              Text(
-                                'Toca para cambiar tu talla de patines o qué protecciones necesitas.',
-                                style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                              ),
+                            if (!propio) Text('Toca para cambiar qué usas de la liga o tu talla.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
                           ],
                         ),
                       ),

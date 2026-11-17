@@ -185,8 +185,14 @@ class _AjustesScreenState extends State<AjustesScreen> {
   }
 }
 
-/// "Patines del club (38) · Protecciones propias".
+/// "Usas de la liga: 2 listas" o "Todo propio" (Victor, 2026-11-17: las
+/// listas las arma cada liga; los nombres se ven al abrir).
 String textoEquipamiento(Map<String, dynamic> d) {
+  final eq = d['equipoLiga'];
+  if (eq is Map) {
+    if (eq.isEmpty) return 'Todo propio';
+    return eq.length == 1 ? 'Usas 1 cosa de la liga' : 'Usas ${eq.length} cosas de la liga';
+  }
   final pat = '${d['necesitaPatines'] ?? ''}' == 'Sí';
   final talla = '${d['talla'] ?? ''}'.trim();
   final pro = '${d['necesitaProtecciones'] ?? ''}'.trim();

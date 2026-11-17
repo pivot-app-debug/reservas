@@ -933,10 +933,9 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   /// Lo que pide el equipo al inscribirse con su enlace, dicho con todas
   /// las letras (Victor, 2026-11-16).
   String get _textoInvitar {
-    final req = (t['requisitos'] as Map?) ?? const {};
-    final pide = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'];
+    final pide = _propioNombres(t);
     if (_piso || pide.isEmpty) return 'Quien se inscribe con este enlace entra a $_nombre.';
-    return 'Quien se inscribe con este enlace entra a $_nombre si tiene ${pide.join(' y ')} propi${pide.length > 1 || pide.first == 'patines' ? 'os' : 'as'}; '
+    return 'Quien se inscribe con este enlace entra a $_nombre si tiene propio: ${_unirY(pide)}; '
         'si no, entra a $_nombreDebajo y se le explica por qué.';
   }
 
@@ -946,8 +945,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     final c = ConfigLiga.de(s);
     final porMes = const {'mes', 'elige', 'segun_equipamiento'}.contains('${c.cobroEquipo(_nombre)['modo']}');
     final g = c.graciaClases(_nombre);
-    final req = (t['requisitos'] as Map?) ?? const {};
-    final propio = [if (req['patinesPropios'] == true) 'patines', if (req['proteccionesPropias'] == true) 'protecciones'].join(' y ');
+    final propio = _unirY(_propioNombres(t));
     Future<void> abrir(Widget w) async {
       await SubAjustes.abrir(context, w);
       if (mounted) setState(() {});
@@ -1011,7 +1009,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         _Fila(
           icono: Icons.roller_skating_outlined,
           titulo: 'Equipamiento propio',
-          texto: propio.isEmpty ? 'No pide equipamiento propio' : 'Pide $propio propios',
+          texto: propio.isEmpty ? 'No pide equipamiento propio' : 'Pide propio: $propio',
           alTocar: () async {
             if (await editarEquipamientoPropio(context, s, t) && mounted) {
               final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
@@ -2158,31 +2156,52 @@ class _NuevoEquipoScreenState extends State<NuevoEquipoScreen> {
   }
 }
 
+/// Nombres de lo que un equipo pide propio (`getTiers.propioNombres`).
+List<String> _propioNombres(Map<String, dynamic> t) => [for (final x in (t['propioNombres'] as List? ?? const [])) '$x'];
+
+String _unirY(List<String> l) {
+  final x = [for (final y in l) y.toLowerCase()];
+  return x.length > 1 ? '${x.sublist(0, x.length - 1).join(', ')} y ${x.last}' : x.join();
+}
+
 /// Equipamiento propio que pide un equipo (Reglas → Equipamiento, Victor
-/// 2026-11-15). Quien se inscribe con su enlace y no lo cumple entra al
-/// equipo inicial. Devuelve true si se guardó.
+/// 2026-11-15). Desde 2026-11-17 se elige de las listas de la liga que se
+/// usan para entrenar (Inventario). Quien se inscribe con su enlace y no lo
+/// cumple entra al equipo inicial. Devuelve true si se guardó.
 Future<bool> editarEquipamientoPropio(BuildContext context, Sesion s, Map<String, dynamic> t) async {
   final req = (t['requisitos'] as Map?) ?? const {};
-  var patines = req['patinesPropios'] == true;
-  var prot = req['proteccionesPropias'] == true;
+  List<Map<String, dynamic>> listas = const [];
+  try {
+    final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
+    listas = [for (final l in (r['listasEntrenar'] as List? ?? const [])) Map<String, dynamic>.from(l as Map)];
+  } catch (_) {}
+  if (!context.mounted) return false;
+  final elegidas = <String>{for (final x in (req['propio'] as List? ?? const [])) '$x'};
   final ok = await abrirSubseccion(
     context,
     titulo: 'Equipamiento propio',
     contenido: (set) => [
       Text(
-        'Qué tiene que tener propio quien está en ${t['nombre']}. Quien se inscribe con su enlace sin cumplirlo entra al equipo inicial y se le explica por qué.',
+        'Qué tiene que tener propio quien está en ${t['nombre']}. Quien usa eso de la liga pasa al equipo de abajo, y quien se inscribe con su enlace sin cumplirlo entra al equipo inicial y se le explica por qué.',
         style: TextStyle(color: context.pivot.textoSecundario),
       ),
       const SizedBox(height: 8),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Patines propios'), value: patines, onChanged: (v) => set(() => patines = v)),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Protecciones propias'), value: prot, onChanged: (v) => set(() => prot = v)),
+      if (listas.isEmpty)
+        Text('Primero marca en el Inventario qué listas de equipamiento se prestan para entrenar.', style: TextStyle(color: context.pivot.textoSecundario)),
+      for (final l in listas)
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('${l['nombre']} propio'),
+          value: elegidas.contains('${l['id']}'),
+          onChanged: (v) => set(() => v ? elegidas.add('${l['id']}') : elegidas.remove('${l['id']}')),
+        ),
     ],
   );
   if (ok != true || !context.mounted) return false;
   final m = ScaffoldMessenger.of(context);
   try {
     final cambios = {
-      'requisitos': {'patinesPropios': patines, 'proteccionesPropias': prot},
+      'requisitos': {...req, 'propio': elegidas.toList()},
     };
     final base = _Regla.de(t).params({...t, ...cambios});
     await _guardarTier(s, {...base, ...cambios.map((k, v) => MapEntry(k, jsonEncode(v)))});

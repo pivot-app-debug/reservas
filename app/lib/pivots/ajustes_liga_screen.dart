@@ -258,8 +258,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                   final t = l[i];
                   final nombre = '${t['nombre']}';
                   final cuantas = gente.personas?.where((x) => x.categoria == nombre).length;
-                  final req = (t['requisitos'] as Map?) ?? const {};
-                  final propio = req['patinesPropios'] == true || req['proteccionesPropias'] == true;
+                  final propio = (t['propioNombres'] as List? ?? const []).isNotEmpty;
                   final logo = '${t['logo'] ?? ''}';
                   final cobro = modosCobro['${ConfigLiga.de(sesion).cobroEquipo(nombre)['modo']}']?.$1;
                   // Con logo, va de fondo y no hace falta el avatar (Victor, 2026-11-16).

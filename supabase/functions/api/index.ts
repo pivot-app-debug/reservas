@@ -153,7 +153,8 @@ function getDatosCompletos(row: Record<string, any> | null): Record<string, any>
   return {
     necesitaPatines:      row.necesita_patines      ?? '',
     talla:                row.talla                 ?? '',
-    necesitaProtecciones: row.necesita_protecciones ?? '',
+        necesitaProtecciones: row.necesita_protecciones ?? '',
+    equipoLiga:           row.equipo_liga ?? {},
     categoria:            row.categoria             ?? '',
     estado_miembro:       row.estado_miembro        ?? 'Activx',
     // snake_case a propósito, mismo criterio que estado_miembro arriba --
@@ -898,6 +899,114 @@ function _necesitaEquipoClub(patines: unknown, protecciones: unknown): boolean {
   return usa(patines) || usa(protecciones);
 }
 
+// ─── Equipamiento armado por cada liga (Victor, 2026-11-17) ───────────────
+// Listas del inventario marcadas "para entrenar" (`para_entrenar`). Lo que
+// cada persona usa de la liga: `equipo.equipo_liga` {listaId: talla, piezas
+// ("Casco, Coderas") o ''}. Cada equipo pide equipamiento propio con
+// `requisitos.propio` [listaId]. Las listas del sistema (patines,
+// protecciones) siguen escribiendo las columnas viejas que usan las reservas.
+type ListaEntrenar = { id: string; nombre: string; tipo: string; icono: string | null; piezas: any[]; sistema: string | null };
+
+async function _listasEntrenar(): Promise<ListaEntrenar[]> {
+  const { data } = await supabase.from('inventario_listas').select('id, nombre, tipo, icono, piezas, sistema').eq('para_entrenar', true).eq('activa', true).order('orden');
+  return (data ?? []).map((l: any) => ({ ...l, piezas: Array.isArray(l.piezas) ? l.piezas : [] }));
+}
+
+/// Columnas viejas a partir de `equipo_liga`.
+function _legadoDesdeEquipoLiga(eq: Record<string, string>, listas: ListaEntrenar[]): Record<string, string> {
+  const pat = listas.find((l) => l.sistema === 'patines'), pro = listas.find((l) => l.sistema === 'protecciones');
+  const out: Record<string, string> = {};
+  if (pat) { const v = eq[pat.id]; out.necesita_patines = v != null ? 'Sí' : 'No'; out.talla = v ?? ''; }
+  if (pro) { const v = eq[pro.id]; out.necesita_protecciones = v == null ? 'No' : (v.trim() ? v : 'Sí'); }
+  return out;
+}
+
+/// `equipo_liga` a partir de las columnas viejas (registro, web vieja).
+async function _equipoLigaDesdeLegado(patines: unknown, talla: unknown, protecciones: unknown, previo: Record<string, string> = {}): Promise<Record<string, string>> {
+  const listas = await _listasEntrenar();
+  const usa = (v: unknown) => { const t = String(v ?? '').trim().toLowerCase(); return t !== '' && t !== 'no'; };
+  const eq: Record<string, string> = { ...previo };
+  const pat = listas.find((l) => l.sistema === 'patines'), pro = listas.find((l) => l.sistema === 'protecciones');
+  if (pat && patines !== undefined) { if (usa(patines)) eq[pat.id] = String(talla ?? ''); else delete eq[pat.id]; }
+  if (pro && protecciones !== undefined) { if (usa(protecciones)) eq[pro.id] = String(protecciones) === 'Sí' ? '' : String(protecciones); else delete eq[pro.id]; }
+  return eq;
+}
+
+/// Listas de `requisitos.propio` (o las banderas viejas) de un equipo.
+function _propioDe(req: any, listas: ListaEntrenar[]): string[] {
+  if (Array.isArray(req?.propio)) return req.propio.map(String);
+  return listas.filter((l) => (l.sistema === 'patines' && req?.patinesPropios) || (l.sistema === 'protecciones' && req?.proteccionesPropias)).map((l) => l.id);
+}
+
+/// Si usa de la liga algo que su equipo pide propio, el equipo más alto (de
+/// los de abajo) que no lo pide. null = puede quedarse.
+async function _equipoSegunEquipamiento(categoria: string, eq: Record<string, string>): Promise<string | null> {
+  const listas = await _listasEntrenar();
+  const { data: tiers } = await supabase.from('config_tiers').select('nombre, orden, requisitos, es_default').order('orden');
+  const l = tiers ?? [];
+  const i = l.findIndex((t: any) => t.nombre === categoria);
+  if (i < 0) return null;
+  const usa = new Set(Object.keys(eq));
+  const choca = (t: any) => _propioDe(t.requisitos, listas).some((id) => usa.has(id));
+  if (!choca(l[i])) return null;
+    // `orden` más bajo = equipo de más arriba (Quindes 1, Mirlxs 2): se busca
+  // hacia abajo, del más cercano al equipo inicial.
+  const abajo = l.filter((t: any) => Number(t.orden) > Number(l[i].orden)).sort((a: any, b: any) => Number(a.orden) - Number(b.orden));
+  return (abajo.find((t: any) => !choca(t)) ?? l.find((t: any) => t.es_default))?.nombre ?? null;
+}
+
+/// Tu equipamiento: las listas para entrenar (con sus tallas o piezas), lo que
+/// usas de la liga y qué pide tu equipo propio.
+async function getMiEquipoLiga(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const listas = await _listasEntrenar();
+  const [{ data: fila }, { data: stock }, { data: tiers }] = await Promise.all([
+    supabase.from('equipo').select('categoria, equipo_liga, tier_modo').eq('username', yo).maybeSingle(),
+    supabase.from('inventario_stock').select('lista_id, variante, cantidad').in('lista_id', listas.map((l) => l.id).length ? listas.map((l) => l.id) : ['00000000-0000-0000-0000-000000000000']),
+    supabase.from('config_tiers').select('nombre, requisitos'),
+  ]);
+  const t = (tiers ?? []).find((x: any) => x.nombre === fila?.categoria);
+  return {
+    exito: true,
+    listas: listas.map((l) => ({
+      id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, piezas: l.piezas.map((p: any) => String(p.nombre)),
+      tallas: l.tipo === 'tallas' ? [...new Set((stock ?? []).filter((s: any) => s.lista_id === l.id && Number(s.cantidad) > 0).map((s: any) => String(s.variante)))] : [],
+    })),
+    mio: (fila?.equipo_liga as Record<string, string>) ?? {},
+    equipo: fila?.categoria ?? '',
+    propio: t ? _propioDe(t.requisitos, listas) : [],
+  };
+}
+
+async function guardarMiEquipoLiga(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const listas = await _listasEntrenar();
+  let pedido: Record<string, any> = {};
+  try { pedido = typeof params.equipo === 'object' ? params.equipo : JSON.parse(String(params.equipo ?? '{}')); } catch { pedido = {}; }
+  const ids = new Set(listas.map((l) => l.id));
+  const eq: Record<string, string> = {};
+  for (const [k, v] of Object.entries(pedido ?? {})) if (ids.has(k)) eq[k] = String(v ?? '').trim().slice(0, 120);
+  const { data: fila } = await supabase.from('equipo').select('categoria, tier_modo, categoria_pre_lesion').eq('username', yo).maybeSingle();
+  if (!fila) return { exito: false, error: 'Usuarix no encontradx.' };
+  const update: Record<string, any> = { equipo_liga: eq, ..._legadoDesdeEquipoLiga(eq, listas) };
+  let categoriaCambiada = false;
+  if (!fila.tier_modo || fila.tier_modo === 'auto') {
+    const nuevo = await _equipoSegunEquipamiento(fila.categoria ?? '', eq);
+    if (nuevo && nuevo !== fila.categoria) { update.categoria = nuevo; categoriaCambiada = true; }
+    if (fila.categoria_pre_lesion) {
+      const pre = await _equipoSegunEquipamiento(fila.categoria_pre_lesion, eq);
+      if (pre) update.categoria_pre_lesion = pre;
+    }
+  }
+  const { error } = await supabase.from('equipo').update(update).eq('username', yo);
+  if (error) return { exito: false, error: error.message };
+  const row = await _getEquipoRow(yo);
+  return { exito: true, categoriaCambiada, categoria: update.categoria ?? fila.categoria ?? null, datos: getDatosCompletos(row) };
+}
+
+
 // Regla de negocio (2026-09-30): quien necesita patines O protecciones del
 // club no puede ser Quindes. Si tras guardar la persona necesita equipamiento
 // y es Quindes, pasa a Mirlxs en la MISMA operación (antes lo hacía el front
@@ -910,13 +1019,19 @@ function _necesitaEquipoClub(patines: unknown, protecciones: unknown): boolean {
 async function actualizarEquipamientoPersona(params: Record<string, any>): Promise<Record<string, any>> {
   const username = await _validarToken(params.token);
   if (!username || username !== params.nombre) return { exito: false, error: 'Sesión inválida.' };
-  const { data: fila } = await supabase.from('equipo').select('categoria, tier_modo, categoria_pre_lesion').eq('username', username).maybeSingle();
+    const { data: fila } = await supabase.from('equipo').select('categoria, tier_modo, categoria_pre_lesion, equipo_liga').eq('username', username).maybeSingle();
   if (!fila) return { exito: false, error: 'Usuarix no encontradx.' };
-  const update: Record<string, any> = { necesita_patines: params.necesitaPatines, talla: params.talla, necesita_protecciones: params.necesitaProtecciones };
+    const update: Record<string, any> = { necesita_patines: params.necesitaPatines, talla: params.talla, necesita_protecciones: params.necesitaProtecciones };
+  update.equipo_liga = await _equipoLigaDesdeLegado(params.necesitaPatines, params.talla, params.necesitaProtecciones, (fila.equipo_liga as any) ?? {});
   let categoriaCambiada = false;
-  if (_necesitaEquipoClub(params.necesitaPatines, params.necesitaProtecciones) && (!fila.tier_modo || fila.tier_modo === 'auto' || fila.tier_modo === 'mirlxs')) {
-    if (fila.categoria === 'Quindes') { update.categoria = 'Mirlxs'; categoriaCambiada = true; }
-    if (fila.categoria_pre_lesion === 'Quindes') update.categoria_pre_lesion = 'Mirlxs';
+  // Equipo según lo que pide cada uno (Victor, 2026-11-17: antes Quindes/Mirlxs fijos).
+  if (!fila.tier_modo || fila.tier_modo === 'auto' || fila.tier_modo === 'mirlxs') {
+    const nuevo = await _equipoSegunEquipamiento(fila.categoria ?? '', update.equipo_liga);
+    if (nuevo && nuevo !== fila.categoria) { update.categoria = nuevo; categoriaCambiada = true; }
+    if (fila.categoria_pre_lesion) {
+      const pre = await _equipoSegunEquipamiento(fila.categoria_pre_lesion, update.equipo_liga);
+      if (pre) update.categoria_pre_lesion = pre;
+    }
   }
   const { error } = await supabase.from('equipo').update(update).eq('username', username);
   if (error) return { exito: false, error: error.message };
@@ -1818,6 +1933,7 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
   const row: Record<string, any> = {
     username: nombre, email, pronombres, prefijo, telefono,
     necesita_patines: necesitaPatines, talla, necesita_protecciones: necesitaProtecciones,
+    equipo_liga: await _equipoLigaDesdeLegado(necesitaPatines, talla, necesitaProtecciones),
     // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16).
     cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false, permisos_configurados: true,
     fecha_registro: new Date().toISOString(),
@@ -1831,15 +1947,18 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
   if (codigoEquipo) {
     const { data: t } = await supabase.from('config_tiers').select('nombre, requisitos').eq('codigo_invitacion', codigoEquipo).maybeSingle();
     if (t) {
-      const req = (t.requisitos ?? {}) as Record<string, any>;
-      const usa = (v: unknown) => { const x = String(v ?? '').trim().toLowerCase(); return x !== '' && x !== 'no'; };
-      const cumple = !(req.patinesPropios && usa(necesitaPatines)) && !(req.proteccionesPropias && usa(necesitaProtecciones));
+      // Lo que pide propio, con las listas de la liga (Victor, 2026-11-17).
+      const listasE = await _listasEntrenar();
+      const usaIds = new Set(Object.keys(row.equipo_liga ?? {}));
+      const faltan = listasE.filter((l) => _propioDe(t.requisitos ?? {}, listasE).includes(l.id) && usaIds.has(l.id));
+      const cumple = !faltan.length;
             if (cumple) row.categoria = t.nombre;
       // Si no cumple, entra al equipo inicial y se le dice por qué (Victor, 2026-11-15).
       else {
-        const falta = [req.patinesPropios && usa(necesitaPatines) ? 'patines' : '', req.proteccionesPropias && usa(necesitaProtecciones) ? 'protecciones' : ''].filter(Boolean).join(' y ');
+        const nombres = faltan.map((l) => l.nombre.toLowerCase());
+        const falta = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0];
                 const { data: ini } = await supabase.from('config_tiers').select('nombre').eq('es_default', true).maybeSingle();
-        avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}:  ${t.nombre} pide ${falta} propios. Cuando tengas tu equipamiento, cámbialo en tu perfil y tu equipo se revisará en el próximo corte.`;
+        avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}: ${t.nombre} pide tener propio: ${falta}. Cuando tengas tu equipamiento, cámbialo en tu perfil y tu equipo se revisará en el próximo corte.`;
       }
     }
   }
@@ -1902,6 +2021,7 @@ async function inscribirPersonaExpress(params: Record<string, any>): Promise<Rec
   const row: Record<string, any> = {
         username: nombre, email: '', pronombres, prefijo: telCrudo.startsWith('+') ? '+' : '', telefono: telCrudo.replace('+', ''),
     necesita_patines: necesitaPatines, talla, necesita_protecciones: necesitaProtecciones,
+    equipo_liga: await _equipoLigaDesdeLegado(necesitaPatines, talla, necesitaProtecciones),
     // Clase gratis de bienvenida, si la liga la usa (Victor, 2026-11-16), una por teléfono.
     cupon_disponible: (await _reglasLiga()).cuponBienvenida !== false && !telefonoYaUso, permisos_configurados: true,
     fecha_registro: new Date().toISOString(), pin_hash: pinHash,
@@ -3249,7 +3369,7 @@ async function getInventario(params: Record<string, any>): Promise<Record<string
           libres: Math.min(...l.piezas.map((p) => Math.floor((filas.find((f: any) => f.variante === p.nombre)?.libres ?? 0) / p.cantidad))),
         }
         : null;
-                        return { id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, unidad: l.unidad, sistema: l.sistema, piezas: l.piezas, stock: filas, sets, seccion: l.seccion ?? 'equipamiento', activa: l.activa !== false, foto: (l as any).foto ?? null };
+                        return { id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, unidad: l.unidad, sistema: l.sistema, piezas: l.piezas, stock: filas, sets, seccion: l.seccion ?? 'equipamiento', activa: l.activa !== false, foto: (l as any).foto ?? null, paraEntrenar: (l as any).para_entrenar === true };
     }),
     prestamos: visibles.map((p: any) => {
       const l = p.lista_id ? porId[p.lista_id] : undefined;
@@ -3542,8 +3662,9 @@ async function adminInventarioLista(params: Record<string, any>): Promise<Record
     if (tipo === 'set' && !pz.length) return { exito: false, error: 'Agrega al menos una pieza.' };
     const { data: max } = await supabase.from('inventario_listas').select('orden').order('orden', { ascending: false }).limit(1).maybeSingle();
         const seccion = ['equipamiento', 'entrenamiento', 'botiquin', 'miscelaneo'].includes(String(params.seccion)) ? String(params.seccion) : 'equipamiento';
-    const { data, error } = await supabase.from('inventario_listas').insert({
+        const { data, error } = await supabase.from('inventario_listas').insert({
       nombre, tipo, icono: String(params.icono ?? '').slice(0, 30) || null, piezas: pz, unidad: String(params.unidad ?? '').trim().slice(0, 20) || null, orden: (Number(max?.orden) || 0) + 1, seccion,
+      para_entrenar: seccion === 'equipamiento' && (params.paraEntrenar === true || params.paraEntrenar === 'true'),
     }).select('id').single();
     if (error) return { exito: false, error: 'No se pudo crear.' };
     await guardarStock(data.id);
@@ -3558,7 +3679,9 @@ async function adminInventarioLista(params: Record<string, any>): Promise<Record
     if (params.icono != null) cambios.icono = String(params.icono).slice(0, 30) || null;
         if (params.unidad != null) cambios.unidad = String(params.unidad).trim().slice(0, 20) || null;
     // Interruptor de la tarjeta: ocultar o mostrar la lista (no borra nada).
-    if (params.activa != null) cambios.activa = !(params.activa === false || params.activa === 'false');
+        if (params.activa != null) cambios.activa = !(params.activa === false || params.activa === 'false');
+    // Para entrenar: la persona la puede usar de la liga (Victor, 2026-11-17).
+    if (params.paraEntrenar != null) cambios.para_entrenar = params.paraEntrenar === true || params.paraEntrenar === 'true';
     if (piezas != null && l.tipo === 'set') { const pz = limpiarPiezas(piezas); if (!pz.length) return { exito: false, error: 'Agrega al menos una pieza.' }; cambios.piezas = pz; }
     if (Object.keys(cambios).length) await supabase.from('inventario_listas').update(cambios).eq('id', id);
     await guardarStock(id);
@@ -9343,7 +9466,7 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
     supabase.from('puntos_mensuales').select('mes, puntos_asistencia, puntos_tareas, puntos_bonificacion, puntos_extra, puntos_total')
       .eq('nombre_usuario', username).eq('anio', anio),
     supabase.from('puntos_mensuales').select('anio').eq('nombre_usuario', username),
-    supabase.from('equipo').select('categoria, tier_modo, estado_miembro, pronombres, necesita_patines, necesita_protecciones, meses_consecutivos_cumplidos, tier_riesgo_hasta, tier_riesgo_objetivo, fecha_ingreso')
+        supabase.from('equipo').select('categoria, tier_modo, estado_miembro, pronombres, necesita_patines, necesita_protecciones, equipo_liga, meses_consecutivos_cumplidos, tier_riesgo_hasta, tier_riesgo_objetivo, fecha_ingreso')
       .eq('username', username).maybeSingle(),
     supabase.from('config_tiers').select('*').order('orden', { ascending: true }),
   ]);
@@ -9422,7 +9545,7 @@ async function getEstadisticasPersona(params: Record<string, any>): Promise<Reco
             estado: fila.estado_miembro ?? null,
       pronombres: fila.pronombres ?? null,
 
-            usaEquipo: !permiso?.length && (usa(fila.necesita_patines) || usa(fila.necesita_protecciones)),
+                        usaEquipo: !permiso?.length && (usa(fila.necesita_patines) || usa(fila.necesita_protecciones) || Object.keys(fila.equipo_liga ?? {}).length > 0),
       mesesSeguidos: Number(fila.meses_consecutivos_cumplidos) || 0,
       riesgoHasta: fila.tier_riesgo_hasta ?? null,
       riesgoObjetivo: fila.tier_riesgo_objetivo ?? null,
@@ -9461,7 +9584,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
   const inicio = new Date(Date.UTC(y, mo - 12, 1)).toISOString().slice(0, 10);
     const reglas = await _reglasLiga();
   const [{ data: gente }, asis, { data: ext }, { data: pts }] = await Promise.all([
-    supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, tier_modo, estado_miembro, necesita_patines, necesita_protecciones, meses_consecutivos_cumplidos')
+        supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, tier_modo, estado_miembro, necesita_patines, necesita_protecciones, equipo_liga, meses_consecutivos_cumplidos')
       .is('eliminado_en', null),
     _paginado((a, b) => supabase.from('asistencias').select('fecha, a_horario, tarde, tipo_evento')
       .not('estado', 'in', '("Evento Cancelado","No se entrena")').gte('fecha', inicio).lt('fecha', hoyISO)
@@ -9504,7 +9627,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
   const personas = (gente ?? []).filter((p: any) => p.username).map((p: any) => ({
     nombre: p.username, nombreMostrar: p.nombre_derby || p.username, foto: p.foto_perfil || '',
     categoria: p.categoria ?? null, modo: p.tier_modo ?? 'auto', estado: p.estado_miembro ?? null,
-    usaEquipo: usa(p.necesita_patines) || usa(p.necesita_protecciones), mesesSeguidos: Number(p.meses_consecutivos_cumplidos) || 0,
+        usaEquipo: usa(p.necesita_patines) || usa(p.necesita_protecciones) || Object.keys(p.equipo_liga ?? {}).length > 0, mesesSeguidos: Number(p.meses_consecutivos_cumplidos) || 0,
         clasesMes: clases[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0),
     // Con regla propia de un equipo: sus clases contadas con esa regla.
     clasesEquipos: Object.fromEntries(Object.entries(clasesEquipos).map(([eq, c]) => [eq, c[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0)])),
@@ -11988,7 +12111,9 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'getDatosCompletos':               return json(await getDatosCompletosAction(params));
       case 'getDatosPersona':                 return json(await getDatosPersona(params));
       case 'actualizarDatosPersona':          return json(await actualizarDatosPersona(params));
-      case 'actualizarEquipamientoPersona':   return json(await actualizarEquipamientoPersona(params));
+            case 'actualizarEquipamientoPersona':   return json(await actualizarEquipamientoPersona(params));
+      case 'getMiEquipoLiga':                 return json(await getMiEquipoLiga(params));
+      case 'guardarMiEquipoLiga':             return json(await guardarMiEquipoLiga(params));
       case 'actualizarPin':                   return json(await actualizarPin(params));
       case 'actualizarPerfilGoogle':          return json(await actualizarPerfilGoogle(params));
       case 'getCuponDisponible':              return json(await getCuponDisponible(params));
@@ -12290,9 +12415,14 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'getTiers': {
         const adminEmail = await _validarAdminToken(params.adminToken);
         if (!adminEmail) return json({ error: 'Sesión admin inválida.' }, 401);
-        const { data, error } = await supabase.from('config_tiers').select('*').order('orden');
+                const { data, error } = await supabase.from('config_tiers').select('*').order('orden');
         if (error) return json({ error: error.message }, 500);
-        return json({ tiers: data });
+        // Listas para entrenar y, por equipo, los nombres de lo que pide propio (Victor, 2026-11-17).
+        const le = await _listasEntrenar();
+        return json({
+          tiers: (data ?? []).map((t: any) => ({ ...t, propioNombres: le.filter((l) => _propioDe(t.requisitos ?? {}, le).includes(l.id)).map((l) => l.nombre) })),
+          listasEntrenar: le.map((l) => ({ id: l.id, nombre: l.nombre })),
+        });
       }
       case 'upsertTier': {
         const adminEmail = await _validarAdminToken(params.adminToken);
@@ -12320,7 +12450,14 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
         if (params.periodo_unidad != null && unidades.includes(String(params.periodo_unidad))) row.periodo_unidad = String(params.periodo_unidad);
         if (params.gracia_unidad != null && unidades.includes(String(params.gracia_unidad))) row.gracia_unidad = String(params.gracia_unidad);
         if (params.requisitos != null) {
-          try { row.requisitos = typeof params.requisitos === 'object' ? params.requisitos : JSON.parse(String(params.requisitos)); } catch { /* sin cambio */ }
+                    try { row.requisitos = typeof params.requisitos === 'object' ? params.requisitos : JSON.parse(String(params.requisitos)); } catch { /* sin cambio */ }
+          // Listas que pide propias (Victor, 2026-11-17); las banderas viejas se derivan.
+          if (row.requisitos && Array.isArray(row.requisitos.propio)) {
+            const le = await _listasEntrenar();
+            row.requisitos.propio = row.requisitos.propio.map(String).filter((x: string) => le.some((l) => l.id === x));
+            row.requisitos.patinesPropios = le.some((l) => l.sistema === 'patines' && row.requisitos.propio.includes(l.id));
+            row.requisitos.proteccionesPropias = le.some((l) => l.sistema === 'protecciones' && row.requisitos.propio.includes(l.id));
+          }
         }
         if (!String(nombre ?? '').trim()) return json({ error: 'Falta el nombre del equipo.' }, 400);
         const { data: antesTier } = id ? await supabase.from('config_tiers').select('*').eq('id', id).maybeSingle() : { data: null };

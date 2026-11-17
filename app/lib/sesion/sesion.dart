@@ -361,6 +361,19 @@ class Sesion extends ChangeNotifier {
     return r['categoriaCambiada'] == true;
   }
 
+  /// Lo que usas de la liga: {listaId: talla, piezas o ''} (Victor, 2026-11-17).
+  /// Devuelve el equipo nuevo si cambiaste de equipo por eso.
+  Future<String?> guardarEquipoLiga(Map<String, String> equipo) async {
+    final r = _ok(await api.post('guardarMiEquipoLiga', {'equipo': jsonEncode(equipo)}), 'No se pudo guardar tu equipamiento.');
+    if (r['datos'] is Map<String, dynamic>) {
+      datos = {...datos, ...(r['datos'] as Map<String, dynamic>)};
+    } else {
+      datos = {...datos, 'equipoLiga': equipo, if (r['categoria'] != null) 'categoria': r['categoria']};
+    }
+    notifyListeners();
+    return r['categoriaCambiada'] == true ? '${r['categoria']}' : null;
+  }
+
   /// Fecha de nacimiento y qué ve el resto (web `guardarPermisos()`).
   Future<void> guardarPrivacidad({required String fechaNacimiento, required bool fechaPublica, required bool edadPublica}) async {
     final f = fechaPublica ? 'Sí' : 'No', e = edadPublica ? 'Sí' : 'No';

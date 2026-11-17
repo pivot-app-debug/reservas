@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../eventos/widgets_comunes.dart' show AvatarPersona;
+import '../core/api.dart';
+import '../core/esqueleto.dart';
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../equipo/equipo_repo.dart';
@@ -152,12 +154,15 @@ class EquipamientoScreen extends StatefulWidget {
 }
 
 class _EquipamientoScreenState extends State<EquipamientoScreen> {
-  static const _piezas = ['Casco', 'Muñequeras', 'Rodilleras', 'Coderas'];
-  late bool _patinesClub;
-  late String _talla;
-  late String _protModo; // 'propias' | 'todas' | 'algunas'
-  late Set<String> _algunas;
-  List<String> _tallas = const [];
+  // Listas de la liga para entrenar (Victor, 2026-11-17): cada liga arma las
+  // suyas en el Inventario. Por cada una: propio o de la liga (con talla o
+  // piezas si tiene).
+  List<Map<String, dynamic>>? _listas;
+  Map<String, String> _orig = const {};
+  final Map<String, String> _usa = {};
+  List<String> _propio = const [];
+  String _equipo = '';
+  String? _error;
   bool _guardando = false;
 
   Sesion get s => widget.sesion;
@@ -165,56 +170,55 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
   @override
   void initState() {
     super.initState();
-    _desdeSesion();
-    _cargarTallas();
+    _cargar();
   }
 
-  void _desdeSesion() {
-    _patinesClub = valorDe(s, 'necesitaPatines') == 'Sí';
-    _talla = valorDe(s, 'talla');
-    final pro = valorDe(s, 'necesitaProtecciones');
-    _protModo = pro.isEmpty || pro == 'No' ? 'propias' : (pro == 'Sí' ? 'todas' : 'algunas');
-    _algunas = _protModo == 'algunas' ? pro.split(',').map((x) => x.trim()).where(_piezas.contains).toSet() : {};
-  }
-
-  Future<void> _cargarTallas() async {
+  Future<void> _cargar() async {
     try {
-      final r = await s.api.getLista('getTallasDisponibles');
-      final l = [for (final t in r) '$t']..sort((a, b) => (num.tryParse(a) ?? 0).compareTo(num.tryParse(b) ?? 0));
-      if (mounted) setState(() => _tallas = l);
-    } catch (_) {}
+      final r = await s.api.get('getMiEquipoLiga');
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      final mio = {for (final e in ((r['mio'] as Map?) ?? const {}).entries) '${e.key}': '${e.value ?? ''}'};
+      if (!mounted) return;
+      setState(() {
+        _listas = [for (final l in (r['listas'] as List? ?? const [])) Map<String, dynamic>.from(l as Map)];
+        _orig = mio;
+        _usa
+          ..clear()
+          ..addAll(mio);
+        _propio = [for (final x in (r['propio'] as List? ?? const [])) '$x'];
+        _equipo = '${r['equipo'] ?? ''}';
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
+    }
   }
 
-  String get _protecciones => switch (_protModo) {
-    'todas' => 'Sí',
-    'algunas' => _piezas.where(_algunas.contains).join(', '),
-    _ => 'No',
-  };
+  bool get _usaLiga => _usa.isNotEmpty;
 
-  bool get _usaClub => _patinesClub || _protecciones != 'No' && _protecciones.isNotEmpty;
+  bool get _cambio => _usa.length != _orig.length || _usa.entries.any((e) => _orig[e.key] != e.value);
 
-  bool get _cambio =>
-      (_patinesClub ? 'Sí' : 'No') != (valorDe(s, 'necesitaPatines') == 'Sí' ? 'Sí' : 'No') ||
-      (_patinesClub && _talla != valorDe(s, 'talla')) ||
-      _protecciones != (valorDe(s, 'necesitaProtecciones').isEmpty ? 'No' : valorDe(s, 'necesitaProtecciones'));
+  /// Listas que tu equipo pide propias y marcaste "de la liga".
+  List<String> get _chocan => [
+    for (final l in _listas ?? const <Map<String, dynamic>>[])
+      if (_propio.contains('${l['id']}') && _usa.containsKey('${l['id']}')) '${l['nombre']}'.toLowerCase(),
+  ];
 
   Future<void> _guardar() async {
-    if (_patinesClub && _talla.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Elige tu talla de patines.')));
-      return;
+    for (final l in _listas ?? const <Map<String, dynamic>>[]) {
+      final id = '${l['id']}';
+      if (_usa.containsKey(id) && l['tipo'] == 'tallas' && (_usa[id] ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Elige tu talla de ${'${l['nombre']}'.toLowerCase()}.')));
+        return;
+      }
     }
-    if (_protModo == 'algunas' && _algunas.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Elige qué protecciones usas del equipo.')));
-      return;
-    }
-    if (_usaClub && valorDe(s, 'categoria') == 'Quindes') {
+    final chocan = _chocan.where((x) => !_orig.keys.any((k) => _listas!.any((l) => '${l['id']}' == k && '${l['nombre']}'.toLowerCase() == x))).toList();
+    if (chocan.isNotEmpty && _equipo.isNotEmpty) {
       final si = await showDialog<String>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('Pasas a Mirlxs'),
-          content: const Text(
-            'Con equipamiento del equipo pasas a Mirlxs: solo podrás reservar por clase (con su precio), no por mes, '
-            'y no vuelves a Quindes hasta tener tu equipamiento completo propio.\n\n'
+          title: Text('Dejas $_equipo'),
+          content: Text(
+            '$_equipo pide tener propio: ${chocan.join(', ')}. Con eso de la liga pasas al equipo de abajo y no vuelves hasta tenerlo propio.\n\n'
             'Si es por un tiempo (se te rompió o lo estás lavando), mejor pídelo: un Pivot decide por cuánto tiempo y no cambias de equipo.',
           ),
           actions: [
@@ -230,14 +234,17 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
       if (si != 'guardar' || !mounted) return;
     }
     setState(() => _guardando = true);
-    var bajo = false;
+    String? nuevo;
     final ok = await guardarConAviso(context, () async {
-      bajo = await s.guardarEquipamiento(patines: _patinesClub ? 'Sí' : 'No', talla: _patinesClub ? _talla : '', protecciones: _protecciones);
+      nuevo = await s.guardarEquipoLiga(Map.of(_usa));
     }, ok: 'Equipamiento guardado');
     if (!mounted) return;
-    setState(() => _guardando = false);
-    if (ok && bajo) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Equipamiento guardado. Ahora estás en Mirlxs.')));
+    setState(() {
+      _guardando = false;
+      if (ok) _orig = Map.of(_usa);
+    });
+    if (ok && nuevo != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Equipamiento guardado. Ahora estás en $nuevo.')));
       EquipoRepo.de(s).cargar(forzar: true);
     }
   }
@@ -269,7 +276,8 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
       ),
     );
-    final dur = const Duration(milliseconds: 260);
+    const dur = Duration(milliseconds: 260);
+    final listas = _listas;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -279,103 +287,68 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Mi equipamiento', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 120 + MediaQuery.paddingOf(context).bottom),
-        children: [
-          titulo('PATINES'),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Propios')),
-              ButtonSegment(value: true, label: Text('Del equipo')),
-            ],
-            selected: {_patinesClub},
-            onSelectionChanged: (x) => setState(() => _patinesClub = x.first),
-          ),
-          AnimatedSize(
-            duration: dur,
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: !_patinesClub
-                ? const SizedBox(width: double.infinity)
-                : Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (_tallas.isEmpty) Text('Cargando tallas…', style: TextStyle(color: p.textoSecundario)),
-                        for (final t in _tallas) ChoiceChip(label: Text('Talla $t'), selected: _talla == t, onSelected: (_) => setState(() => _talla = t)),
+      body: AnimatedSwitcher(
+        duration: dur,
+        child: listas == null
+            ? (_error == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error!)))
+            : ListView(
+                key: const ValueKey('l'),
+                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 120 + MediaQuery.paddingOf(context).bottom),
+                children: [
+                  if (listas.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 40),
+                      child: Text(
+                        'Tu liga todavía no presta equipamiento para entrenar.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: p.textoSecundario),
+                      ),
+                    ),
+                  for (final l in listas) ...[
+                    titulo('${l['nombre']}'.toUpperCase()),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: false, label: Text('Propio')),
+                        ButtonSegment(value: true, label: Text('De la liga')),
                       ],
+                      selected: {_usa.containsKey('${l['id']}')},
+                      onSelectionChanged: (x) => setState(() => x.first ? _usa['${l['id']}'] = _orig['${l['id']}'] ?? '' : _usa.remove('${l['id']}')),
+                    ),
+                    AnimatedSize(
+                      duration: dur,
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: !_usa.containsKey('${l['id']}') ? const SizedBox(width: double.infinity) : _detalle(p, l),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  AnimatedSwitcher(
+                    duration: dur,
+                    child: Text(
+                      key: ValueKey(_usaLiga),
+                      _usaLiga ? 'Con equipamiento de la liga reservas por clase, y la liga te lo tiene listo.' : '',
+                      style: TextStyle(fontSize: 13.5, color: p.textoSecundario),
                     ),
                   ),
-          ),
-          const SizedBox(height: 24),
-          titulo('PROTECCIONES'),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'propias', label: Text('Propias')),
-              ButtonSegment(value: 'todas', label: Text('Del equipo')),
-              ButtonSegment(value: 'algunas', label: Text('Algunas')),
-            ],
-            selected: {_protModo},
-            onSelectionChanged: (x) => setState(() => _protModo = x.first),
-          ),
-          AnimatedSize(
-            duration: dur,
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: _protModo != 'algunas'
-                ? const SizedBox(width: double.infinity)
-                : Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('¿Cuáles usas del equipo?', style: TextStyle(fontSize: 13.5, color: p.textoSecundario)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final x in _piezas)
-                              FilterChip(
-                                label: Text(x),
-                                selected: _algunas.contains(x),
-                                onSelected: (si) => setState(() => si ? _algunas.add(x) : _algunas.remove(x)),
-                              ),
-                          ],
-                        ),
-                      ],
+                  // Se quitó al entrar desde Inventario (Victor, 2026-11-14): ahí está
+                  // la tarjeta "Solicitar equipamiento de emergencia".
+                  if (widget.conPedido && _propio.isNotEmpty && !_usaLiga) ...[
+                    const SizedBox(height: 12),
+                    Material(
+                      color: p.tarjeta,
+                      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                        leading: Icon(Icons.volunteer_activism_outlined, color: p.marcaTexto),
+                        title: const Text('¿Necesitas equipamiento por un tiempo?', style: TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: const Text('Si se te rompió o lo estás lavando, pídelo: un Pivot decide por cuánto tiempo y no cambias de equipo.'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _pedirUso,
+                      ),
                     ),
-                  ),
-          ),
-          const SizedBox(height: 20),
-          AnimatedSwitcher(
-            duration: dur,
-            child: Text(
-              key: ValueKey(_usaClub),
-              _usaClub ? 'Con equipamiento del equipo reservas por clase, y el equipo te lo tiene listo.' : '',
-              style: TextStyle(fontSize: 13.5, color: p.textoSecundario),
-            ),
-          ),
-          // Se quitó al entrar desde Inventario (Victor, 2026-11-14): ahí está
-          // la tarjeta "Solicitar equipamiento de emergencia".
-          if (widget.conPedido && valorDe(s, 'categoria') == 'Quindes' && !_usaClub) ...[
-            const SizedBox(height: 12),
-            Material(
-              color: p.tarjeta,
-              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-              child: ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-                leading: Icon(Icons.volunteer_activism_outlined, color: p.marcaTexto),
-                title: const Text('¿Necesitas equipamiento por un tiempo?', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Si se te rompió o lo estás lavando, pídelo: un Pivot decide por cuánto tiempo y no cambias de equipo.'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _pedirUso,
+                  ],
+                ],
               ),
-            ),
-          ],
-        ],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -386,6 +359,57 @@ class _EquipamientoScreenState extends State<EquipamientoScreen> {
             child: Text(_guardando ? 'Guardando…' : 'Guardar'),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Talla (listas con tallas) o qué piezas (sets).
+  Widget _detalle(PivotPaleta p, Map<String, dynamic> l) {
+    final id = '${l['id']}';
+    if (l['tipo'] == 'tallas') {
+      final tallas = [for (final t in (l['tallas'] as List? ?? const [])) '$t']..sort((a, b) => (num.tryParse(a) ?? 0).compareTo(num.tryParse(b) ?? 0));
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (tallas.isEmpty) Text('La liga todavía no cargó tallas.', style: TextStyle(color: p.textoSecundario)),
+            for (final t in tallas) ChoiceChip(label: Text('Talla $t'), selected: _usa[id] == t, onSelected: (_) => setState(() => _usa[id] = t)),
+          ],
+        ),
+      );
+    }
+    final piezas = [for (final x in (l['piezas'] as List? ?? const [])) '$x'];
+    if (l['tipo'] != 'set' || piezas.isEmpty) return const SizedBox(width: double.infinity);
+    final elegidas = (_usa[id] ?? '').split(',').map((x) => x.trim()).where(piezas.contains).toSet();
+    final todas = elegidas.isEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            todas ? 'Usas el set completo. ¿Solo algunas piezas? Elígelas:' : '¿Cuáles usas de la liga?',
+            style: TextStyle(fontSize: 13.5, color: p.textoSecundario),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final x in piezas)
+                FilterChip(
+                  label: Text(x),
+                  selected: elegidas.contains(x),
+                  onSelected: (si) => setState(() {
+                    si ? elegidas.add(x) : elegidas.remove(x);
+                    _usa[id] = piezas.where(elegidas.contains).join(', ');
+                  }),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
