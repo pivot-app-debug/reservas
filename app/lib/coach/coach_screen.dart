@@ -85,6 +85,7 @@ class _CoachScreenState extends State<CoachScreen> {
             icon: const Icon(Icons.checklist_rounded),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HabilidadesScreen(sesion: s))),
           ),
+          if (_d != null) IconButton(tooltip: 'Ajustes de Coach', icon: const Icon(Icons.tune_rounded), onPressed: _ajustes),
         ],
       ),
       body: AnimatedSwitcher(
@@ -118,6 +119,48 @@ class _CoachScreenState extends State<CoachScreen> {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  /// Aviso semanal a las personas con novedades en su ficha (Victor, 2026-11-17).
+  Future<void> _ajustes() async {
+    var avisar = _d?['avisarNovedades'] != false;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: Text('Ajustes de Coach', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                ),
+                SwitchListTile(
+                  title: const Text('Avisar novedades a las personas'),
+                  subtitle: const Text(
+                    'Los lunes, a quien tiene notas, feedback o pruebas nuevas que puede ver en su ficha. Si no hay nada nuevo, no le llega nada.',
+                  ),
+                  value: avisar,
+                  onChanged: (v) async {
+                    set(() => avisar = v);
+                    try {
+                      await s.api.post('coachGuardar', {'accion': 'ajustes', 'avisarNovedades': v});
+                      _d?['avisarNovedades'] = v;
+                    } catch (_) {
+                      set(() => avisar = !v);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

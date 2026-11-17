@@ -4829,7 +4829,8 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
     const { data: planes } = await supabase.from('coach_planes').select('id_evento, fecha, coach, bloques, compartido').gte('fecha', hoy).order('fecha').limit(60);
   return {
     exito: true,
-    pendientes: await _porEvaluar(c),
+        pendientes: await _porEvaluar(c),
+    avisarNovedades: (await supabase.from('coaches').select('avisar_novedades').eq('username', c.user).maybeSingle()).data?.avisar_novedades !== false,
     equipos: c.equipos,
     totalHabilidades: habs.length,
     jugadorxs: personas.map((p: any) => ({
@@ -4928,6 +4929,8 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     if (!idEvento || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { exito: false, error: 'Falta el evento.' };
     if (!bloques.length) await supabase.from('coach_planes').delete().eq('id_evento', idEvento);
     else await supabase.from('coach_planes').upsert({ id_evento: idEvento, fecha, coach: c.user, bloques, compartido: params.compartido === true || params.compartido === 'true', actualizado_en: new Date().toISOString() });
+    } else if (accion === 'ajustes') {
+    await supabase.from('coaches').update({ avisar_novedades: params.avisarNovedades !== false && params.avisarNovedades !== 'false' }).eq('username', c.user);
   } else if (accion === 'habilidad') {
     // Agregar, renombrar o apagar una habilidad de la lista de la liga.
     const id = String(params.id ?? '');
@@ -5074,41 +5077,34 @@ async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<
   };
 }
 
-/// Recordatorio al coach si no dejó feedback: 2 horas después del evento y,
-/// si sigue pendiente, al día siguiente (último aviso). Corre con cronAdminEvento.
-async function _recordarFeedbackCoach(): Promise<number> {
-  const { data: coaches } = await supabase.from('coaches').select('username, equipos').eq('estado', 'aprobado');
-  if (!coaches?.length) return 0;
+
+/// Los lunes: a quien tiene novedades visibles en su ficha deportiva de los
+/// últimos 7 días (notas, feedback o pruebas que la persona puede ver), un
+/// solo aviso. Sin novedades, nada. Solo de coaches que dejan avisar.
+async function _avisarNovedadesFicha(): Promise<number> {
   const hoy = _hoyEcuadorISO();
-  const ayer = new Date(Date.now() - 5 * 3600000 - 2 * 86400000).toISOString().slice(0, 10);
-  const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, termina, inicia, tipo_evento, estado').gte('fecha', ayer).lte('fecha', hoy);
-  let enviados = 0;
-  const ahora = Date.now();
-  for (const ev of evs ?? []) {
-    if (['Cancelado', 'Sin entrenamiento'].includes(String(ev.estado))) continue;
-    const hora = String(ev.termina || ev.inicia || '23:00').slice(0, 5);
-    const fin = new Date(`${String(ev.fecha).slice(0, 10)}T${hora}:00-05:00`).getTime();
-    if (!isFinite(fin)) continue;
-    const etapa = ahora >= fin + 24 * 3600000 ? 2 : ahora >= fin + 2 * 3600000 ? 1 : 0;
-    if (!etapa || ahora > fin + 30 * 3600000) continue;
-    for (const c of coaches) {
-      const { data: ya } = await supabase.from('coach_recordatorios').select('etapa').eq('id_evento', ev.id_evento).eq('coach', c.username);
-      if ((ya ?? []).some((x: any) => x.etapa >= etapa)) continue;
-      const { count } = await supabase.from('coach_feedback').select('id', { count: 'exact', head: true }).eq('id_evento', ev.id_evento).eq('coach', c.username);
-      if ((count ?? 0) > 0) continue;
-      const vinieron = await _vinieron(String(ev.id_evento), { equipos: (c.equipos as string[]) ?? [] });
-      if (!vinieron.length) continue;
-      await supabase.from('coach_recordatorios').upsert({ id_evento: ev.id_evento, coach: c.username, etapa });
-      await sendPush({
-        tipo: 'solicitud_resuelta', include_external_user_ids: [c.username],
-        headings: { es: etapa === 1 ? '¿Cómo les fue?' : 'Último recordatorio' },
-        contents: { es: `Falta tu feedback del ${_tipoEventoMin(ev.tipo_evento)} ${_cuandoEvento(ev.fecha)}: ${vinieron.length} ${vinieron.length === 1 ? 'persona' : 'personas'} de tus equipos.` },
-        url: _urlEvento(String(ev.id_evento)),
-      }).catch(() => {});
-      enviados++;
-    }
-  }
-  return enviados;
+  if (new Date(hoy + 'T12:00:00Z').getUTCDay() !== 1) return 0;
+  const desde = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { data: coaches } = await supabase.from('coaches').select('username, avisar_novedades').eq('estado', 'aprobado');
+  const avisan = new Set((coaches ?? []).filter((c: any) => c.avisar_novedades !== false).map((c: any) => c.username));
+  if (!avisan.size) return 0;
+  const [{ data: notas }, { data: fb }, { data: marcas }, { data: pruebas }] = await Promise.all([
+    supabase.from('coach_notas').select('username, coach').eq('visible', 'jugadorx').gte('creado_en', desde),
+    supabase.from('coach_feedback').select('username, coach').eq('visible', 'jugadorx').gte('creado_en', desde),
+    supabase.from('coach_marcas').select('username, coach, prueba_id').gte('creado_en', desde),
+    supabase.from('coach_pruebas').select('id, visible'),
+  ]);
+  const visibles = new Set((pruebas ?? []).filter((p: any) => p.visible === 'jugadorx').map((p: any) => p.id));
+  const quienes = new Set<string>();
+  for (const x of [...(notas ?? []), ...(fb ?? [])]) if (avisan.has(x.coach)) quienes.add(x.username);
+  for (const x of marcas ?? []) if (avisan.has(x.coach) && visibles.has(x.prueba_id)) quienes.add(x.username);
+  if (!quienes.size) return 0;
+  await sendPush({
+    tipo: 'solicitud_resuelta', include_external_user_ids: [...quienes],
+    headings: { es: 'Novedades en tu ficha deportiva' },
+    contents: { es: 'Tu coach dejó notas o resultados esta semana. Míralos en tu ficha.' }, url: APP_URL + '/',
+  }).catch(() => {});
+  return quienes.size;
 }
 
 // Coach toma asistencia de sus equipos (sin ser Pivot).
@@ -10616,7 +10612,8 @@ async function cronRecordatorio1Dia(): Promise<Record<string, any>> {
 // cancelar). 1 sola llamada para todos los admins.
 async function cronAdminEvento(): Promise<Record<string, any>> {
   // Recordatorios de feedback a lxs coaches (Victor, 2026-11-16).
-  await _recordarFeedbackCoach().catch((e) => console.error('recordar feedback coach:', e));
+    // Sin recordatorio al coach después de cada clase (Victor, 2026-11-17): lo
+  // pendiente se ve al abrir Coach. A las personas, aviso semanal (cronDiario).
   const ahora = Date.now();
   const enVentana = await _eventosEnVentana(ahora + 55 * 60 * 1000, ahora + 65 * 60 * 1000, [0, 1]);
   if (!enVentana.length) return { exito: true, eventos: 0, enviados: 0 };
@@ -11276,7 +11273,8 @@ async function adminEliminarTemporadaDescanso(params: Record<string, any>): Prom
 // con el header `x-cron-secret` -- validado en el router (Deno.serve), no
 // acá, porque necesita leer `req.headers`, no `params`.
 async function cronDiario(): Promise<Record<string, any>> {
-  try { await _extenderExcepcionesIndefinidas(); } catch (e) { console.error('[excepciones] extender:', e); }
+    try { await _extenderExcepcionesIndefinidas(); } catch (e) { console.error('[excepciones] extender:', e); }
+  try { await _avisarNovedadesFicha(); } catch (e) { console.error('[coach] novedades:', e); }
   // Puntos de asistencia del mes actual y el anterior (bug 2026-11-13: antes solo con botón manual).
   try {
     const h = _hoyEcuadorISO();
