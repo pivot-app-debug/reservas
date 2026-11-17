@@ -209,7 +209,59 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     }
   }
 
+  /// Cursos y clínicas con clases en el descanso, y cómo se correrían (Victor,
+  /// 2026-11-17: saberlo antes de crear la temporada). Mismo cálculo que el
+  /// servidor (`_posponerCursos`).
+  Future<List<String>> _cursosAfectados(DateTime desde, DateTime hasta) async {
+    final s = widget.repo.sesion;
+    final r = await s.api.get('adminCursos', {'adminToken': s.adminToken});
+    final hoy = Fechas.iso(Fechas.hoy()), d = Fechas.iso(desde), h = Fechas.iso(hasta);
+    final out = <String>[];
+    for (final c in (r['cursos'] as List? ?? const [])) {
+      if (c is! Map || !const ['abierto', 'cerrado'].contains(c['estado'])) continue;
+      final f = [for (final x in (c['fechas'] as List? ?? const [])) '${(x as Map)['fecha']}']..sort();
+      final i = f.indexWhere((x) => x.compareTo(hoy) >= 0 && x.compareTo(d) >= 0 && x.compareTo(h) <= 0);
+      if (i < 0) continue;
+      final primera = DateTime.parse(f[i]);
+      final semanas = ((hasta.difference(primera).inDays + 1) / 7).ceil();
+      final nueva = primera.add(Duration(days: semanas * 7));
+      final n = f.length - i;
+      out.add(
+        '${c['tipo'] == 'clinica' ? 'Clínica' : 'Curso'} "${c['nombre']}": ${n == 1 ? 'su clase del ${Fechas.corta(primera)} pasa' : 'sus $n clases desde el ${Fechas.corta(primera)} pasan'} '
+        'a ${n == 1 ? 'el' : 'empezar el'} ${Fechas.corta(nueva)} (${semanas == 1 ? '1 semana' : '$semanas semanas'} después).',
+      );
+    }
+    return out;
+  }
+
   Future<void> _guardarDescanso() async {
+    // Antes de crear: qué cursos o clínicas se moverían.
+    try {
+      final afectados = await _cursosAfectados(_descDesde!, _descHasta!);
+      if (afectados.isNotEmpty && mounted) {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: Text(afectados.length == 1 ? 'Un curso tiene clases en el descanso' : '${afectados.length} cursos tienen clases en el descanso'),
+            content: Text(
+              [
+                ...afectados.map((x) => '• $x'),
+                '',
+                'Se pausan y siguen después del descanso, el mismo día de la semana. Se avisa a quienes están inscritxs.',
+              ].join('\n'),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+              FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Crear igual')),
+            ],
+          ),
+        );
+        if (ok != true || !mounted) return;
+      }
+    } catch (_) {
+      // Sin poder revisar (sin señal o sin permiso de cursos): sigue igual.
+    }
+    if (!mounted) return;
     setState(() => _guardando = true);
     try {
       final n = await widget.repo.guardarDescanso(
