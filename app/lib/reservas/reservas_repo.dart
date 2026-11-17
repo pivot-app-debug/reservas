@@ -243,7 +243,16 @@ class ReservasRepo {
   bool get cambiadoParaEsta => patinesEsta != null || tallaEsta != null || protecEsta != null;
 
   /// Equipamiento del club: solo reserva por clase (`canPayMonthly()`).
-  bool get necesitaEquipo => necesitaPatines || necesitaProtecciones;
+  bool get necesitaEquipo => necesitaPatines || necesitaProtecciones || _otrasDeLiga > 0;
+
+  /// Cuántas cosas usa de la liga además de patines y protecciones (Victor,
+  /// 2026-11-17: listas que arma cada liga).
+  int get _otrasDeLiga {
+    final eq = _d['equipoLiga'];
+    if (eq is! Map) return 0;
+    final sistema = (necesitaPatines ? 1 : 0) + (necesitaProtecciones ? 1 : 0);
+    return (eq.length - sistema).clamp(0, 99);
+  }
 
   bool get _exenta {
     final e = _d['exenta_cuota'];
@@ -282,6 +291,7 @@ class ReservasRepo {
     final partes = [
       if (_pat) 'patines talla $_tal',
       if (_usa(_pro)) _pro.toLowerCase() == 'sí' ? 'protecciones completas' : 'protecciones (${_pro.toLowerCase()})',
+      if (_otrasDeLiga > 0) _otrasDeLiga == 1 ? 'tu equipamiento de la liga' : 'tus $_otrasDeLiga cosas de la liga',
     ];
     if (partes.isEmpty) return null;
     final t = partes.join(' y ');

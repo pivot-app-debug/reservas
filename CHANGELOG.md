@@ -2,7 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (equipamiento armado por cada liga, 15:29)
+- **Inventario:** cada lista de equipamiento tiene "Se presta para entrenar". Las que lo tienen aparecen en Mi equipamiento y en lo que cada equipo puede pedir propio. En Quindes, Patines y Protecciones ya vienen marcadas.
+- **Mi equipamiento:** por cada lista, "Propio" o "De la liga", con talla (listas con tallas) o piezas (sets). Si tu equipo pide propio algo que marcas de la liga, se avisa antes de guardar y pasas al equipo de abajo.
+- **Equipo → Equipamiento propio:** se eligen las listas que el equipo pide propias. Reemplaza la regla fija "con equipamiento del club no puede ser Quindes": ahora vale para cualquier equipo y liga (al guardar, al inscribirse con el enlace y en el recálculo de equipos).
+- **Reservas por clase:** con listas propias de la liga se revisa que haya (por talla o por set) y el Inventario cuenta lo reservado para la próxima clase. Patines y protecciones siguen como antes.
+- **Temporada de descanso:** antes de crearla se ve qué cursos o clínicas se moverían y a qué fecha.
+
 ## 2026-11-17 (ronda de las 15:08)
+
 - **Coach rediseñado:** arriba "Vinieron N personas de tus equipos. ¿Las evaluamos?" (eventos de los últimos 7 días sin evaluar). "Evaluar" abre una pantalla por persona, deslizando: qué trabajó (temas del plan u otro), cómo le fue (1 a 10), comentario escrito o dictado, pruebas del día y habilidades; "Guardar y seguir" o "Saltar". Quién ve las notas se elige arriba.
 - Sin recordatorio al coach después de cada clase. **Aviso semanal** (lunes) a las personas con novedades visibles en su ficha; el coach lo apaga en Ajustes de Coach.
 - **Cursos y clínicas:** curso con clases, clínicas en medio y evaluación final opcional; o clínica de una sola sesión (con hora de fin). Descripción más larga. Enlace para invitar (copiar o compartir) que abre el curso en la app. Botón **Cursos** arriba en el Calendario (sale del +). La temporada de descanso pausa los cursos y corre sus clases después (avisa a quienes están inscritxs). Antes de crear la temporada, la app muestra qué cursos o clínicas se moverían y a qué fecha.

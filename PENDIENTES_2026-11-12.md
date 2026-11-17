@@ -650,4 +650,6 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 - [x] Textos neutros por deporte (cursos, apodo/número, roles, WFTDA). Ficha de la persona opción A.
 - [x] Rediseño de Coach, Cursos y clínicas, aviso semanal de novedades (15:08).
 - [x] Anticipada y Funciones de Pivot con los equipos de cada liga.
-- [ ] **Equipamiento armado por cada liga** (aprobado 15:15): listas propias que se prestan (con o sin tallas) en vez de patines/protecciones fijos; tus datos, reserva de clase, requisitos de equipo y la regla "con equipamiento de la liga no puede estar en Quindes" pasan a esas listas. Quindes conserva sus listas actuales.
+- [x] **Equipamiento armado por cada liga** (aprobado 15:15, hecho 15:29): listas propias que se prestan (con o sin tallas) en vez de patines/protecciones fijos; tus datos, reserva de clase, requisitos de equipo y la regla "con equipamiento de la liga no puede estar en Quindes" pasan a esas listas. Quindes conserva sus listas actuales.
+
+- [ ] Equipamiento por liga, para después: al crear una lista nueva preguntar si se presta para entrenar (hoy se marca dentro de la lista); cambiar talla en una reserva ya hecha y la reserva sin equipamiento "solo para esta" siguen solo con patines y protecciones.

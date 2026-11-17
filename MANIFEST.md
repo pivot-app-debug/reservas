@@ -246,7 +246,14 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Equipamiento por liga (2026-11-17, 15:29)
+- Migración `20261117130000_equipamiento_por_liga.sql`: `inventario_listas.para_entrenar`, `equipo.equipo_liga` jsonb {listaId: talla | piezas | ''}, `config_tiers.requisitos.propio` [listaId], `reservas.equipo` jsonb. Datos de Quindes migrados desde las columnas viejas.
+- Servidor: `_listasEntrenar`, `_legadoDesdeEquipoLiga` / `_equipoLigaDesdeLegado` (las columnas viejas `necesita_patines`, `talla`, `necesita_protecciones` y `patinesPropios`/`proteccionesPropias` siguen sincronizadas para lo que aún las usa), `_propioDe`, `_equipoSegunEquipamiento` (orden más bajo = equipo de más arriba), `getMiEquipoLiga`, `guardarMiEquipoLiga`, `_otrasDeLiga`/`_faltaDeLiga` (cupo de listas no del sistema en `getFechasDisponibles` y `guardarReserva`). `getTiers` devuelve `propioNombres` y `listasEntrenar`. `getDatosCompletos.equipoLiga`.
+- recalcular-categorias: con `requisitos.propio`, baja a quien usa de la liga algo que su equipo pide propio y no sube a un equipo que lo pide (contador en 0).
+- App: `EquipamientoScreen` genérica (datos_screens.dart), `Sesion.guardarEquipoLiga`, `editarEquipamientoPropio` con listas, interruptor "Se presta para entrenar" en `ListaInventarioScreen`.
+
 ## Coach, cursos y equipos de cada liga (2026-11-17, 15:08)
+
 - `getCoach.pendientes` (`_porEvaluar`: eventos terminados de 7 días con quiénes vinieron y cuántas evaluó) y `avisarNovedades`; `coachGuardar accion=ajustes`. `coaches.avisar_novedades` (migración `20261117120000`). `_avisarNovedadesFicha` en cronDiario (lunes). Se quitó `_recordarFeedbackCoach`. App: `EvaluarScreen`, `_HojaHabilidades`, `tituloPendiente` en coach_screen.dart.
 - `cursos.tipo` ('curso' | 'clinica', migración `20261117110000`); cada fecha con `tipo` ('clase' | 'clinica' | 'evaluacion'), `titulo`, `termina` (venue `finaliza`). Cursos viejos: la última de varias fechas es la evaluación (`Curso.tipoFecha`). Enlace `?curso=<id>` (main.dart → `CursosAbiertosScreen(destacado:)`). `_posponerCursos` al guardar una temporada de descanso.
 - `adminSetTierModo` acepta `tierModo='fijo'` + `equipo`. `AnticipadaRepo.disponible`: cualquier equipo cuyo cobro no sea 'clase'. `EventosRepo.actual`.
