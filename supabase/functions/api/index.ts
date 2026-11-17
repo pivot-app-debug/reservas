@@ -9522,7 +9522,13 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     if (fila?.solicitud_lesion_pendiente || fila?.solicitud_estado) {
     items.push({ tipo: 'lesion', id: 'lesion', titulo: `Pasar a ${fila.solicitud_estado ?? 'Lesionadx'}`, detalle: 'Un Pivot lo revisará.', estado: 'pendiente', fecha: fila.solicitud_estado_en ?? new Date().toISOString() });
   }
-  items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  // Lo resuelto (aprobado, rechazado, cancelado…) desaparece a los 3 días
+  // para que no se acumule (Victor, 2026-11-17).
+  const hace3 = new Date(Date.now() - 3 * 86400000).toISOString();
+  const visibles = items.filter((x) => x.estado === 'pendiente' || String(x.fecha) >= hace3);
+
+  const novedades = await _novedadesEquipo(yo).catch(() => []);
 
   const recomendaciones = [
     ...(!fila?.emerg1_nombre || !fila?.emerg1_telefono ? [{ clave: 'contacto', titulo: 'Agrega un contacto de emergencia', texto: 'Si te pasa algo en un entrenamiento, el equipo sabrá a quién llamar.' }] : []),
@@ -9531,7 +9537,61 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     ...(fila && fila.necesita_patines == null && fila.necesita_protecciones == null ? [{ clave: 'equipamiento', titulo: 'Cuéntanos tu equipamiento', texto: 'Si tienes el tuyo o necesitas el del equipo.' }] : []),
     ...(fila && fila.push_notificaciones_activas === false ? [{ clave: 'notificaciones', titulo: 'Activa las notificaciones', texto: 'Para enterarte de entrenamientos, cambios y respuestas a tus pedidos.' }] : []),
   ];
-  return { exito: true, solicitudes: items, recomendaciones };
+    return { exito: true, solicitudes: visibles, recomendaciones, novedades };
+}
+
+/// Novedades del equipo para la campana (Victor, 2026-11-17): cambios de
+/// asistencia de los eventos de hoy y mañana que todavía no terminan (uno por
+/// persona, el último; se van solos al terminar el evento), cumpleaños de hoy
+/// y comunicados de los últimos 3 días.
+async function _novedadesEquipo(yo: string): Promise<any[]> {
+  const out: any[] = [];
+  const hoy = _hoyEcuadorISO();
+  const manana = new Date(new Date(hoy + 'T12:00:00Z').getTime() + 86400000).toISOString().slice(0, 10);
+  const { data: yoFila } = await supabase.from('equipo').select('email').eq('username', yo).maybeSingle();
+  const esPivotAsistencia = !!yoFila?.email && (await _adminDestinatariosPush(undefined, 'asistencia')).includes(yo);
+  const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina, tipo_evento, estado').gte('fecha', hoy).lte('fecha', manana);
+  const ahora = Date.now();
+  const vigentes = (evs ?? []).filter((e: any) => {
+    if (['Cancelado', 'Sin entrenamiento'].includes(String(e.estado))) return false;
+    const fin = new Date(`${String(e.fecha).slice(0, 10)}T${String(e.termina || e.inicia || '23:59').slice(0, 5)}:00-05:00`).getTime();
+    return isFinite(fin) && fin > ahora;
+  });
+  if (vigentes.length) {
+    const ids = vigentes.map((e: any) => e.id_evento);
+    const { data: rs } = await supabase.from('log_asistencias').select('id_evento, nombre_usuario, estado, marca_temporal')
+      .in('id_evento', ids).in('origen', ['Usuario', 'AsistenciaAnticipada']).gte('marca_temporal', new Date(ahora - 36 * 3600000).toISOString()).order('marca_temporal');
+    const ultimo = new Map<string, any>();
+    for (const r of rs ?? []) if (r.nombre_usuario !== yo) ultimo.set(`${r.id_evento}|${r.nombre_usuario}`, r);
+    const quien = ultimo.size ? await _mapaEquipoPorNombre() : {};
+    for (const r of ultimo.values()) {
+      // El equipo ve quién ya no viene; los Pivots de asistencia, todo.
+      if (!esPivotAsistencia && r.estado !== 'No asistiré') continue;
+      const ev = vigentes.find((e: any) => e.id_evento === r.id_evento);
+      const nombre = quien[String(r.nombre_usuario).toUpperCase()]?.nombreDerby || r.nombre_usuario;
+      out.push({
+        tipo: 'asistencia', idEvento: r.id_evento, fecha: r.marca_temporal,
+        titulo: r.estado === 'No asistiré' ? `${nombre} no asistirá` : r.estado === 'Asistiré' ? `${nombre} asistirá` : `${nombre}: ${r.estado}`,
+        detalle: _eventoFrase(ev?.tipo_evento, ev?.fecha),
+      });
+    }
+  }
+  // Cumpleaños de hoy (solo quien deja ver su fecha).
+  const md = hoy.slice(5);
+  const { data: gente } = await supabase.from('equipo').select('username, nombre_derby, fecha_nacimiento, fecha_publica, estado_miembro').is('eliminado_en', null).not('fecha_nacimiento', 'is', null);
+  for (const g of gente ?? []) {
+    if (g.username === yo || g.fecha_publica !== 'Sí' || String(g.fecha_nacimiento).slice(5, 10) !== md) continue;
+    out.push({ tipo: 'cumple', usuario: g.username, fecha: hoy + 'T05:00:00Z', titulo: `¡Hoy cumple años ${g.nombre_derby || g.username}!`, detalle: 'Escríbele un saludo.' });
+  }
+  // Comunicados enviados en los últimos 3 días a todo el equipo o a ti.
+  const { data: com } = await supabase.from('avisos_programados').select('id, titulo, mensaje, destino, enviado_en')
+    .not('enviado_en', 'is', null).gte('enviado_en', new Date(ahora - 3 * 86400000).toISOString()).order('enviado_en', { ascending: false }).limit(10);
+  for (const c of com ?? []) {
+    const d = c.destino;
+    const paraMi = !d || d === 'todos' || (Array.isArray(d) && (d.includes('todos') || d.includes(yo))) || String(d) === yo;
+    if (paraMi) out.push({ tipo: 'comunicado', id: c.id, fecha: c.enviado_en, titulo: c.titulo, detalle: c.mensaje });
+  }
+  return out.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 }
 
 async function getDesglosePuntos(params: Record<string, any>): Promise<Record<string, any>> {

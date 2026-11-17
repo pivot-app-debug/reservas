@@ -80,6 +80,9 @@ class BandejaRepo extends ChangeNotifier {
   // abrió la Bandeja (fecha guardada en el teléfono, solo como comodidad).
   List<MiPedido> misPedidos = [];
   List<Recomendacion> recomendaciones = [];
+
+  /// Novedades del equipo (asistencia de hoy y mañana, cumpleaños, comunicados).
+  List<Map<String, dynamic>> novedades = [];
   DateTime? _ultimaVista;
   Set<String> _recomVistas = {};
   bool _cargandoMia = false;
@@ -111,6 +114,10 @@ class BandejaRepo extends ChangeNotifier {
         recomendaciones = [
           for (final x in (r['recomendaciones'] as List? ?? const []))
             if (x is Map<String, dynamic>) Recomendacion(x),
+        ];
+        novedades = [
+          for (final x in (r['novedades'] as List? ?? const []))
+            if (x is Map<String, dynamic>) x,
         ];
       }
     } catch (_) {

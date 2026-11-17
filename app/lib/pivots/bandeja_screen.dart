@@ -543,6 +543,19 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               );
             }
           }
+          // Del equipo: asistencia de hoy y mañana, cumpleaños y comunicados
+          // (Victor, 2026-11-17). Se van solos cuando dejan de tener sentido.
+          if (repo.novedades.isNotEmpty) {
+            hijos.add(_Encabezado(titulo: 'Del equipo', icono: Icons.campaign_outlined, cantidad: repo.novedades.length));
+            for (final n in repo.novedades.take(30)) {
+              hijos.add(
+                _TarjetaNovedad(
+                  n: n,
+                  alTocar: n['tipo'] == 'cumple' ? () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${n['usuario']}') : null,
+                ),
+              );
+            }
+          }
           // Lo de cada persona: sus pedidos y lo que la app recomienda.
           if (repo.misPedidos.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Tus pedidos', icono: Icons.send_rounded, cantidad: repo.misPedidos.length));
@@ -1237,6 +1250,36 @@ class _TarjetaMiPedido extends StatelessWidget {
 }
 
 /// Ajuste recomendado: toca y abre la pantalla para completarlo.
+class _TarjetaNovedad extends StatelessWidget {
+  const _TarjetaNovedad({required this.n, this.alTocar});
+  final Map<String, dynamic> n;
+  final VoidCallback? alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final icono = switch (n['tipo']) {
+      'cumple' => Icons.cake_outlined,
+      'comunicado' => Icons.campaign_outlined,
+      _ => '${n['titulo']}'.contains('no asistirá') ? Icons.event_busy_outlined : Icons.event_available_outlined,
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: p.tarjeta,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Icon(icono, color: p.marcaTexto),
+          title: Text('${n['titulo']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: '${n['detalle'] ?? ''}'.isEmpty ? null : Text('${n['detalle']}', maxLines: 3, overflow: TextOverflow.ellipsis),
+          onTap: alTocar,
+        ),
+      ),
+    );
+  }
+}
+
 class _TarjetaRecomendacion extends StatelessWidget {
   const _TarjetaRecomendacion({required this.r, required this.alTocar});
   final Recomendacion r;
