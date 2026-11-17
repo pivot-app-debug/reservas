@@ -84,4 +84,12 @@ class _VidrioState extends State<Vidrio> {
 // Con `viewPadding` da lo mismo desde fuera o desde dentro del Scaffold
 // (dentro, `padding.top` ya incluye la barra y quedaba un hueco: Victor,
 // 2026-11-16, espacio en blanco en Reglas).
-double altoBarra(BuildContext context) => MediaQuery.viewPaddingOf(context).top + kToolbarHeight;
+// Dentro del cuerpo de un Scaffold con barra, `viewPadding.top` llega en 0
+// y el contenido quedaba ~20 px debajo de la barra (Victor, 2026-11-17:
+// tarjetas cortadas en Notificaciones y Tareas). Se lee de la ventana.
+// Desde dentro del cuerpo se usa el alto real de la barra del Scaffold
+// (cuenta pestañas, barras de progreso y barras más altas).
+double altoBarra(BuildContext context) {
+  final real = Scaffold.maybeOf(context)?.appBarMaxHeight;
+  return real ?? MediaQueryData.fromView(View.of(context)).viewPadding.top + kToolbarHeight;
+}

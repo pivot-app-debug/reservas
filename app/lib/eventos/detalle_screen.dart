@@ -261,7 +261,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
                 )
               : null,
           body: ListView(
-            padding: EdgeInsets.fromLTRB(0, 8 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(0, 20 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom), // barra de 68
             children: [
               KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
               // Plan del coach: "Qué veremos" si lo compartió (Victor, 2026-11-16).

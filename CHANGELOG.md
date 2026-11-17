@@ -10,6 +10,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **Calendario:** la asistencia anticipada sale del + y queda en "Tu asistencia" del detalle del evento. Si el + tiene una sola opción, muestra el texto completo.
 - **Personas archivadas:** el texto dice que se quitaron del equipo por inactividad.
 - Campana vacía: solo dice "No hay nada pendiente".
+- **Arreglo de barras superiores en toda la app:** en varias pantallas (Notificaciones, Tareas y otras) la primera tarjeta quedaba unos píxeles debajo de la barra. `altoBarra` ahora usa el alto real de la barra (incluye pestañas y barras más altas) y la altura de la barra de estado de la ventana.
 - **Rol Coach fijo:** no se borra ni se renombra (app y asistente). Elegirlo manda el pedido a un Pivot; al aprobarse se elige si es coach de la liga o de equipos, y queda en la ficha.
 - **Reglas de la liga:** así se llama ahora, y junto con **Fondos de viaje** se abre desde cada equipo → De toda la liga (ya no en la portada de Mi Liga). Cada equipo puede tener su propia **fecha límite de pago** (con gracia y recargo) y **recompensa por pagar a tiempo**, o usar las de la liga. Rige desde que se guarda; pagos y puntos anteriores no cambian.
 
