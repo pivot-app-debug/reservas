@@ -970,7 +970,7 @@ async function getMiEquipoLiga(params: Record<string, any>): Promise<Record<stri
   return {
     exito: true,
     listas: listas.map((l) => ({
-      id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, piezas: l.piezas.map((p: any) => String(p.nombre)),
+            id: l.id, nombre: l.nombre, tipo: l.tipo, icono: l.icono, sistema: l.sistema ?? null, piezas: l.piezas.map((p: any) => String(p.nombre)),
       tallas: l.tipo === 'tallas' ? [...new Set((stock ?? []).filter((s: any) => s.lista_id === l.id && Number(s.cantidad) > 0).map((s: any) => String(s.variante)))] : [],
     })),
     mio: (fila?.equipo_liga as Record<string, string>) ?? {},
@@ -6051,10 +6051,17 @@ async function getProximosEntrenamientos(): Promise<any[]> {
 /// Listas propias de la liga (no patines ni protecciones del sistema) que una
 /// persona usa, con su stock (Victor, 2026-11-17). Las del sistema siguen con
 /// `talla`/`protecciones` de la reserva.
-async function _otrasDeLiga(nombre: string): Promise<{ eq: Record<string, string>; listas: ListaEntrenar[]; cupo: (l: ListaEntrenar, v: string) => number }> {
+async function _otrasDeLiga(nombre: string, soloEsta?: unknown): Promise<{ eq: Record<string, string>; listas: ListaEntrenar[]; cupo: (l: ListaEntrenar, v: string) => number }> {
   const listas = (await _listasEntrenar()).filter((l) => !l.sistema);
-  const { data: fila } = await supabase.from('equipo').select('equipo_liga').eq('username', nombre).maybeSingle();
-  const todo = (fila?.equipo_liga as Record<string, string>) ?? {};
+  // Equipamiento solo para esta reserva (`equipo` de la app) o el del perfil.
+  let todo: Record<string, string> | null = null;
+  if (soloEsta != null && soloEsta !== '') {
+    try { const j = typeof soloEsta === 'object' ? soloEsta : JSON.parse(String(soloEsta)); if (j && typeof j === 'object') todo = j as Record<string, string>; } catch { todo = null; }
+  }
+  if (!todo) {
+    const { data: fila } = await supabase.from('equipo').select('equipo_liga').eq('username', nombre).maybeSingle();
+    todo = (fila?.equipo_liga as Record<string, string>) ?? {};
+  }
   const usadas = listas.filter((l) => l.id in todo);
   const eq: Record<string, string> = {};
   for (const l of usadas) eq[l.id] = todo[l.id];
@@ -6080,7 +6087,7 @@ function _faltaDeLiga(o: { eq: Record<string, string>; listas: ListaEntrenar[]; 
 
 async function getFechasDisponibles(params: Record<string, any>): Promise<any[]> {
   const { nombre, talla, necesitaProtecciones } = params;
-  const otras = await _otrasDeLiga(String(nombre ?? ''));
+    const otras = await _otrasDeLiga(String(nombre ?? ''), params.equipo);
   const proximos = await _proximosEntrenamientos();
   const { data: tallasSupa } = await supabase.from('equipamiento_tallas').select('talla, cantidad');
   const stockPatines: Record<string, number> = {};
@@ -6123,7 +6130,7 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     const { data: dup } = await supabase.from('reservas').select('id').eq('nombre_usuario', nombre).eq('id_evento', fecha).neq('estado', 'Cancelada').maybeSingle();
   if (dup) return { exito: false, mensaje: 'Ya tienes una reserva para esta fecha.' };
   // Equipamiento de las listas propias de la liga (Victor, 2026-11-17).
-  const otras = esMensual ? null : await _otrasDeLiga(String(nombre ?? ''));
+    const otras = esMensual ? null : await _otrasDeLiga(String(nombre ?? ''), params.equipo);
   if (otras && otras.listas.length) {
     const { data: delEvento } = await supabase.from('reservas').select('equipo').eq('id_evento', fecha).neq('estado', 'Cancelada');
     const falta = _faltaDeLiga(otras, delEvento ?? []);

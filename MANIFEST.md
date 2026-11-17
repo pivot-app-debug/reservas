@@ -246,7 +246,13 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - API: `adminPlanes` (finanzas), `getMisPlanes`, `comprarPlan` (reserva tipo 'plan', pendiente), `guardarReserva` con `planId` (mes: precio/N sin recargo) y consumo de `_consumirCreditoPlan` cuando la clase va en 0; `adminSetEstadoReserva` crea o recorta `plan_creditos`; `cancelarReserva` devuelve la clase al plan y el cupón manual. `adminCuponDescuento` (finanzas); `getPreciosClases.descuentoPct`.
 - App: `finanzas/planes_screen.dart`; ReservaScreen muestra PLANES y suma las clases de plan como clases a favor; `Precios.descuentoPct`, `Total.descuento`.
 
+## Planes por equipo y quién ve (2026-11-17, 17:45)
+- `coach_planes`: PK `id` (uuid), `equipo` ('' = toda la liga), `da` text[]; único (liga_id, id_evento, equipo); `id_evento` null = sin fecha (migración `20261117140000`). `coachGuardar accion=plan` con `equipo` y `da`; `accion=asignarPlan`. `getPlanEvento.planes`, `equiposPlan`, `deTodaLaLiga`. `getCoach.sinFecha`, `coaches`. `moverPlanesEvento` (Pivot o coach; `soloContar`).
+- Quién ve (notas, feedback, pruebas): lista con comas de 'jugadorx', 'pivots', 'coaches' ('yo' = solo quien la escribe); un solo valor lleva coma final. Los valores viejos sin coma son escalonados (`_visSet`/`quienVeDe`). App: `QuienVe`, `textoQuienVe`, `BotonDictar` (mantener presionado).
+- `_otrasDeLiga(nombre, equipo)` acepta el equipamiento solo para esta reserva (`equipo` en `getFechasDisponibles` y `guardarReserva`); `ReservasRepo.equipoEsta`. `getMiEquipoLiga` devuelve `sistema` por lista.
+
 ## Equipamiento por liga (2026-11-17, 15:29)
+
 - Migración `20261117130000_equipamiento_por_liga.sql`: `inventario_listas.para_entrenar`, `equipo.equipo_liga` jsonb {listaId: talla | piezas | ''}, `config_tiers.requisitos.propio` [listaId], `reservas.equipo` jsonb. Datos de Quindes migrados desde las columnas viejas.
 - Servidor: `_listasEntrenar`, `_legadoDesdeEquipoLiga` / `_equipoLigaDesdeLegado` (las columnas viejas `necesita_patines`, `talla`, `necesita_protecciones` y `patinesPropios`/`proteccionesPropias` siguen sincronizadas para lo que aún las usa), `_propioDe`, `_equipoSegunEquipamiento` (orden más bajo = equipo de más arriba), `getMiEquipoLiga`, `guardarMiEquipoLiga`, `_otrasDeLiga`/`_faltaDeLiga` (cupo de listas no del sistema en `getFechasDisponibles` y `guardarReserva`). `getTiers` devuelve `propioNombres` y `listasEntrenar`. `getDatosCompletos.equipoLiga`.
 - recalcular-categorias: con `requisitos.propio`, baja a quien usa de la liga algo que su equipo pide propio y no sube a un equipo que lo pide (contador en 0).

@@ -323,7 +323,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
                         _r.cambiadoParaEsta ? 'Equipamiento para esta reserva' : 'Tu equipamiento',
                         style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
                       ),
-                      Text(r == null ? 'Llevas tu propio equipamiento' : 'Del equipo: ${r.toLowerCase()}', style: TextStyle(fontSize: 13, color: p.sobreSuave)),
+                      Text(r == null ? 'Llevas tu propio equipamiento' : 'De la liga: ${r.toLowerCase()}', style: TextStyle(fontSize: 13, color: p.sobreSuave)),
                     ],
                   ),
                 ),
@@ -336,26 +336,24 @@ class _ReservaScreenState extends State<ReservaScreen> {
     );
   }
 
+  /// Equipamiento solo para esta reserva, con las listas que arma la liga
+  /// (Victor, 2026-11-17).
   Future<void> _cambiarEquipo() async {
-    const piezas = ['Casco', 'Muñequeras', 'Rodilleras', 'Coderas'];
-    final d = widget.repo.sesion.datos;
-    var patines = _r.patinesEsta ?? _r.necesitaPatines;
-    var talla = _r.tallaEsta ?? _r.talla;
-    final proIni = _r.protecEsta ?? (_r.necesitaProtecciones ? '${d['necesitaProtecciones'] ?? ''}' : 'No');
-    var modo = proIni.isEmpty || proIni == 'No' ? 'propias' : (proIni == 'Sí' ? 'todas' : 'algunas');
-    final algunas = modo == 'algunas' ? proIni.split(',').map((x) => x.trim()).where(piezas.contains).toSet() : <String>{};
-    var guardar = false;
-    List<String> tallas = const [];
+    final s = widget.repo.sesion;
+    List<Map<String, dynamic>> listas = const [];
+    Map<String, String> mio = const {};
     try {
-      tallas = [for (final t in await widget.repo.sesion.api.getLista('getTallasDisponibles')) '$t']
-        ..sort((a, b) => (num.tryParse(a) ?? 0).compareTo(num.tryParse(b) ?? 0));
+      final r = await s.api.get('getMiEquipoLiga');
+      listas = [for (final l in (r['listas'] as List? ?? const [])) Map<String, dynamic>.from(l as Map)];
+      mio = {for (final e in ((r['mio'] as Map?) ?? const {}).entries) '${e.key}': '${e.value ?? ''}'};
     } catch (_) {}
     if (!mounted) return;
-    String protec() => switch (modo) {
-      'todas' => 'Sí',
-      'algunas' => algunas.isEmpty ? 'No' : piezas.where(algunas.contains).join(', '),
-      _ => 'No',
-    };
+    if (listas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tu liga no presta equipamiento para entrenar.')));
+      return;
+    }
+    final usa = Map<String, String>.of(_r.equipoEsta ?? mio);
+    var guardar = false;
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -368,72 +366,95 @@ class _ReservaScreenState extends State<ReservaScreen> {
             children: [
               Text('Equipamiento para estas clases', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('Elige lo que necesitas del equipo solo para esta reserva.', style: TextStyle(color: h.pivot.textoSecundario)),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Patines del equipo'),
-                value: patines,
-                onChanged: (v) => set(() => patines = v),
-              ),
-              if (patines && tallas.isNotEmpty)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [for (final t in tallas) ChoiceChip(label: Text('Talla $t'), selected: talla == t, onSelected: (_) => set(() => talla = t))],
+              Text('Elige lo que necesitas de la liga solo para esta reserva.', style: TextStyle(color: h.pivot.textoSecundario)),
+              for (final l in listas) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${l['nombre']} de la liga'),
+                  value: usa.containsKey('${l['id']}'),
+                  onChanged: (v) => set(() => v ? usa['${l['id']}'] = mio['${l['id']}'] ?? '' : usa.remove('${l['id']}')),
                 ),
-              const SizedBox(height: 12),
-              const Text('Protecciones', style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final (k, t) in const [('propias', 'Llevo las mías'), ('todas', 'Todas del equipo'), ('algunas', 'Algunas')])
-                    ChoiceChip(label: Text(t), selected: modo == k, onSelected: (_) => set(() => modo = k)),
+                if (usa.containsKey('${l['id']}') && l['tipo'] == 'tallas')
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in ([
+                        for (final x in (l['tallas'] as List? ?? const [])) '$x',
+                      ]..sort((a, b) => (num.tryParse(a) ?? 0).compareTo(num.tryParse(b) ?? 0))))
+                        ChoiceChip(label: Text('Talla $t'), selected: usa['${l['id']}'] == t, onSelected: (_) => set(() => usa['${l['id']}'] = t)),
+                    ],
+                  ),
+                if (usa.containsKey('${l['id']}') && l['tipo'] == 'set' && (l['piezas'] as List? ?? const []).isNotEmpty) ...[
+                  Text('Sin elegir piezas: el set completo.', style: TextStyle(fontSize: 13, color: h.pivot.textoSecundario)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final x in [for (final y in l['piezas'] as List) '$y'])
+                        FilterChip(
+                          label: Text(x),
+                          selected: (usa['${l['id']}'] ?? '').split(',').map((y) => y.trim()).contains(x),
+                          onSelected: (v) => set(() {
+                            final todas = [for (final y in l['piezas'] as List) '$y'];
+                            final el = (usa['${l['id']}'] ?? '').split(',').map((y) => y.trim()).where(todas.contains).toSet();
+                            v ? el.add(x) : el.remove(x);
+                            usa['${l['id']}'] = todas.where(el.contains).join(', ');
+                          }),
+                        ),
+                    ],
+                  ),
                 ],
-              ),
-              if (modo == 'algunas') ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final x in piezas)
-                      FilterChip(label: Text(x), selected: algunas.contains(x), onSelected: (v) => set(() => v ? algunas.add(x) : algunas.remove(x))),
-                  ],
-                ),
               ],
               const SizedBox(height: 8),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Guardarlo en mi perfil'),
-                subtitle: const Text('Para mis próximas reservas. Si pasas a usar equipamiento del equipo, tu equipo puede cambiar.'),
+                subtitle: const Text('Para mis próximas reservas. Si pasas a usar equipamiento de la liga, tu equipo puede cambiar.'),
                 value: guardar,
                 onChanged: (v) => set(() => guardar = v == true),
               ),
               const SizedBox(height: 8),
-              FilledButton(onPressed: patines && talla.isEmpty ? null : () => Navigator.of(h).pop(true), child: const Text('Listo')),
+              FilledButton(
+                onPressed: listas.any((l) => l['tipo'] == 'tallas' && usa.containsKey('${l['id']}') && (usa['${l['id']}'] ?? '').isEmpty)
+                    ? null
+                    : () => Navigator.of(h).pop(true),
+                child: const Text('Listo'),
+              ),
             ],
           ),
         ),
       ),
     );
     if (ok != true || !mounted) return;
-    final pro = protec();
     if (guardar) {
       try {
-        await widget.repo.sesion.guardarEquipamiento(patines: patines ? 'Sí' : 'No', talla: patines ? talla : '', protecciones: pro);
+        await s.guardarEquipoLiga(usa);
         _r.patinesEsta = null;
         _r.tallaEsta = null;
         _r.protecEsta = null;
+        _r.equipoEsta = null;
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardado en tu perfil')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar en tu perfil.')));
         return;
       }
     } else {
-      _r.patinesEsta = patines;
-      _r.tallaEsta = patines ? talla : null;
-      _r.protecEsta = pro;
+      // Patines y protecciones (listas del sistema) siguen por sus campos de siempre.
+      final pat = listas.where((l) => l['sistema'] == 'patines').firstOrNull, pro = listas.where((l) => l['sistema'] == 'protecciones').firstOrNull;
+      if (pat != null) {
+        _r.patinesEsta = usa.containsKey('${pat['id']}');
+        _r.tallaEsta = usa['${pat['id']}'];
+      }
+      if (pro != null) {
+        final v = usa['${pro['id']}'];
+        _r.protecEsta = v == null ? 'No' : (v.isEmpty ? 'Sí' : v);
+      }
+      _r.equipoEsta = {
+        for (final e in usa.entries)
+          if (!listas.any((l) => '${l['id']}' == e.key && l['sistema'] != null)) e.key: e.value,
+      };
     }
     // Los cupos dependen de la talla: se vuelven a pedir.
     try {

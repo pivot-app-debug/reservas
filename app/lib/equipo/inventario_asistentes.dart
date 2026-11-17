@@ -184,6 +184,7 @@ class _NuevaListaAsistenteState extends State<NuevaListaAsistente> {
   int _sets = 1;
 
   bool get _equipamiento => _seccion == 'equipamiento';
+  bool _paraEntrenar = true;
 
   @override
   void dispose() {
@@ -237,6 +238,7 @@ class _NuevaListaAsistenteState extends State<NuevaListaAsistente> {
         icono: _icono,
         seccion: _seccion!,
         piezas: piezas,
+        paraEntrenar: _equipamiento && _paraEntrenar,
         stock: _equipamiento ? (_tipo == 'tallas' ? _tallas : [for (final p in piezas) (p.nombre, p.cantidad * _sets)]) : const [],
         renglones: _equipamiento
             ? null
@@ -365,6 +367,17 @@ class _NuevaListaAsistenteState extends State<NuevaListaAsistente> {
               ChoiceChip(showCheckmark: false, label: Icon(e.value, size: 22), selected: _icono == e.key, onSelected: (_) => setState(() => _icono = e.key)),
           ],
         ),
+        // Se pregunta al crear (Victor, 2026-11-17); después se cambia en la lista.
+        if (_equipamiento) ...[
+          const SizedBox(height: 16),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Se presta para entrenar'),
+            subtitle: const Text('Cada persona dice en "Mi equipamiento" si la usa de la liga, y cada equipo puede pedirla propia.'),
+            value: _paraEntrenar,
+            onChanged: (v) => setState(() => _paraEntrenar = v),
+          ),
+        ],
       ],
     );
   }

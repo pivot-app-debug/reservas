@@ -2,7 +2,19 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (ronda de las 17:45)
+- **Calendario:** arriba la campana primero, Tareas y un menú ⋯ con Buscar, Filtros y Cursos y clínicas. Punto rojo en la pestaña Calendario cuando hay novedades en Notificaciones.
+- Detalle del evento: el botón dice siempre "Asistencia anticipada", sin texto debajo.
+- **Plan del evento:** siempre visible en el detalle (no se expande al abrir). Uno por equipo dentro del mismo evento: coach de un equipo arma el de su equipo; coach de toda la liga, el de toda la liga o el de cada equipo. Cada plan dice quién lo da. Lo ven quienes son de ese equipo si se comparte.
+- **Evento cancelado con plan:** se pregunta a dónde pasa (sugiere el siguiente evento del mismo tipo) o queda sin fecha en Coach → Cronograma, con "Asignar". Si el evento elegido ya tiene plan de ese equipo, no se pisa: queda sin fecha.
+- Coach: "Plan del evento" en vez de "Tema" en el feedback y la evaluación ("Agregar otro"). **Quién lo ve:** Usuarios (marcado por defecto), Pivots, Coaches o Yo, por separado.
+- **Dictado como en WhatsApp:** se mantiene presionado el micrófono mientras se habla.
+- **Tareas:** se abre deslizando y pasa de la carga a la lista de una vez.
+- Equipamiento: al crear una lista se pregunta si se presta para entrenar; "Equipamiento para estas clases" en la reserva usa las listas de la liga.
+- Cursos siguen en el Calendario; sus clases aparecen en el Cronograma de Coach para armarles el plan.
+
 ## 2026-11-17 (equipamiento armado por cada liga, 15:29)
+
 - **Inventario:** cada lista de equipamiento tiene "Se presta para entrenar". Las que lo tienen aparecen en Mi equipamiento y en lo que cada equipo puede pedir propio. En Quindes, Patines y Protecciones ya vienen marcadas.
 - **Mi equipamiento:** por cada lista, "Propio" o "De la liga", con talla (listas con tallas) o piezas (sets). Si tu equipo pide propio algo que marcas de la liga, se avisa antes de guardar y pasas al equipo de abajo.
 - **Equipo → Equipamiento propio:** se eligen las listas que el equipo pide propias. Reemplaza la regla fija "con equipamiento del club no puede ser Quindes": ahora vale para cualquier equipo y liga (al guardar, al inscribirse con el enlace y en el recálculo de equipos).

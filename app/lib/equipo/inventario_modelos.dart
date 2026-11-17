@@ -294,6 +294,7 @@ class InventarioRepo {
     List<Pieza> piezas = const [],
     required List<(String, int)> stock,
     List<Map<String, Object?>>? renglones,
+    bool paraEntrenar = false,
   }) => _ok(
     _api.post('adminInventarioLista', {
       ..._admin,
@@ -303,6 +304,7 @@ class InventarioRepo {
       'icono': icono,
       'seccion': seccion,
       'unidad': unidad,
+      'paraEntrenar': paraEntrenar,
       if (renglones != null) 'stock': jsonEncode(renglones),
       'piezas': jsonEncode([for (final p in piezas) p.json]),
       if (renglones == null)

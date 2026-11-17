@@ -237,10 +237,14 @@ class ReservasRepo {
   /// vieja): sin protecciones, solo muñequeras, otra talla… null = el del perfil.
   bool? patinesEsta;
   String? tallaEsta, protecEsta;
+
+  /// Lo que usa de la liga solo para esta reserva {listaId: talla o piezas}
+  /// (Victor, 2026-11-17: listas que arma cada liga). null = el del perfil.
+  Map<String, String>? equipoEsta;
   bool get _pat => patinesEsta ?? necesitaPatines;
   String get _tal => tallaEsta ?? talla;
   String get _pro => protecEsta ?? (necesitaProtecciones ? (_d['necesitaProtecciones'] ?? '').toString() : 'No');
-  bool get cambiadoParaEsta => patinesEsta != null || tallaEsta != null || protecEsta != null;
+  bool get cambiadoParaEsta => patinesEsta != null || tallaEsta != null || protecEsta != null || equipoEsta != null;
 
   /// Equipamiento del club: solo reserva por clase (`canPayMonthly()`).
   bool get necesitaEquipo => necesitaPatines || necesitaProtecciones || _otrasDeLiga > 0;
@@ -248,6 +252,8 @@ class ReservasRepo {
   /// Cuántas cosas usa de la liga además de patines y protecciones (Victor,
   /// 2026-11-17: listas que arma cada liga).
   int get _otrasDeLiga {
+    // Solo para esta reserva: ya viene sin patines ni protecciones.
+    if (equipoEsta != null) return equipoEsta!.length;
     final eq = _d['equipoLiga'];
     if (eq is! Map) return 0;
     final sistema = (necesitaPatines ? 1 : 0) + (necesitaProtecciones ? 1 : 0);
@@ -338,7 +344,12 @@ class ReservasRepo {
 
   /// Próximos entrenamientos con sus cupos (`getFechasDisponibles`).
   Future<List<FechaClase>> fechas() async {
-    final lista = await _api.getLista('getFechasDisponibles', {'nombre': sesion.nombre, 'talla': _pat ? _tal : '', 'necesitaProtecciones': _pro});
+    final lista = await _api.getLista('getFechasDisponibles', {
+      'nombre': sesion.nombre,
+      'talla': _pat ? _tal : '',
+      'necesitaProtecciones': _pro,
+      if (equipoEsta != null) 'equipo': jsonEncode(equipoEsta),
+    });
     final agotada = 'sin patines talla $_tal disponibles';
     return [
       for (final f in lista.whereType<Map<String, dynamic>>())
@@ -554,6 +565,7 @@ class ReservasRepo {
             'anio': '${m.year}',
             'talla': tallaBase,
             'protecciones': protec,
+            if (equipoEsta != null) 'equipo': jsonEncode(equipoEsta),
             'monto': total.precio.toStringAsFixed(2),
             'email': email,
             'medio': ?medio,
@@ -584,6 +596,7 @@ class ReservasRepo {
             'fecha': c.id,
             'talla': tallaPorFecha[c.id] ?? tallaBase,
             'protecciones': protec,
+            if (equipoEsta != null) 'equipo': jsonEncode(equipoEsta),
             'monto': gratis ? '0.00' : total.precio.toStringAsFixed(2),
             'email': email,
             if (!gratis) 'medio': ?medio,
