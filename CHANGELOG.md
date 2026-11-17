@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-17 (varias ligas encendido)
+- Servidor por liga encendido (secreto configurado por Victor): cada pedido solo ve los datos de su liga. Probado: una liga de prueba no ve a nadie de Quindes y Quindes sigue igual.
+- **Arreglo importante:** Coach, Cursos, Planes de pago y Recompensas automáticas no funcionaban porque el servidor no tenía permiso sobre sus tablas (este proyecto no da permisos por defecto a tablas nuevas). Ya tienen permiso, también las que se creen de ahora en más.
+
 ## 2026-11-17 (base para varias ligas)
 - Base de datos lista para varias ligas: cada dato sabe de qué liga es (todo lo actual, Quindes Volcánicos) y una liga no puede ver ni cambiar datos de otra (probado con una liga de prueba). Los ajustes de la liga son únicos por liga.
 - El servidor ya sabe atender a cada pedido con su liga; se enciende al configurar un secreto (paso manual de Victor). Hasta entonces todo funciona igual que antes.
