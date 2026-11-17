@@ -661,3 +661,9 @@ Esperando respuesta de Victor (no hacer hasta que conteste aquí):
 ## AB. Cursos y niveles (Victor, 2026-11-17, 18:09–18:19) — hecho
 - [x] Sin Curso en Nuevo evento; asistente paso a paso; temas por clase (habilidades); evaluación automática con mínimo por tema; Excel; plantillas y Freshmeat; niveles en Coach; marcar habilidades en grupo; cursos para personas o niveles; cursos abiertos.
 - [ ] Ideas para después: requisito de equipo "tener aprobado tal curso"; plan del evento para un nivel (hoy por equipo).
+
+## AC. Para el jueves 2026-11-19, 6 p. m. (tarea programada, pedido de Victor 2026-11-17 18:40)
+Trabajar todo lo pendiente de abajo y lo que Victor mande desde el 17/11 a las 18:40 (se anota aquí y en la Bandeja de Claude Docs, sección Nuevo):
+- [ ] Cambiar la talla en una reserva ya hecha con las listas de equipamiento que arma cada liga (hoy solo patines).
+- [ ] Requisito de equipo "tener aprobado tal curso" (idea).
+- [ ] Plan del evento para un nivel de Coach (hoy por equipo o toda la liga).
