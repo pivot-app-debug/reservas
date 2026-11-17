@@ -2023,23 +2023,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            clipBehavior: Clip.none,
-                            child: Row(
-                              children: [
-                                for (var n = 1; n <= 10; n++)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 6),
-                                    child: ChoiceChip(
-                                      label: Text('$n'),
-                                      selected: _notas['${x['username']}'] == n,
-                                      onSelected: (v) => setState(() => _notas['${x['username']}'] = v ? n : null),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                          EscalaDiez(valor: _notas['${x['username']}'], alCambiar: (n) => setState(() => _notas['${x['username']}'] = n)),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _com('${x['username']}'),
@@ -2059,6 +2043,48 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                 ],
               ),
       ),
+    );
+  }
+}
+
+/// Nota del 1 al 10 que siempre cabe en el ancho (Victor, 2026-11-17: los
+/// números se cortaban y costaba tocarlos). Tocar la elegida la quita.
+class EscalaDiez extends StatelessWidget {
+  const EscalaDiez({super.key, required this.valor, required this.alCambiar});
+  final int? valor;
+  final ValueChanged<int?> alCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Row(
+      children: [
+        for (var n = 1; n <= 10; n++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Semantics(
+                button: true,
+                selected: valor == n,
+                label: 'Nota $n',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  onTap: () => alCambiar(valor == n ? null : n),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: valor == n ? p.marca : p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                    child: Text(
+                      '$n',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: valor == n ? p.sobreMarca : p.sobreSuave),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

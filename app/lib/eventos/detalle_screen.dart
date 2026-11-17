@@ -487,19 +487,54 @@ class _DetalleScreenState extends State<DetalleScreen> {
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
           // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
-          if (repo.anticipada.disponible) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AnticipadaScreen(repo: repo, abrirNueva: true))),
-                icon: const Icon(Icons.event_repeat_rounded),
-                label: const Text('Avisar por adelantado para varias fechas'),
-              ),
-            ),
-          ],
+          if (repo.anticipada.disponible) ...[const SizedBox(height: 12), _botonAnticipada(context)],
         ],
       ),
+    );
+  }
+
+  /// "Crea una asistencia anticipada" con su explicación; si ya tienes
+  /// alguna, un botón más sutil que lleva a verlas (Victor, 2026-11-17).
+  Widget _botonAnticipada(BuildContext context) {
+    final p = context.pivot;
+    final a = repo.anticipada;
+    if (a.cuantas.value == null) a.reglas().ignore();
+    return ValueListenableBuilder<int?>(
+      valueListenable: a.cuantas,
+      builder: (context, n, _) {
+        final tiene = (n ?? 0) > 0;
+        void abrir() => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AnticipadaScreen(repo: repo, abrirNueva: !tiene),
+          ),
+        );
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          child: Column(
+            key: ValueKey(tiene),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (tiene)
+                OutlinedButton.icon(
+                  onPressed: abrir,
+                  icon: const Icon(Icons.event_repeat_rounded),
+                  label: Text(n == 1 ? 'Tu asistencia anticipada' : 'Tus $n asistencias anticipadas'),
+                )
+              else
+                FilledButton.tonalIcon(onPressed: abrir, icon: const Icon(Icons.event_repeat_rounded), label: const Text('Crea una asistencia anticipada')),
+              const SizedBox(height: 8),
+              Text(
+                tiene
+                    ? 'Si un día no puedes venir, marca No asistiré en ese evento: tu respuesta de ese día siempre manda.'
+                    : 'Marca Asistiré, No asistiré o No jugador en muchos eventos de una vez (sin fecha de fin, por meses o entre dos fechas) '
+                          'y no tendrás que marcar evento por evento. Si un día no puedes venir, marca No asistiré en ese evento: '
+                          'tu respuesta de ese día siempre manda.',
+                style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

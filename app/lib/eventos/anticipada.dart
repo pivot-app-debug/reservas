@@ -394,10 +394,16 @@ class AnticipadaRepo {
     return (cat == 'quindes' || cat == 'mirlxs') && !usa(d['necesitaPatines']) && !usa(d['necesitaProtecciones']);
   }
 
+  /// Cuántas reglas tienes (null = sin cargar); el botón del detalle del evento
+  /// se ve más sutil si ya tienes alguna (Victor, 2026-11-17).
+  final cuantas = ValueNotifier<int?>(null);
+
   Future<List<ReglaAnticipada>> reglas() async {
     final nombre = Uri.encodeComponent(sesion.nombre ?? '');
     final filas = await _api.restGet('reglas_asistencia?select=*&nombre=eq.$nombre&order=created_at.desc');
-    return [for (final f in filas) ?ReglaAnticipada.desdeFila(f as Map<String, dynamic>)];
+    final l = [for (final f in filas) ?ReglaAnticipada.desdeFila(f as Map<String, dynamic>)];
+    cuantas.value = l.length;
+    return l;
   }
 
   Future<Cuota> cuota() async {
