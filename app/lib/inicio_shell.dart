@@ -42,11 +42,19 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
 
   // Cada pestaña con su propio Navigator (Victor, 2026-11-17): al entrar a una
   // subsección (Cursos, Tareas, una ficha…) la barra de abajo sigue visible.
-  final _navs = <int, GlobalKey<NavigatorState>>{};
-  final _heroes = <int, HeroController>{};
-  GlobalKey<NavigatorState> _nav(int i) => _navs[i] ??= GlobalKey<NavigatorState>(debugLabel: 'pestana-$i');
+  // Se identifican por su nombre (no por posición: Coach o Finanzas pueden
+  // aparecer o irse). Cada pestaña visitada queda viva y recuerda dónde
+  // estabas (Victor, 2026-11-17).
+  final _navs = <String, GlobalKey<NavigatorState>>{};
+  final _heroes = <String, HeroController>{};
+  final _visitadas = <String>{};
+  String _actual = '';
+  GlobalKey<NavigatorState> _nav(String i) => _navs[i] ??= GlobalKey<NavigatorState>(debugLabel: 'pestana-$i');
 
-  Widget _pestana(int i, Widget pagina) => NavigatorPopHandler(
+  Widget _pestana(String i, Widget pagina) => NavigatorPopHandler(
+    // Solo la pestaña visible responde al botón o gesto de atrás.
+    enabled: i == _actual,
+
     onPopWithResult: (_) => _nav(i).currentState?.maybePop(),
     child: Navigator(
       key: _nav(i),
@@ -57,7 +65,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
 
   /// Vuelve al inicio de la pestaña actual (si había entrado a una subsección).
   bool _alInicioDePestana() {
-    final n = _nav(_indice).currentState;
+    final n = _nav(_actual).currentState;
     if (n == null || !n.canPop()) return false;
     n.popUntil((r) => r.isFirst);
     return true;
@@ -109,7 +117,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     if (p == null || !mounted) return;
     Navegacion.ir.value = null;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    _alInicioDePestana();
+    // La pestaña que se deja queda donde estaba (Victor, 2026-11-17): solo
+    // vuelve a su inicio al tocar de nuevo su ícono o al ir atrás.
+
     setState(
       () => _indice = switch (p) {
         Pestana.calendario => 0,
@@ -199,6 +209,11 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       ),
     ];
     final indice = _indice.clamp(0, destinos.length - 1);
+    _actual = destinos[indice].$1.label;
+    _visitadas
+      ..add(_actual)
+      ..retainWhere((l) => destinos.any((d) => d.$1.label == l));
+
     ClavesTour.destinos = destinos.length;
     // Barra de estado con íconos que contrastan en las pestañas sin AppBar.
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -214,9 +229,18 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
             final mq = MediaQuery.of(context);
             return MediaQuery(
               data: mq.copyWith(viewPadding: mq.viewPadding.copyWith(bottom: mq.padding.bottom)),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: KeyedSubtree(key: ValueKey(indice), child: _pestana(indice, destinos[indice].$2)),
+              // Todas las pestañas visitadas siguen montadas, una encima de
+              // otra; la activa aparece con un fundido.
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  for (final d in destinos)
+                    if (_visitadas.contains(d.$1.label))
+                      KeyedSubtree(
+                        key: ValueKey(d.$1.label),
+                        child: _CapaPestana(activa: d.$1.label == _actual, child: _pestana(d.$1.label, d.$2)),
+                      ),
+                ],
               ),
             );
           },
@@ -239,8 +263,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                   if (i == 0 && indice == 0) {
                     _irAHoy.disparar();
                   } else {
-                    // Al volver al Calendario el timeline abre en hoy.
-                    if (i != 0) _irAHoy.lejos.value = 0;
+                    // El Calendario queda donde estaba (con su flecha hacia hoy si corresponde).
+
                     setState(() => _indice = i);
                   }
                 },
@@ -306,4 +330,28 @@ class _IconoHoy extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Una pestaña de la barra: la activa se ve y recibe toques; las otras quedan
+/// montadas (con su pila de pantallas) pero ocultas y en pausa.
+class _CapaPestana extends StatelessWidget {
+  const _CapaPestana({required this.activa, required this.child});
+  final bool activa;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: activa ? 1 : 0,
+    duration: const Duration(milliseconds: 200),
+    child: IgnorePointer(
+      ignoring: !activa,
+      child: ExcludeSemantics(
+        excluding: !activa,
+        child: ExcludeFocus(
+          excluding: !activa,
+          child: TickerMode(enabled: activa, child: child),
+        ),
+      ),
+    ),
+  );
 }

@@ -6,6 +6,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **La barra de abajo ya no desaparece:** cada pestaña tiene su propia navegación, así que Cursos, Tareas, fichas y demás subsecciones se abren con la barra visible. Tocar la pestaña en la que estás vuelve a su inicio. Las hojas que suben desde abajo se abren por encima de la barra.
 - **Calendario:** el menú ⋯ tiene solo Buscar y Filtros, con el mismo color que la campana y Tareas, y se abre debajo del botón. Cursos queda al lado de Tareas solo para Pivots y coaches; el resto entra a los cursos abiertos desde el + cuando hay alguno.
 - **Cursos para todxs (18:54):** el botón Cursos aparece arriba también para quien puede tomar algún curso; el + ya no lo tiene. Al crear un curso le llega un aviso ("Cursos nuevos", en Entrenamientos) solo a quienes pueden tomarlo (toda la liga, sus equipos, su nivel o las personas invitadas), y el botón muestra un punto rojo hasta que entran a Cursos.
+- **Cada pestaña recuerda dónde estabas (19:14):** si cambias de pestaña y vuelves, sigues en la pantalla que tenías abierta (por ejemplo, creando un curso). Solo vuelve al inicio al tocar de nuevo el ícono de la pestaña en la que estás o al ir atrás. El Calendario también queda en la fecha en la que estabas.
 - PENDIENTES reescrito con lo que falta de verdad; el historial quedó en `PENDIENTES_HISTORIAL.md`.
 
 ## 2026-11-17 (cursos y niveles, 18:19)
