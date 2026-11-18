@@ -21,7 +21,7 @@ import 'salud_screen.dart';
 import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
 import 'recorte_foto.dart';
-import '../push/activar_avisos.dart';
+import '../push/avisos_obligatorios.dart';
 import '../pivots/ajustes_liga_screen.dart';
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
@@ -80,7 +80,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
               // Mi perfil (Victor, 2026-11-12): arriba quién eres y tus datos
               // de la ficha; después pagos y datos personales; al final, la app.
 
-              TarjetaActivarAvisos(api: sesion.api),
+              BannerAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
               // Mi Liga dentro de Ajustes, solo para Pivots (Victor, 2026-11-16).
               if (sesion.esAdmin && sesion.adminToken != null)

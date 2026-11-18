@@ -110,6 +110,9 @@ class Push {
 
   static final _listo = Completer<void>();
 
+  /// Se completa cuando terminó el arranque (con o sin éxito).
+  static Future<void> get listo => _listo.future;
+
   /// Arranque en primer plano: plugin, mensaje en segundo plano y la
   /// notificación que abrió la app en frío, si la hubo.
   static Future<void> iniciar() async {

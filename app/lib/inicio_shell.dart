@@ -23,6 +23,7 @@ import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
 import 'finanzas/tesoreria_screen.dart';
 import 'core/aviso_cambio_equipo.dart';
+import 'push/avisos_obligatorios.dart';
 
 /// Estructura principal con la barra de navegación inferior. En esta
 /// primera versión solo Eventos es nativo; el resto abre la web mientras se
@@ -93,6 +94,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       await Future<void>.delayed(const Duration(seconds: 2));
     }
     if (!mounted || Tour.activo) return;
+    // Notificaciones casi obligatorias (Victor, 2026-11-18): primero que todo.
+    await PantallaAvisos.siCorresponde(context, widget.sesion.api);
+    if (!mounted) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);
     if (!mounted) return;
@@ -145,6 +149,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       setState(() {});
       // Al volver a la app: subir lo guardado sin señal.
       widget.repo.cola.sincronizar();
+      // Por si activó o apagó las notificaciones en los ajustes del teléfono.
+      EstadoAvisos.revisar(widget.sesion.api);
     }
   }
 

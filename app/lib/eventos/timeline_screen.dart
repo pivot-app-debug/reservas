@@ -35,6 +35,7 @@ import '../pivots/bandeja_screen.dart';
 import '../pivots/icono_bandeja.dart';
 import '../core/esqueleto.dart';
 import '../cursos/cursos_screen.dart';
+import '../push/avisos_obligatorios.dart';
 
 /// Timeline de Eventos (maqueta aprobada + pedido 2026-11-06):
 /// - Barra: "Noviembre ⌄" despliega el calendario del mes hacia abajo (como
@@ -1348,6 +1349,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Notificaciones apagadas: aviso fijo (Victor, 2026-11-18).
+              BannerAvisos(api: repo.sesion.api),
               for (final m in atrasadas.take(2))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),

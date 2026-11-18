@@ -634,6 +634,14 @@ class _FilaIntegrante extends StatelessWidget {
                         ),
                       ),
                       if (p.numero.isNotEmpty) Text('  #${p.numero}', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
+                      // Solo Pivots: tiene las notificaciones apagadas (Victor, 2026-11-18).
+                      if (p.avisosApagados && !yo) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Notificaciones apagadas',
+                          child: Icon(Icons.notifications_off_outlined, size: 16, color: pal.textoSecundario),
+                        ),
+                      ],
                       if (yo) ...[
                         const SizedBox(width: 6),
                         Container(

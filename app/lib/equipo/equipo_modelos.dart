@@ -70,6 +70,9 @@ class Integrante {
   bool get esAdminMiembro => m['esAdminMiembro'] == true;
   bool get solicitudLesionPendiente => m['solicitudLesionPendiente'] == true;
 
+  /// Tiene las notificaciones apagadas (solo llega a Pivots).
+  bool get avisosApagados => m['avisosApagados'] == true;
+
   /// Inactivx = 30+ días sin una asistencia real (o ninguna), salvo de viaje
   /// o lesionadx (mismo criterio que la web `_eqEsInactivo()`; el servidor no
   /// guarda un estado "Inactivx").

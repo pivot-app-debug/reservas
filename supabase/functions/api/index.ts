@@ -9218,7 +9218,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   // (token de usuarix, o sin token) recibe el roster SIN esas claves.
   const vistaAdmin = params.adminToken ? !!(await _validarAdminToken(String(params.adminToken))) : false;
   const { data: filas } = await supabase.from('equipo')
-        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible, cupon_descuento')
+        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible, cupon_descuento, avisos')
     .is('eliminado_en', null)
     .order('username');
   const personas = filas ?? [];
@@ -9621,7 +9621,9 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
             exentaCuota: r.exenta_cuota === true,
       cuponDisponible: r.cupon_disponible === true,
       cuponDescuento: r.cupon_descuento ?? null,
-      esAdminMiembro: adminEmails.has(String(r.email ?? '').toLowerCase()),
+            esAdminMiembro: adminEmails.has(String(r.email ?? '').toLowerCase()),
+      // Notificaciones apagadas (lo informa la app al abrirse).
+      avisosApagados: r.avisos != null && r.avisos !== 'activos',
     } : {}),
         // Roles en el equipo y cumpleaños (solo "mm-dd" y solo si es público).
     roles: Array.isArray(r.roles) ? r.roles : [],
@@ -10677,6 +10679,16 @@ async function registrarDispositivoPush(params: Record<string, any>): Promise<Re
     { onConflict: 'token' },
   );
   if (error) return { exito: false, error: error.message };
+  return { exito: true };
+}
+
+/** La app informa si la persona tiene las notificaciones activas (Victor, 2026-11-18). */
+async function estadoAvisos(params: Record<string, any>): Promise<Record<string, any>> {
+  const username = await _validarToken(params.token);
+  if (!username) return { exito: false, error: 'Sesión inválida.' };
+  const estado = String(params.estado ?? '');
+  if (!['activos', 'pendiente', 'bloqueados', 'instalar', 'sin_soporte'].includes(estado)) return { exito: false, error: 'Estado inválido.' };
+  await supabase.from('equipo').update({ avisos: estado, avisos_en: new Date().toISOString() }).eq('username', username);
   return { exito: true };
 }
 
@@ -12637,7 +12649,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'getCumpleañosRango':              return json(await getCumpleañosRango(params));
       case 'guardarFechaNacimiento':          return json(await guardarFechaNacimiento(params));
       case 'registrarDispositivoPush':        return json(await registrarDispositivoPush(params));
-      case 'eliminarDispositivoPush':         return json(await eliminarDispositivoPush(params));
+            case 'eliminarDispositivoPush':         return json(await eliminarDispositivoPush(params));
+      case 'estadoAvisos':                    return json(await estadoAvisos(params));
       case 'getEventosFiltrados':             return json(await getEventosFiltrados(params));
       case 'marcarAsistenciaUsuario':         return json(await marcarAsistenciaUsuario(params));
                   case 'adminSugeridosAsistencia':        return json(await adminSugeridosAsistencia(params));
