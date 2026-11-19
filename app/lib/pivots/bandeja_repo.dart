@@ -60,12 +60,14 @@ class Recomendacion {
 /// rectificaciones, excepciones de cuota, lesiones y tareas por validar.
 /// Se abre desde Calendario; el número va en el ícono.
 class BandejaRepo extends ChangeNotifier {
-  BandejaRepo._(this.sesion);
+  BandejaRepo._(this.sesion) : _usuario = sesion.nombre;
   final Sesion sesion;
+  final String? _usuario;
 
   static BandejaRepo? _instancia;
   static BandejaRepo de(Sesion s) {
-    if (_instancia == null || !identical(_instancia!.sesion, s)) _instancia = BandejaRepo._(s);
+    // Otra persona en el mismo navegador: nada de lo de la anterior queda en memoria.
+    if (_instancia == null || !identical(_instancia!.sesion, s) || _instancia!._usuario != s.nombre) _instancia = BandejaRepo._(s);
     return _instancia!;
   }
 
@@ -85,6 +87,36 @@ class BandejaRepo extends ChangeNotifier {
   List<Map<String, dynamic>> novedades = [];
   DateTime? _ultimaVista;
   Set<String> _recomVistas = {};
+
+  /// Avisos "Del equipo" que la persona descartó con la X (QA 2026-11-18). No hay
+  /// endpoint para esto: se guarda en el teléfono solo una huella del aviso (tipo,
+  /// id/fecha), nunca su texto ni datos de la persona.
+  Set<String> _novDescartadas = {};
+
+  static String claveNovedad(Map<String, dynamic> n) {
+    final base = '${n['tipo']}|${n['id'] ?? n['idEvento'] ?? ''}|${n['usuario'] ?? ''}|${n['fecha'] ?? ''}';
+    // FNV-1a de 32 bits: corto y sin datos legibles.
+    var h = 0x811c9dc5;
+    for (final c in base.codeUnits) {
+      h ^= c;
+      h = (h * 0x01000193) & 0xffffffff;
+    }
+    return '${n['tipo']}:${h.toRadixString(36)}';
+  }
+
+  /// Quita un aviso "Del equipo" y recuerda que ya se descartó.
+  Future<void> descartarNovedad(Map<String, dynamic> n) async {
+    final k = claveNovedad(n);
+    _novDescartadas.add(k);
+    novedades = [...novedades]..remove(n);
+    notifyListeners();
+    try {
+      final pr = await SharedPreferences.getInstance();
+      final l = _novDescartadas.toList();
+      await pr.setStringList('bandeja.novDescartadas.${sesion.nombre}', l.length > 300 ? l.sublist(l.length - 300) : l);
+    } catch (_) {}
+  }
+
   bool _cargandoMia = false;
 
   bool get hayNovedades {
@@ -104,6 +136,7 @@ class BandejaRepo extends ChangeNotifier {
         final pr = await SharedPreferences.getInstance();
         _ultimaVista = DateTime.tryParse(pr.getString('bandeja.vista.${sesion.nombre}') ?? '');
         _recomVistas = (pr.getStringList('bandeja.recom.${sesion.nombre}') ?? const []).toSet();
+        _novDescartadas = (pr.getStringList('bandeja.novDescartadas.${sesion.nombre}') ?? const []).toSet();
       } catch (_) {}
       final r = await _api.get('getMiBandeja', {});
       if (r['exito'] != false) {
@@ -117,7 +150,7 @@ class BandejaRepo extends ChangeNotifier {
         ];
         novedades = [
           for (final x in (r['novedades'] as List? ?? const []))
-            if (x is Map<String, dynamic>) x,
+            if (x is Map<String, dynamic> && !_novDescartadas.contains(claveNovedad(x))) x,
         ];
       }
     } catch (_) {

@@ -42,6 +42,18 @@ class BandejaPivotsScreen extends StatefulWidget {
 class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
   BandejaRepo get repo => widget.repo;
   final _saliendo = <String>{};
+  final _novSaliendo = <String>{};
+
+  /// X en un aviso "Del equipo": sale con fundido y deslizamiento, luego se quita.
+  Future<void> _descartarNovedad(Map<String, dynamic> n) async {
+    final c = BandejaRepo.claveNovedad(n);
+    if (_novSaliendo.contains(c)) return;
+    setState(() => _novSaliendo.add(c));
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await repo.descartarNovedad(n);
+    if (mounted) setState(() => _novSaliendo.remove(c));
+  }
+
   static String _clave(Pedido x) => '${x.tipo.name}-${x.id}';
 
   /// Excepciones de cuota aprobadas y vigentes (carrusel al final).
@@ -551,10 +563,29 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
           if (repo.novedades.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Del equipo', icono: Icons.campaign_outlined, cantidad: repo.novedades.length));
             for (final n in repo.novedades.take(30)) {
+              final c = BandejaRepo.claveNovedad(n);
+              final sale = _novSaliendo.contains(c);
               hijos.add(
-                _TarjetaNovedad(
-                  n: n,
-                  alTocar: n['tipo'] == 'cumple' ? () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${n['usuario']}') : null,
+                AnimatedSize(
+                  key: ValueKey('nov-$c'),
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedSlide(
+                    offset: sale ? const Offset(0.15, 0) : Offset.zero,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: sale ? 0 : 1,
+                      duration: const Duration(milliseconds: 200),
+                      child: sale
+                          ? const SizedBox(width: double.infinity)
+                          : _TarjetaNovedad(
+                              n: n,
+                              alTocar: n['tipo'] == 'cumple' ? () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${n['usuario']}') : null,
+                              alDescartar: () => _descartarNovedad(n),
+                            ),
+                    ),
+                  ),
                 ),
               );
             }
@@ -839,26 +870,42 @@ class _TarjetaPedido extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (pedido.tipo == TipoPedido.reserva) _Comprobante(pedido: pedido, alPedir: alPedirComprobante),
+                if (pedido.tipo == TipoPedido.reserva) _Comprobante(pedido: pedido),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (_puedeDeuda) ...[TextButton(onPressed: alResolver == null ? null : alDeuda, child: const Text('Pasar a deuda')), const Spacer()],
-                    TextButton(
-                      onPressed: alResolver == null ? null : () => alResolver!(false),
-                      child: Text(switch (pedido.tipo) {
-                        TipoPedido.equipo => 'Dejar como está',
-                        TipoPedido.revisionEquipo => 'Devolver a ${pedido.m['de'] ?? 'su equipo'}',
-                        _ => 'Rechazar',
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: alResolver == null ? null : () => alResolver!(true),
-                      child: Text(pedido.tipo == TipoPedido.revisionEquipo ? 'Mantener' : 'Aprobar'),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final pedir = _faltaComprobante(pedido)
+                        ? TextButton.icon(
+                            onPressed: alPedirComprobante,
+                            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                            label: const Text('Pedir comprobante'),
+                          )
+                        : null;
+                    final decision = _decision();
+                    // En un teléfono angosto no entran los tres: "Pedir comprobante" arriba a la izquierda y la decisión abajo a la derecha.
+                    if (pedir != null && c.maxWidth < 360) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Wrap(
+                            children: [
+                              pedir,
+                              if (_puedeDeuda) TextButton(onPressed: alResolver == null ? null : alDeuda, child: const Text('Pasar a deuda')),
+                            ],
+                          ),
+                          Row(mainAxisAlignment: MainAxisAlignment.end, children: decision),
+                        ],
+                      );
+                    }
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (pedir != null) ...[pedir, const Spacer()],
+                        if (_puedeDeuda) ...[TextButton(onPressed: alResolver == null ? null : alDeuda, child: const Text('Pasar a deuda')), const Spacer()],
+                        ...decision,
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -867,6 +914,22 @@ class _TarjetaPedido extends StatelessWidget {
       ),
     );
   }
+
+  List<Widget> _decision() => [
+    TextButton(
+      onPressed: alResolver == null ? null : () => alResolver!(false),
+      child: Text(switch (pedido.tipo) {
+        TipoPedido.equipo => 'Dejar como está',
+        TipoPedido.revisionEquipo => 'Devolver a ${pedido.m['de'] ?? 'su equipo'}',
+        _ => 'Rechazar',
+      }),
+    ),
+    const SizedBox(width: 8),
+    FilledButton(
+      onPressed: alResolver == null ? null : () => alResolver!(true),
+      child: Text(pedido.tipo == TipoPedido.revisionEquipo ? 'Mantener' : 'Aprobar'),
+    ),
+  ];
 }
 
 /// Entrada suave de cada tarjeta.
@@ -1075,10 +1138,12 @@ class _TarjetaExcepcion extends StatelessWidget {
 /// Un pedido propio y cómo quedó.
 /// Comprobante de una reserva en la Bandeja de Pivots (Victor, 2026-11-14):
 /// la captura (enlace firmado, solo en memoria) o "Pedir comprobante".
+/// "Pedir comprobante" va en la fila de Rechazar/Aprobar (QA 2026-11-18).
+bool _faltaComprobante(Pedido pedido) => pedido.tipo == TipoPedido.reserva && '${pedido.m['comprobante'] ?? ''}'.isEmpty && pedido.m['sinComprobante'] == true;
+
 class _Comprobante extends StatelessWidget {
-  const _Comprobante({required this.pedido, this.alPedir});
+  const _Comprobante({required this.pedido});
   final Pedido pedido;
-  final VoidCallback? alPedir;
 
   @override
   Widget build(BuildContext context) {
@@ -1141,7 +1206,7 @@ class _Comprobante extends StatelessWidget {
         ),
       );
     }
-    if (pedido.m['sinComprobante'] != true) return const SizedBox.shrink();
+    if (!_faltaComprobante(pedido)) return const SizedBox.shrink();
     final avisos = (pedido.m['comprobanteAvisos'] as num?)?.toInt() ?? 0;
     return Padding(
       padding: const EdgeInsets.only(top: 8, left: 52),
@@ -1151,11 +1216,10 @@ class _Comprobante extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              avisos == 0 ? 'Sin comprobante todavía' : 'Sin comprobante · ya se le avisó $avisos ${avisos == 1 ? 'vez' : 'veces'}',
+              avisos == 0 ? 'Sin comprobante todavía' : 'Sin comprobante · $avisos ${avisos == 1 ? 'aviso enviado' : 'avisos enviados'}',
               style: TextStyle(fontSize: 13, color: p.marcaTexto),
             ),
           ),
-          TextButton(onPressed: alPedir, child: const Text('Pedir comprobante')),
         ],
       ),
     );
@@ -1248,9 +1312,10 @@ class _TarjetaMiPedido extends StatelessWidget {
 
 /// Ajuste recomendado: toca y abre la pantalla para completarlo.
 class _TarjetaNovedad extends StatelessWidget {
-  const _TarjetaNovedad({required this.n, this.alTocar});
+  const _TarjetaNovedad({required this.n, this.alTocar, this.alDescartar});
   final Map<String, dynamic> n;
   final VoidCallback? alTocar;
+  final VoidCallback? alDescartar;
 
   @override
   Widget build(BuildContext context) {
@@ -1270,6 +1335,13 @@ class _TarjetaNovedad extends StatelessWidget {
           leading: Icon(icono, color: p.marcaTexto),
           title: Text('${n['titulo']}', style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: '${n['detalle'] ?? ''}'.isEmpty ? null : Text('${n['detalle']}', maxLines: 3, overflow: TextOverflow.ellipsis),
+          trailing: alDescartar == null
+              ? null
+              : IconButton(
+                  tooltip: 'Descartar aviso',
+                  icon: Icon(Icons.close_rounded, size: 20, color: p.textoSecundario),
+                  onPressed: alDescartar,
+                ),
           onTap: alTocar,
         ),
       ),

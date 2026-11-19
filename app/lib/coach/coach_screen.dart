@@ -745,8 +745,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
             ),
             const SizedBox(height: 16),
           ],
-          if (_bloques.isEmpty)
-            Text('Agrega los bloques del entrenamiento en orden: calentamiento, ejercicios, juego…', style: TextStyle(color: p.textoSecundario)),
+          if (_bloques.isEmpty) Text('Agrega los bloques del entrenamiento en orden.', style: TextStyle(color: p.textoSecundario)),
           for (var i = 0; i < _bloques.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

@@ -4,6 +4,8 @@ import '../ajustes/componentes.dart';
 import '../core/tema.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
+import 'tareas_widgets.dart';
+import '../eventos/widgets_comunes.dart' show TextoDeslizante;
 
 /// Tareas recurrentes (Pivots) como tarjetas que se deslizan de lado dentro
 /// de Tareas (Victor, 2026-11-13: no como subsección). Tocar una la edita,
@@ -42,15 +44,16 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
           children: [
             ListTile(leading: const Icon(Icons.edit_rounded), title: const Text('Editar'), onTap: () => Navigator.pop(c, 'editar')),
             ListTile(
-              leading: Icon(r.pausada ? Icons.play_arrow_rounded : Icons.pause_rounded),
+              leading: CirculoPausa(icono: r.pausada ? Icons.play_arrow_rounded : Icons.pause_rounded),
               title: Text(r.pausada ? 'Reanudar' : 'Pausar'),
-              subtitle: Text(r.pausada ? 'Vuelve a crearse según su frecuencia.' : 'Deja de crearse hasta que la reanudes.'),
+              // Reanudar sin subtítulo (Victor, QA 2026-11-18).
+              subtitle: r.pausada ? null : const Text('Deja de crearse hasta que la reanudes.'),
               onTap: () => Navigator.pop(c, r.pausada ? 'activa' : 'pausada'),
             ),
             ListTile(
               leading: Icon(Icons.stop_circle_outlined, color: context.pivot.marcaTexto),
               title: Text('Terminar', style: TextStyle(color: context.pivot.marcaTexto)),
-              subtitle: const Text('No se crea más. El historial y los puntos dados se mantienen.'),
+              subtitle: const Text('La tarea se dará por terminada y no volverá a aparecer'),
               onTap: () => Navigator.pop(c, 'terminada'),
             ),
           ],
@@ -85,13 +88,20 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
       context,
       titulo: 'Título',
       valor: r.titulo,
-      maxLength: 120,
-      validar: (v) => v.length < 3 ? 'Escribe al menos 3 caracteres.' : null,
+      maxLength: maxTituloTarea,
+      validar: (v) => v.length < 3 ? 'Escribe al menos 3 caracteres.' : (v.length > maxTituloTarea ? 'Usa hasta $maxTituloTarea caracteres.' : null),
     );
     if (titulo == null || !mounted) return;
     final notas = await editarTexto(context, titulo: 'Detalles', valor: r.notas, lineas: 6, maxLength: 1000);
     if (notas == null || !mounted) return;
-    final area = await elegirOpciones(context, titulo: 'Área', opciones: [for (final a in AreaTarea.lista) a.nombre], valor: r.area);
+    final area = await elegirOpciones(
+      context,
+      titulo: 'Áreas',
+      ayuda: 'Puedes elegir una o varias.',
+      multi: true,
+      opciones: [for (final a in AreaTarea.lista) a.nombre],
+      valor: r.area,
+    );
     if (area == null || !mounted) return;
     final puntos = await editarTexto(
       context,
@@ -137,7 +147,7 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
               ),
             ),
             SizedBox(
-              height: 112,
+              height: 124,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.none,
@@ -155,7 +165,6 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
 
   Widget _tarjeta(Recurrente r) {
     final p = context.pivot;
-    final a = AreaTarea.de(r.area);
     return SizedBox(
       width: 230,
       child: Material(
@@ -171,27 +180,26 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(r.pausada ? Icons.pause_rounded : a.icono, size: 20, color: p.marcaTexto),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        r.titulo,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                      ),
+                    // Pausada: ícono dentro de un círculo rojo (Victor, QA 2026-11-18).
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: r.pausada
+                          ? const CirculoPausa(key: ValueKey('pausa'), tamano: 24)
+                          : IconosAreas(key: const ValueKey('areas'), areas: r.areas, tamano: 22),
                     ),
+                    const Spacer(),
+                    PillPuntos(puntos: r.puntos, completo: true),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  r.frecuencia,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: p.texto),
+                const SizedBox(height: 10),
+                TextoDeslizante(
+                  texto: r.titulo,
+                  alineacion: TextAlign.start,
+                  estilo: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
                 ),
+                const Spacer(),
                 Text(
-                  '${r.pausada ? 'Pausada · ' : ''}${textoPuntos(r.puntos)} · ${r.cupos == 1 ? '1 cupo' : '${r.cupos} cupos'}',
+                  '${r.pausada ? 'Pausada · ' : ''}${r.frecuencia} · ${r.cupos == 1 ? '1 cupo' : '${r.cupos} cupos'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12.5, color: p.textoSecundario),

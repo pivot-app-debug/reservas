@@ -97,6 +97,47 @@ class BuscadorEquipo {
     return res;
   }
 
+  /// Frase arriba de los resultados cuando se buscó una sola cosa concreta
+  /// (QA 2026-11-18): "6 jammers encontradxs" o "Shusho cumple años el 15 de
+  /// abril". Solo usa lo que ya se ve en la lista (roles y cumpleaños públicos).
+  static String? resumen(String consulta, List<ResultadoBusqueda> res, {DateTime? hoy}) {
+    if (res.isEmpty) return null;
+    final h = hoy ?? Fechas.hoy();
+    final tokens = normalizar(consulta).split(RegExp(r'\s+')).where((t) => t.isNotEmpty && !_vacias.contains(t)).toList();
+    if (tokens.length != 1) return null;
+    final t = tokens.single;
+    final s = _singular(t);
+    final n = res.length;
+    String encontradxs() => n == 1 ? 'encontradx' : 'encontradxs';
+
+    // Rol (del deporte o propio de la liga).
+    final rol = _roles[s] ?? _roles[t] ?? res.first.persona.roles.where((r) => normalizar(r) == t || normalizar(r) == s).firstOrNull;
+    if (rol != null) {
+      final siglas = rol == rol.toUpperCase();
+      final base = siglas ? rol : rol.toLowerCase();
+      final plural = n == 1 || siglas ? base : (RegExp(r'(s|x|z|ch|sh)$').hasMatch(base) ? '${base}es' : '${base}s');
+      return '$n $plural ${encontradxs()}';
+    }
+
+    // Mes: cumpleaños (solo fechas públicas) y aniversarios en el equipo.
+    final mes = _meses.indexOf(t);
+    if (mes >= 0) {
+      final cumplen = res.where((r) => r.persona.proximoCumple(h)?.month == mes + 1).toList();
+      final aniv = n - cumplen.length;
+      if (n == 1) {
+        final per = res.single.persona;
+        final c = per.proximoCumple(h);
+        if (c != null && c.month == mes + 1) return '${per.nombreMostrar} cumple años el ${c.day} de ${_meses[mes]}';
+        final a = per.proximoAniversario(h);
+        if (a != null) return '${per.nombreMostrar} cumple ${per.aniosEnEquipo(a)} años en el equipo el ${a.day} de ${_meses[mes]}';
+        return null;
+      }
+      final partes = [if (cumplen.isNotEmpty) '${cumplen.length} cumpleaños', if (aniv > 0) '$aniv ${aniv == 1 ? 'aniversario' : 'aniversarios'}'];
+      return '${partes.join(' y ')} en ${_meses[mes]}';
+    }
+    return null;
+  }
+
   /// null = no coincide; si coincide: (motivo opcional, orden).
   static (String?, int)? _token(String t, Integrante p, DateTime hoy, Set<String> favs, bool esAdmin) {
     final s = _singular(t);

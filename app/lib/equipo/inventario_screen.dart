@@ -95,49 +95,62 @@ class _InventarioScreenState extends State<InventarioScreen> {
   /// Atajos de la portada: lo que antes estaba en el "+".
   Widget _atajos(BuildContext context) {
     final p = context.pivot;
-    final l = <(IconData, String, VoidCallback)>[
+    final l = <(IconData, String, VoidCallback, String?)>[
       if (_pivot) ...[
-        (Icons.assignment_ind_outlined, 'Alguien tiene algo', () => _prestamo(ModoPrestamo.registrar)),
-        (Icons.rule_rounded, 'Reglas de préstamo', () => _abrir(ReglasPrestamoScreen(repo: repo), 'Guardado')),
+        (Icons.assignment_ind_outlined, 'Retenido', () => _prestamo(ModoPrestamo.registrar), 'Registra si alguien tiene algo del equipo'),
+        (Icons.rule_rounded, 'Reglas', () => _abrir(ReglasPrestamoScreen(repo: repo), 'Guardado'), 'Reglas de préstamo del equipamiento de la liga'),
       ] else ...[
-        (Icons.back_hand_outlined, 'Me llevé algo', () => _prestamo(ModoPrestamo.salida)),
+        (Icons.back_hand_outlined, 'Me llevé algo', () => _prestamo(ModoPrestamo.salida), null),
         if (repo.reglaPrestamo != 'no' && tieneEquipoPropio(widget.sesion.datos))
-          (Icons.inventory_2_outlined, 'Pedir equipamiento', () => _prestamo(ModoPrestamo.uso)),
+          (Icons.inventory_2_outlined, 'Pedir equipamiento', () => _prestamo(ModoPrestamo.uso), null),
       ],
     ];
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        children: [
-          for (var i = 0; i < l.length; i++) ...[
-            if (i > 0) const SizedBox(width: 10),
-            Expanded(
-              child: Material(
-                color: p.tarjeta,
-                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: _guardando ? null : l[i].$3,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    child: Row(
-                      children: [
-                        Icon(l[i].$1, color: p.marcaTexto),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            l[i].$2,
-                            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+      // Atajos del mismo alto aunque uno tenga subtítulo más largo (QA 2026-11-18).
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < l.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(
+                child: Material(
+                  color: p.tarjeta,
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _guardando ? null : l[i].$3,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(l[i].$1, color: p.marcaTexto),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  l[i].$2,
+                                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          if (l[i].$4 != null) ...[
+                            const SizedBox(height: 6),
+                            Text(l[i].$4!, style: TextStyle(fontSize: 12, height: 1.3, color: p.textoSecundario)),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -364,7 +364,7 @@ class _Cabecera extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      area.nombre,
+                      tarea.areas.join(' · '),
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.textoSecundario),
                     ),
                     const SizedBox(height: 2),
@@ -379,7 +379,7 @@ class _Cabecera extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              PillPuntos(puntos: tarea.puntos),
+              PillPuntos(puntos: tarea.puntos, completo: true),
               _Dato(
                 icono: Icons.event_rounded,
                 texto: vence == null

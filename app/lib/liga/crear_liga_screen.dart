@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../liga/directorio_screen.dart';
 import '../core/monedas_mundo.dart';
 import '../core/tema.dart';
+import '../core/fondo_dinamico.dart';
 import '../sesion/boton_google.dart';
 import '../sesion/sesion.dart';
 
@@ -434,49 +435,52 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
             ),
           ),
         ),
-        body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            transitionBuilder: (h, a) => FadeTransition(
-              opacity: a,
-              child: SlideTransition(
-                position: Tween(begin: Offset(_adelante ? 0.06 : -0.06, 0), end: Offset.zero).animate(a),
-                child: h,
+        // Mismo fondo que el inicio de sesión (QA 2026-11-18).
+        body: FondoDinamico(
+          child: SafeArea(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              transitionBuilder: (h, a) => FadeTransition(
+                opacity: a,
+                child: SlideTransition(
+                  position: Tween(begin: Offset(_adelante ? 0.06 : -0.06, 0), end: Offset.zero).animate(a),
+                  child: h,
+                ),
               ),
-            ),
-            child: KeyedSubtree(
-              key: ValueKey(_paso),
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + MediaQuery.paddingOf(context).bottom),
-                children: [
-                  ..._contenido(context),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
-                    child: _error == null
-                        ? const SizedBox(width: double.infinity)
-                        : Padding(
-                            padding: const EdgeInsets.only(top: 14),
-                            child: Text(
-                              _error!,
-                              style: TextStyle(color: p.marcaTexto, fontWeight: FontWeight.w600),
+              child: KeyedSubtree(
+                key: ValueKey(_paso),
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + MediaQuery.paddingOf(context).bottom),
+                  children: [
+                    ..._contenido(context),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      child: _error == null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Text(
+                                _error!,
+                                style: TextStyle(color: p.marcaTexto, fontWeight: FontWeight.w600),
+                              ),
                             ),
-                          ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (_paso != _Paso.cuenta && _paso != _Paso.modo)
-                    FilledButton(
-                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      onPressed: _ocupado ? null : (_paso == _Paso.perfil ? _crear : _siguiente),
-                      child: _ocupado
-                          ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: p.sobreMarca))
-                          : Text(switch (_paso) {
-                              _Paso.resumen => 'Todo bien, seguir con mi perfil',
-                              _Paso.perfil => 'Crear mi liga',
-                              _ => 'Siguiente',
-                            }),
                     ),
-                  if (avanzadoActual) TextButton(onPressed: _siguiente, child: const Text('Lo veo después')),
-                ],
+                    const SizedBox(height: 20),
+                    if (_paso != _Paso.cuenta && _paso != _Paso.modo)
+                      FilledButton(
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                        onPressed: _ocupado ? null : (_paso == _Paso.perfil ? _crear : _siguiente),
+                        child: _ocupado
+                            ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: p.sobreMarca))
+                            : Text(switch (_paso) {
+                                _Paso.resumen => 'Todo bien, seguir con mi perfil',
+                                _Paso.perfil => 'Crear mi liga',
+                                _ => 'Siguiente',
+                              }),
+                      ),
+                    if (avanzadoActual) TextButton(onPressed: _siguiente, child: const Text('Lo veo después')),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1135,63 +1139,65 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
     ];
     final ultima = _i == tarjetas.length - 1;
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pag,
-                onPageChanged: (i) => setState(() => _i = i),
-                children: [
-                  for (final t in tarjetas)
-                    Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(t.$1, size: 72, color: p.marcaTexto),
-                          const SizedBox(height: 22),
-                          Text(
-                            t.$2,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: p.texto),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            t.$3,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16, height: 1.45, color: p.textoSecundario),
-                          ),
-                        ],
+      body: FondoDinamico(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView(
+                  controller: _pag,
+                  onPageChanged: (i) => setState(() => _i = i),
+                  children: [
+                    for (final t in tarjetas)
+                      Padding(
+                        padding: const EdgeInsets.all(28),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(t.$1, size: 72, color: p.marcaTexto),
+                            const SizedBox(height: 22),
+                            Text(
+                              t.$2,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: p.texto),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              t.$3,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 16, height: 1.45, color: p.textoSecundario),
+                            ),
+                          ],
+                        ),
                       ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < tarjetas.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.all(4),
+                      width: i == _i ? 22 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: i == _i ? p.marca : p.apagadoFondo, borderRadius: BorderRadius.circular(PivotRadios.chip)),
                     ),
                 ],
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 0; i < tarjetas.length; i++)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.all(4),
-                    width: i == _i ? 22 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(color: i == _i ? p.marca : p.apagadoFondo, borderRadius: BorderRadius.circular(PivotRadios.chip)),
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: FilledButton(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                onPressed: () => ultima
-                    ? Navigator.of(context).popUntil((r) => r.isFirst)
-                    : _pag.nextPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic),
-                child: Text(ultima ? 'Entrar a mi liga' : 'Siguiente'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  onPressed: () => ultima
+                      ? Navigator.of(context).popUntil((r) => r.isFirst)
+                      : _pag.nextPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic),
+                  child: Text(ultima ? 'Entrar a mi liga' : 'Siguiente'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

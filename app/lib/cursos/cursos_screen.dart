@@ -23,6 +23,7 @@ import '../reservas/reserva_screen.dart' show ReservaExitoScreen;
 import '../reservas/reservas_repo.dart';
 import '../sesion/sesion.dart';
 import '../eventos/anticipada.dart' show horaAmPm;
+import '../eventos/widgets_comunes.dart' show AvatarPersona;
 import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
@@ -93,9 +94,11 @@ class Curso {
   }
 }
 
-/// Qué es un curso, para guiar a quien lo arma (Victor, 2026-11-16).
+/// Qué es un curso, para guiar a quien lo arma (Victor, 2026-11-16). Para
+/// quien no puede crear cursos, qué significa para ellxs (Victor, 2026-11-18).
 class _QueEsUnCurso extends StatelessWidget {
-  const _QueEsUnCurso();
+  const _QueEsUnCurso({this.persona = false});
+  final bool persona;
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -124,15 +127,23 @@ class _QueEsUnCurso extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Un grupo de clases con inscripción, para quienes empiezan o para practicar algo más avanzado. Cada clase tiene sus temas y, al final, puede haber una evaluación.',
+            persona
+                ? 'Un grupo de clases para aprender o mejorar tus habilidades, con su propio precio. Algunos están abiertos a toda la liga y otros solo para ciertos equipos o personas.'
+                : 'Un grupo de clases con inscripción, para quienes empiezan o para practicar algo más avanzado. Cada clase tiene sus temas y, al final, puede haber una evaluación.',
             style: TextStyle(height: 1.35, color: p.sobreSuave),
           ),
-          paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
-          paso(
-            Icons.payments_outlined,
-            'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
-          ),
-          paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ese día evalúas a cada persona en los temas de las clases.'),
+          if (persona) ...[
+            paso(Icons.how_to_reg_outlined, 'Te inscribes aquí y, si tiene precio, pagas con los medios de la liga.'),
+            paso(Icons.event_outlined, 'Sus clases aparecen en tu calendario con su día, hora y lugar.'),
+            paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ves tu resultado aquí y las habilidades aprobadas quedan en tu ficha deportiva.'),
+          ] else ...[
+            paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
+            paso(
+              Icons.payments_outlined,
+              'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
+            ),
+            paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ese día evalúas a cada persona en los temas de las clases.'),
+          ],
         ],
       ),
     );
@@ -355,9 +366,11 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
                 children: [
+                  const _QueEsUnCurso(persona: true),
+                  const SizedBox(height: 14),
                   if (l.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 40),
+                      padding: const EdgeInsets.only(top: 24),
                       child: Text(
                         'No hay cursos abiertos por ahora.',
                         textAlign: TextAlign.center,
@@ -433,7 +446,7 @@ class _CursosScreenState extends State<CursosScreen> {
   List<String> _lugares = const [];
   List<Map<String, dynamic>> _habilidades = const [];
   List<Map<String, dynamic>> _plantillas = const [];
-  List<(String, String)> _personas = const [];
+  List<(String, String, String)> _personas = const [];
   String? _error;
   Sesion get s => widget.sesion;
 
@@ -446,7 +459,7 @@ class _CursosScreenState extends State<CursosScreen> {
     }, onError: (_) {});
     final eq = EquipoRepo.de(s);
     eq.cargar().then((_) {
-      if (mounted) setState(() => _personas = [for (final x in eq.personas ?? const []) (x.username, x.nombreMostrar)]);
+      if (mounted) setState(() => _personas = [for (final x in eq.personas ?? const []) (x.username, x.nombreMostrar, x.foto)]);
     }, onError: (_) {});
     s.api.restGet('venues?select=lugar&order=lugar.asc').then((f) {
       if (mounted) setState(() => _lugares = {for (final x in f) '${(x as Map)['lugar'] ?? ''}'}.where((x) => x.isNotEmpty).toList());
@@ -508,9 +521,13 @@ class _CursosScreenState extends State<CursosScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _barra('Cursos'),
-      floatingActionButton: l == null
-          ? null
-          : FloatingActionButton.extended(onPressed: _editar, icon: const Icon(Icons.add_rounded), label: const Text('Nuevo curso')),
+      // Solo con al menos un curso; si no hay, el botón está en la lista (Victor, 2026-11-18).
+      floatingActionButton: AnimatedScale(
+        scale: l != null && l.isNotEmpty ? 1 : 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        child: FloatingActionButton.extended(onPressed: _editar, icon: const Icon(Icons.add_rounded), label: const Text('Nuevo curso')),
+      ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: l == null
@@ -524,10 +541,33 @@ class _CursosScreenState extends State<CursosScreen> {
                   if (l.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        'Todavía no hay cursos. Toca "Nuevo curso" para armar el primero.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: p.textoSecundario),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Todavía no hay cursos.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Arma el primero: sus clases quedan en el calendario.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: p.textoSecundario),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                              ),
+                              onPressed: _editar,
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Crear un curso'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   for (final c in l)
@@ -740,7 +780,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
           ),
           // Para repetirlo (Victor, 2026-11-17).
           IconButton(
-            tooltip: 'Guardar como plantilla',
+            tooltip: 'Guardar en Pre-armados',
             icon: const Icon(Icons.bookmark_add_outlined),
             onPressed: () async {
               final ok = await widget.llamar({
@@ -758,7 +798,7 @@ class _DetalleCursoState extends State<_DetalleCurso> {
                 }),
               });
               if (ok && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plantilla guardada: aparece al crear un curso nuevo.')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardado en Pre-armados: aparece al crear un curso nuevo.')));
               }
             },
           ),

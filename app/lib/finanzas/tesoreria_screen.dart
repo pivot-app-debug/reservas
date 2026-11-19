@@ -553,10 +553,6 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     await _cargar();
   }
 
-  // Lo frecuente vive en la pantalla (Victor, 2026-11-14): el botón flotante
-  // solo crea cuentas.
-  void _mas() => _cuenta();
-
   /// Ingreso/Egreso y los dos registros rápidos, debajo de la tarjeta roja.
   Widget _acciones(BuildContext context) {
     final p = context.pivot;
@@ -717,7 +713,6 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
                 ),
               ),
       ),
-      floatingActionButton: r == null ? null : FloatingActionButton(tooltip: 'Nueva cuenta', onPressed: _mas, child: const Icon(Icons.add_rounded)),
     );
   }
 
@@ -748,25 +743,41 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   List<Widget> _contenido(BuildContext context, Map<String, dynamic> r, PivotPaleta p) {
     final mes = (r['mes'] as Map?) ?? const {};
     final saldos = (r['saldos'] as Map?) ?? const {};
-    final movs = [for (final m in (r['movimientos'] as List? ?? const [])) m as Map<String, dynamic>];
     return [
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total en cuentas', style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.85))),
-            Text(
-              plata((r['total'] as num?) ?? 0),
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: PivotPaleta.sobreSeccion),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Este mes: +${plata((mes['ingresos'] as num?) ?? 0)} · −${plata((mes['egresos'] as num?) ?? 0)}',
-              style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.9)),
-            ),
-          ],
+      // Los movimientos se abren desde aquí (Victor, 2026-11-18): ya no hay
+      // lista de últimos movimientos en la portada.
+      Resaltable(
+        id: 'movimientos',
+        resaltado: _resaltado,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total en cuentas', style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.85))),
+              Text(
+                plata((r['total'] as num?) ?? 0),
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: PivotPaleta.sobreSeccion),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Este mes: +${plata((mes['ingresos'] as num?) ?? 0)} · −${plata((mes['egresos'] as num?) ?? 0)}',
+                style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.9)),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => _abrir(MovimientosScreen(repo: repo, cuentas: _todas)),
+                icon: const Icon(Icons.list_alt_rounded, size: 18),
+                label: const Text('Ver movimientos'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: PivotPaleta.sobreSeccion,
+                  side: BorderSide(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.6)),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       const SizedBox(height: 12),
@@ -778,9 +789,11 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           scrollDirection: Axis.horizontal,
           // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
           clipBehavior: Clip.none,
-          itemCount: _cuentas.length,
+          itemCount: _cuentas.length + 1,
           separatorBuilder: (_, _) => const SizedBox(width: 10),
           itemBuilder: (_, i) {
+            // Agregar cuenta al final, como "Nuevo equipo" en Mi Liga (Victor, 2026-11-18).
+            if (i == _cuentas.length) return _tarjetaNuevaCuenta(context, p);
             final c = _cuentas[i];
             final conc = c['conciliacion'] as Map?;
             return Material(
@@ -882,18 +895,6 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           () => _abrir(CuotasMesScreen(repo: repo)),
         ),
       ),
-
-      Resaltable(
-        id: 'movimientos',
-        resaltado: _resaltado,
-        child: _fila(
-          context,
-          Icons.manage_search_rounded,
-          'Todos los movimientos',
-          'Filtrar y exportar',
-          () => _abrir(MovimientosScreen(repo: repo, cuentas: _todas)),
-        ),
-      ),
       if (_todas.any((c) => c['archivada'] == true))
         _fila(context, Icons.inventory_outlined, 'Cuentas archivadas', '${_todas.where((c) => c['archivada'] == true).length} con su historial', _archivadas),
       Padding(
@@ -911,27 +912,41 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           ),
         ),
       ),
-      const SizedBox(height: 10),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-        child: Text(
-          'ÚLTIMOS MOVIMIENTOS',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-        ),
-      ),
-      if (movs.isEmpty) Text('Todavía no hay movimientos.', style: TextStyle(color: p.textoSecundario)),
-      for (final m in movs)
-        FilaMovimiento(
-          m: m,
-          alTocar: () => detalleMovimiento(
-            context,
-            repo,
-            m,
-            alCorregir: () => _registrar('${m['tipo']}', corregir: m),
-            alCambiar: _cargar,
+    ];
+  }
+
+  /// Última tarjeta de CUENTAS: crear una cuenta nueva.
+  Widget _tarjetaNuevaCuenta(BuildContext context, PivotPaleta p) {
+    final (degradado, sobre) = PivotPaleta.seccion('cuota', Theme.of(context).brightness);
+    return Material(
+      color: p.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        onTap: () => _cuenta(),
+        child: Container(
+          width: 132,
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.contador)),
+                child: Icon(Icons.add_rounded, color: sobre),
+              ),
+              const Spacer(),
+              Text(
+                'Nueva cuenta',
+                style: TextStyle(fontWeight: FontWeight.w700, height: 1.2, color: p.texto),
+              ),
+              Text('Efectivo, billetera o banco', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+            ],
           ),
         ),
-    ];
+      ),
+    );
   }
 
   Widget _fila(BuildContext context, IconData i, String t, String s, VoidCallback f) {
@@ -1264,7 +1279,8 @@ Future<bool?> abrirFormularioMovimiento(
   );
 }
 
-/// Todos los movimientos con filtros y exportación a CSV (Excel lo abre).
+/// Movimientos (desde "Total en cuentas"): los últimos 10 y "Ver más", con
+/// filtros y exportación a CSV, que Excel abre (Victor, 2026-11-18).
 class MovimientosScreen extends StatefulWidget {
   const MovimientosScreen({super.key, required this.repo, required this.cuentas, this.cuentaId});
   final TesoreriaRepo repo;
@@ -1283,11 +1299,24 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
   List<Map<String, dynamic>>? _movs;
   Map<String, dynamic> _totales = const {};
 
+  /// Cuántos se ven; "Ver más" suma otros tantos. Vuelve a 10 al cambiar un filtro.
+  static const _porPagina = 10;
+  int _visibles = _porPagina;
+
+  bool get _hayFiltros => _rango != null || _cuenta != null || _tipo != null || _categoria != null || _persona != null || _anulados;
+
   @override
   void initState() {
     super.initState();
-    final h = Fechas.hoy();
-    _rango = DateTimeRange(start: DateTime(h.year, h.month, 1), end: h);
+    _cargar();
+  }
+
+  void _limpiar() {
+    setState(() {
+      _rango = null;
+      _cuenta = _tipo = _categoria = _persona = _personaNombre = null;
+      _anulados = false;
+    });
     _cargar();
   }
 
@@ -1302,7 +1331,10 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
   };
 
   Future<void> _cargar() async {
-    setState(() => _movs = null);
+    setState(() {
+      _movs = null;
+      _visibles = _porPagina;
+    });
     try {
       final r = await widget.repo.accion('movimientos', _filtros);
       if (!mounted) return;
@@ -1325,7 +1357,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile.fromData(bytes, mimeType: 'text/csv', name: 'tesoreria.csv')],
-          fileNameOverrides: ['tesoreria-${isoFecha(Fechas.hoy())}.csv'],
+          fileNameOverrides: ['movimientos-${isoFecha(Fechas.hoy())}.csv'],
           subject: 'Movimientos de Finanzas',
         ),
       );
@@ -1336,7 +1368,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
 
   String _textoRango() {
     final r = _rango;
-    if (r == null) return 'Todo';
+    if (r == null) return 'Todas las fechas';
     return '${Fechas.corta(r.start)} – ${Fechas.corta(r.end)}';
   }
 
@@ -1356,7 +1388,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final e in opciones.entries) ListTile(title: Text(e.key), onTap: () => Navigator.of(s).pop(e.value)),
-            ListTile(title: const Text('Todo'), onTap: () => Navigator.of(s).pop('todo')),
+            ListTile(title: const Text('Todas las fechas'), onTap: () => Navigator.of(s).pop('todo')),
             ListTile(title: const Text('Elegir fechas'), trailing: const Icon(Icons.date_range_rounded), onTap: () => Navigator.of(s).pop('elegir')),
             const SizedBox(height: 8),
           ],
@@ -1413,7 +1445,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Movimientos', style: TextStyle(fontWeight: FontWeight.w700)),
-        actions: [IconButton(tooltip: 'Exportar a CSV (Excel)', onPressed: _exportar, icon: const Icon(Icons.ios_share_rounded))],
+        actions: [IconButton(tooltip: 'Exportar a Excel (CSV)', onPressed: _exportar, icon: const Icon(Icons.file_download_outlined))],
       ),
       body: Column(
         children: [
@@ -1423,12 +1455,45 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+              // Orden (Victor, 2026-11-18): fechas, cuenta, persona, cuotas y el resto.
               children: [
                 ActionChip(avatar: const Icon(Icons.date_range_rounded, size: 18), label: Text(_textoRango()), onPressed: _elegirRango),
                 const SizedBox(width: 8),
                 ActionChip(
+                  avatar: const Icon(Icons.account_balance_wallet_outlined, size: 18),
                   label: Text(nombreCuenta ?? 'Todas las cuentas'),
                   onPressed: () => _elegir('Cuenta', {null: 'Todas', for (final c in widget.cuentas) c['id'] as String: '${c['nombre']}'}, (v) => _cuenta = v),
+                ),
+                const SizedBox(width: 8),
+                InputChip(
+                  avatar: const Icon(Icons.person_outline_rounded, size: 18),
+                  label: Text(_personaNombre ?? 'Cualquier persona'),
+                  onDeleted: _persona == null
+                      ? null
+                      : () {
+                          setState(() => (_persona = null, _personaNombre = null));
+                          _cargar();
+                        },
+                  onPressed: () async {
+                    final x = await elegirPersona(context, widget.repo.sesion);
+                    if (x == null) return;
+                    setState(() => (_persona = x.username, _personaNombre = x.nombreMostrar));
+                    _cargar();
+                  },
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('Solo cuotas'),
+                  selected: _categoria == 'cuota',
+                  onSelected: (v) {
+                    _categoria = v ? 'cuota' : null;
+                    _cargar();
+                  },
+                ),
+                const SizedBox(width: 8),
+                ActionChip(
+                  label: Text(_categoria == null ? 'Todas las categorías' : categoriasTesoreria[_categoria] ?? ''),
+                  onPressed: () => _elegir('Categoría', {null: 'Todas', ...categoriasTesoreria}, (v) => _categoria = v),
                 ),
                 const SizedBox(width: 8),
                 ActionChip(
@@ -1442,26 +1507,6 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                       _elegir('Tipo', {null: 'Todos', 'ingreso': 'Ingresos', 'egreso': 'Gastos', 'transferencia': 'Transferencias'}, (v) => _tipo = v),
                 ),
                 const SizedBox(width: 8),
-                ActionChip(
-                  label: Text(_categoria == null ? 'Todas las categorías' : categoriasTesoreria[_categoria] ?? ''),
-                  onPressed: () => _elegir('Categoría', {null: 'Todas', ...categoriasTesoreria}, (v) => _categoria = v),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
-                  label: Text(_personaNombre ?? 'Cualquier persona'),
-                  onPressed: () async {
-                    if (_persona != null) {
-                      setState(() => (_persona = null, _personaNombre = null));
-                      _cargar();
-                      return;
-                    }
-                    final x = await elegirPersona(context, widget.repo.sesion);
-                    if (x == null) return;
-                    setState(() => (_persona = x.username, _personaNombre = x.nombreMostrar));
-                    _cargar();
-                  },
-                ),
-                const SizedBox(width: 8),
                 FilterChip(
                   label: const Text('Ver anulados'),
                   selected: _anulados,
@@ -1470,6 +1515,10 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                     _cargar();
                   },
                 ),
+                if (_hayFiltros) ...[
+                  const SizedBox(width: 8),
+                  ActionChip(avatar: const Icon(Icons.filter_alt_off_outlined, size: 18), label: const Text('Quitar filtros'), onPressed: _limpiar),
+                ],
               ],
             ),
           ),
@@ -1499,9 +1548,9 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                       child: Text('Sin movimientos con estos filtros.', style: TextStyle(color: p.textoSecundario)),
                     )
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 40),
+                      padding: EdgeInsets.fromLTRB(12, 0, 12, 40 + MediaQuery.paddingOf(context).bottom),
                       children: [
-                        for (final m in movs)
+                        for (final m in movs.take(_visibles))
                           FilaMovimiento(
                             m: m,
                             alTocar: () => detalleMovimiento(
@@ -1521,6 +1570,22 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                               },
                             ),
                           ),
+                        if (movs.length > _visibles)
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: () => setState(() => _visibles += _porPagina),
+                              icon: const Icon(Icons.expand_more_rounded),
+                              label: Text('Ver más (${movs.length - _visibles})'),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: OutlinedButton.icon(
+                            onPressed: _exportar,
+                            icon: const Icon(Icons.file_download_outlined, size: 18),
+                            label: Text('Exportar a Excel (CSV) · ${movs.length} ${movs.length == 1 ? 'movimiento' : 'movimientos'}'),
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -1893,6 +1958,16 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
 
   static const _grupos = [('pagado', 'Pagaron'), ('en_revision', 'En revisión'), ('debe', 'Deben'), ('exenta', 'Exentas o con excepción')];
 
+  /// Un mes que todavía no empieza: se puede ver quién pagó por adelantado,
+  /// pero nadie aparece debiendo (Victor, 2026-11-18). Solo cambia lo que se muestra.
+  bool get _futuro {
+    final h = Fechas.hoy();
+    return _mes.year * 12 + _mes.month > h.year * 12 + h.month;
+  }
+
+  /// Por qué aparece en "Deben", con la regla que usa el servidor.
+  static const _porQueDebe = 'Está activx, paga cuota y no tiene pago, exención ni excepción registrada este mes.';
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -1948,14 +2023,56 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                       child: ListView(
                         padding: EdgeInsets.fromLTRB(16, 0, 16, 32 + MediaQuery.paddingOf(context).bottom),
                         children: [
-                          Text('Entró ${plata(r['total'] as num? ?? 0)} por cuotas de este mes.', style: TextStyle(color: p.textoSecundario)),
+                          if (_futuro) ...[
+                            Material(
+                              color: p.tarjeta,
+                              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.schedule_rounded, color: p.marcaTexto),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Este mes todavía no empieza',
+                                            style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Nadie debe todavía. Aquí verás quién pagó por adelantado.',
+                                            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          Text(
+                            _futuro
+                                ? 'Entró ${plata(r['total'] as num? ?? 0)} por adelantado para este mes.'
+                                : 'Entró ${plata(r['total'] as num? ?? 0)} por cuotas de este mes.',
+                            style: TextStyle(color: p.textoSecundario),
+                          ),
                           for (final (clave, titulo) in _grupos)
-                            if (gente.any((x) => x['estado'] == clave)) ...[
+                            if (!(_futuro && clave == 'debe') && gente.any((x) => x['estado'] == clave)) ...[
                               const SizedBox(height: 16),
                               Text(
                                 '$titulo (${gente.where((x) => x['estado'] == clave).length})',
                                 style: TextStyle(fontWeight: FontWeight.w800, color: clave == 'debe' ? p.marcaTexto : p.texto),
                               ),
+                              if (clave == 'debe')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(_porQueDebe, style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                                ),
                               const SizedBox(height: 6),
                               for (final x in gente.where((x) => x['estado'] == clave)) _persona(context, x),
                             ],
@@ -2004,7 +2121,8 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                           style: TextStyle(fontSize: 13, color: p.textoSecundario),
                         ),
                       ),
-                    if (pagos.isEmpty && x['estado'] == 'debe') Text('Aún no paga', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
+                    if (pagos.isEmpty && x['estado'] == 'debe') Text('Sin pago registrado este mes', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
+                    if (x['estado'] == 'exenta') Text('Exentx de cuota o con excepción este mes', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
                   ],
                 ),
               ),

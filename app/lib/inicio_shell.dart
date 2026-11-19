@@ -167,8 +167,28 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           // Punto rojo si hay novedades en Notificaciones (Victor, 2026-11-17).
           icon: ListenableBuilder(
             listenable: BandejaRepo.de(widget.sesion),
-            builder: (context, hijo) =>
-                Badge(isLabelVisible: BandejaRepo.de(widget.sesion).hayNovedades, smallSize: 9, backgroundColor: context.pivot.marca, child: hijo),
+            // El punto va centrado sobre la esquina redondeada del recuadro del
+            // día (el Badge de Material lo dejaba metido y descuadrado; QA 2026-11-18).
+            builder: (context, hijo) => Stack(
+              clipBehavior: Clip.none,
+              children: [
+                hijo!,
+                Positioned(
+                  right: -2.5,
+                  top: -2.5,
+                  child: AnimatedScale(
+                    scale: BandejaRepo.de(widget.sesion).hayNovedades ? 1 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutBack,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(color: context.pivot.marca, shape: BoxShape.circle),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             child: ValueListenableBuilder<int>(
               valueListenable: _irAHoy.lejos,
               builder: (context, lejos, _) => AnimatedSwitcher(

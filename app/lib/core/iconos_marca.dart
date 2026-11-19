@@ -13,4 +13,5 @@ abstract final class IconosMarca {
   static final IconData telegram = FontAwesomeIcons.telegram.data;
   static final IconData signal = FontAwesomeIcons.signalMessenger.data;
   static final IconData discord = FontAwesomeIcons.discord.data;
+  static final IconData google = FontAwesomeIcons.google.data;
 }

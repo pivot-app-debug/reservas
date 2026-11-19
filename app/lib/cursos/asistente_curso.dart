@@ -16,13 +16,13 @@ class _AsistenteCurso extends StatefulWidget {
     this.personas = const [],
   });
 
-  /// Gente de la liga, para cursos individuales: (username, nombre).
-  final List<(String, String)> personas;
+  /// Gente de la liga, para cursos individuales: (username, nombre, foto).
+  final List<(String, String, String)> personas;
   final Curso? curso;
   final List<String> equipos, lugares;
   final List<Map<String, dynamic>> habilidades;
 
-  /// Cursos prearmados (Freshmeat en roller derby y los que guarda la liga).
+  /// Pre-armados (Freshmeat en roller derby y los que guarda la liga).
   final List<Map<String, dynamic>> plantillas;
   @override
   State<_AsistenteCurso> createState() => _AsistenteCursoState();
@@ -52,7 +52,9 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   bool get _clinica => _tipo == 'clinica';
   late final _nombre = TextEditingController(text: o?.nombre ?? '');
   late final _descripcion = TextEditingController(text: o?.descripcion ?? '');
-  late final _precio = TextEditingController(text: o == null ? '' : '${o!.precio % 1 == 0 ? o!.precio.toInt() : o!.precio}');
+  late final _precio = TextEditingController(text: o == null || o!.precio == 0 ? '' : '${o!.precio % 1 == 0 ? o!.precio.toInt() : o!.precio}');
+  late bool _cobrar = (o?.precio ?? 0) > 0;
+  final _buscaPersona = TextEditingController();
   late bool _conCupo = o?.cupo != null;
   late int _cupo = o?.cupo ?? 20;
   late bool _cambiaEquipo = o?.cambiaEquipo ?? false;
@@ -77,10 +79,15 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     _nombre.dispose();
     _descripcion.dispose();
     _precio.dispose();
+    _buscaPersona.dispose();
     super.dispose();
   }
 
-  num? get _monto => _precio.text.trim().isEmpty ? 0 : num.tryParse(_precio.text.replaceAll(',', '.'));
+  /// Sin cobrar: gratis. Cobrando: el precio tiene que ser mayor a 0.
+  num? get _monto => !_cobrar ? 0 : num.tryParse(_precio.text.trim().replaceAll(',', '.'));
+
+  /// Curso solo para habilidades avanzadas: los temas son solo avanzados.
+  bool get _soloAvanzadas => _paraTipo == 'nivel' && _paraValores.length == 1 && _paraValores.first == 'avanzadas';
 
   List<_PasoCurso> get _pasos => [
     if (o == null && widget.plantillas.isNotEmpty) _PasoCurso.origen,
@@ -122,7 +129,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     _PasoCurso.clases => _abierto ? _dias.isNotEmpty : _clases.isNotEmpty,
     _PasoCurso.evaluacion => !_conEvaluacion || (!_evalAntes && _evalTemas.isNotEmpty),
     _PasoCurso.equipo => !_cambiaEquipo || _equipo != null,
-    _PasoCurso.precio => _monto != null,
+    _PasoCurso.precio => !_cobrar || (_monto ?? 0) > 0,
     _PasoCurso.resumen => true,
   };
 
@@ -222,7 +229,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => _HojaTemas(habilidades: widget.habilidades, ya: ya),
+    builder: (_) => _HojaTemas(habilidades: widget.habilidades, ya: ya, soloAvanzadas: _soloAvanzadas),
   );
 
   Future<void> _agregarTema(int i) async {
@@ -286,10 +293,17 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     children: [
       OpcionAsistente(
         icono: Icons.edit_note_rounded,
-        titulo: 'Desde cero',
-        texto: 'Armas las clases y los temas.',
+        titulo: 'Personalizado',
+        texto: 'Crea tus clases y los temas que quieras. Aparecerán en los eventos del calendario y podrás guardarlos como cursos pre-armados para usarlos cuando quieras.',
         activa: _dePlantilla == null && _nombre.text.isEmpty,
         alTocar: () => _usarPlantilla(null),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+        child: Text(
+          'PRE-ARMADOS',
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
+        ),
       ),
       for (final pl in widget.plantillas)
         OpcionAsistente(
@@ -307,8 +321,8 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     children: [
       OpcionAsistente(
         icono: Icons.school_outlined,
-        titulo: 'Curso',
-        texto: 'Varias clases con inscripción. Puede tener clínicas en medio y una evaluación final.',
+        titulo: 'Clases',
+        texto: 'Ideal para personas nuevas con habilidades básicas a pulir. Podrás agregar clínicas en medio del curso y sumar una evaluación al final.',
         activa: _tipo == 'curso' && !_abierto,
         alTocar: () {
           setState(() {
@@ -320,8 +334,8 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       ),
       OpcionAsistente(
         icono: Icons.all_inclusive_rounded,
-        titulo: 'Curso abierto',
-        texto: 'Se repite cada semana hasta que lo terminas. Sirve para pulir habilidades: evalúas cuando quieras.',
+        titulo: 'Clases que se repiten',
+        texto: 'Crea un curso con clases fijas que se repiten al llegar a la última clase. Útil para pulir habilidades avanzadas. Podrás evaluar cuando quieras y armar o editar tu currícula en el proceso.',
         activa: _tipo == 'curso' && _abierto,
         alTocar: () {
           setState(() {
@@ -333,8 +347,8 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       ),
       OpcionAsistente(
         icono: Icons.star_outline_rounded,
-        titulo: 'Clínica',
-        texto: 'Una sola sesión intensiva, por ejemplo con jugadorxs invitadxs de otra liga.',
+        titulo: 'Clínica o curso avanzado de un solo día',
+        texto: 'Crea una sesión intensiva.',
         activa: _tipo == 'clinica',
         alTocar: () {
           setState(() {
@@ -354,6 +368,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       TextField(
         controller: _nombre,
         autofocus: true,
+        maxLength: 40,
         onChanged: (_) => setState(() {}),
         textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(labelText: 'Nombre', hintText: _clinica ? 'Ej. Clínica intensiva de defensa' : 'Ej. Curso de iniciación de verano'),
@@ -361,11 +376,11 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       const SizedBox(height: 12),
       TextField(
         controller: _descripcion,
-        maxLines: 6,
+        maxLines: 4,
         minLines: 3,
-        maxLength: 1000,
+        maxLength: 140,
         textCapitalization: TextCapitalization.sentences,
-        decoration: const InputDecoration(labelText: 'Descripción', hintText: 'Qué se verá, quién la da, para quién es y qué se necesita'),
+        decoration: const InputDecoration(labelText: 'Descripción', hintText: 'Qué se verá y para quién es'),
       ),
     ],
   );
@@ -424,29 +439,19 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     });
   }
 
+  /// Al tocar una opción, su card se abre con lo que hay que elegir (Victor, 2026-11-18).
   Widget _pasoPara(BuildContext context) {
     const opciones = [
-      ('todos', Icons.groups_rounded, 'Toda la liga', 'Aparece para todxs en Cursos.'),
-      ('equipos', Icons.group_outlined, 'Ciertos equipos', 'Solo lo ven esos equipos.'),
-      ('nivel', Icons.stacked_bar_chart_rounded, 'Un nivel', 'Según sus habilidades en Coach.'),
-      (
-        'personas',
-        Icons.person_outline_rounded,
-        'Personas específicas',
-        'Un curso individual o para unas pocas personas, sin importar su equipo. Les llega la invitación.',
-      ),
+      ('todos', Icons.groups_rounded, 'Toda la liga', 'Disponible para toda la liga.'),
+      ('equipos', Icons.group_outlined, 'Ciertos equipos', 'Disponible para los equipos que decidas.'),
+      ('nivel', Icons.stacked_bar_chart_rounded, 'Por nivel', 'Según sus habilidades en Coach.'),
+      ('personas', Icons.person_outline_rounded, 'Para pocas personas', 'Un curso individual o para unas pocas personas, sin importar su equipo.'),
     ];
-    final valores = switch (_paraTipo) {
-      'equipos' => [for (final e in widget.equipos) (e, e)],
-      'nivel' => [('sin', 'Aprendiendo lo básico'), ('basicas', 'Habilidades básicas'), ('avanzadas', 'Habilidades avanzadas')],
-      'personas' => widget.personas,
-      _ => const <(String, String)>[],
-    };
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         for (final (k, i, t, d) in opciones)
-          OpcionAsistente(
+          _OpcionExpandible(
             icono: i,
             titulo: t,
             texto: d,
@@ -455,22 +460,94 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
               if (_paraTipo != k) _paraValores.clear();
               _paraTipo = k;
             }),
+            child: switch (k) {
+              'equipos' => _chipsPara([for (final e in widget.equipos) (e, e)]),
+              'nivel' => _chipsPara(const [('sin', 'Aprendiendo lo básico'), ('basicas', 'Habilidades básicas'), ('avanzadas', 'Habilidades avanzadas')]),
+              'personas' => _elegirPersonas(context),
+              _ => null,
+            },
           ),
-        if (valores.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+      ],
+    );
+  }
+
+  Widget _chipsPara(List<(String, String)> valores) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      for (final (v, t) in valores)
+        FilterChip(label: Text(t), selected: _paraValores.contains(v), onSelected: (s) => setState(() => s ? _paraValores.add(v) : _paraValores.remove(v))),
+    ],
+  );
+
+  /// Buscador con avatares: las elegidas quedan arriba.
+  Widget _elegirPersonas(BuildContext context) {
+    final p = context.pivot;
+    final q = _buscaPersona.text.trim().toLowerCase();
+    final elegidas = [
+      for (final x in widget.personas)
+        if (_paraValores.contains(x.$1)) x,
+    ];
+    final resto = [
+      for (final x in widget.personas)
+        if (!_paraValores.contains(x.$1) && (q.isEmpty || '${x.$1} ${x.$2}'.toLowerCase().contains(q))) x,
+    ];
+    Widget fila((String, String, String) x) {
+      final si = _paraValores.contains(x.$1);
+      return ListTile(
+        key: ValueKey(x.$1),
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: AvatarPersona(nombre: x.$2, foto: x.$3, tamano: 36),
+        title: Text(x.$2),
+        trailing: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Icon(si ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, key: ValueKey(si), color: si ? p.marcaTexto : p.textoSecundario),
+        ),
+        onTap: () => setState(() => si ? _paraValores.remove(x.$1) : _paraValores.add(x.$1)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          alignment: Alignment.topCenter,
+          child: elegidas.isEmpty
+              ? const SizedBox(width: double.infinity)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'ESTAS PERSONAS RECIBIRÁN EL CURSO',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                    ),
+                    for (final x in elegidas) fila(x),
+                    const Divider(),
+                  ],
+                ),
+        ),
+        TextField(
+          controller: _buscaPersona,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar persona'),
+        ),
+        const SizedBox(height: 4),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: ListView(
+            shrinkWrap: true,
             children: [
-              for (final (v, t) in valores)
-                FilterChip(
-                  label: Text(t),
-                  selected: _paraValores.contains(v),
-                  onSelected: (s) => setState(() => s ? _paraValores.add(v) : _paraValores.remove(v)),
+              for (final x in resto) fila(x),
+              if (resto.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(widget.personas.isEmpty ? 'Cargando personas…' : 'Nadie con ese nombre.', style: TextStyle(color: p.textoSecundario)),
                 ),
             ],
           ),
-        ],
+        ),
       ],
     );
   }
@@ -741,7 +818,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('${_evalTemas[i]['nombre']}', style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('Mínimo ${_evalTemas[i]['minimo']} de 10'),
+              subtitle: Text('Mínimo para aprobar la evaluación: ${_evalTemas[i]['minimo']} de 10'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -795,7 +872,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       OpcionAsistente(
         icono: Icons.do_not_disturb_on_outlined,
         titulo: 'No cambia de equipo',
-        texto: 'Las habilidades quedan en su ficha y su equipo sigue según los requisitos de la liga.',
+        texto: 'Las habilidades quedan en su ficha deportiva. Su estado en el equipo no cambia ni cambiará de equipo.',
         activa: !_cambiaEquipo,
         alTocar: () => setState(() => _cambiaEquipo = false),
       ),
@@ -819,18 +896,41 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     ],
   );
 
+  /// Cobrar y cupo con interruptores (Victor, 2026-11-18): encendidos piden el dato.
   Widget _pasoPrecio(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
-      TextField(
-        controller: _precio,
-        onChanged: (_) => setState(() {}),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-        decoration: InputDecoration(labelText: 'Precio', prefixText: '${Moneda.s} ', helperText: 'Vacío o 0: gratis'),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Cobrar el curso'),
+        subtitle: Text(_cobrar ? 'Se paga al inscribirse, con los medios de la liga.' : 'Gratis.'),
+        value: _cobrar,
+        onChanged: (v) => setState(() => _cobrar = v),
       ),
-      const SizedBox(height: 8),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Cupo limitado'), value: _conCupo, onChanged: (v) => setState(() => _conCupo = v)),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        alignment: Alignment.topCenter,
+        child: _cobrar
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextField(
+                  controller: _precio,
+                  autofocus: _precio.text.isEmpty,
+                  onChanged: (_) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  decoration: InputDecoration(labelText: 'Precio del curso', prefixText: '${Moneda.s} '),
+                ),
+              )
+            : const SizedBox(width: double.infinity),
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Cupo limitado'),
+        subtitle: Text(_conCupo ? 'Se cierra al llenarse.' : 'Sin límite de personas.'),
+        value: _conCupo,
+        onChanged: (v) => setState(() => _conCupo = v),
+      ),
       AnimatedSize(
         duration: const Duration(milliseconds: 220),
         alignment: Alignment.topCenter,
@@ -927,10 +1027,10 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       indice: i,
       total: l.length,
       tituloPaso: switch (_paso) {
-        _PasoCurso.origen => '¿Cómo empiezas?',
+        _PasoCurso.origen => 'Elige un tipo de curso',
         _PasoCurso.tipo => '¿Qué vas a armar?',
-        _PasoCurso.nombre => '¿Cómo se llama?',
-        _PasoCurso.para => '¿Para quién es?',
+        _PasoCurso.nombre => 'Nombre y descripción',
+        _PasoCurso.para => '¿A quién está dirigido?',
         _PasoCurso.clases => _clinica ? '¿Cuándo es?' : (_abierto ? '¿Cuándo se repite?' : 'Clases y temas'),
         _PasoCurso.evaluacion => 'Evaluación',
         _PasoCurso.equipo => 'Al aprobar',
@@ -938,6 +1038,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         _PasoCurso.resumen => 'Revisa y guarda',
       },
       ayuda: switch (_paso) {
+        _PasoCurso.tipo => 'Podrás editar la currícula cuando quieras, cobrar o no el curso y abrirlo a un equipo, a toda la liga o a personas específicas. Al crearlo queda guardado en tus cursos pre-armados para reutilizarlo o editarlo.',
         _PasoCurso.clases =>
           _abierto
               ? 'Aparece en el calendario cada semana hasta que termines el curso. Los temas (2 a 4 palabras) arman la evaluación.'
@@ -965,17 +1066,94 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   }
 }
 
+/// Opción del asistente que, activa, se abre con sus opciones dentro.
+class _OpcionExpandible extends StatelessWidget {
+  const _OpcionExpandible({required this.icono, required this.titulo, required this.texto, required this.activa, required this.alTocar, this.child});
+  final IconData icono;
+  final String titulo, texto;
+  final bool activa;
+  final VoidCallback alTocar;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: activa ? p.suave : p.tarjeta,
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          border: Border.all(color: activa ? p.marca : p.tarjeta, width: 1.5),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: alTocar,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      Icon(icono, size: 28, color: p.marcaTexto),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              titulo,
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(texto, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                          ],
+                        ),
+                      ),
+                      Icon(activa ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: activa ? p.marcaTexto : p.textoSecundario),
+                    ],
+                  ),
+                ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: activa && child != null
+                    ? Padding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 18), child: child)
+                    : const SizedBox(width: double.infinity),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Temas: de la lista de habilidades de la liga, o uno nuevo corto.
 class _HojaTemas extends StatefulWidget {
-  const _HojaTemas({required this.habilidades, required this.ya});
+  const _HojaTemas({required this.habilidades, required this.ya, this.soloAvanzadas = false});
   final List<Map<String, dynamic>> habilidades;
   final Set<String> ya;
+
+  /// Curso por nivel avanzado: solo habilidades avanzadas.
+  final bool soloAvanzadas;
   @override
   State<_HojaTemas> createState() => _HojaTemasState();
 }
 
 class _HojaTemasState extends State<_HojaTemas> {
   final _q = TextEditingController();
+
+  /// Filtro por nivel (Victor, 2026-11-18): null todas, 'basica' o 'avanzada'.
+  String? _nivel;
+
+  static String _nivelDe(Map h) => h['nivel'] == 'avanzada' ? 'avanzada' : 'basica';
 
   @override
   void dispose() {
@@ -987,12 +1165,32 @@ class _HojaTemasState extends State<_HojaTemas> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final q = _q.text.trim();
+    final nivel = widget.soloAvanzadas ? 'avanzada' : _nivel;
     final l = widget.habilidades
         .where(
           (h) =>
-              !widget.ya.contains('${h['nombre']}'.toLowerCase()) && (q.isEmpty || '${h['nombre']} ${h['categoria']}'.toLowerCase().contains(q.toLowerCase())),
+              !widget.ya.contains('${h['nombre']}'.toLowerCase()) &&
+              (nivel == null || _nivelDe(h) == nivel) &&
+              (q.isEmpty || '${h['nombre']} ${h['categoria']}'.toLowerCase().contains(q.toLowerCase())),
         )
         .toList();
+    Widget seccion(String t) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+      ),
+    );
+    Widget fila(Map<String, dynamic> h) =>
+        ListTile(dense: true, title: Text('${h['nombre']}'), subtitle: Text('${h['categoria']}'), onTap: () => Navigator.of(context).pop('${h['nombre']}'));
+    final basicas = [
+      for (final h in l)
+        if (_nivelDe(h) == 'basica') h,
+    ];
+    final avanzadas = [
+      for (final h in l)
+        if (_nivelDe(h) == 'avanzada') h,
+    ];
     final existe = widget.habilidades.any((h) => '${h['nombre']}'.toLowerCase() == q.toLowerCase());
     final palabras = q.split(RegExp(r'\s+')).where((x) => x.isNotEmpty).length;
     return SafeArea(
@@ -1014,6 +1212,22 @@ class _HojaTemasState extends State<_HojaTemas> {
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Busca o escribe un tema nuevo', counterText: ''),
                 ),
               ),
+              if (widget.soloAvanzadas)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Text('Curso para habilidades avanzadas: solo se muestran las avanzadas.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final (v, t) in const [(null, 'Todas'), ('basica', 'Básicas'), ('avanzada', 'Avanzadas')])
+                        ChoiceChip(label: Text(t), selected: _nivel == v, onSelected: (_) => setState(() => _nivel = v)),
+                    ],
+                  ),
+                ),
               if (q.isNotEmpty && !existe)
                 ListTile(
                   leading: Icon(Icons.add_circle_outline_rounded, color: p.marcaTexto),
@@ -1022,16 +1236,18 @@ class _HojaTemasState extends State<_HojaTemas> {
                   onTap: palabras > 5 ? null : () => Navigator.of(context).pop(q),
                 ),
               Expanded(
-                child: ListView(
-                  children: [
-                    for (final h in l)
-                      ListTile(
-                        dense: true,
-                        title: Text('${h['nombre']}'),
-                        subtitle: Text('${h['categoria']}'),
-                        onTap: () => Navigator.of(context).pop('${h['nombre']}'),
-                      ),
-                  ],
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: ListView(
+                    key: ValueKey(nivel),
+                    children: [
+                      if (nivel == null) ...[
+                        if (basicas.isNotEmpty) ...[seccion('HABILIDADES BÁSICAS'), for (final h in basicas) fila(h)],
+                        if (avanzadas.isNotEmpty) ...[seccion('HABILIDADES AVANZADAS'), for (final h in avanzadas) fila(h)],
+                      ] else
+                        for (final h in l) fila(h),
+                    ],
+                  ),
                 ),
               ),
             ],

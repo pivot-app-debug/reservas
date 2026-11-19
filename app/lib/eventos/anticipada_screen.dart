@@ -408,15 +408,13 @@ class _AnticipadaAsistenteState extends State<AnticipadaAsistente> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (d) => AlertDialog(
-          title: const Text('Esta regla se cruza con otra'),
+          title: const Text('Esta asistencia anticipada se cruza con otra'),
           content: Text(
             [
               for (final r in cruces) '• ${r.estado.valor}${r.resumenFiltros.isEmpty ? '' : ' (${r.resumenFiltros.toLowerCase()})'} · ${r.resumenRango}',
               '',
-              gana
-                  ? 'En los eventos donde coinciden manda esta nueva, por ser más específica o más reciente.'
-                  : 'En los eventos donde coinciden manda la otra, por ser de un tipo con más prioridad (período > meses > indefinido).',
-              'Tus respuestas a mano nunca se cambian.',
+              gana ? 'En los eventos donde se crucen, la nueva asistencia anticipada tiene prioridad sobre la anterior.' : 'En los eventos donde se crucen, la asistencia anticipada anterior tiene prioridad sobre la nueva, por ser de un tipo con más prioridad (período > meses > indefinido).',
+              'Tus respuestas manuales de asistencia nunca se ven afectadas por una asistencia anticipada.',
             ].join('\n'),
           ),
           actions: [

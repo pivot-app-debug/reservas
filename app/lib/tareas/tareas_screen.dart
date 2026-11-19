@@ -6,15 +6,18 @@ import '../core/sincroniza.dart';
 
 import '../ajustes/componentes.dart';
 import '../core/tema.dart';
-import '../eventos/widgets_comunes.dart';
+import '../eventos/widgets_comunes.dart' show TextoDeslizante;
 import 'crear_tarea_screen.dart';
 import 'recurrentes_screen.dart';
 import 'tareas_archivadas_screen.dart';
 import 'tarea_screen.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
+import 'tareas_widgets.dart';
 import '../core/vidrio.dart';
 import '../core/esqueleto.dart';
+
+export 'tareas_widgets.dart' show HeroOpcional, PillPuntos, PilaAvatares, IconosAreas;
 
 /// Pestaña Tareas (nativa, 2026-11-08). Mismo lenguaje que Ajustes: grupos
 /// en tarjeta, íconos con el degradado del área.
@@ -118,7 +121,7 @@ class _TareasScreenState extends State<TareasScreen> {
     final l = _archivadas.take(3).toList();
     void verTodas() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TareasArchivadasScreen(repo: repo)));
     Widget tarjeta({required Widget child, VoidCallback? alTocar}) => Container(
-      width: 220,
+      width: 230,
       margin: const EdgeInsets.only(right: 10),
       child: Material(
         color: p.tarjeta,
@@ -143,7 +146,7 @@ class _TareasScreenState extends State<TareasScreen> {
             ),
           ),
           SizedBox(
-            height: 104,
+            height: 124,
             child: ListView(
               scrollDirection: Axis.horizontal,
               clipBehavior: Clip.none,
@@ -151,21 +154,36 @@ class _TareasScreenState extends State<TareasScreen> {
                 for (final x in l)
                   tarjeta(
                     alTocar: verTodas,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${x['titulo']}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${x['puntos'] ?? 0} pts · ${(x['personas'] as List? ?? const []).length} personas',
-                          style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                        ),
-                      ],
+                    child: Builder(
+                      builder: (context) {
+                        final personas = [
+                          for (final y in (x['personas'] as List? ?? const []))
+                            if (y is Map) PersonaTarea(Map<String, dynamic>.from(y)),
+                        ];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                IconosAreas(areas: AreaTarea.separar('${x['area'] ?? ''}'), tamano: 22),
+                                const Spacer(),
+                                PillPuntos(puntos: (x['puntos'] as num?)?.toInt() ?? 0, completo: true),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextoDeslizante(
+                              texto: '${x['titulo']}',
+                              alineacion: TextAlign.start,
+                              estilo: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                            ),
+                            const Spacer(),
+                            if (personas.isEmpty)
+                              Text('Sin personas', style: TextStyle(fontSize: 13, color: p.textoSecundario))
+                            else
+                              PilaAvatares(personas: personas, tamano: 22),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 tarjeta(
@@ -192,8 +210,8 @@ class _TareasScreenState extends State<TareasScreen> {
 
   Widget _lista(BuildContext context) {
     final p = context.pivot;
-    final disponibles = repo.disponibles.where((x) => _area == null || x.area == _area).toList();
-    final areas = {for (final x in repo.disponibles) x.area}.toList()
+    final disponibles = repo.disponibles.where((x) => _area == null || x.areas.contains(_area)).toList();
+    final areas = {for (final x in repo.disponibles) ...x.areas}.toList()
       ..sort((a, b) => AreaTarea.lista.indexOf(AreaTarea.de(a)).compareTo(AreaTarea.lista.indexOf(AreaTarea.de(b))));
     final sugeridas = repo.sugeridas;
     return ListView(
@@ -346,11 +364,13 @@ class FilaTarea extends StatelessWidget {
       detalle = '${tarea.libres == 1 ? '1 cupo libre' : '${tarea.libres} cupos libres'} · ${textoVence(tarea.vence)}';
     }
     final personas = tarea.personas;
+    final areas = tarea.areas;
     return InkWell(
       onTap: alTocar,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             HeroOpcional(
               tag: hero ? 'tarea-${tarea.id}' : null,
@@ -366,11 +386,19 @@ class FilaTarea extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tarea.titulo,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: p.texto),
+                  Row(
+                    children: [
+                      // Títulos largos se deslizan en bucle (Victor, QA 2026-11-18).
+                      Expanded(
+                        child: TextoDeslizante(
+                          texto: tarea.titulo,
+                          alineacion: TextAlign.start,
+                          estilo: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: p.texto),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PillPuntos(puntos: tarea.puntos, completo: true),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -390,67 +418,22 @@ class FilaTarea extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (areas.length > 1 || personas.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          if (areas.length > 1) IconosAreas(areas: areas, tamano: 22),
+                          const Spacer(),
+                          if (personas.isNotEmpty) PilaAvatares(personas: personas),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
-            if (m == null && personas.isNotEmpty) ...[const SizedBox(width: 8), PilaAvatares(personas: personas)],
-            const SizedBox(width: 8),
-            PillPuntos(puntos: tarea.puntos),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class HeroOpcional extends StatelessWidget {
-  const HeroOpcional({super.key, required this.tag, required this.child});
-  final String? tag;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => tag == null ? child : Hero(tag: tag!, child: child);
-}
-
-class PillPuntos extends StatelessWidget {
-  const PillPuntos({super.key, required this.puntos});
-  final int puntos;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.boton)),
-      child: Text(
-        puntos == 0 ? 'Sin puntos' : '+$puntos',
-        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: p.sobreSuave),
-      ),
-    );
-  }
-}
-
-/// Hasta 3 avatares superpuestos de quienes tienen la tarea.
-class PilaAvatares extends StatelessWidget {
-  const PilaAvatares({super.key, required this.personas, this.tamano = 24});
-  final List<PersonaTarea> personas;
-  final double tamano;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final v = personas.take(3).toList();
-    return SizedBox(
-      width: tamano + (v.length - 1) * tamano * 0.6,
-      height: tamano,
-      child: Stack(
-        children: [
-          for (final (i, x) in v.indexed)
-            Positioned(
-              left: i * tamano * 0.6,
-              child: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: tamano, borde: p.tarjeta),
-            ),
-        ],
       ),
     );
   }

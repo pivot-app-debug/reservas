@@ -12,12 +12,14 @@ import 'equipo_modelos.dart';
 /// Datos de Equipo (getEquipo + favoritos), compartidos por la pestaña
 /// Equipo y por el detalle de un evento (tocar un avatar abre la ficha).
 class EquipoRepo extends ChangeNotifier {
-  EquipoRepo._(this.sesion);
+  EquipoRepo._(this.sesion) : _usuario = sesion.nombre;
   final Sesion sesion;
+  final String? _usuario;
 
   static EquipoRepo? _instancia;
   static EquipoRepo de(Sesion s) {
-    if (_instancia == null || !identical(_instancia!.sesion, s)) _instancia = EquipoRepo._(s);
+    // Otra persona en el mismo navegador: nada de lo de la anterior queda en memoria.
+    if (_instancia == null || !identical(_instancia!.sesion, s) || _instancia!._usuario != s.nombre) _instancia = EquipoRepo._(s);
     return _instancia!;
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -148,6 +149,7 @@ class Sesion extends ChangeNotifier {
   Future<void> conGoogle() async {
     final gs = GoogleSignIn.instance;
     await gs.initialize(serverClientId: ApiConfig.googleWebClientId);
+    _googleIniciado = true;
     final GoogleSignInAccount cuenta;
     try {
       cuenta = await gs.authenticate();
@@ -166,6 +168,7 @@ class Sesion extends ChangeNotifier {
     if (!_googleWebListo) {
       await gs.initialize(clientId: ApiConfig.googleWebClientId);
       _googleWebListo = true;
+      _googleIniciado = true;
     }
     return gs.authenticationEvents;
   }
@@ -197,6 +200,7 @@ class Sesion extends ChangeNotifier {
   Future<String> idTokenGoogle() async {
     final gs = GoogleSignIn.instance;
     await gs.initialize(serverClientId: ApiConfig.googleWebClientId);
+    _googleIniciado = true;
     try {
       final cuenta = await gs.authenticate();
       final t = cuenta.authentication.idToken;
@@ -288,11 +292,21 @@ class Sesion extends ChangeNotifier {
     await _guardar(res);
   }
 
+  /// Cierra la sesión. QA 2026-11-18 (web/PWA no deslogueaba): en la web
+  /// `GoogleSignIn.signOut()` espera a que Google se haya inicializado, y si la
+  /// sesión se restauró al abrir la app (sin pasar por el inicio) eso nunca
+  /// pasa: el `await` quedaba colgado para siempre y no se avisaba a la
+  /// pantalla. Además, en la web pedir el token de push puede no responder.
+  /// Ahora lo externo va con tiempo límite, lo local se limpia siempre y
+  /// Google solo se cierra si se usó, sin esperar.
   Future<void> cerrar({bool avisarBackend = true}) async {
+    final usuario = nombre;
     if (avisarBackend && api.token != null) {
-      await Push.desregistrar(api);
       try {
-        await api.get('cerrarSesion');
+        await Push.desregistrar(api).timeout(const Duration(seconds: 4));
+      } catch (_) {}
+      try {
+        await api.get('cerrarSesion').timeout(const Duration(seconds: 6));
       } catch (_) {}
     }
     api.token = null;
@@ -303,12 +317,20 @@ class Sesion extends ChangeNotifier {
     coachEquipos = const [];
     areasPivot = const [];
     datos = const {};
-    await _almacen.delete(key: 'sesion');
     try {
-      await GoogleSignIn.instance.signOut();
+      await _almacen.delete(key: 'sesion');
+      if (usuario != null) await _almacen.delete(key: 'coach.$usuario');
     } catch (_) {}
+    cargando = false;
     notifyListeners();
+    // Web: además apaga el ingreso automático de Google (disableAutoSelect).
+    if (_googleIniciado) {
+      unawaited(GoogleSignIn.instance.signOut().timeout(const Duration(seconds: 5)).catchError((Object _) {}));
+    }
   }
+
+  /// Si Google ya se inicializó en esta sesión de la app (ver [cerrar]).
+  static bool _googleIniciado = false;
 
   Future<void> _guardar(Map<String, dynamic> res) async {
     api.token = res['token'] as String;

@@ -18,10 +18,39 @@ class AreaTarea {
     AreaTarea('Entrenamientos', Icons.sports_outlined, 'entrenamientos'),
     AreaTarea('Mantenimiento', Icons.build_outlined, 'mantenimiento'),
     AreaTarea('Recaudación', Icons.savings_outlined, 'recaudacion'),
-    AreaTarea('Otro', Icons.task_alt_rounded, 'otro'),
+    // Nuevas áreas (Victor, QA 2026-11-18). Reusan degradados ya definidos en el tema.
+    AreaTarea('Finanzas', Icons.account_balance_wallet_outlined, 'cuota'),
+    AreaTarea('Torneos', Icons.emoji_events_outlined, 'privacidad'),
+    AreaTarea('Partidos', Icons.sports_score_outlined, 'reservas'),
+    AreaTarea('Eventos', Icons.celebration_outlined, 'notificaciones'),
+    AreaTarea('Viajes', Icons.luggage_outlined, 'logistica'),
+    AreaTarea('Clases', Icons.school_outlined, 'identidad'),
+    AreaTarea('Cursos', Icons.menu_book_outlined, 'mantenimiento'),
+    AreaTarea('Otro', Icons.more_horiz, 'otro'),
   ];
 
   static AreaTarea de(String nombre) => lista.firstWhere((a) => a.nombre == nombre, orElse: () => lista.last);
+
+  /// Una tarea puede tener varias áreas: se guardan en el mismo campo de
+  /// texto separadas por coma ("Logística, Eventos"), sin cambiar la base.
+  static List<String> separar(String texto) {
+    final l = [
+      for (final x in texto.split(','))
+        if (x.trim().isNotEmpty) x.trim(),
+    ];
+    return l.isEmpty ? const ['Otro'] : l;
+  }
+
+  /// Une las áreas en el orden de [lista] (las que no están en la lista, al final).
+  static String unir(Iterable<String> areas) {
+    int orden(String a) {
+      final i = lista.indexWhere((x) => x.nombre == a);
+      return i < 0 ? lista.length : i;
+    }
+
+    final l = areas.toSet().toList()..sort((a, b) => orden(a).compareTo(orden(b)));
+    return l.isEmpty ? 'Otro' : l.join(', ');
+  }
 }
 
 class PersonaTarea {
@@ -44,7 +73,8 @@ class Tarea {
   String get titulo => '${m['titulo'] ?? ''}';
   String get notas => '${m['notas'] ?? ''}'.trim();
   String get area => '${m['area'] ?? ''}'.trim().isEmpty ? 'Otro' : '${m['area']}';
-  AreaTarea get areaInfo => AreaTarea.de(area);
+  List<String> get areas => AreaTarea.separar(area);
+  AreaTarea get areaInfo => AreaTarea.de(areas.first);
   int get puntos => (m['puntos'] as num?)?.toInt() ?? 0;
   int get cupos => (m['cuposTotales'] as num?)?.toInt() ?? 1;
   int get libres => (m['cuposLibres'] as num?)?.toInt() ?? 0;
@@ -90,6 +120,7 @@ class Recurrente {
   String get titulo => '${m['titulo'] ?? ''}';
   String get notas => '${m['notas'] ?? ''}';
   String get area => '${m['area'] ?? ''}'.trim().isEmpty ? 'Otro' : '${m['area']}';
+  List<String> get areas => AreaTarea.separar(area);
   int get puntos => (m['puntos'] as num?)?.toInt() ?? 0;
   int get cupos => (m['cuposTotales'] as num?)?.toInt() ?? 1;
   bool get pausada => m['estado'] == 'pausada';
@@ -115,3 +146,16 @@ String textoVence(DateTime? v) {
 }
 
 String textoPuntos(int n) => n == 1 ? '1 punto' : '$n puntos';
+
+/// Estado de una persona en una tarea, para mostrarlo en listas.
+String textoEstadoPersona(String estado) => switch (estado) {
+  'aprobada' => 'Aprobada',
+  'pendiente_revision' => 'En revisión',
+  'iniciada' => 'En curso',
+  'rechazada' => 'Rechazada',
+  '' => '',
+  _ => '${estado[0].toUpperCase()}${estado.substring(1).replaceAll('_', ' ')}',
+};
+
+/// Límite del título de una tarea (Victor, QA 2026-11-18: 120 era mucho).
+const maxTituloTarea = 40;

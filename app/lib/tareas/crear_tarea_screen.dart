@@ -27,6 +27,15 @@ const _frecuencias = [
   ('mes', 12, 'Cada año'),
 ];
 
+/// Vencimientos rápidos de una recurrente: días desde que aparece (Victor, QA 2026-11-18).
+const _vencimientos = [(1, 'El día siguiente'), (3, '3 días después'), (7, '7 días después'), (15, '15 días después')];
+
+String textoVencimiento(int dias) {
+  if (dias == 1) return 'El día siguiente';
+  if (dias >= 7 && dias % 7 == 0) return dias == 7 ? '1 semana después' : '${dias ~/ 7} semanas después';
+  return '$dias días después';
+}
+
 String textoFrecuencia(String unidad, int n) => switch (unidad) {
   'dia' => n == 1 ? 'Cada día' : 'Cada $n días',
   'semana' => n == 1 ? 'Cada semana' : 'Cada $n semanas',
@@ -59,7 +68,8 @@ class CrearTareaScreen extends StatefulWidget {
 class _CrearTareaScreenState extends State<CrearTareaScreen> {
   late final _titulo = TextEditingController(text: widget.base?.titulo ?? '');
   late final _notas = TextEditingController(text: widget.base?.notas ?? '');
-  late String? _area = widget.base?.area;
+  // Una o varias áreas (Victor, QA 2026-11-18); se guardan unidas por coma.
+  late final Set<String> _areas = {if (widget.base != null) ...widget.base!.areas};
   late int _puntos = widget.base?.puntos ?? 1;
   late int _cupos = widget.base?.cupos ?? 1;
   late DateTime? _fecha = widget.modo == ModoTarea.editar ? widget.base?.vence : null;
@@ -73,7 +83,7 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
   String _unidad = 'mes';
   int _cadaN = 1;
   late DateTime _inicio = Fechas.hoy();
-  int? _venceEnDias; // null = el día antes de la siguiente
+  int _venceEnDias = 1; // días desde que aparece hasta que vence
 
   int _i = 0;
   bool _adelante = true;
@@ -111,8 +121,8 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
 
   bool get _puedeSeguir => switch (_paso) {
     _Paso.tipo => _recurrente != null,
-    _Paso.titulo => _titulo.text.trim().length >= 3,
-    _Paso.area => _area != null,
+    _Paso.titulo => _titulo.text.trim().length >= 3 && _titulo.text.trim().length <= maxTituloTarea,
+    _Paso.area => _areas.isNotEmpty,
     _Paso.fecha => _fecha != null,
     _ => true,
   };
@@ -127,7 +137,7 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
   Future<void> _guardar() async {
     setState(() => _ocupado = true);
     final repo = widget.repo;
-    final titulo = _titulo.text.trim(), notas = _notas.text.trim(), area = _area ?? 'Otro';
+    final titulo = _titulo.text.trim(), notas = _notas.text.trim(), area = AreaTarea.unir(_areas);
     final m = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
     try {
@@ -207,7 +217,7 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
   String get _tituloPaso => switch (_paso) {
     _Paso.tipo => '¿Se hace una vez o se repite?',
     _Paso.repeticion => '¿Cada cuánto se repite?',
-    _Paso.calendario => '¿Desde cuándo y con cuánto tiempo?',
+    _Paso.calendario => '¿Cuándo aparece y cuándo vence?',
     _Paso.titulo => '¿Qué hay que hacer?',
     _Paso.area => '¿De qué área es?',
     _Paso.puntos => 'Puntos y cupos',
@@ -217,9 +227,9 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
   };
 
   String? get _ayuda => switch (_paso) {
-    _Paso.tipo => 'Una recurrente se crea sola cada cierto tiempo (cada semana, cada mes, cada 6 meses…). Puedes pausarla o terminarla cuando quieras.',
     _Paso.repeticion => 'Cada vez que toca, la tarea aparece sola en el tablero.',
-    _Paso.calendario => 'El día en que aparece por primera vez y cuánto tiempo hay para hacerla cada vez.',
+    _Paso.calendario => 'El día en que aparece por primera vez y cuándo vence cada vez.',
+    _Paso.area => 'Puedes elegir una o varias.',
     _Paso.titulo => widget.modo == ModoTarea.proponer ? 'Queda asignada a ti. Los puntos los define admin al aprobarla.' : null,
     _Paso.puntos => 'Los puntos se suman al aprobarla. Los cupos son cuántas personas pueden tomarla.',
     _Paso.fecha => widget.siguientes ? 'La fecha cambia solo en la de este mes.' : null,
@@ -261,7 +271,7 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
           TextField(
             controller: _titulo,
             autofocus: true,
-            maxLength: 120,
+            maxLength: maxTituloTarea,
             textCapitalization: TextCapitalization.sentences,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'Título', hintText: 'Ej. Llevar el botiquín al partido'),
@@ -285,11 +295,8 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
               padding: const EdgeInsets.only(bottom: 10),
               child: _OpcionArea(
                 area: a,
-                activa: _area == a.nombre,
-                alTocar: () {
-                  setState(() => _area = a.nombre);
-                  _ir(1);
-                },
+                activa: _areas.contains(a.nombre),
+                alTocar: () => setState(() => _areas.contains(a.nombre) ? _areas.remove(a.nombre) : _areas.add(a.nombre)),
               ),
             ),
         ],
@@ -340,7 +347,12 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
               FilaAjuste(icono: Icons.title_rounded, titulo: 'Título', valor: _titulo.text.trim(), alTocar: () => _saltar(_Paso.titulo)),
               if (_notas.text.trim().isNotEmpty)
                 FilaAjuste(icono: Icons.notes_rounded, titulo: 'Detalles', valor: _notas.text.trim(), alTocar: () => _saltar(_Paso.titulo)),
-              FilaAjuste(icono: AreaTarea.de(_area ?? 'Otro').icono, titulo: 'Área', valor: _area ?? '', alTocar: () => _saltar(_Paso.area)),
+              FilaAjuste(
+                icono: AreaTarea.de(AreaTarea.separar(AreaTarea.unir(_areas)).first).icono,
+                titulo: _areas.length > 1 ? 'Áreas' : 'Área',
+                valor: AreaTarea.unir(_areas),
+                alTocar: () => _saltar(_Paso.area),
+              ),
               if (_pasos.contains(_Paso.tipo))
                 FilaAjuste(
                   icono: Icons.repeat_rounded,
@@ -442,7 +454,8 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
       'semana' => _inicio.add(Duration(days: 7 * _cadaN)),
       _ => DateTime(_inicio.year, _inicio.month + _cadaN, _inicio.day),
     };
-    final vence = _venceEnDias == null ? siguiente.subtract(const Duration(days: 1)) : _inicio.add(Duration(days: _venceEnDias!));
+    final vence = _inicio.add(Duration(days: _venceEnDias));
+    final rapido = _vencimientos.any((v) => v.$1 == _venceEnDias);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       children: [
@@ -465,29 +478,90 @@ class _CrearTareaScreenState extends State<CrearTareaScreen> {
           },
         ),
         const SizedBox(height: 12),
-        titulo('Tiempo para hacerla cada vez'),
+        titulo('Vencimiento'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
+            for (final (d, t) in _vencimientos)
+              ChoiceChip(showCheckmark: false, label: Text(t), selected: _venceEnDias == d, onSelected: (_) => setState(() => _venceEnDias = d)),
             ChoiceChip(
               showCheckmark: false,
-              label: const Text('Hasta la siguiente'),
-              selected: _venceEnDias == null,
-              onSelected: (_) => setState(() => _venceEnDias = null),
+              label: Text(rapido ? 'Otro' : textoVencimiento(_venceEnDias)),
+              selected: !rapido,
+              onSelected: (_) => _otroVencimiento(),
             ),
-            for (final d in const [3, 7, 15])
-              ChoiceChip(showCheckmark: false, label: Text('$d días'), selected: _venceEnDias == d, onSelected: (_) => setState(() => _venceEnDias = d)),
           ],
         ),
         const SizedBox(height: 16),
         Text(
-          'La primera vez aparece el ${Fechas.corta(_inicio)} y vence el ${Fechas.corta(vence)}. La siguiente aparece el ${Fechas.corta(siguiente)}.',
+          'La primera vez aparece el ${Fechas.corta(_inicio)} y vence el ${Fechas.corta(vence)}. La siguiente aparece el ${Fechas.corta(siguiente)}.'
+          '${vence.isBefore(siguiente) ? '' : ' Ojo: vence después de que aparezca la siguiente.'}',
           style: TextStyle(fontSize: 13.5, color: p.textoSecundario),
         ),
       ],
     );
+  }
+
+  /// "Otro" vencimiento: un número de días o semanas a elección.
+  Future<void> _otroVencimiento() async {
+    var semanas = _venceEnDias >= 7 && _venceEnDias % 7 == 0;
+    var n = semanas ? _venceEnDias ~/ 7 : _venceEnDias;
+    final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
+      context: context,
+      showDragHandle: true,
+      builder: (hoja) => StatefulBuilder(
+        builder: (hoja, refrescar) {
+          final maximo = semanas ? 52 : 365;
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Vence después de…', style: Theme.of(hoja).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton.filledTonal(onPressed: n > 1 ? () => refrescar(() => n--) : null, icon: const Icon(Icons.remove_rounded)),
+                      SizedBox(
+                        width: 64,
+                        child: Text(
+                          '$n',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(hoja).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      IconButton.filledTonal(onPressed: n < maximo ? () => refrescar(() => n++) : null, icon: const Icon(Icons.add_rounded)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('Días')),
+                      ButtonSegment(value: true, label: Text('Semanas')),
+                    ],
+                    selected: {semanas},
+                    onSelectionChanged: (s) => refrescar(() {
+                      semanas = s.first;
+                      n = n.clamp(1, semanas ? 52 : 365);
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(onPressed: () => Navigator.of(hoja).pop(true), child: Text(textoVencimiento(semanas ? n * 7 : n))),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (ok == true && mounted) setState(() => _venceEnDias = semanas ? n * 7 : n);
   }
 
   Future<void> _otraFrecuencia() async {
@@ -589,7 +663,18 @@ class _OpcionArea extends StatelessWidget {
                     style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: p.texto),
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (c, a) => FadeTransition(
+                    opacity: a,
+                    child: ScaleTransition(scale: a, child: c),
+                  ),
+                  child: Icon(
+                    activa ? Icons.check_circle_rounded : Icons.circle_outlined,
+                    key: ValueKey(activa),
+                    color: activa ? p.marcaTexto : p.textoSecundario,
+                  ),
+                ),
               ],
             ),
           ),

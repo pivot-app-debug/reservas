@@ -508,7 +508,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
     if (res.isEmpty) {
       return ListView(
         key: const ValueKey('sin-resultados'),
-        padding: const EdgeInsets.all(32),
+        // La barra de vidrio está encima del cuerpo: el texto empieza debajo de ella (QA 2026-11-18).
+        padding: EdgeInsets.fromLTRB(32, 32 + MediaQuery.paddingOf(context).top, 32, 32),
         children: [
           Icon(Icons.search_off_rounded, size: 40, color: p.textoSecundario),
           const SizedBox(height: 12),
@@ -529,13 +530,48 @@ class _EquipoScreenState extends State<EquipoScreen> {
     return _envolverScroll(
       ListView.builder(
         key: const ValueKey('resultados'),
-        padding: const EdgeInsets.only(top: 4, bottom: 32),
+        padding: EdgeInsets.only(top: 4 + MediaQuery.paddingOf(context).top, bottom: 32),
         itemCount: res.length + 1,
         itemBuilder: (context, i) {
           if (i == 0) {
+            final resumen = BuscadorEquipo.resumen(_busqueda.text, res, hoy: hoy);
+            if (resumen == null) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+                child: Text('${res.length} ${res.length == 1 ? 'persona' : 'personas'}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+              );
+            }
+            // Búsqueda por rol o por mes: la frase y los avatares de quienes coinciden.
+            final visibles = res.take(5).toList();
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
-              child: Text('${res.length} ${res.length == 1 ? 'persona' : 'personas'}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    resumen,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final (j, r) in visibles.indexed)
+                        Transform.translate(
+                          offset: Offset(-8.0 * j, 0),
+                          child: AvatarPersona(nombre: r.persona.nombreMostrar, foto: r.persona.foto, tamano: 30, borde: p.fondo),
+                        ),
+                      if (res.length > visibles.length)
+                        Transform.translate(
+                          offset: Offset(-8.0 * visibles.length + 4, 0),
+                          child: Text(
+                            '+${res.length - visibles.length}',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.textoSecundario),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             );
           }
           final r = res[i - 1];

@@ -90,11 +90,13 @@ class EnlaceComunidad {
 /// Redes y grupos de la liga (Victor, 2026-11-08; etapa 3). Toda persona
 /// con sesión los ve; Pivots los editan.
 class ComunidadRepo extends ChangeNotifier {
-  ComunidadRepo._(this.sesion);
+  ComunidadRepo._(this.sesion) : _usuario = sesion.nombre;
   final Sesion sesion;
+  final String? _usuario;
   static ComunidadRepo? _instancia;
   static ComunidadRepo de(Sesion s) {
-    if (_instancia == null || !identical(_instancia!.sesion, s)) _instancia = ComunidadRepo._(s);
+    // Otra persona en el mismo navegador: nada de lo de la anterior queda en memoria.
+    if (_instancia == null || !identical(_instancia!.sesion, s) || _instancia!._usuario != s.nombre) _instancia = ComunidadRepo._(s);
     return _instancia!;
   }
 

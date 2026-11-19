@@ -7,6 +7,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../liga/crear_liga_screen.dart';
 import '../core/api.dart';
 import 'boton_google.dart';
+import '../core/fondo_dinamico.dart';
+import '../core/iconos_marca.dart';
 import '../core/tema.dart';
 import 'sesion.dart';
 
@@ -100,49 +102,45 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: ClipRRect(borderRadius: BorderRadius.circular(PivotRadios.grande), child: Image.asset('assets/logo.png', width: 88, height: 88)),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Bienvenidx a Pivot',
-                    textAlign: TextAlign.center,
-                    style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Entrena, confirma tu asistencia y sigue al equipo.',
-                    textAlign: TextAlign.center,
-                    style: t.bodyMedium?.copyWith(color: context.pivot.textoSecundario),
-                  ),
-                  const SizedBox(height: 32),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: _modoCorreo.isNotEmpty ? _formCorreo() : (_modoPin ? _formPin(t) : _botonesInicio()),
-                  ),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
-                    child: _error == null
-                        ? const SizedBox.shrink()
-                        : Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: t.bodyMedium?.copyWith(color: context.pivot.marcaTexto),
+      body: FondoDinamico(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: ClipRRect(borderRadius: BorderRadius.circular(PivotRadios.grande), child: Image.asset('assets/logo.png', width: 88, height: 88)),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Inicia sesión o crea una cuenta',
+                      textAlign: TextAlign.center,
+                      style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 32),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _modoCorreo.isNotEmpty ? _formCorreo() : (_modoPin ? _formPin(t) : _botonesInicio()),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      child: _error == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: t.bodyMedium?.copyWith(color: context.pivot.marcaTexto),
+                              ),
                             ),
-                          ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -151,38 +149,40 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Inicio (QA 2026-11-18): todos los botones del mismo ancho, en orden:
+  /// Google, correo o usuario y, al final, crear la liga.
   Widget _botonesInicio() {
     return Column(
       key: const ValueKey('inicio'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (kIsWeb)
-          // Web: el botón oficial de Google (no se puede abrir desde uno propio).
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _googleWebListo && !_ocupado
-                ? Center(child: botonGoogleWeb())
-                : const SizedBox(height: 52, child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
+          // Web: el botón oficial de Google (no se puede abrir desde uno
+          // propio), con el mismo ancho que los demás.
+          LayoutBuilder(
+            builder: (context, c) => AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _googleWebListo && !_ocupado
+                  ? Center(child: botonGoogleWeb(ancho: c.maxWidth))
+                  : const SizedBox(height: 52, child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
+            ),
           )
         else
-          FilledButton(
+          FilledButton.icon(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
             onPressed: _ocupado ? null : () => _ejecutar(widget.sesion.conGoogle),
-            child: _ocupado
+            icon: _ocupado ? null : Icon(IconosMarca.google, size: 18),
+            label: _ocupado
                 ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: context.pivot.sobreMarca))
-                : const Text('Entrar con Google'),
+                : const Text('Continuar con Google'),
           ),
         const SizedBox(height: 12),
-        if (_correoActivo) ...[
-          const SizedBox(height: 4),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            onPressed: _ocupado ? null : () => setState(() => _modoCorreo = 'correo'),
-            child: const Text('Entrar o crear cuenta con correo'),
-          ),
-        ],
-        TextButton(onPressed: _ocupado ? null : () => setState(() => _modoPin = true), child: const Text('Entrar con usuario y contraseña')),
-        const SizedBox(height: 18),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: _ocupado ? null : () => setState(() => _modoPin = true),
+          child: const Text('Iniciar sesión con correo o nombre de usuario', textAlign: TextAlign.center),
+        ),
+        const SizedBox(height: 28),
         // Crear una liga (Victor, 2026-11-17).
         Text(
           '¿Tu liga todavía no está en Pivot?',
@@ -328,6 +328,19 @@ class _LoginScreenState extends State<LoginScreen> {
               ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: context.pivot.sobreMarca))
               : const Text('Entrar'),
         ),
+        // Código por correo (solo si el servidor lo activa): vive aquí para que
+        // el inicio tenga dos botones parejos (QA 2026-11-18).
+        if (_correoActivo)
+          TextButton(
+            onPressed: _ocupado
+                ? null
+                : () => setState(() {
+                    _modoPin = false;
+                    _modoCorreo = 'correo';
+                    _error = null;
+                  }),
+            child: const Text('Entrar o crear cuenta con un código por correo', textAlign: TextAlign.center),
+          ),
         TextButton(onPressed: _ocupado ? null : () => setState(() => _modoPin = false), child: const Text('Volver')),
       ],
     );

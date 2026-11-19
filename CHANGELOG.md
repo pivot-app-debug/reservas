@@ -2,6 +2,19 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-19 (QA por sección, ronda chica)
+- **QA en Google Doc:** "Pivot — QA por sección" en el Drive de Victor, con una sección por parte de la app y la pestaña "Bugs y Nuevas funciones".
+- **Calendario:** el punto rojo queda justo en la esquina del recuadro del día.
+- **Notificaciones:** "Sin comprobante · N avisos enviados" y "Pedir comprobante" en la fila de Rechazar/Aprobar; en Del equipo cada aviso tiene una X para descartarlo.
+- **Tareas:** avatares (3 + "+N"), pill "N puntos", íconos de áreas, título que se desliza si no cabe (máx. 40 caracteres), áreas nuevas y varias áreas por tarea, "Otro" con ⋯. Recurrentes: "¿Cuándo aparece y cuándo vence?", "Vencimiento" (el día siguiente, 3, 7, 15 días u otro), textos del menú y círculo rojo de pausa. Archivadas con buscador y filtros por área y fecha.
+- **Cursos:** "Elige un tipo de curso" (Personalizado y Pre-armados), "Clases", "Clases que se repiten", "Clínica o curso avanzado de un solo día", "Nombre y descripción" (40/140), "¿A quién está dirigido?" con cards que se abren y buscador de personas, temas por básicas y avanzadas, interruptores de precio y cupo, botón "Crear un curso" cuando no hay ninguno y texto para quien no crea cursos.
+- **Plan del evento y asistencia anticipada:** textos nuevos.
+- **Equipo:** el buscador ya no tapa el resultado; busca por rol ("6 jammers encontradxs") y por mes de cumpleaños.
+- **Inventario:** atajos "Retenido" y "Reglas" con subtítulo.
+- **Finanzas:** "Ver movimientos" en la card del total (10 por página, filtros, exportar a Excel en CSV); "Nueva cuenta" al deslizar las cuentas, sin botón flotante; en meses futuros nadie aparece debiendo.
+- **Cerrar sesión en web y PWA arreglado** (Google no inicializado dejaba colgado el cierre).
+- **Login:** "Inicia sesión o crea una cuenta", botones del mismo ancho y fondo rojo suave en movimiento, también al crear la liga.
+
 ## 2026-11-18 (notificaciones casi obligatorias)
 - **Al abrir la app con las notificaciones apagadas** (web y Android) aparece una pantalla completa "Activa las notificaciones" con "Activar" y "Ahora no". Si ya están bloqueadas, en Android abre los ajustes de notificaciones de Pivot; en web explica cómo permitirlas en el navegador; en iPhone explica que hay que agregar Pivot a la pantalla de inicio. Sale en cada apertura mientras sigan apagadas, después del recorrido de primera vez.
 - **Aviso fijo en Calendario** ("Tus notificaciones están apagadas · Activar") y el mismo en Ajustes (reemplaza la tarjeta que solo salía en web). Se va solo al activarlas, también si se activan desde los ajustes del teléfono.
