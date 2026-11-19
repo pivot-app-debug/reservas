@@ -15,6 +15,9 @@ import '../ajustes/componentes.dart';
 import 'buscador_equipo.dart';
 import 'comunidad_screen.dart';
 import 'inventario_screen.dart';
+import 'habilidades_screen.dart';
+import '../ajustes/herramientas_liga.dart';
+import '../core/config_liga.dart';
 import 'emergencia_screen.dart';
 import 'equipo_modelos.dart';
 import 'equipo_repo.dart';
@@ -333,7 +336,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       );
     }
 
-    return Padding(
+    final fila = Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         children: [
@@ -354,6 +357,37 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ),
         ],
       ),
+    );
+    // Habilidades (Victor, 2026-11-19): salieron de Coach; solo para coaches
+    // de una liga que usa Coach.
+    return Column(
+      children: [
+        fila,
+        ListenableBuilder(
+          listenable: Listenable.merge([repo.sesion, ConfigLiga.de(repo.sesion)]),
+          builder: (context, _) => AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: !FuncionesLiga.usaCoach(repo.sesion)
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                    child: Row(
+                      children: [
+                        acceso(
+                          Icons.checklist_rounded,
+                          'entrenamientos',
+                          'Habilidades',
+                          'Marcar habilidades, comentar y la lista de habilidades',
+                          () => SubAjustes.abrir(context, HabilidadesEquipoScreen(sesion: repo.sesion)),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+      ],
     );
   }
 

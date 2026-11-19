@@ -22,7 +22,7 @@ import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
 import 'recorte_foto.dart';
 import '../push/avisos_obligatorios.dart';
-import '../pivots/ajustes_liga_screen.dart';
+import 'herramientas_liga.dart';
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
 /// ajustes de la app, de seguridad y de emergencia; lo que ve el resto del
@@ -82,19 +82,9 @@ class _AjustesScreenState extends State<AjustesScreen> {
 
               BannerAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
-              // Mi Liga dentro de Ajustes, solo para Pivots (Victor, 2026-11-16).
-              if (sesion.esAdmin && sesion.adminToken != null)
-                GrupoAjustes(
-                  filas: [
-                    FilaAjuste(
-                      icono: Icons.stadium_rounded,
-                      seccion: 'liga',
-                      titulo: 'Mi Liga',
-                      valor: 'Equipos, reglas, Pivots y comunicación',
-                      alTocar: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: sesion, pestana: true)),
-                    ),
-                  ],
-                ),
+              // Herramientas de la liga (Victor, 2026-11-19): Mi Liga, Finanzas y
+              // Coach, cada una solo para quien le corresponde.
+              GrupoHerramientasLiga(sesion: sesion, eventos: eventos),
 
               GrupoAjustes(
                 filas: [

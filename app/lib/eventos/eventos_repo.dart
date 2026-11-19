@@ -659,6 +659,7 @@ class EventosRepo extends ChangeNotifier {
     required DateTime hasta,
     bool congela = false,
     bool sinCuota = false,
+    String? cuota,
   }) async {
     final res = await _api.post('adminGuardarTemporadaDescanso', {
       'adminToken': _adminToken,
@@ -668,6 +669,7 @@ class EventosRepo extends ChangeNotifier {
       'hasta': Fechas.iso(hasta),
       'congela': congela,
       'sinCuota': sinCuota,
+      'cuota': ?cuota,
     });
     if (res['exito'] != true) throw ApiException((res['error'] ?? 'No se pudo guardar la temporada.').toString());
     await cargar(forzar: true);
@@ -702,6 +704,13 @@ class EventosRepo extends ChangeNotifier {
     final filas = await _api.restGet('venues?select=*&order=lugar.asc');
     return filas.whereType<Map<String, dynamic>>().where((f) => (f['lugar'] ?? '').toString().trim().isNotEmpty).toList();
   }
+
+  /// Venue del último evento creado (el id del evento es `EV-<venue>-<AAAAMMDD>`):
+  /// lo usa el evento Social para abrir su configuración al crearlo.
+  String? ultimoVenueId;
+
+  /// Id de evento de una fecha de ese venue (mismo formato que regenerar_ventana_asistencias).
+  static String idEventoDe(String venueId, DateTime fecha) => 'EV-$venueId-${Fechas.iso(fecha).replaceAll('-', '')}';
 
   /// Crea un evento (único o recurrente). Mismo mecanismo que la web
   /// (`_evCrearGuardar()`): una fila NUEVA en `venues` con la identidad del
@@ -744,8 +753,10 @@ class EventosRepo extends ChangeNotifier {
     // dejarla huérfana (mismo criterio que la web, `esVenuePlaceholderRecienCreado`).
     if (venue['tipo'] == null && venue['id'] != null) {
       await _api.restPatch('venues?id=eq.${Uri.encodeComponent(venue['id'].toString())}', fila);
+      ultimoVenueId = venue['id'].toString();
     } else {
-      await _api.restPost('venues', fila);
+      final creada = await _api.restPostDevolver('venues', fila);
+      ultimoVenueId = creada['id']?.toString();
     }
     try {
       await _api.get('adminRegenerarVentanaAsistencias', {'adminToken': token});

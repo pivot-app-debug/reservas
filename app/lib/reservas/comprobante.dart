@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api.dart';
+import '../core/fechas.dart';
+import '../core/tema.dart';
 import 'reservas_repo.dart';
 
 /// Elige la captura del pago y la sube a esas reservas (Victor, 2026-11-14).
@@ -37,5 +39,48 @@ Future<bool> subirComprobante(BuildContext context, ReservasRepo repo, List<Stri
         await File(x.path).delete();
       } catch (_) {}
     }
+  }
+}
+
+/// Reserva o suscripción pendiente sin comprobante (Victor, 2026-11-19): si un
+/// Pivot lo pidió, muestra "Esperando comprobante" con el plazo de 24 h; en
+/// cualquier caso, el botón para adjuntarlo desde la pantalla de pagos.
+class ComprobanteFaltante extends StatelessWidget {
+  const ComprobanteFaltante({super.key, required this.r, required this.repo, required this.alSubir});
+  final ReservaActiva r;
+  final ReservasRepo repo;
+  final VoidCallback alSubir;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final fin = r.comprobanteLimite;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: !r.faltaComprobante || r.id.isEmpty
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (fin != null)
+                    Text(
+                      'Esperando comprobante: adjúntalo antes del ${Fechas.corta(fin)} a las ${Fechas.hora(fin)}; si no, la solicitud se descarta y tendrás que volver a ${r.mensual ? 'suscribirte' : 'reservar'}.',
+                      style: TextStyle(fontSize: 13, color: p.marcaTexto),
+                    ),
+                  const SizedBox(height: 4),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      if (await subirComprobante(context, repo, [r.id])) alSubir();
+                    },
+                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                    label: const Text('Adjuntar comprobante'),
+                  ),
+                ],
+              ),
+            ),
+    );
   }
 }

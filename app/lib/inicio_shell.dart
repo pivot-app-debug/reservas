@@ -3,7 +3,6 @@ import 'pivots/bandeja_repo.dart' show BandejaRepo;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'coach/coach_screen.dart';
 import 'liga/directorio_screen.dart';
 import 'pivots/ajustes_liga_screen.dart';
 import 'ajustes/componentes.dart';
@@ -21,7 +20,6 @@ import 'eventos/eventos_repo.dart';
 import 'eventos/timeline_screen.dart';
 import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
-import 'finanzas/tesoreria_screen.dart';
 import 'core/aviso_cambio_equipo.dart';
 import 'push/avisos_obligatorios.dart';
 
@@ -43,9 +41,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
 
   // Cada pestaña con su propio Navigator (Victor, 2026-11-17): al entrar a una
   // subsección (Cursos, Tareas, una ficha…) la barra de abajo sigue visible.
-  // Se identifican por su nombre (no por posición: Coach o Finanzas pueden
-  // aparecer o irse). Cada pestaña visitada queda viva y recuerda dónde
-  // estabas (Victor, 2026-11-17).
+  // Se identifican por su nombre (no por posición). Cada pestaña visitada
+  // queda viva y recuerda dónde estabas (Victor, 2026-11-17). Desde
+  // 2026-11-19 son siempre tres: Calendario, Equipo y Ajustes.
   final _navs = <String, GlobalKey<NavigatorState>>{};
   final _heroes = <String, HeroController>{};
   final _visitadas = <String>{};
@@ -77,8 +75,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Navegacion.ir.addListener(_irAPestana);
-    // Coach: la pestaña aparece al aprobarse (Victor, 2026-11-16).
-    widget.sesion.addListener(_alCambiarSesion);
+    // Coach (ahora en Ajustes → Herramientas de la liga, Victor 2026-11-19).
     widget.sesion.cargarCoach();
     // Ajustes y reglas de la liga (inactividad, tolerancia…) desde el inicio.
     ConfigLiga.de(widget.sesion);
@@ -110,11 +107,6 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     await DatosPendientes.recordarSiCorresponde(context, widget.sesion, abrir: (clave) => abrirPendiente(context, widget.sesion, clave));
   }
 
-  bool _eraCoach = false;
-  void _alCambiarSesion() {
-    if (mounted && widget.sesion.esCoach != _eraCoach) setState(() => _eraCoach = widget.sesion.esCoach);
-  }
-
   /// Otra pantalla pidió abrir una pestaña (ej. Mi perfil desde tu ficha).
   void _irAPestana() {
     final p = Navegacion.ir.value;
@@ -128,14 +120,13 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       () => _indice = switch (p) {
         Pestana.calendario => 0,
         Pestana.equipo => 1,
-        Pestana.perfil => 1 + (widget.sesion.tieneArea('finanzas') ? 1 : 0) + (widget.sesion.esCoach ? 1 : 0) + 1,
+        Pestana.perfil => 2,
       },
     );
   }
 
   @override
   void dispose() {
-    widget.sesion.removeListener(_alCambiarSesion);
     Navegacion.ir.removeListener(_irAPestana);
     WidgetsBinding.instance.removeObserver(this);
     _irAHoy.dispose();
@@ -214,20 +205,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
         const NavigationDestination(icon: Icon(Icons.group_outlined), selectedIcon: Icon(Icons.group), label: 'Equipo'),
         EquipoScreen(repo: EquipoRepo.de(widget.sesion)),
       ),
-      // Finanzas (antes Tesorería en Mi Liga; Victor, 2026-11-16): en la
-      // barra para quien gestiona finanzas.
-      if (widget.sesion.tieneArea('finanzas'))
-        (
-          const NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Finanzas'),
-          TesoreriaScreen(sesion: widget.sesion),
-        ),
-      // Mi Liga ya no es una pestaña: vive dentro de Ajustes (Victor, 2026-11-16).
-      // En su lugar, Coach para quien un Pivot aprobó como coach.
-      if (widget.sesion.esCoach)
-        (
-          const NavigationDestination(icon: Icon(Icons.sports_outlined), selectedIcon: Icon(Icons.sports), label: 'Coach'),
-          CoachScreen(sesion: widget.sesion, eventos: widget.repo),
-        ),
+      // Finanzas y Coach salieron de la barra (Victor, 2026-11-19): viven en
+      // Ajustes → Herramientas de la liga, junto con Mi Liga.
       // Ajustes (antes Mi perfil): ícono de engranaje (Victor, 2026-11-16).
       (
         const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Ajustes'),

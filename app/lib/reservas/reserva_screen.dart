@@ -754,7 +754,9 @@ class _ReservaScreenState extends State<ReservaScreen> {
         ? (_mesesSel.toList()..sort()).map((m) => ReglaAnticipada.nombreMes(m)).toList()
         : _clases!.where((c) => _clasesSel.contains(c.id)).map(ReservasRepo.etiquetaClase).toList();
     final partes = [
-      if (t.cobradas > 0)
+      if (t.cobradas > 0 && t.proporcional)
+        '${t.cobradas} ${t.cobradas == 1 ? 'mes' : 'meses'} ${ReservasRepo.dinero(t.mensualidades)} (proporcional por el descanso)'
+      else if (t.cobradas > 0)
         '${t.cobradas} ${_esMes ? (t.cobradas == 1 ? 'mes' : 'meses') : (t.cobradas == 1 ? 'clase' : 'clases')} × ${ReservasRepo.dinero(t.precio)}',
       if (t.recargos > 0) 'recargo por pagar tarde ${ReservasRepo.dinero(t.recargo)}',
       if (t.descuento > 0) 'descuento de ${ReservasRepo.dinero(t.descuento)}',

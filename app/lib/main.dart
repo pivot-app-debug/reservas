@@ -11,6 +11,7 @@ import 'core/api.dart';
 import 'core/tema.dart';
 import 'eventos/detalle_screen.dart';
 import 'eventos/eventos_repo.dart';
+import 'eventos/social/invitado_screen.dart';
 import 'inicio_shell.dart';
 import 'push/push.dart';
 import 'sesion/login_screen.dart';
@@ -24,6 +25,13 @@ final _navegador = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final sesion = Sesion(Api());
+  // Invitadx +1 de un evento social (?social=<token>): entra sin cuenta, sin
+  // la puerta de instalar ni notificaciones (NAVIQUINDE.md, 2026-11-19).
+  final invitado = kIsWeb ? (Uri.base.queryParameters['social'] ?? '') : '';
+  if (invitado.isNotEmpty) {
+    runApp(PivotInvitadoApp(token: invitado));
+    return;
+  }
   // La interfaz se dibuja SIEMPRE primero (bug real 1.0.4: si Firebase o las
   // notificaciones fallaban al iniciar, la app quedaba en el logo). Firebase
   // y las notificaciones arrancan después y, si fallan, la app sigue andando.
@@ -60,6 +68,28 @@ class PivotApp extends StatelessWidget {
         child: ControlActualizacion(child: IntroPivot(child: child ?? const SizedBox.shrink())),
       ),
       home: _Raiz(sesion: sesion),
+    );
+  }
+}
+
+/// App mínima para lxs invitadxs +1 (sin sesión): solo su pantalla.
+class PivotInvitadoApp extends StatelessWidget {
+  const PivotInvitadoApp({super.key, required this.token});
+  final String token;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Pivot',
+      debugShowCheckedModeBanner: false,
+      theme: construirTema(Brightness.light),
+      darkTheme: construirTema(Brightness.dark),
+      themeMode: ThemeMode.system,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const [Locale('es'), Locale('es', 'EC'), Locale('en'), Locale('pt')],
+      locale: const Locale('es'),
+      builder: (context, child) => IntroPivot(child: child ?? const SizedBox.shrink()),
+      home: InvitadoSocialScreen(token: token, alCargar: () => IntroPivot.listo.value = true),
     );
   }
 }

@@ -1956,7 +1956,13 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
     _cargar();
   }
 
-  static const _grupos = [('pagado', 'Pagaron'), ('en_revision', 'En revisión'), ('debe', 'Deben'), ('exenta', 'Exentas o con excepción')];
+  static const _grupos = [
+    ('pagado', 'Pagaron'),
+    ('en_revision', 'En revisión'),
+    ('debe', 'Deben'),
+    ('no_vino', 'No vino / dentro de la gracia'),
+    ('exenta', 'Exentas o con excepción'),
+  ];
 
   /// Un mes que todavía no empieza: se puede ver quién pagó por adelantado,
   /// pero nadie aparece debiendo (Victor, 2026-11-18). Solo cambia lo que se muestra.
@@ -1965,8 +1971,13 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
     return _mes.year * 12 + _mes.month > h.year * 12 + h.month;
   }
 
-  /// Por qué aparece en "Deben", con la regla que usa el servidor.
-  static const _porQueDebe = 'Está activx, paga cuota y no tiene pago, exención ni excepción registrada este mes.';
+  /// Explicación de cada grupo, con la regla que usa el servidor (Victor, 2026-11-19:
+  /// debe solo quien paga por mes y vino a más entrenamientos que sus clases de gracia).
+  static const _explicacion = {
+    'debe': 'Su equipo paga por mes y vino a más entrenamientos que sus clases de gracia, sin pago registrado.',
+    'no_vino': 'Su equipo paga por mes, pero no vino a entrenar o está dentro de sus clases de gracia. Todavía no debe.',
+  };
+  static const _porQueDebeAntes = 'Está activx, paga cuota y no tiene pago, exención ni excepción registrada este mes.';
 
   @override
   Widget build(BuildContext context) {
@@ -2068,10 +2079,21 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                                 '$titulo (${gente.where((x) => x['estado'] == clave).length})',
                                 style: TextStyle(fontWeight: FontWeight.w800, color: clave == 'debe' ? p.marcaTexto : p.texto),
                               ),
-                              if (clave == 'debe')
+                              if (_explicacion[clave] != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 2),
-                                  child: Text(_porQueDebe, style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                                  child: Text(
+                                    clave == 'debe' && r['reglaAsistencia'] != true ? _porQueDebeAntes : _explicacion[clave]!,
+                                    style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+                                  ),
+                                ),
+                              if (clave == 'debe' && (r['totalDeben'] as num? ?? 0) > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    'Por cobrar: ${plata(r['totalDeben'] as num)}',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: p.marcaTexto),
+                                  ),
                                 ),
                               const SizedBox(height: 6),
                               for (final x in gente.where((x) => x['estado'] == clave)) _persona(context, x),
@@ -2121,7 +2143,16 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                           style: TextStyle(fontSize: 13, color: p.textoSecundario),
                         ),
                       ),
-                    if (pagos.isEmpty && x['estado'] == 'debe') Text('Sin pago registrado este mes', style: TextStyle(fontSize: 13, color: p.marcaTexto)),
+                    if (pagos.isEmpty && x['estado'] == 'debe')
+                      Text(
+                        x['monto'] is num ? 'Debe ${plata(x['monto'] as num)}' : 'Sin pago registrado este mes',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.marcaTexto),
+                      ),
+                    if ('${x['motivo'] ?? ''}'.isNotEmpty && (x['estado'] == 'debe' || x['estado'] == 'no_vino'))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text('${x['motivo']}', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                      ),
                     if (x['estado'] == 'exenta') Text('Exentx de cuota o con excepción este mes', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
                   ],
                 ),

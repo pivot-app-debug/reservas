@@ -12,6 +12,9 @@ import 'nuevo_lugar_screen.dart';
 import 'selector_fechas.dart';
 import '../core/config_liga.dart';
 import '../core/esqueleto.dart';
+import 'social/social_config_screen.dart';
+import 'social/social_repo.dart';
+import 'tipos_evento.dart';
 
 enum _Paso { tipo, lugar, detalles, frecuencia, fecha, hora, descanso }
 
@@ -39,6 +42,10 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
 
   /// Reglas de la temporada de descanso (Victor, 2026-11-15).
   bool _descCongela = true, _descSinCuota = false;
+
+  /// "Cuota durante el descanso" (Victor, 2026-11-19). null = temporada de
+  /// antes: sigue con el interruptor "Sin cuota".
+  String? _descCuota = 'entera';
   final _nombreDescanso = TextEditingController();
   DateTime? _descDesde;
   DateTime? _descHasta;
@@ -57,7 +64,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   TimeOfDay? _fin;
   bool _guardando = false;
 
-  List<String> get _categorias => ConfigLiga.de(widget.repo.sesion).tiposEvento(const ['Entrenamiento', 'Partido', 'Evento', 'Otro']);
+  List<String> get _categorias => ConfigLiga.de(widget.repo.sesion).tiposEvento(kTiposEventoBase);
   static const _diasCortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   static const _diasPlural = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
 
@@ -73,6 +80,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
       _descHasta = t.hasta;
       _descCongela = t.congela;
       _descSinCuota = t.sinCuota;
+      _descCuota = t.cuota;
       return;
     }
     _cargarVenues();
@@ -199,7 +207,24 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
         horaInicio: _hhmm(_inicio),
         horaFin: _fin == null ? null : _hhmm(_fin!),
       );
-      if (mounted) Navigator.of(context).pop(primera ?? true);
+      if (!mounted) return;
+      // Evento social: se sigue directo a sus opciones (amigo secreto, comida, +1).
+      final venueId = widget.repo.ultimoVenueId;
+      if (_tipoEvento == kTipoSocial && primera != null && venueId != null && widget.repo.sesion.adminToken != null) {
+        final social = SocialRepo.miembro(
+          widget.repo.sesion.api,
+          idEvento: EventosRepo.idEventoDe(venueId, primera),
+          adminToken: widget.repo.sesion.adminToken,
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => SocialConfigScreen(repo: social, fechaEvento: primera),
+          ),
+          result: primera,
+        );
+        return;
+      }
+      Navigator.of(context).pop(primera ?? true);
     } catch (e) {
       if (mounted) {
         setState(() => _guardando = false);
@@ -269,7 +294,8 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
         desde: _descDesde!,
         hasta: _descHasta!,
         congela: _descCongela,
-        sinCuota: _descSinCuota,
+        sinCuota: _descCuota == null ? _descSinCuota : _descCuota == 'no',
+        cuota: _descCuota,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -409,18 +435,61 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
                   value: _descCongela,
                   onChanged: (v) => setState(() => _descCongela = v),
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Sin cuota', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Los meses completos dentro del descanso no se cobran.'),
-                  value: _descSinCuota,
-                  onChanged: (v) => setState(() => _descSinCuota = v),
-                ),
+                if (_descCuota == null)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Sin cuota', style: TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: const Text('Los meses completos dentro del descanso no se cobran.'),
+                    value: _descSinCuota,
+                    onChanged: (v) => setState(() => _descSinCuota = v),
+                  )
+                else
+                  _cuotaDescanso(context),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  static const _textosCuota = {
+    'entera': 'Los meses del descanso se cobran completos.',
+    'proporcional': 'Cada mes se cobra según los entrenamientos que sí hay: mensualidad × entrenamientos del mes ÷ los que habría sin el descanso.',
+    'no': 'Los meses completos dentro del descanso no se cobran.',
+  };
+
+  /// Entera / proporcional / no se cobra, con su explicación.
+  Widget _cuotaDescanso(BuildContext context) {
+    final p = context.pivot;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Cuota durante el descanso', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'entera', label: Text('Entera')),
+              ButtonSegment(value: 'proporcional', label: Text('Proporcional')),
+              ButtonSegment(value: 'no', label: Text('No se cobra')),
+            ],
+            selected: {_descCuota ?? 'entera'},
+            onSelectionChanged: (s) => setState(() => _descCuota = s.first),
+          ),
+          const SizedBox(height: 6),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              _textosCuota[_descCuota] ?? '',
+              key: ValueKey(_descCuota),
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -551,7 +620,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
           runSpacing: 8,
           children: [
             for (final c in _categorias)
-              ChoiceChip(label: Text(c), selected: (_categoria ?? 'Entrenamiento') == c, onSelected: (_) => setState(() => _categoria = c)),
+              ChoiceChip(label: Text(etiquetaOpcionTipo(c)), selected: (_categoria ?? 'Entrenamiento') == c, onSelected: (_) => setState(() => _categoria = c)),
           ],
         ),
         AnimatedSize(

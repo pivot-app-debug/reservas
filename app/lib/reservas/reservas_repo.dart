@@ -53,7 +53,18 @@ class Precios {
     this.recargoPorcentaje = false,
     this.recargoMensual = false,
     this.descuentoPct = 0,
+    this.factorPorMes = const {},
   });
+
+  /// Meses con cuota proporcional por un descanso ('aaaa-mm' → fracción de la
+  /// mensualidad; Victor, 2026-11-19). Lo calcula el servidor.
+  final Map<String, double> factorPorMes;
+
+  /// Mensualidad de `mes`, ya proporcional si un descanso la reduce (sin recargo).
+  double mensualDe(DateTime mes) {
+    final f = factorPorMes['${mes.year}-${mes.month.toString().padLeft(2, '0')}'];
+    return f == null ? mensual : double.parse((mensual * f).toStringAsFixed(2));
+  }
 
   /// Cupón manual de un Pivot: % para el próximo pago (Victor, 2026-11-16).
   final int descuentoPct;
@@ -81,7 +92,7 @@ class Precios {
       final dif = (hoy.year * 12 + hoy.month) - (mes.year * 12 + mes.month) - (hoy.day <= diaLimite ? 1 : 0);
       veces = 1 + (dif > 0 ? dif : 0);
     }
-    final uno = recargoPorcentaje ? mensual * recargo / 100 : recargo;
+    final uno = recargoPorcentaje ? mensualDe(mes) * recargo / 100 : recargo;
     return double.parse((uno * veces).toStringAsFixed(2));
   }
 }
@@ -99,7 +110,14 @@ class Total {
     this.recargo = 0,
     this.saldo = 0,
     this.descuento = 0,
+    this.mensualidades = 0,
+    this.proporcional = false,
   });
+
+  /// Suma de las mensualidades sin recargo y si alguna es proporcional por un
+  /// descanso (Victor, 2026-11-19).
+  final double mensualidades;
+  final bool proporcional;
 
   /// Cupón manual aplicado (monto), en la primera cuota o clase cobrada.
   final double descuento;
@@ -161,8 +179,17 @@ class ReservaActiva {
     this.lugar = '',
     this.talla = '',
     this.protecciones = '',
+    this.id = '',
+    this.faltaComprobante = false,
+    this.comprobanteLimite,
   });
   final String clave;
+
+  /// Id de la reserva y si falta su comprobante de pago; `comprobanteLimite` =
+  /// "Esperando comprobante": hasta cuándo tiene para adjuntarlo (Victor, 2026-11-19).
+  final String id;
+  final bool faltaComprobante;
+  final DateTime? comprobanteLimite;
   final bool mensual;
   final String estado;
   final DateTime? dia; // clase
@@ -176,12 +203,12 @@ class ReservaActiva {
   bool get conProtecciones => protecciones.isNotEmpty && protecciones.toLowerCase() != 'no';
 
   String get titulo => mensual
-      ? 'Cuota de ${ReglaAnticipada.nombreMes(mes!)}'
+      ? 'Suscripción a ${ReglaAnticipada.nombreMes(mes!).toLowerCase()}'
       : dia == null
       ? clave
       : '${Fechas.dia(dia!)[0].toUpperCase()}${Fechas.dia(dia!).substring(1)} ${Fechas.corta(dia!)}';
 
-  String get detalle => mensual ? 'Mensualidad' : [if (hora.isNotEmpty) hora, if (lugar.isNotEmpty) lugar].join(' · ');
+  String get detalle => mensual ? 'Suscripción mensual' : [if (hora.isNotEmpty) hora, if (lugar.isNotEmpty) lugar].join(' · ');
 
   /// "Reserva confirmada" / "Clase a favor" / "Reserva pendiente" (web).
   String get textoEstado => estado == 'Confirmada' ? 'Reserva confirmada' : (estado == 'Reagendar' ? 'Clase a favor' : 'Reserva pendiente');
@@ -194,13 +221,24 @@ class ReservaActiva {
     if (estado == 'Cancelada' || estado == 'Crédito usado') return null;
     final hoy = Fechas.hoy();
     if (r['tipo'] == 'plan' || r['tipo'] == 'curso') return null; // compra de un plan o curso, no una clase
+    final id = '${r['id'] ?? ''}';
+    final falta = estado == 'Pendiente' && (num.tryParse('${r['monto'] ?? ''}') ?? 0) > 0 && r['comprobante_subido_en'] == null;
+    final limite = falta ? DateTime.tryParse('${r['comprobante_limite'] ?? ''}')?.toLocal() : null;
     if (r['tipo'] == 'mensual') {
       final v = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch('${r['validezHasta'] ?? ''}');
       final nombre = (r['fecha'] ?? r['mes_texto'] ?? '').toString();
       if (v == null || nombre.isEmpty) return null;
       final fin = DateTime(int.parse(v[3]!), int.parse(v[2]!), int.parse(v[1]!));
       if (fin.isBefore(hoy)) return null;
-      return ReservaActiva(clave: nombre, mensual: true, estado: estado, mes: DateTime(fin.year, fin.month));
+      return ReservaActiva(
+        clave: nombre,
+        mensual: true,
+        estado: estado,
+        mes: DateTime(fin.year, fin.month),
+        id: id,
+        faltaComprobante: falta,
+        comprobanteLimite: limite,
+      );
     }
     final dia = Fechas.desdeIso(r['fechaCalendario']);
     if (dia != null && dia.isBefore(hoy)) return null;
@@ -213,6 +251,9 @@ class ReservaActiva {
       lugar: (r['donde'] ?? '').toString(),
       talla: (r['talla'] ?? '').toString(),
       protecciones: (r['protecciones'] ?? '').toString(),
+      id: id,
+      faltaComprobante: falta,
+      comprobanteLimite: limite,
     );
   }
 }
@@ -330,6 +371,10 @@ class ReservasRepo {
       recargoPorcentaje: c['recargoTipo'] == 'porcentaje',
       recargoMensual: c['recargoModo'] == 'mensual',
       descuentoPct: (r['descuentoPct'] as num?)?.toInt() ?? 0,
+      factorPorMes: {
+        for (final e in ((r['factorPorMes'] as Map?) ?? const {}).entries)
+          if (e.value is num) '${e.key}': (e.value as num).toDouble(),
+      },
     );
   }
 
@@ -435,9 +480,11 @@ class ReservasRepo {
       final h = hoy ?? DateTime.now();
       final rec = [for (final m in meses) p.recargoPara(m, h)].where((r) => r > 0).toList();
       final suma = rec.fold<double>(0, (a, b) => a + b);
-      final base = cantidad * p.mensual + suma;
+      // Cada mes con su mensualidad (proporcional si hay descanso).
+      final mensualidades = meses.length == cantidad ? meses.fold<double>(0, (a, m) => a + p.mensualDe(m)) : cantidad * p.mensual;
+      final base = mensualidades + suma;
       // Sin elegir usar o pagar el saldo, igual se suma lo que pasó a deuda.
-      final primero = meses.isEmpty ? 0.0 : p.mensual + p.recargoPara(meses.first, h);
+      final primero = meses.isEmpty ? 0.0 : p.mensualDe(meses.first) + p.recargoPara(meses.first, h);
       final desc = cantidad == 0 ? 0.0 : double.parse((primero * p.descuentoPct / 100).toStringAsFixed(2));
       final s = saldo == 0 && deudaObligatoria > 0 ? -deudaObligatoria : saldo;
       final resto = base - desc;
@@ -453,6 +500,8 @@ class ReservasRepo {
         recargo: suma,
         saldo: aplicado,
         descuento: desc,
+        mensualidades: mensualidades,
+        proporcional: meses.any((m) => p.mensualDe(m) != p.mensual),
       );
     }
     final aFavor = creditos < cantidad ? creditos : cantidad;

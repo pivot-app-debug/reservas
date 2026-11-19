@@ -36,6 +36,7 @@ import '../pivots/icono_bandeja.dart';
 import '../core/esqueleto.dart';
 import '../cursos/cursos_screen.dart';
 import '../push/avisos_obligatorios.dart';
+import 'tipos_evento.dart';
 
 /// Timeline de Eventos (maqueta aprobada + pedido 2026-11-06):
 /// - Barra: "Noviembre ⌄" despliega el calendario del mes hacia abajo (como
@@ -1083,7 +1084,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                             padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
                             child: FilterChip(
                               showCheckmark: false,
-                              label: Text(o ?? 'Todos'),
+                              label: Text(o == null ? 'Todos' : etiquetaTipoEvento(o)),
                               selected: o == null ? valor.isEmpty : valor.contains(o),
                               onSelected: (_) => elegir(() {
                                 if (o == null) {
@@ -1729,7 +1730,7 @@ class _TarjetaEvento extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          ev.tipo,
+                          etiquetaTipoEvento(ev.tipo),
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,

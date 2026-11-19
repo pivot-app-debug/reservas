@@ -171,11 +171,13 @@ class BandejaRepo extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Le pide el comprobante a la persona con una notificación (sin WhatsApp).
+  /// Le pide el comprobante a la persona con una notificación (sin WhatsApp):
+  /// tiene 24 h para adjuntarlo o la solicitud se descarta (Victor, 2026-11-19).
   Future<void> pedirComprobante(Pedido p) async {
     final r = await _api.post('adminPedirComprobante', {'adminToken': sesion.adminToken, 'id': '${p.m['id']}'});
     if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo avisar.'}');
     p.m['comprobanteAvisos'] = ((p.m['comprobanteAvisos'] as num?) ?? 0) + 1;
+    if (r['comprobanteLimite'] != null) p.m['comprobanteLimite'] = r['comprobanteLimite'];
     notifyListeners();
   }
 

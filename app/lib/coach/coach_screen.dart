@@ -1,5 +1,3 @@
-import '../core/deporte.dart';
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,21 +8,23 @@ import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/esqueleto.dart';
 import '../core/fechas.dart';
-import '../core/pronombres.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
 import '../eventos/widgets_comunes.dart';
-import '../cursos/cursos_screen.dart' show CursosScreen;
+import '../cursos/cursos_screen.dart' show Curso, CursosAbiertosScreen, CursosScreen;
+import '../equipo/habilidades_screen.dart';
+import '../ajustes/herramientas_liga.dart';
 import '../sesion/sesion.dart';
 
-/// Sección Coach (Victor, 2026-11-16): sus jugadorxs con su ficha deportiva
-/// (habilidades de WFTDA editables y notas escritas o dictadas) y el
-/// cronograma de lo que se ve en cada evento del calendario. Sin datos de
-/// salud: solo el estado que ve el equipo.
+/// Coach (Victor, 2026-11-16; rediseño 2026-11-19): portada con atajos
+/// (en Ajustes → Herramientas de la liga), ficha deportiva, plan y evaluación
+/// de cada evento. Las habilidades y "Marcar habilidades" están en
+/// `equipo/habilidades_screen.dart`. Sin datos de salud: solo el estado que
+/// ve el equipo.
 
-AppBar _barra(String titulo, {List<Widget>? acciones, PreferredSizeWidget? abajo}) => AppBar(
+AppBar barraCoach(String titulo, {List<Widget>? acciones, PreferredSizeWidget? abajo}) => AppBar(
   backgroundColor: Colors.transparent,
   surfaceTintColor: Colors.transparent,
   scrolledUnderElevation: 0,
@@ -34,10 +34,14 @@ AppBar _barra(String titulo, {List<Widget>? acciones, PreferredSizeWidget? abajo
   bottom: abajo,
 );
 
-String _error(Object e) => e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.';
+String errorCoach(Object e) => e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.';
 
-// ─── Pestaña Coach ─────────────────────────────────────────────────────────
+// ─── Coach (Ajustes → Herramientas de la liga) ────────────────────────────
 
+/// Portada de Coach (rediseño de Victor, 2026-11-19): atajos a la vista y
+/// nada más. Las fichas y "Marcar habilidades" viven en Equipo; los cursos
+/// y la evaluación de cada entrenamiento, en el Calendario. Se quitó el
+/// Cronograma (para eso está el Calendario).
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key, required this.sesion, required this.eventos});
   final Sesion sesion;
@@ -49,15 +53,15 @@ class CoachScreen extends StatefulWidget {
 class _CoachScreenState extends State<CoachScreen> {
   Map<String, dynamic>? _d;
   String? _error_;
-  String _vista = 'jugadorxs';
-  String _q = '';
-  String? _nivel; // filtro por nivel (Victor, 2026-11-17)
+  List<Curso>? _cursos;
   Sesion get s => widget.sesion;
+  bool get _pivot => s.esAdmin && s.adminToken != null;
 
   @override
   void initState() {
     super.initState();
     _cargar();
+    _cargarCursos();
     widget.eventos.cargar();
   }
 
@@ -67,40 +71,34 @@ class _CoachScreenState extends State<CoachScreen> {
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _d = r);
     } catch (e) {
-      if (mounted) setState(() => _error_ = _error(e));
+      if (mounted) setState(() => _error_ = errorCoach(e));
+    }
+  }
+
+  Future<void> _cargarCursos() async {
+    try {
+      final r = await s.api.get('getCursos', const {});
+      final l = [
+        for (final c in (r['cursos'] as List? ?? const []))
+          if ('${(c as Map)['estado'] ?? 'abierto'}' != 'terminado') Curso(Map<String, dynamic>.from(c)),
+      ];
+      if (mounted) setState(() => _cursos = l);
+    } catch (_) {
+      if (mounted) setState(() => _cursos ??= const []);
     }
   }
 
   List<Map<String, dynamic>> get _jugadorxs => [for (final x in (_d?['jugadorxs'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
 
-  /// Planes por evento (uno por equipo, Victor 2026-11-17).
-  Map<String, List<Map<String, dynamic>>> get _planes {
-    final out = <String, List<Map<String, dynamic>>>{};
-    for (final x in (_d?['planes'] as List? ?? const [])) {
-      (out['${(x as Map)['id_evento']}'] ??= []).add(Map<String, dynamic>.from(x));
-    }
-    return out;
+  Future<void> _abrir(Widget pantalla) async {
+    await SubAjustes.abrir<void>(context, pantalla);
+    if (mounted) _cargar();
   }
 
-  /// Abre el plan de un evento: si puede armar para varios equipos, elige primero.
-  Future<void> _abrirPlan(Evento e) async {
-    final hechos = _planes[e.id] ?? const [];
-    final equipo = await elegirEquipoPlan(context, _d ?? const {}, hechos);
-    if (equipo == null || !mounted) return;
-    final plan = hechos.where((x) => '${x['equipo'] ?? ''}' == equipo).firstOrNull;
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => PlanEventoScreen(
-          sesion: s,
-          evento: e,
-          plan: plan,
-          equipo: equipo,
-          coaches: [for (final c in (_d?['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)],
-          otros: [for (final l in _planes.values) ...l],
-        ),
-      ),
-    );
-    if (ok == true) _cargar();
+  /// Los mismos Cursos del Calendario (Pivots: crear, editar y pre-armados).
+  Future<void> _abrirCursos() async {
+    await SubAjustes.abrir<void>(context, _pivot ? CursosScreen(sesion: s) : CursosAbiertosScreen(sesion: s));
+    if (mounted) _cargarCursos();
   }
 
   /// Plan sin fecha (de un evento cancelado) a un evento próximo.
@@ -141,25 +139,16 @@ class _CoachScreenState extends State<CoachScreen> {
       m.showSnackBar(const SnackBar(content: Text('Plan asignado.')));
       _cargar();
     } catch (err) {
-      m.showSnackBar(SnackBar(content: Text(_error(err))));
+      m.showSnackBar(SnackBar(content: Text(errorCoach(err))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pivot;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra(
-        'Coach',
-        acciones: [
-          IconButton(
-            tooltip: 'Lista de habilidades',
-            icon: const Icon(Icons.checklist_rounded),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HabilidadesScreen(sesion: s))),
-          ),
-          if (_d != null) IconButton(tooltip: 'Ajustes de Coach', icon: const Icon(Icons.tune_rounded), onPressed: _ajustes),
-        ],
-      ),
+      appBar: barraCoach('Coach'),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: _d == null
@@ -168,31 +157,155 @@ class _CoachScreenState extends State<CoachScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
-                  // Por evaluar primero (Victor, 2026-11-17).
-                  ..._porEvaluar(context),
-                  SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: 'jugadorxs', icon: Icon(Icons.groups_rounded), label: Text('Jugadorxs')),
-                      ButtonSegment(value: 'cronograma', icon: Icon(Icons.view_timeline_outlined), label: Text('Cronograma')),
-                      ButtonSegment(value: 'pruebas', icon: Icon(Icons.timer_outlined), label: Text('Pruebas')),
-                    ],
-                    selected: {_vista},
-                    onSelectionChanged: (v) => setState(() => _vista = v.first),
+                  Text(
+                    (_d?['equipos'] as List? ?? const []).isEmpty ? 'Llevas todos los equipos.' : 'Llevas: ${(_d!['equipos'] as List).join(' · ')}',
+                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
                   ),
-                  const SizedBox(height: 14),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    child: switch (_vista) {
-                      'jugadorxs' => KeyedSubtree(key: const ValueKey('j'), child: _listaJugadorxs(context)),
-                      'pruebas' => _PruebasCoach(key: const ValueKey('p'), sesion: s, jugadorxs: _jugadorxs),
-                      _ => KeyedSubtree(key: const ValueKey('k'), child: _cronograma(context)),
-                    },
+                  const SizedBox(height: 12),
+                  _atajos(context),
+                  ..._sinFecha(context),
+                  ..._enCurso(context),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Las fichas deportivas y "Marcar habilidades" están en Equipo. Para evaluar un entrenamiento, ábrelo en el Calendario y toca "Evaluar".',
+                    style: TextStyle(fontSize: 12.5, height: 1.35, color: p.textoSecundario),
                   ),
                 ],
               ),
       ),
     );
+  }
+
+  /// Atajos de la portada, del mismo estilo que los de Inventario.
+  Widget _atajos(BuildContext context) {
+    final p = context.pivot;
+    final n = _cursos?.length;
+    final l = <(IconData, String, String, VoidCallback)>[
+      (Icons.checklist_rounded, 'Habilidades', 'Básicas y avanzadas: crear, editar y marcar', () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true))),
+      (Icons.tune_rounded, 'Ajustes de coach', 'Avisos de novedades a las personas', _ajustes),
+      (Icons.school_outlined, 'Cursos en curso', n == null ? 'Cursos y clínicas' : (n == 1 ? '1 curso abierto' : '$n cursos abiertos'), _abrirCursos),
+      if (_pivot) (Icons.auto_awesome_motion_outlined, 'Pre-armados', 'Plantillas para crear cursos', _abrirCursos),
+      (Icons.timer_outlined, 'Pruebas', 'Medir el progreso, como vueltas en 5 minutos', () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs))),
+    ];
+    Widget atajo((IconData, String, String, VoidCallback) a) => Material(
+      color: p.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: a.$4,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(a.$1, color: p.marcaTexto),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      a.$2,
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(a.$3, style: TextStyle(fontSize: 12, height: 1.3, color: p.textoSecundario)),
+            ],
+          ),
+        ),
+      ),
+    );
+    return Column(
+      children: [
+        for (var i = 0; i < l.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            // Mismo alto aunque un subtítulo sea más largo (QA 2026-11-18).
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: atajo(l[i])),
+                  const SizedBox(width: 10),
+                  Expanded(child: i + 1 < l.length ? atajo(l[i + 1]) : const SizedBox.shrink()),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _titulo(BuildContext context, String t) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 14, 2, 6),
+    child: Text(
+      t,
+      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
+    ),
+  );
+
+  /// Planes de eventos cancelados, para pasarlos a otro (Victor, 2026-11-17).
+  List<Widget> _sinFecha(BuildContext context) {
+    final p = context.pivot;
+    final l = [for (final x in (_d?['sinFecha'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    if (l.isEmpty) return const [];
+    return [
+      _titulo(context, 'PLANES SIN FECHA'),
+      for (final x in l)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Material(
+            color: p.suave,
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: Icon(Icons.inventory_2_outlined, color: p.sobreSuave),
+              title: Text(
+                '${'${x['equipo'] ?? ''}'.isEmpty ? 'Toda la liga' : x['equipo']} · ${_resumenPlan([x])}',
+                style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+              ),
+              subtitle: Text(
+                [for (final b in (x['bloques'] as List? ?? const [])) '${(b as Map)['titulo']}'].join(', '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: p.sobreSuave),
+              ),
+              trailing: TextButton(onPressed: () => _asignar(x), child: const Text('Asignar')),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// Cursos que están corriendo, con atajo a editarlos.
+  List<Widget> _enCurso(BuildContext context) {
+    final p = context.pivot;
+    final l = _cursos;
+    if (l == null) return const [];
+    return [
+      _titulo(context, 'CURSOS EN CURSO'),
+      if (l.isEmpty)
+        Text('No hay cursos abiertos ahora.', style: TextStyle(color: p.textoSecundario))
+      else
+        for (final c in l.take(5))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: p.tarjeta,
+              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: Icon(c.esClinica ? Icons.bolt_rounded : Icons.school_outlined, color: p.marcaTexto),
+                title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text('${c.resumenFechas} · ${c.inscritos == 1 ? '1 inscritx' : '${c.inscritos} inscritxs'}'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _abrirCursos,
+              ),
+            ),
+          ),
+    ];
   }
 
   /// Aviso semanal a las personas con novedades en su ficha (Victor, 2026-11-17).
@@ -212,7 +325,7 @@ class _CoachScreenState extends State<CoachScreen> {
               children: [
                 const Padding(
                   padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: Text('Ajustes de Coach', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  child: Text('Ajustes de coach', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 ),
                 SwitchListTile(
                   title: const Text('Avisar novedades a las personas'),
@@ -238,292 +351,6 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
-  List<Widget> _porEvaluar(BuildContext context) {
-    final p = context.pivot;
-    final l = [
-      for (final x in (_d?['pendientes'] as List? ?? const []))
-        if (((x as Map)['evaluados'] as num? ?? 0) < (x['total'] as num? ?? 0)) Map<String, dynamic>.from(x),
-    ];
-    if (l.isEmpty) return const [];
-    final x = l.first;
-    final faltan = (x['total'] as num).toInt() - (x['evaluados'] as num? ?? 0).toInt();
-    Future<void> evaluar(Map<String, dynamic> y) async {
-      await EvaluarScreen.abrir(context, s, y);
-      _cargar();
-    }
-
-    return [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              tituloPendiente(x),
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.sobreSuave),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${x['total'] == 1 ? 'Vino 1 persona' : 'Vinieron ${x['total']} personas'} de tus equipos. '
-              '${faltan == x['total'] ? '¿Las evaluamos?' : 'Faltan $faltan por evaluar.'}',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.25, color: p.sobreSuave),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(onPressed: () => evaluar(x), icon: const Icon(Icons.rate_review_rounded), label: const Text('Evaluar')),
-          ],
-        ),
-      ),
-      for (final y in l.skip(1))
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          leading: const Icon(Icons.history_rounded),
-          title: Text(tituloPendiente(y)),
-          subtitle: Text('${(y['total'] as num).toInt() - (y['evaluados'] as num? ?? 0).toInt()} sin evaluar'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => evaluar(y),
-        ),
-      const SizedBox(height: 16),
-    ];
-  }
-
-  /// Nivel a mano (o volver a calcularlo). Se abre manteniendo presionada la fila.
-  Future<void> _cambiarNivel(Map<String, dynamic> x) async {
-    final v = await showModalBottomSheet<String>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      builder: (h) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Nivel de ${x['nombre']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_mode_rounded),
-              title: const Text('Calcularlo con sus habilidades'),
-              trailing: x['nivelAMano'] != true ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
-              onTap: () => Navigator.of(h).pop(''),
-            ),
-            for (final e in nivelesCoach.entries)
-              ListTile(
-                title: Text(e.value),
-                trailing: x['nivelAMano'] == true && x['nivel'] == e.key ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
-                onTap: () => Navigator.of(h).pop(e.key),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (v == null) return;
-    try {
-      await s.api.post('coachGuardar', {'accion': 'nivel', 'username': '${x['username']}', 'nivel': v});
-      _cargar();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
-    }
-  }
-
-  /// Varias personas y habilidades logradas de una vez (Victor, 2026-11-17).
-  Future<void> _marcarGrupo() async {
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _MarcarGrupoScreen(
-          sesion: s,
-          personas: _jugadorxs,
-          habilidades: [for (final h in (_d?['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)],
-        ),
-      ),
-    );
-    if (ok == true) _cargar();
-  }
-
-  Widget _listaJugadorxs(BuildContext context) {
-    final p = context.pivot;
-    final total = (_d?['totalHabilidades'] as num?)?.toInt() ?? 0;
-    final q = _q.trim().toLowerCase();
-    final todos = _jugadorxs;
-    final l = todos
-        .where((x) => (_nivel == null || x['nivel'] == _nivel) && (q.isEmpty || '${x['nombre']} ${x['username']}'.toLowerCase().contains(q)))
-        .toList();
-    final equipos = [for (final e in (_d?['equipos'] as List? ?? const [])) '$e'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · '), style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-        const SizedBox(height: 8),
-        // Por nivel (Victor, 2026-11-17).
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.none,
-          child: Row(
-            children: [
-              for (final (k, t) in [(null, 'Todxs'), ...nivelesCoach.entries.map((e) => (e.key, e.value))])
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text('$t (${k == null ? todos.length : todos.where((x) => x['nivel'] == k).length})'),
-                    selected: _nivel == k,
-                    onSelected: (_) => setState(() => _nivel = k),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(onPressed: _marcarGrupo, icon: const Icon(Icons.done_all_rounded), label: const Text('Marcar habilidades')),
-            ),
-            if (s.esAdmin && s.adminToken != null) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CursosScreen(sesion: s))),
-                  icon: const Icon(Icons.school_outlined),
-                  label: Text(_nivel == null ? 'Armar curso' : 'Curso para este grupo'),
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          onChanged: (v) => setState(() => _q = v),
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar jugadorx'),
-        ),
-        const SizedBox(height: 8),
-        if (l.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Center(
-              child: Text('No hay jugadorxs en tus equipos.', style: TextStyle(color: p.textoSecundario)),
-            ),
-          ),
-        for (final x in l)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 44),
-            title: Text('${x['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            onLongPress: () => _cambiarNivel(x),
-            subtitle: Text(
-              [
-                '${x['equipo']}',
-                nivelesCoach['${x['nivel']}'] ?? '',
-                if ('${x['estado']}' != 'Activx') conPronombres('${x['estado']}', x['pronombres']),
-                '${x['asistencias30']} ${x['asistencias30'] == 1 ? 'asistencia' : 'asistencias'} en 30 días',
-                if (total > 0) '${x['logradas']} de $total habilidades',
-              ].join(' · '),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FichaDeportivaScreen(sesion: s, username: '${x['username']}', nombre: '${x['nombre']}'),
-                ),
-              );
-              _cargar();
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _cronograma(BuildContext context) {
-    final p = context.pivot;
-    final hoy = Fechas.hoy();
-    final hasta = hoy.add(const Duration(days: 45));
-    // Los de los últimos 3 días también, para dar el feedback.
-    final desde = hoy.subtract(const Duration(days: 3));
-    final evs = [
-      for (final e in widget.eventos.eventos)
-        if (!e.cancelado && !e.fecha.isBefore(desde) && e.fecha.isBefore(hasta)) e,
-    ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
-    final planes = _planes;
-    final sinFecha = [for (final x in (_d?['sinFecha'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Arma el plan de cada evento, por equipo, y quién lo da. Puedes compartirlo para que el equipo lo vea en el evento.',
-          style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
-        ),
-        const SizedBox(height: 10),
-        // Planes de eventos cancelados, para asignarlos (Victor, 2026-11-17).
-        if (sinFecha.isNotEmpty) ...[
-          Text(
-            'SIN FECHA',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-          ),
-          const SizedBox(height: 6),
-          for (final x in sinFecha)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: p.suave,
-                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: Icon(Icons.inventory_2_outlined, color: p.sobreSuave),
-                  title: Text(
-                    '${'${x['equipo'] ?? ''}'.isEmpty ? 'Toda la liga' : x['equipo']} · ${_resumenPlan([x])}',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
-                  ),
-                  subtitle: Text(
-                    [for (final b in (x['bloques'] as List? ?? const [])) '${(b as Map)['titulo']}'].join(', '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.sobreSuave),
-                  ),
-                  trailing: TextButton(onPressed: () => _asignar(x), child: const Text('Asignar')),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-        if (evs.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Center(
-              child: Text('No hay eventos en las próximas semanas.', style: TextStyle(color: p.textoSecundario)),
-            ),
-          ),
-        for (final e in evs)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: p.tarjeta,
-              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-              clipBehavior: Clip.antiAlias,
-              child: ListTile(
-                leading: Icon(
-                  planes.containsKey(e.id) ? Icons.assignment_turned_in_outlined : Icons.assignment_outlined,
-                  color: planes.containsKey(e.id) ? p.marcaTexto : p.textoSecundario,
-                ),
-                title: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text([e.tipo, e.lugar, _resumenPlan(planes[e.id])].where((x) => x.isNotEmpty).join(' · ')),
-                trailing: e.finalizado
-                    ? TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => FeedbackEventoScreen(sesion: s, evento: e),
-                          ),
-                        ),
-                        child: const Text('Feedback'),
-                      )
-                    : const Icon(Icons.chevron_right_rounded),
-                onTap: () => _abrirPlan(e),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
   static String _resumenPlan(List<Map<String, dynamic>>? l) {
     if (l == null || l.isEmpty) return 'Sin plan';
     if (l.length > 1) return '${l.length} planes (${l.map((x) => '${x['equipo'] ?? ''}'.isEmpty ? 'toda la liga' : '${x['equipo']}').join(', ')})';
@@ -534,7 +361,24 @@ class _CoachScreenState extends State<CoachScreen> {
   }
 }
 
-// ─── Cronograma: plan de un evento ─────────────────────────────────────────
+/// Pruebas de progreso en su propia pantalla (antes, tercera vista de Coach).
+class PruebasCoachScreen extends StatelessWidget {
+  const PruebasCoachScreen({super.key, required this.sesion, required this.jugadorxs});
+  final Sesion sesion;
+  final List<Map<String, dynamic>> jugadorxs;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
+    appBar: barraCoach('Pruebas'),
+    body: ListView(
+      padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
+      children: [_PruebasCoach(sesion: sesion, jugadorxs: jugadorxs)],
+    ),
+  );
+}
+
+// ─── Plan de un evento ─────────────────────────────────────────
 
 class PlanEventoScreen extends StatefulWidget {
   const PlanEventoScreen({super.key, required this.sesion, required this.evento, this.plan, this.otros = const [], this.equipo = '', this.coaches = const []});
@@ -695,7 +539,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -706,7 +550,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
     final min = _bloques.fold<int>(0, (a, b) => a + ((b['minutos'] as num?) ?? 0).toInt());
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra(
+      appBar: barraCoach(
         'Plan del evento',
         acciones: [
           if (widget.otros.any((x) => x['id_evento'] != e.id || '${x['equipo'] ?? ''}' != widget.equipo))
@@ -870,6 +714,8 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
 
   List<Map<String, dynamic>> get _planes => [for (final x in (_r?['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
 
+  bool get _esEntrenamiento => widget.evento.tipo.toLowerCase().contains('entrenamiento');
+
   Future<void> _armar() async {
     final hechos = _planes;
     final equipo = await elegirEquipoPlan(context, _r ?? const {}, hechos);
@@ -948,19 +794,30 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
                   child: Text('Solo lo ven lxs coaches.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                 ),
             ],
-            // Al terminar: feedback por persona (Victor, 2026-11-16).
-            if (esCoach && widget.evento.finalizado)
+            // Al terminar: los entrenamientos se evalúan siempre desde aquí
+            // (Victor, 2026-11-19); el resto, feedback por persona.
+            if (esCoach && widget.evento.finalizado && FuncionesLiga.coach(widget.sesion))
               Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => FeedbackEventoScreen(sesion: widget.sesion, evento: widget.evento),
-                    ),
-                  ),
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Dar feedback'),
-                ),
+                child: _esEntrenamiento
+                    ? FilledButton.icon(
+                        onPressed: () => EvaluarScreen.abrir(context, widget.sesion, {
+                          'idEvento': widget.evento.id,
+                          'fecha': Fechas.iso(widget.evento.fecha),
+                          'tipo': widget.evento.tipo,
+                        }),
+                        icon: const Icon(Icons.rate_review_rounded),
+                        label: const Text('Evaluar'),
+                      )
+                    : FilledButton.tonalIcon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => FeedbackEventoScreen(sesion: widget.sesion, evento: widget.evento),
+                          ),
+                        ),
+                        icon: const Icon(Icons.rate_review_outlined),
+                        label: const Text('Dar feedback'),
+                      ),
               ),
           ],
         ),
@@ -1066,7 +923,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _d = r);
     } catch (e) {
-      if (mounted) setState(() => _error_ = _error(e));
+      if (mounted) setState(() => _error_ = errorCoach(e));
     }
   }
 
@@ -1077,7 +934,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
       await _cargar();
       return true;
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
       return false;
     }
   }
@@ -1152,7 +1009,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
       if (r['exito'] == false) throw ApiException('${r['error']}');
       await _cargar();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -1183,7 +1040,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
     final notas = [for (final n in (d?['notas'] as List? ?? const [])) Map<String, dynamic>.from(n as Map)];
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra(widget.username == null ? 'Mi ficha deportiva' : (widget.nombre ?? 'Ficha deportiva')),
+      appBar: barraCoach(widget.username == null ? 'Mi ficha deportiva' : (widget.nombre ?? 'Ficha deportiva')),
       floatingActionButton: _puedeEditar
           ? FloatingActionButton.extended(onPressed: _nuevaNota, icon: const Icon(Icons.mic_none_rounded), label: const Text('Nota'))
           : null,
@@ -1403,172 +1260,6 @@ class _EditorNotaState extends State<_EditorNota> {
   }
 }
 
-// ─── Lista de habilidades (editable) ───────────────────────────────────────
-
-class HabilidadesScreen extends StatefulWidget {
-  const HabilidadesScreen({super.key, required this.sesion});
-  final Sesion sesion;
-  @override
-  State<HabilidadesScreen> createState() => _HabilidadesScreenState();
-}
-
-class _HabilidadesScreenState extends State<HabilidadesScreen> {
-  List<Map<String, dynamic>>? _l;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
-
-  Future<void> _cargar() async {
-    try {
-      final r = await widget.sesion.api.get('getHabilidades');
-      if (mounted) setState(() => _l = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)]);
-    } catch (_) {}
-  }
-
-  Future<void> _editar([Map<String, dynamic>? h, String? categoria]) async {
-    final nombre = TextEditingController(text: '${h?['nombre'] ?? ''}');
-    final cat = TextEditingController(text: '${h?['categoria'] ?? categoria ?? ''}');
-    var activa = h?['activa'] != false;
-    var nivel = '${h?['nivel'] ?? 'basica'}';
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(h == null ? 'Nueva habilidad' : 'Editar habilidad', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nombre,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Habilidad'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: cat,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Grupo', hintText: 'Ej. Frenos'),
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'basica', label: Text('Básica')),
-                  ButtonSegment(value: 'avanzada', label: Text('Avanzada')),
-                ],
-                selected: {nivel},
-                onSelectionChanged: (v) => set(() => nivel = v.first),
-              ),
-              if (h != null)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('En uso'),
-                  subtitle: const Text('Apagada, deja de aparecer en las fichas (no se borra su historial).'),
-                  value: activa,
-                  onChanged: (v) => set(() => activa = v),
-                ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Guardar')),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (ok != true || nombre.text.trim().isEmpty || cat.text.trim().isEmpty) return;
-    try {
-      final r = await widget.sesion.api.post('coachGuardar', {
-        'accion': 'habilidad',
-        'id': h?['id'],
-        'nombre': nombre.text.trim(),
-        'categoria': cat.text.trim(),
-        'activa': activa,
-        'nivel': nivel,
-      });
-      if (r['exito'] == false) throw ApiException('${r['error']}');
-      _cargar();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final l = _l;
-    final grupos = <String, List<Map<String, dynamic>>>{};
-    for (final h in l ?? const <Map<String, dynamic>>[]) {
-      (grupos['${h['categoria']}'] ??= []).add(h);
-    }
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: _barra('Habilidades'),
-      floatingActionButton: l == null
-          ? null
-          : FloatingActionButton.extended(onPressed: () => _editar(), icon: const Icon(Icons.add_rounded), label: const Text('Habilidad')),
-      body: l == null
-          ? const Esqueleto()
-          : ListView(
-              padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
-              children: [
-                Text(
-                  Deporte.esDerby
-                      ? 'La lista parte de las habilidades mínimas de WFTDA. Agrega, cambia o apaga las que tu liga necesite: vale para todas las fichas.'
-                      : 'Arma la lista de habilidades de tu deporte. Agrega, cambia o apaga las que tu liga necesite: vale para todas las fichas.',
-                  style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
-                ),
-                for (final g in grupos.entries) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          g.key.toUpperCase(),
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Agregar a ${g.key}',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _editar(null, g.key),
-                        icon: const Icon(Icons.add_rounded, size: 20),
-                      ),
-                    ],
-                  ),
-                  for (final h in g.value)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(
-                        '${h['nombre']}',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: h['activa'] == false ? p.apagado : p.texto,
-                          decoration: h['activa'] == false ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                      subtitle: h['nivel'] == 'avanzada' ? const Text('Avanzada') : null,
-                      trailing: const Icon(Icons.edit_outlined, size: 18),
-                      onTap: () => _editar(h),
-                    ),
-                ],
-              ],
-            ),
-    );
-  }
-}
-
 // ─── Pivots: coaches de la liga ────────────────────────────────────────────
 
 /// Elige qué equipos lleva un coach. Vacío = todos. Null si se cancela.
@@ -1642,7 +1333,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _l = [for (final c in (r['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)]);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -1652,7 +1343,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
       final r = await s.api.get('adminGetRosterEquipo', {'adminToken': s.adminToken});
       personas = [for (final x in (r['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
       return;
     }
     final ya = {
@@ -1749,7 +1440,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
     final l = _l;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra('Coaches'),
+      appBar: barraCoach('Coaches'),
       floatingActionButton: l == null
           ? null
           : FloatingActionButton.extended(onPressed: _nombrar, icon: const Icon(Icons.add_rounded), label: const Text('Nombrar coach')),
@@ -1810,7 +1501,7 @@ class FilaSerCoach extends StatelessWidget {
             const Text('Quiero ser coach', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás la sección Coach para seguir a tus jugadorxs, armar el plan de cada evento y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás Coach en Ajustes y Habilidades en Equipo para seguir a tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),
@@ -1837,7 +1528,7 @@ class FilaSerCoach extends StatelessWidget {
       await sesion.cargarCoach();
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pedido enviado. Te avisamos cuando un Pivot lo revise.')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -2043,7 +1734,7 @@ class _TarjetaTema extends StatelessWidget {
 
 /// Pruebas del coach: crear, editar y a quién se le hacen.
 class _PruebasCoach extends StatefulWidget {
-  const _PruebasCoach({super.key, required this.sesion, required this.jugadorxs});
+  const _PruebasCoach({required this.sesion, required this.jugadorxs});
   final Sesion sesion;
   final List<Map<String, dynamic>> jugadorxs;
   @override
@@ -2065,7 +1756,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _l = [for (final x in (r['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)]);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -2246,7 +1937,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error_ = _error(e));
+      if (mounted) setState(() => _error_ = errorCoach(e));
     }
   }
 
@@ -2290,7 +1981,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _guardando = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
   }
 
@@ -2307,7 +1998,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
     }
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra('Feedback'),
+      appBar: barraCoach('Feedback'),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: d == null
@@ -2548,7 +2239,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
         _cargando = false;
       });
     } catch (e) {
-      if (mounted) setState(() => _error_ = _error(e));
+      if (mounted) setState(() => _error_ = errorCoach(e));
     }
   }
 
@@ -2610,7 +2301,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
         _marcas.remove(u);
         _niveles.remove(u);
       } catch (e) {
-        m.showSnackBar(SnackBar(content: Text(_error(e))));
+        m.showSnackBar(SnackBar(content: Text(errorCoach(e))));
         if (mounted) setState(() => _guardando = false);
         return;
       }
@@ -3029,141 +2720,6 @@ class _BotonDictarState extends State<BotonDictar> {
           height: _escuchando ? 48 : 40,
           decoration: BoxDecoration(color: _escuchando ? p.marca : p.suave, shape: BoxShape.circle),
           child: Icon(Icons.mic_rounded, color: _escuchando ? p.sobreMarca : p.sobreSuave),
-        ),
-      ),
-    );
-  }
-}
-
-/// Niveles en Coach (Victor, 2026-11-17).
-const nivelesCoach = {'sin': 'Aprendiendo lo básico', 'basicas': 'Habilidades básicas', 'avanzadas': 'Habilidades avanzadas'};
-
-/// Marcar habilidades logradas a varias personas de una vez: por ejemplo,
-/// quienes ya pasaron Freshmeat antes de usar la app.
-class _MarcarGrupoScreen extends StatefulWidget {
-  const _MarcarGrupoScreen({required this.sesion, required this.personas, required this.habilidades});
-  final Sesion sesion;
-  final List<Map<String, dynamic>> personas, habilidades;
-  @override
-  State<_MarcarGrupoScreen> createState() => _MarcarGrupoScreenState();
-}
-
-class _MarcarGrupoScreenState extends State<_MarcarGrupoScreen> {
-  final Set<String> _personas = {}, _habs = {};
-  bool _paso2 = false, _guardando = false;
-  String _q = '';
-
-  Future<void> _guardar() async {
-    setState(() => _guardando = true);
-    try {
-      final r = await widget.sesion.api.post('coachGuardar', {
-        'accion': 'marcarGrupo',
-        'personas': jsonEncode(_personas.toList()),
-        'habilidades': jsonEncode(_habs.toList()),
-      });
-      if (r['exito'] == false) throw ApiException('${r['error']}');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Listo: ${_habs.length} habilidades logradas para ${_personas.length} ${_personas.length == 1 ? 'persona' : 'personas'}.')),
-      );
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _guardando = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error(e))));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final grupos = <String, List<Map<String, dynamic>>>{};
-    for (final h in widget.habilidades) {
-      (grupos['${h['categoria']}'] ??= []).add(h);
-    }
-    final basicas = widget.habilidades.where((h) => h['nivel'] != 'avanzada').map((h) => '${h['id']}').toSet();
-    final q = _q.trim().toLowerCase();
-    return PopScope(
-      canPop: !_paso2,
-      onPopInvokedWithResult: (hecho, _) {
-        if (!hecho) setState(() => _paso2 = false);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(_paso2 ? '¿Qué habilidades?' : '¿A quiénes?', style: const TextStyle(fontWeight: FontWeight.w700)),
-        ),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 240),
-          child: !_paso2
-              ? ListView(
-                  key: const ValueKey('p'),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    TextField(
-                      onChanged: (v) => setState(() => _q = v),
-                      decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar'),
-                    ),
-                    for (final x in widget.personas.where((x) => q.isEmpty || '${x['nombre']}'.toLowerCase().contains(q)))
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        secondary: AvatarPersona(nombre: '${x['nombre']}', foto: '${x['foto'] ?? ''}', tamano: 36),
-                        title: Text('${x['nombre']}'),
-                        subtitle: Text('${x['equipo']} · ${nivelesCoach['${x['nivel']}'] ?? ''}'),
-                        value: _personas.contains('${x['username']}'),
-                        onChanged: (v) => setState(() => v == true ? _personas.add('${x['username']}') : _personas.remove('${x['username']}')),
-                      ),
-                  ],
-                )
-              : ListView(
-                  key: const ValueKey('h'),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (basicas.isNotEmpty)
-                      Material(
-                        color: p.suave,
-                        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                        clipBehavior: Clip.antiAlias,
-                        child: CheckboxListTile(
-                          title: Text(
-                            Deporte.esDerby ? 'Todas las básicas (Freshmeat)' : 'Todas las básicas',
-                            style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
-                          ),
-                          value: basicas.every(_habs.contains),
-                          onChanged: (v) => setState(() => v == true ? _habs.addAll(basicas) : _habs.removeAll(basicas)),
-                        ),
-                      ),
-                    for (final g in grupos.entries) ...[
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          g.key.toUpperCase(),
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-                        ),
-                        value: g.value.every((h) => _habs.contains('${h['id']}')),
-                        onChanged: (v) =>
-                            setState(() => v == true ? _habs.addAll(g.value.map((h) => '${h['id']}')) : _habs.removeAll(g.value.map((h) => '${h['id']}'))),
-                      ),
-                      for (final h in g.value)
-                        CheckboxListTile(
-                          dense: true,
-                          contentPadding: const EdgeInsets.only(left: 16),
-                          title: Text('${h['nombre']}'),
-                          value: _habs.contains('${h['id']}'),
-                          onChanged: (v) => setState(() => v == true ? _habs.add('${h['id']}') : _habs.remove('${h['id']}')),
-                        ),
-                    ],
-                  ],
-                ),
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-              onPressed: _guardando ? null : (!_paso2 ? (_personas.isEmpty ? null : () => setState(() => _paso2 = true)) : (_habs.isEmpty ? null : _guardar)),
-              child: Text(!_paso2 ? 'Siguiente (${_personas.length})' : 'Marcar como logradas (${_habs.length})'),
-            ),
-          ),
         ),
       ),
     );

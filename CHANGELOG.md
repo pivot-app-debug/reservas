@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-19 (noche: decisiones de Victor)
+- **Evento social (Naviquinde):** tipo "Social" con amigo secreto (sorteo en ronda con exclusiones, cada quien gira su ruleta y ve solo a quien le tocó), regalo robado (tope y recordatorio), comida compartida con metas por asistente e invitadxs +1 con enlace sin cuenta. Pistas y wishlist quedan guardadas para el año siguiente. Nuevo evento: Entrenamiento, Partido, Reunión de equipo, Social, Otro (antes "Evento") y Personalizado.
+- **Cuotas del mes:** desde noviembre debe solo quien vino a más entrenamientos que sus clases de gracia, en equipos que cobran por mes; muestra monto y motivo, y un grupo "No vino / dentro de la gracia". No había deudas guardadas por la regla vieja.
+- **Pedir comprobante (24 h):** la solicitud queda esperando el comprobante y se descarta sola si no llega; la persona lo adjunta desde su suscripción.
+- **Temporada de descanso:** al crearla se elige cuota entera, proporcional a los entrenamientos que sí hay, o sin cobro.
+- **Herramientas de la liga en Ajustes:** Mi Liga, Finanzas y Coach, con interruptor para activar o desactivar Finanzas y Coach. La barra queda en Calendario, Equipo y Ajustes.
+- **Coach:** portada con atajos (Habilidades, Ajustes de coach, Cursos en curso, Pre-armados, Pruebas), sin Cronograma. "¿Las evaluamos?" pasa a Notificaciones y cada entrenamiento terminado tiene "Evaluar". Habilidades y "Marcar habilidades" (con filtros por nivel, equipo y asistencia) pasan a Equipo.
+
 ## 2026-11-19 (QA por sección, ronda chica)
 - **QA en Google Doc:** "Pivot — QA por sección" en el Drive de Victor, con una sección por parte de la app y la pestaña "Bugs y Nuevas funciones".
 - **Calendario:** el punto rojo queda justo en la esquina del recuadro del día.

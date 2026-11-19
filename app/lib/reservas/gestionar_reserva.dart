@@ -6,6 +6,7 @@ import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../eventos/anticipada.dart';
 import '../eventos/eventos_repo.dart';
+import 'comprobante.dart';
 import 'reservas_repo.dart';
 import '../core/vidrio.dart';
 import '../core/esqueleto.dart';
@@ -543,6 +544,10 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                   EstadoReserva(estado: r.estado),
                   const SizedBox(width: 8),
                 ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ComprobanteFaltante(r: r, repo: ReservasRepo(widget.repo.sesion), alSubir: () => widget.repo.recargarCuota()),
               ),
               if (r.gestionable)
                 Align(

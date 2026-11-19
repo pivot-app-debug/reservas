@@ -4,6 +4,7 @@ import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../eventos/anticipada.dart';
 import '../eventos/eventos_repo.dart';
+import '../reservas/comprobante.dart';
 import '../reservas/gestionar_reserva.dart';
 import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
@@ -80,7 +81,12 @@ class _PagosScreenState extends State<PagosScreen> {
         if (activas.isNotEmpty) ...[
           const SizedBox(height: 22),
           _titulo(p, 'Reservas activas'),
-          for (final r in activas) _Activa(r: r, alGestionar: r.gestionable ? () => gestionarReserva(context, widget.repo, r) : null),
+          for (final r in activas)
+            _Activa(
+              r: r,
+              alGestionar: r.gestionable ? () => gestionarReserva(context, widget.repo, r) : null,
+              comprobante: ComprobanteFaltante(r: r, repo: ReservasRepo(widget.repo.sesion), alSubir: () => widget.repo.recargarCuota()),
+            ),
         ],
         const SizedBox(height: 22),
         _titulo(p, 'Historial'),
@@ -233,9 +239,10 @@ class _Estado extends StatelessWidget {
 }
 
 class _Activa extends StatelessWidget {
-  const _Activa({required this.r, required this.alGestionar});
+  const _Activa({required this.r, required this.alGestionar, this.comprobante});
   final ReservaActiva r;
   final VoidCallback? alGestionar;
+  final Widget? comprobante;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +270,7 @@ class _Activa extends StatelessWidget {
                         style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: p.texto),
                       ),
                       if (r.detalle.isNotEmpty) Text(r.detalle, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                      ?comprobante,
                       if (alGestionar != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),

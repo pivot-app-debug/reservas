@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../coach/coach_screen.dart';
+import '../ajustes/herramientas_liga.dart';
 import '../liga/directorio_screen.dart';
 import '../core/sincroniza.dart';
 
@@ -77,9 +78,10 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   /// Buscador: lleva al ajuste (abriendo la subsección si hace falta) y lo
   /// hace parpadear.
   Future<void> _buscar() async {
-    final e = await Navigator.of(context).push<EntradaAjuste>(MaterialPageRoute(builder: (_) => BuscadorLigaScreen(tesoreria: sesion.tieneArea('finanzas'))));
+    final e = await Navigator.of(context)
+        .push<EntradaAjuste>(MaterialPageRoute(builder: (_) => BuscadorLigaScreen(tesoreria: sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(sesion))));
     if (e == null || !mounted) return;
-    // Finanzas está en la barra de abajo (Victor, 2026-11-16).
+    // Finanzas está en Ajustes → Herramientas de la liga (Victor, 2026-11-19).
     if (e.id == 'tesoreria') {
       SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion));
       return;

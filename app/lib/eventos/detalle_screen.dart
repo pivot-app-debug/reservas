@@ -20,6 +20,8 @@ import 'eventos_repo.dart';
 import 'tomar_asistencia_screen.dart';
 import 'video_screen.dart';
 import 'rectificacion.dart';
+import 'social/social_evento.dart';
+import 'tipos_evento.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
 import '../core/vidrio.dart';
@@ -219,7 +221,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: const Text('Guardarlo sin fecha'),
-              subtitle: const Text('Queda en Coach → Cronograma para asignarlo después'),
+              subtitle: const Text('Queda en Coach → Planes sin fecha para asignarlo después'),
               onTap: () => Navigator.of(h).pop(''),
             ),
             const SizedBox(height: 8),
@@ -359,6 +361,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
                 ),
               // Pasado o cancelado (Victor, 2026-11-12): sin botones de respuesta.
               if (!ev.finalizado && !ev.cancelado) KeyedSubtree(key: _kRespuesta, child: _tuAsistencia(context, ev)),
+              // Evento social (Naviquinde): +1, amigo secreto, regalo robado y comida.
+              if (ev.tipo == kTipoSocial && !ev.cancelado) SocialEnEvento(repo: repo, evento: ev),
               if (!ev.cancelado) _tuReserva(context, ev),
               if (ev.cancelado)
                 _ibanAIr(context, ev)
@@ -386,7 +390,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          ev.tipo,
+          etiquetaTipoEvento(ev.tipo),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(

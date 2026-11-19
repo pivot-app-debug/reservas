@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../coach/coach_screen.dart';
+import '../coach/por_evaluar.dart';
 import '../core/sincroniza.dart';
 
 import '../core/config_liga.dart';
@@ -163,7 +164,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     final m = ScaffoldMessenger.of(context);
     try {
       await repo.pedirComprobante(x);
-      m.showSnackBar(SnackBar(content: Text('Le avisamos a ${x.nombreMostrar} que suba el comprobante.')));
+      m.showSnackBar(SnackBar(content: Text('Le pedimos el comprobante a ${x.nombreMostrar}. Tiene 24 h para adjuntarlo.')));
     } catch (e) {
       m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo avisar. Revisa tu conexión.')));
     }
@@ -615,6 +616,8 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
             }
           }
           final vacia = hijos.isEmpty;
+          // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
+          hijos.insert(0, TarjetasPorEvaluar(sesion: repo.sesion));
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));
             hijos.add(
@@ -800,7 +803,10 @@ class _CuentaCorte extends StatelessWidget {
         v('mensaje').isEmpty ? 'Mantener deja el cambio. Devolver lo regresa y queda fijo hasta el próximo corte.' : 'Mensaje: ${v('mensaje')}',
       );
     case TipoPedido.coach:
-      return ('Pidió ser coach', v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparece la sección Coach.' : 'Mensaje: ${v('mensaje')}');
+      return (
+        'Pidió ser coach',
+        v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de Coach en Ajustes.' : 'Mensaje: ${v('mensaje')}',
+      );
     case TipoPedido.tarea:
       final t = x.tarea;
       return (
@@ -878,7 +884,7 @@ class _TarjetaPedido extends StatelessWidget {
                         ? TextButton.icon(
                             onPressed: alPedirComprobante,
                             icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                            label: const Text('Pedir comprobante'),
+                            label: Text(_esperando(pedido) == null ? 'Pedir comprobante (24 h)' : 'Recordar comprobante'),
                           )
                         : null;
                     final decision = _decision();
@@ -1141,6 +1147,16 @@ class _TarjetaExcepcion extends StatelessWidget {
 /// "Pedir comprobante" va en la fila de Rechazar/Aprobar (QA 2026-11-18).
 bool _faltaComprobante(Pedido pedido) => pedido.tipo == TipoPedido.reserva && '${pedido.m['comprobante'] ?? ''}'.isEmpty && pedido.m['sinComprobante'] == true;
 
+/// "Esperando comprobante" (Victor, 2026-11-19): hasta cuándo tiene para
+/// adjuntarlo; después la solicitud se descarta sola. null = sin plazo.
+DateTime? _esperando(Pedido pedido) => DateTime.tryParse('${pedido.m['comprobanteLimite'] ?? ''}')?.toLocal();
+
+String _textoPlazo(DateTime fin) {
+  final hoy = DateTime.now();
+  final mismoDia = fin.year == hoy.year && fin.month == hoy.month && fin.day == hoy.day;
+  return 'se descarta ${mismoDia ? 'hoy' : 'el ${Fechas.corta(fin)}'} a las ${Fechas.hora(fin)} si no llega';
+}
+
 class _Comprobante extends StatelessWidget {
   const _Comprobante({required this.pedido});
   final Pedido pedido;
@@ -1208,6 +1224,7 @@ class _Comprobante extends StatelessWidget {
     }
     if (!_faltaComprobante(pedido)) return const SizedBox.shrink();
     final avisos = (pedido.m['comprobanteAvisos'] as num?)?.toInt() ?? 0;
+    final fin = _esperando(pedido);
     return Padding(
       padding: const EdgeInsets.only(top: 8, left: 52),
       child: Row(
@@ -1216,7 +1233,11 @@ class _Comprobante extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              avisos == 0 ? 'Sin comprobante todavía' : 'Sin comprobante · $avisos ${avisos == 1 ? 'aviso enviado' : 'avisos enviados'}',
+              fin != null
+                  ? 'Esperando comprobante · ${_textoPlazo(fin)}'
+                  : avisos == 0
+                  ? 'Sin comprobante todavía'
+                  : 'Sin comprobante · $avisos ${avisos == 1 ? 'aviso enviado' : 'avisos enviados'}',
               style: TextStyle(fontSize: 13, color: p.marcaTexto),
             ),
           ),
@@ -1241,6 +1262,7 @@ class _TarjetaMiPedido extends StatelessWidget {
       'rechazada' => (Icons.cancel_outlined, 'No aprobado'),
       'vencida' => (Icons.history_rounded, 'Venció'),
       'cancelada' => (Icons.block_rounded, 'Cancelado'),
+      _ when x.m['comprobanteLimite'] != null => (Icons.receipt_long_outlined, 'Esperando comprobante'),
       _ => (Icons.hourglass_top_rounded, 'Pendiente'),
     };
     final cancelable = x.estado == 'pendiente' && const {'reserva', 'rectificacion', 'excepcion', 'prestamo', 'lesion'}.contains(x.tipo);
