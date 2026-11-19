@@ -43,6 +43,16 @@ Trabajar lo de esta sección y lo que Victor mande desde el 17/11 a las 18:45 (s
 - [ ] Naviquinde: cada persona que marcó Asistiré (o su +1) gira su ruleta; pistas opcionales sobre la persona en la ficha del evento, si no hay pistas, wishlist. Faltan: fecha de cierre, tipo de pistas, qué ven los +1, orden y fecha del evento.
 - [x] Web vieja (`js/`): obsoleta, no se adapta (la app Flutter la reemplaza).
 
+**Respuestas de Victor del 19/11, 20:00 (todas aprobadas; construir):**
+- [ ] Suscripciones: quien usa la app solo ve "suscripción"; Pivots: sección "Suscripciones" y el dinero sigue como "pago"; Finanzas sigue con pagos, ingresos y egresos.
+- [ ] **Naviquinde / evento social: urgente (19/12, cierre 05/12).** Especificación completa en `NAVIQUINDE.md`. Incluye "Evento" → "Otro" y el tipo "Reunión de equipo" en Nuevo evento.
+- [ ] Caja de ventas: externxs y +1 anotan con un enlace de invitación que genera cualquiera del equipo; el cierre lo aprueba un Pivot.
+- [ ] Cuotas: la regla nueva rige desde noviembre y es **retroactiva** (era un bug): las deudas generadas por la regla vieja se corrigen.
+- [ ] Offseason proporcional: cuota × (entrenamientos que sí hay ÷ entrenamientos normales del mes); entera / proporcional / no se cobra al crear el descanso.
+- [ ] Pruebas en cursos, evaluación en cursos, recompensa al aprobar (puntos, descuento, clases gratis o recompensa de la liga: todas), plan del entrenamiento con "Comenzar", planes con descuento, conciliar con responsable, hojas desde abajo en Finanzas, pedir acceso sin enlace: aprobados como se propusieron.
+- [ ] Personas inactivas: se cortan solo las notificaciones de eventos y asistencia (falta saber a qué estados aplica).
+- [ ] Orden: lo chico aprobado → Herramientas de la liga y Coach/habilidades a Equipo → offseason → Naviquinde (antes, por la fecha).
+
 **Esperan respuesta de Victor (propuestas del 19/11, no construir antes; las que siguen abiertas están en la pestaña "Preguntas de claude"):**
 - [ ] **Coach y Finanzas a Ajustes.** Propuesta A (recomendada): en Ajustes, un grupo "Herramientas de la liga" con Mi Liga, Finanzas y Coach; cada una se activa o desactiva ahí y sale de la barra. Barra: Calendario, Equipo, Ajustes. B: solo Coach a Ajustes y Finanzas sigue en la barra para quienes la usan.
 - [ ] **Rediseño de Coach.** Portada con atajos (Habilidades, Ajustes de coach, Cursos en curso y Pre-armados). La card "¿Las evaluamos?" pasa a Notificaciones del Calendario (3 días) y todo evento de Entrenamiento tiene "Evaluar". Se quita Cronograma. "Marcar habilidades" + buscador pasan a Equipo (filtros por nivel, asistencia y equipo, selección múltiple, notas de voz, quién ve el feedback en la ficha deportiva). Pregunta: ¿la lista de habilidades (crear/editar básicas y avanzadas) queda en Coach o también va a Equipo?
