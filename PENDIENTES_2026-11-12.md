@@ -32,7 +32,18 @@ Trabajar lo de esta sección y lo que Victor mande desde el 17/11 a las 18:45 (s
 - [~] 18/11 16:29 (19/11: hecha la ronda chica de Calendario, Notificaciones, Tareas, Cursos, Plan del evento, Asistencia anticipada, Equipo → Buscar, Inventario, Finanzas, cerrar sesión en web y login; queda lo de abajo) **QA por sección de Victor:** todas sus notas, textuales, en `QA_2026-11-18.md` (Calendario, tareas, cursos, plan del evento, nuevo evento, Equipo, Inventario, Finanzas, Coach, Mi Liga, cerrar sesión en web, tours, login). Varias son preguntas o rediseños grandes (Coach y Finanzas a Ajustes, planes por tipo de evento, caja de eventos, pruebas en cursos, rediseño de Coach): proponer y preguntar antes de construir. Victor todavía no testeó crear cuenta / crear liga.
 - [x] 19/11 hecho: [Pivot — QA por sección](https://docs.google.com/document/d/12Exhxe8_ZH3MvM60IQtEI2kONrWcaVppOMSR8DiQnWo/edit) (id `12Exhxe8_ZH3MvM60IQtEI2kONrWcaVppOMSR8DiQnWo`, pestañas "App" y "Bugs y Nuevas funciones"). Claude lo lee con Google Drive y lo edita con el conector de Google Docs (activo desde el 19/11). Reglas de Victor: lo resuelto se borra del doc, lo que queda abierto lleva una línea "Claude (fecha):", y si cambia un título o sección de la app se actualiza también en el doc. **Trabajar el QA en un Google Doc compartido:** Victor quiere un Google Doc que Claude pueda leer y editar y donde él pueda anotar el QA sección por sección (formato de `QA_2026-11-18.md`). Crearlo el jueves con el conector de Google Drive, pasarle el contenido y el link, y desde ahí leer las notas nuevas en cada tarea.
 
-**Esperan respuesta de Victor (propuestas del 19/11, no construir antes):**
+**Decidido por Victor el 19/11 (pestaña "Preguntas de claude" del Google Doc; las dudas nuevas van ahí y lo resuelto se borra de ahí):**
+- [ ] Grupo "Herramientas de la liga" en Ajustes con Mi Liga, Finanzas y Coach (se activan ahí); barra: Calendario, Equipo, Ajustes.
+- [ ] Rediseño de Coach como se propuso; "Marcar habilidades", el buscador **y la lista de habilidades** pasan a Equipo.
+- [ ] Tipos de evento: Entrenamiento, Partido, Reunión de equipo y Otro ("Evento" pasa a "Otro"; Otro sin plan).
+- [ ] Caja de ventas: un "libro de ventas" del evento donde se eligen encargadxs (alguien del equipo o externx) y se cargan productos con precio; ventas y cierre de caja aprobado. Falta definir cómo entran lxs externxs y quién aprueba el cierre.
+- [ ] Cuotas del mes: cambiar la regla (debe solo quien vino más veces que sus clases de gracia, en equipos que cobran por mes; monto y motivo). Falta: desde qué mes rige.
+- [ ] Offseason: cobro proporcional a los entrenamientos que sí hay en el mes (entera / proporcional / no se cobra al crear el descanso).
+- [ ] "Pedir comprobante (24 h)" en vez de rechazar; si no lo adjunta se descarta.
+- [ ] Naviquinde: cada persona que marcó Asistiré (o su +1) gira su ruleta; pistas opcionales sobre la persona en la ficha del evento, si no hay pistas, wishlist. Faltan: fecha de cierre, tipo de pistas, qué ven los +1, orden y fecha del evento.
+- [x] Web vieja (`js/`): obsoleta, no se adapta (la app Flutter la reemplaza).
+
+**Esperan respuesta de Victor (propuestas del 19/11, no construir antes; las que siguen abiertas están en la pestaña "Preguntas de claude"):**
 - [ ] **Coach y Finanzas a Ajustes.** Propuesta A (recomendada): en Ajustes, un grupo "Herramientas de la liga" con Mi Liga, Finanzas y Coach; cada una se activa o desactiva ahí y sale de la barra. Barra: Calendario, Equipo, Ajustes. B: solo Coach a Ajustes y Finanzas sigue en la barra para quienes la usan.
 - [ ] **Rediseño de Coach.** Portada con atajos (Habilidades, Ajustes de coach, Cursos en curso y Pre-armados). La card "¿Las evaluamos?" pasa a Notificaciones del Calendario (3 días) y todo evento de Entrenamiento tiene "Evaluar". Se quita Cronograma. "Marcar habilidades" + buscador pasan a Equipo (filtros por nivel, asistencia y equipo, selección múltiple, notas de voz, quién ve el feedback en la ficha deportiva). Pregunta: ¿la lista de habilidades (crear/editar básicas y avanzadas) queda en Coach o también va a Equipo?
 - [ ] **Planes según tipo de evento.** Tipos: Entrenamiento (bloques), Partido (lineups, estrategia, tareas vinculadas, caja), Reunión de equipo (temas colaborativos, links) y Otro (sin plan). Preguntas: ¿"Evento" pasa a llamarse "Otro"? ¿Crear eventos para un equipo, varios o toda la liga desde el + (revisar qué falta)?
@@ -54,7 +65,6 @@ Trabajar lo de esta sección y lo que Victor mande desde el 17/11 a las 18:45 (s
 - [ ] Mi Liga: el buscador lleva directo al ajuste ("Puntos por asistencia - Quindes"), sin resaltar.
 - [ ] Tours guiados según funciones activadas (Coach, Finanzas, reglas).
 - [ ] Cursos: rediseño de Pre-armados, guardar el progreso del asistente con "Reanudar" en Notificaciones, precargar lugar y hora del calendario al elegir fecha, lista de personas por nivel.
-- [ ] Web vieja (`js/tareas.js`): entender varias áreas separadas por coma.
 - [ ] Finanzas: exportar .xlsx real (hoy CSV), plantilla de Excel para importar cuentas viejas, ventanas vs. bottom sheets.
 
 ## Grandes etapas que faltan (HOJA_DE_RUTA)
