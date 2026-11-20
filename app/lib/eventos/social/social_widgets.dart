@@ -10,6 +10,7 @@ import '../widgets_comunes.dart';
 import 'mensajeria.dart';
 import 'pistas_screen.dart';
 import 'que_lleva_calculo.dart';
+import 'social_editar_tarjetas.dart';
 import 'social_juego_screen.dart';
 import 'social_repo.dart';
 
@@ -383,7 +384,12 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
         onTap: fuera ? null : _pistas,
       ),
     );
-    return TarjetaSocial(titulo: 'Amigo secreto', icono: Icons.redeem_rounded, children: contenido);
+    return TarjetaSocial(
+      titulo: 'Amigo secreto',
+      icono: Icons.redeem_rounded,
+      accion: e.puedeArea('amigo') ? EditarTarjetas.boton(() => EditarTarjetas(context, widget.repo, e, widget.alCambiar).amigo()) : null,
+      children: contenido,
+    );
   }
 }
 
@@ -684,22 +690,26 @@ class ComidaTarjeta extends StatelessWidget {
                 ),
               ],
             ],
-            const SizedBox(height: 16),
-            const Text('¿Para quién?'),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                emptySelectionAllowed: true,
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: true, label: Text('Para todxs')),
-                  ButtonSegment(value: false, label: Text('Solo para mí')),
-                ],
-                selected: {?paraTodxs},
-                onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+            // "¿Para quién?" solo con cosas de uso personal (vasos, platos,
+            // cubiertos): la comida o las servilletas son para todxs (Victor, 2026-11-20).
+            if (esDeUsoPersonal(c.nombre) || esDeUsoPersonal(detalle.text)) ...[
+              const SizedBox(height: 16),
+              const Text('¿Para quién?'),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  emptySelectionAllowed: true,
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Para todxs')),
+                    ButtonSegment(value: false, label: Text('Solo para mí')),
+                  ],
+                  selected: {?paraTodxs},
+                  onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+                ),
               ),
-            ),
+            ],
             if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false) ...[
               const SizedBox(height: 10),
               Text(
@@ -725,7 +735,8 @@ class ComidaTarjeta extends StatelessWidget {
     if (c.porCosa && texto.isEmpty) return avisarSocial(context, 'Escribe qué llevas.');
     if (n == null || n <= 0) return avisarSocial(context, 'Indica cuánto llevas.');
     try {
-      await repo.anotarComida(c.id, n, texto, paraTodxs: paraTodxs);
+      // Si no se preguntó, no se guarda (cuenta como para todxs).
+      await repo.anotarComida(c.id, n, texto, paraTodxs: esDeUsoPersonal(c.nombre) || esDeUsoPersonal(texto) ? paraTodxs : null);
       alCambiar();
     } catch (e) {
       if (context.mounted) avisarSocial(context, e.toString());
@@ -1334,6 +1345,9 @@ class RegaloRobadoTarjeta extends StatelessWidget {
     return TarjetaSocial(
       titulo: 'Regalo robado',
       icono: Icons.card_giftcard_rounded,
+      accion: repo != null && estado.puedeArea('amigo')
+          ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).robado())
+          : null,
       children: [
         Text(
           estado.topeRobado != null

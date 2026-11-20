@@ -13,6 +13,7 @@ import '../modelos.dart';
 import 'crear_social_screen.dart';
 import 'mensajeria.dart';
 import 'social_piezas.dart';
+import 'social_editar_tarjetas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
 
@@ -149,13 +150,24 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
   /// +1 por enlace (Victor, 2026-11-20): se crea su enlace y se abre para
   /// mandarlo. El +1 escribe su nombre al abrirlo.
+  /// Mientras se crea el enlace el botón muestra que está trabajando; el
+  /// menú para enviarlo se abre enseguida y la lista se recarga detrás
+  /// (Victor, 2026-11-20: "lo toqué y no responde").
+  bool _creandoInvitado = false;
+
   Future<void> _agregarInvitado() async {
+    if (_creandoInvitado) return;
+    setState(() => _creandoInvitado = true);
     try {
       final inv = await _social.agregarInvitado('', '');
-      await _cargar();
-      if (mounted) await _compartir(inv);
+      if (!mounted) return;
+      setState(() => _creandoInvitado = false);
+      unawaited(_cargar());
+      await _compartir(inv);
     } catch (e) {
       if (mounted) avisarSocial(context, e.toString());
+    } finally {
+      if (mounted && _creandoInvitado) setState(() => _creandoInvitado = false);
     }
   }
 
@@ -165,7 +177,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final que = titulo.isEmpty ? 'nuestro evento' : '"$titulo"';
     final n = '${inv['nombre'] ?? ''}'.trim();
     return '${n.isEmpty ? 'Hola' : 'Hola, $n'}. Te invito a ${ev.lugar.isEmpty ? que : '$que en ${ev.lugar}'} el ${Fechas.corta(ev.fecha)}. '
-        'Entra aquí (sin crear cuenta) para tus pistas del amigo secreto y la comida: ${inv['enlace']}';
+        'Entra aquí (sin crear cuenta) para ver todo el evento: ${inv['enlace']}';
   }
 
   Future<void> _compartir(Map<String, dynamic> inv) async {
@@ -255,26 +267,31 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
   Widget _invitados(EstadoSocial e) {
     final p = context.pivot;
     final lista = e.misInvitados;
+    final max = e.maxInvitados;
     return TarjetaSocial(
-      titulo: 'Tus invitadxs +1',
+      titulo: 'Tus invitadxs +$max',
       icono: Icons.person_add_alt_1_outlined,
+      accion: e.puedeArea('invitados') ? EditarTarjetas.boton(() => EditarTarjetas(context, _social, e, _cargar).invitados()) : null,
       children: [
         if (!e.asiste)
           Text('Marca Asistiré para sumar a tu +1.', style: TextStyle(color: p.textoSecundario))
         else ...[
           if (lista.isEmpty)
             Text(
-              'Mándale un enlace a tu +1: entra sin crear cuenta, escribe su nombre y ve el evento. Cada enlace es para una persona.',
+              max == 1
+                  ? 'Mándale un enlace a tu +1: entra sin crear cuenta, escribe su nombre y ve todo el evento. El enlace es para una persona.'
+                  : 'Puedes invitar hasta $max personas. Mándale un enlace a cada una: entra sin crear cuenta, escribe su nombre y ve todo el evento.',
               style: TextStyle(color: p.textoSecundario),
             ),
           for (final inv in lista)
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(inv['entro'] == false ? Icons.schedule_send_outlined : Icons.person_outline_rounded),
-              title: Text(inv['entro'] == false ? 'Enlace enviado' : '${inv['nombre']}'),
+              // Sin abrir el enlace todavía: invitación pendiente (no sabemos si se envió).
+              title: Text(inv['entro'] == false ? 'Invitación pendiente' : '${inv['nombre']}'),
               subtitle: Text(
                 [
-                  if (inv['entro'] == false) 'Todavía no entra',
+                  if (inv['entro'] == false) 'Todavía no abre su enlace',
                   if ('${inv['contacto'] ?? ''}'.isNotEmpty) '${inv['contacto']}',
                   if (inv['enSorteo'] == true) 'En el amigo secreto',
                 ].join(' · '),
@@ -289,7 +306,15 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: _agregarInvitado, icon: const Icon(Icons.add_rounded), label: const Text('Invitar a mi +1')),
+            child: lista.length >= max
+                ? Text(max == 1 ? 'Ya invitaste a tu +1.' : 'Ya invitaste a $max personas.', style: TextStyle(color: p.textoSecundario))
+                : TextButton.icon(
+                    onPressed: _creandoInvitado ? null : _agregarInvitado,
+                    icon: _creandoInvitado
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.add_rounded),
+                    label: Text(_creandoInvitado ? 'Creando el enlace…' : (lista.isEmpty ? 'Invitar a mi +1' : 'Invitar a otra persona')),
+                  ),
           ),
         ],
       ],
@@ -384,8 +409,13 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar, pronombres: widget.repo.sesion.datos['pronombres']),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
           if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
-          if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
-          if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
+          if (e.playlist != null)
+            PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
+          if (e.dress != null)
+            DressTarjeta(
+              texto: '${e.dress!['texto'] ?? ''}',
+              alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).dress() : null,
+            ),
           // "Qué traer" ya está dentro de "Qué lleva cada quien" (Victor, 2026-11-20).
           if (e.premios != null) PremiosTarjeta(lista: e.premios!),
           // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).

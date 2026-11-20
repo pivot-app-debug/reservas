@@ -127,6 +127,9 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   // Regalo robado en vivo (Victor, 2026-11-20): opciones del juego.
   int _robosMax = 3;
+
+  /// Cuántxs +1 por persona (se edita desde la tarjeta de invitadxs).
+  int? _maxInvitados;
   bool _devolver = false, _turnoFinal = true, _describir = true;
   final _dress = TextEditingController();
   final List<_Item> _traer = [];
@@ -242,6 +245,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       _cats.add(_Cat(id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: c.porPersona, modo: c.modo, total: c.total, ideas: c.sugerencias));
     }
     if (_cats.isEmpty) _cats.addAll(_catsSugeridas());
+    _maxInvitados = (piezas['maxInvitados'] as num?)?.toInt();
     final jr = (piezas['juegoRobado'] as Map?) ?? const {};
     _robosMax = (jr['robosMax'] as num?)?.toInt() ?? 3;
     _devolver = jr['devolver'] == true;
@@ -1658,6 +1662,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           ],
         },
       if (_piezas.contains(Pieza.homenaje)) 'homenaje': {'mensajes': _mensajes, 'regalo': _regalo, 'regaloNota': _regaloNota.text.trim()},
+      if (_piezas.contains(Pieza.invitados) && _maxInvitados != null) 'maxInvitados': _maxInvitados,
       if (_piezas.contains(Pieza.regaloRobado))
         'juegoRobado': {'robosMax': _robosMax, 'devolver': _devolver, 'turnoFinal': _turnoFinal, 'describir': _describir},
       if (_piezas.contains(Pieza.amigoSecreto) && _noTocar.isNotEmpty)

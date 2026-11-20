@@ -69,8 +69,11 @@ Future<void> _abrir(BuildContext context, String link) async {
 }
 
 class PlaylistTarjeta extends StatelessWidget {
-  const PlaylistTarjeta({super.key, required this.datos});
+  const PlaylistTarjeta({super.key, required this.datos, this.alEditar});
   final Map<String, dynamic> datos;
+
+  /// Lápiz para quien organiza (Victor, 2026-11-20).
+  final VoidCallback? alEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +83,7 @@ class PlaylistTarjeta extends StatelessWidget {
     return TarjetaSocial(
       titulo: 'Playlist colaborativa',
       icono: Icons.queue_music_rounded,
+      accion: alEditar == null ? null : IconButton(tooltip: 'Editar', icon: const Icon(Icons.edit_outlined), onPressed: alEditar),
       children: [
         if (nota.isNotEmpty) Text(nota, style: TextStyle(color: p.texto)),
         if (link.isEmpty)
@@ -96,8 +100,7 @@ class PlaylistTarjeta extends StatelessWidget {
           // Victor, 2026-11-20.
           const SizedBox(height: 8),
           Text(
-            'La playlist debe ser pública y colaborativa para que puedas agregar las canciones que quieras. '
-            'Si no está configurada así o no puedes agregar canciones, avísale a quien organiza el evento.',
+            'La playlist deberá ser pública y colaborativa. En caso de no poder agregar canciones, contacta a quien la creó.',
             style: TextStyle(fontSize: 12, color: p.textoSecundario),
           ),
         ],
@@ -107,8 +110,9 @@ class PlaylistTarjeta extends StatelessWidget {
 }
 
 class DressTarjeta extends StatelessWidget {
-  const DressTarjeta({super.key, required this.texto});
+  const DressTarjeta({super.key, required this.texto, this.alEditar});
   final String texto;
+  final VoidCallback? alEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +120,7 @@ class DressTarjeta extends StatelessWidget {
     return TarjetaSocial(
       titulo: 'Dress code',
       icono: Icons.checkroom_rounded,
+      accion: alEditar == null ? null : IconButton(tooltip: 'Editar', icon: const Icon(Icons.edit_outlined), onPressed: alEditar),
       children: [Text(texto.isEmpty ? 'Ven como quieras.' : texto, style: TextStyle(color: p.texto))],
     );
   }

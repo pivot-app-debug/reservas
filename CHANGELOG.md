@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (tarjetas editables y +1)
+- Quien organiza edita cada tarjeta desde su lápiz, sin pasar por el asistente: Amigo secreto (tope y cierre), Regalo robado (tope, recordatorio, opciones del juego y reglas), Playlist, Dress code e Invitadxs (activar y cuántxs por persona: +1, +2 o +3).
+- La tarjeta de +1 dice "Tus invitadxs +N" según el límite.
+  - Mientras se crea un enlace, el botón muestra "Creando el enlace…" y el menú para enviarlo se abre enseguida (antes parecía trabado).
+  - Quien todavía no abre su enlace aparece como "Invitación pendiente".
+- Playlist: el aviso ahora es más corto.
+- "¿Para quién?" solo se pregunta con cosas de uso personal (vasos, platos, cubiertos…). La comida, las servilletas o los adornos son para todxs.
+- Se arregló que las opciones del juego del regalo robado elegidas en el asistente no se guardaban.
+
 ## 2026-11-20 (Novedades y actualización de la web)
 - La primera sección de Actividad ahora se llama Novedades (ícono de noticias). Arriba muestra los eventos de los próximos 7 días, los cumpleaños de los próximos 10 días y las próximas fiestas; debajo, las notificaciones. Quien puede crear eventos tiene ahí el botón fijo "Crear un evento" (o "Crear una fiesta").
 - Ya no hay pill de Eventos.

@@ -51,7 +51,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
         'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
-  'socialJuego',
+    'socialJuego', 'socialEditarPieza',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -83,6 +83,12 @@ type Quien = {
 };
 
 const MAX_INVITADOS = 5;
+
+/// Cuántxs +1 puede sumar cada persona (lo elige quien organiza; por defecto 1).
+function _maxInvitados(v: unknown): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_INVITADOS) : 1;
+}
 const MAX_LISTA = 30;
 const MAX_WISHLIST = 20;
 const MAX_FAVORITOS = 2;
@@ -182,7 +188,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
       case 'socialQuitarTraer': return await socialQuitarTraer(params, deps);
       case 'socialMensaje': return await socialMensaje(params, deps);
             case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
-      case 'socialJuego': return await socialJuego(params, deps);
+            case 'socialJuego': return await socialJuego(params, deps);
+      case 'socialEditarPieza': return await socialEditarPieza(params, deps);
       case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
@@ -280,7 +287,9 @@ export function _filtrarPorPermisos(d: any, areas: string[], previa: any): any {
   if (d.piezas !== undefined) {
     const antes = _piezas(previa);
     const nuevas = d.piezas && typeof d.piezas === 'object' ? d.piezas : {};
-        const porArea: Record<string, string[]> = { amigo: ['noTocar', 'juegoRobado'], comida: ['traer'], extras: ['playlist', 'dress', 'premios'], homenaje: ['homenaje', 'ocultas'] };
+            const porArea: Record<string, string[]> = {
+      amigo: ['noTocar', 'juegoRobado'], comida: ['traer'], extras: ['playlist', 'dress', 'premios'], homenaje: ['homenaje', 'ocultas'], invitados: ['maxInvitados'],
+    };
     const piezas: any = { ...antes };
     for (const [area, claves] of Object.entries(porArea)) {
       if (!puede(area)) continue;
@@ -422,7 +431,9 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   const social: Record<string, any> = {
     amigoSecreto: !!cfg.amigo_secreto && ve('amigoSecreto'), regaloRobado: !!cfg.regalo_robado && ve('regaloRobado'),
     comida: !!cfg.comida && ve('comida'), invitados: !!cfg.invitados && ve('invitados'),
-    topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
+        topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
+    // Para editar desde las tarjetas (Victor, 2026-11-20).
+    maxInvitados: _maxInvitados(_piezas(cfg).maxInvitados), juegoOpciones: reglasJuego(_piezas(cfg).juegoRobado), reglasPropias: cfg.reglas_robado ?? '',
     cierre, inscripcionAbierta: !cfg.sorteado_en && _hoyEc() <= cierre, sorteado: !!cfg.sorteado_en,
         // Sin reglas propias, la plantilla sigue las opciones del juego (Victor, 2026-11-20).
     reglasRobado: cfg.reglas_robado ?? plantillaReglasRobado(reglasJuego(_piezas(cfg).juegoRobado)), reglasPorDefecto: !cfg.reglas_robado,
@@ -666,6 +677,9 @@ function _leerPiezas(v: any): Record<string, any> {
     out.premios = { lista };
   }
   if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
+        // Opciones del regalo robado en vivo y límite de +1 (Victor, 2026-11-20).
+  if (p.juegoRobado) out.juegoRobado = reglasJuego(p.juegoRobado);
+  if (p.maxInvitados !== undefined && p.maxInvitados !== null) out.maxInvitados = _maxInvitados(p.maxInvitados);
       // Ícono elegido para una festividad propia (Victor, 2026-11-20).
   if (typeof p.icono === 'string' && /^[a-z_]{1,20}$/.test(p.icono)) out.icono = p.icono;
   // Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
@@ -1257,7 +1271,8 @@ async function socialAgregarInvitado(params: Record<string, any>, deps: DepsSoci
   const nombre = _texto(params.nombre, 60);
   const contacto = _texto(params.contacto, 120);
   const { count } = await db.from('social_invitados').select('id', { count: 'exact', head: true }).eq('id_evento', q.idEvento).eq('anfitrion', q.clave);
-  if ((count ?? 0) >= MAX_INVITADOS) return { exito: false, error: `Puedes sumar hasta ${MAX_INVITADOS} invitadxs.` };
+    const max = _maxInvitados(_piezas(cfg).maxInvitados);
+  if ((count ?? 0) >= max) return { exito: false, error: max === 1 ? 'Puedes sumar 1 invitadx.' : `Puedes sumar hasta ${max} invitadxs.` };
   const token = _tokenNuevo();
   const { data, error } = await db.from('social_invitados')
         .insert({ id_evento: q.idEvento, anfitrion: q.clave, nombre, contacto: contacto || null, token, liga_id: liga, ...(nombre ? { entro_en: new Date().toISOString() } : {}) })
@@ -1518,6 +1533,60 @@ async function socialQuitarTraer(params: Record<string, any>, deps: DepsSocial):
   if ('error' in q) return { exito: false, error: q.error };
   if (a.clave !== q.clave && !_organiza(q, await _config(db, a.id_evento))) return { exito: false, error: 'Solo puedes quitar lo que anotaste tú.' };
   await db.from('social_traer_anotes').delete().eq('id', a.id);
+  return { exito: true };
+}
+
+// ─── Editar una tarjeta (Victor, 2026-11-20) ───────────────────────────────
+// Quien organiza cambia una pieza desde su tarjeta, sin pasar por el asistente.
+
+const AREA_DE_PIEZA: Record<string, string> = { amigo: 'amigo', robado: 'amigo', playlist: 'extras', dress: 'extras', invitados: 'invitados' };
+
+async function socialEditarPieza(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db;
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const cfg = await _config(db, q.idEvento);
+  const pieza = String(params.pieza ?? '');
+  const area = AREA_DE_PIEZA[pieza];
+  if (!cfg || !area) return { exito: false, error: 'No encontramos esa parte del evento.' };
+  if (!_organiza(q, cfg)) return { exito: false, error: 'Solo quienes organizan pueden cambiar esto.' };
+  const mis = _misPermisos(q, cfg);
+  if (mis && !mis.includes(area)) return { exito: false, error: 'No estás a cargo de esta parte del evento.' };
+  const d = _json(params.datos) ?? {};
+  const piezas = { ..._piezas(cfg) };
+  const fila: Record<string, any> = {};
+  switch (pieza) {
+    case 'amigo': {
+      if (d.tope !== undefined) fila.tope_amigo = _num(d.tope);
+      if (typeof d.cierre === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.cierre)) {
+        if (cfg.sorteado_en) return { exito: false, error: 'El sorteo ya se hizo: el cierre no se puede cambiar.' };
+        const ev = await _evento(db, q.idEvento);
+        const limite = ev ? _restarDias(ev.fecha, DIAS_CIERRE_MIN) : d.cierre;
+        fila.cierre = d.cierre > limite ? limite : d.cierre;
+      }
+      break;
+    }
+    case 'robado':
+      if (d.tope !== undefined) fila.tope_robado = _num(d.tope);
+      if (d.recordatorio !== undefined) fila.recordatorio_robado = _texto(d.recordatorio, 300) || null;
+      if (d.reglas !== undefined) fila.reglas_robado = _reglas(d.reglas);
+      if (d.juego !== undefined) piezas.juegoRobado = reglasJuego(d.juego);
+      break;
+    case 'playlist':
+      piezas.playlist = { link: _link(d.link), nota: _texto(d.nota, 200) };
+      break;
+    case 'dress':
+      piezas.dress = { texto: _textoLargo(d.texto, 400) };
+      break;
+    case 'invitados':
+      if (d.activo !== undefined) fila.invitados = d.activo === true;
+      if (d.max !== undefined) piezas.maxInvitados = _maxInvitados(d.max);
+      break;
+  }
+  fila.piezas = piezas;
+  if ('actualizado_en' in cfg) fila.actualizado_en = new Date().toISOString();
+  const { error } = await db.from('social_eventos').update(fila).eq('id_evento', q.idEvento);
+  if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
   return { exito: true };
 }
 

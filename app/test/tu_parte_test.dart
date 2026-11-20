@@ -28,6 +28,14 @@ void main() {
     expect(rendimientoDe('Algo rico'), isNull);
   });
 
+  test('¿Para quién? solo con cosas de uso personal', () {
+    expect(esDeUsoPersonal('Vasos y platos'), isTrue);
+    expect(esDeUsoPersonal('Cubiertos'), isTrue);
+    expect(esDeUsoPersonal('Snacks'), isFalse);
+    expect(esDeUsoPersonal('Servilletas'), isFalse);
+    expect(esDeUsoPersonal('Postres navideños'), isFalse);
+  });
+
   test('Tu parte: lo que llevas para todxs compensa entre secciones', () {
     // 10 personas; salado y postre a 2 porciones, bebida a 1 litro; hielo no cuenta.
     EstadoSocial con(List<Map<String, dynamic>> bebida) => EstadoSocial({

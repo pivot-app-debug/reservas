@@ -114,3 +114,11 @@ Rendimiento? rendimientoDe(String texto) {
   }
   return null;
 }
+
+/// Cosas de uso personal: solo con estas tiene sentido preguntar "¿Para quién?"
+/// (Victor, 2026-11-20). Comida, bebida, servilletas o adornos son para todxs.
+bool esDeUsoPersonal(String texto) {
+  const claves = ['vaso', 'plato', 'cubierto', 'cuchara', 'tenedor', 'cuchillo', 'taza', 'copa', 'sorbete', 'pajilla', 'popote'];
+  final t = ' ${_normal(texto)} ';
+  return claves.any((k) => t.contains(' ${_normal(k)}'));
+}

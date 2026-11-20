@@ -97,7 +97,9 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byTooltip('Me anoto').first);
     await t.pumpAndSettle();
-    expect(find.text('¿Para quién?'), findsOneWidget);
+    // El hielo es para todxs: no se pregunta para quién.
+    expect(find.text('¿Para quién?'), findsNothing);
+    expect(find.text('Me anoto'), findsOneWidget);
     expect(find.text('Faltan 2 bolsas.'), findsOneWidget);
     expect(t.takeException(), isNull);
   });

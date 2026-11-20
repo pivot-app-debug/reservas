@@ -30,6 +30,10 @@ class SocialRepo {
   Future<Map<String, dynamic>> guardarConfig(Map<String, Object?> config, List<Map<String, Object?>> categorias) =>
       _post('socialGuardarConfig', {'config': jsonEncode(config), 'categorias': jsonEncode(categorias)});
 
+  /// Editar una tarjeta sin pasar por el asistente (Victor, 2026-11-20):
+  /// 'amigo', 'robado', 'playlist', 'dress' o 'invitados'.
+  Future<void> editarPieza(String pieza, Map<String, Object?> datos) => _post('socialEditarPieza', {'pieza': pieza, 'datos': jsonEncode(datos)});
+
   /// Regalo robado en vivo (Victor, 2026-11-20): 'ver', 'iniciar', 'mio', 'dejo',
   /// 'sortear', 'empezar', 'abrir', 'robar', 'siguiente', 'final', 'deshacer', 'reiniciar'.
   Future<Map<String, dynamic>> juego(String accion, [Map<String, Object?> extra = const {}]) => _post('socialJuego', {'accion': accion, ...extra});
@@ -161,11 +165,23 @@ class EstadoSocial {
   bool get organiza => raw['organiza'] == true;
 
   /// Puede administrar la comida: organiza y (crea el evento, es Pivot o está a cargo de la comida).
-  bool get puedeComida {
+  bool get puedeComida => puedeArea('comida');
+
+  /// Organiza y está a cargo de esa área ('amigo', 'comida', 'extras', 'invitados'…).
+  bool puedeArea(String area) {
     if (!organiza) return false;
     final m = editable?['misPermisos'];
-    return m is! List || m.contains('comida');
+    return m is! List || m.contains(area);
   }
+
+  /// Cuántxs +1 puede sumar cada persona (lo elige quien organiza).
+  int get maxInvitados => (social?['maxInvitados'] as num?)?.toInt() ?? 1;
+
+  /// Opciones del regalo robado en vivo (robosMax, devolver, turnoFinal, describir).
+  Map<String, dynamic> get juegoOpciones => Map<String, dynamic>.from((social?['juegoOpciones'] as Map?) ?? const {});
+
+  /// Reglas escritas por quien organiza (vacío = las de la plantilla).
+  String get reglasPropias => '${social?['reglasPropias'] ?? ''}';
 
   bool get esInvitadx => raw['tipo'] == 'invitado';
 
