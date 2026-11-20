@@ -47,8 +47,8 @@ class SocialRepo {
     return FichaAmigo(Map<String, dynamic>.from(r['ficha'] as Map));
   }
 
-  Future<void> anotarComida(String categoriaId, num cantidad, String detalle) =>
-      _post('socialAnotarComida', {'categoriaId': categoriaId, 'cantidad': cantidad, 'detalle': detalle});
+  Future<void> anotarComida(String categoriaId, num cantidad, String detalle, {bool? paraTodxs}) =>
+      _post('socialAnotarComida', {'categoriaId': categoriaId, 'cantidad': cantidad, 'detalle': detalle, 'paraTodxs': ?paraTodxs});
 
   Future<void> quitarAporte(String id) => _post('socialQuitarAporte', {'id': id});
 
@@ -61,8 +61,12 @@ class SocialRepo {
     num? porPersona,
     bool? falta,
     List<String>? sugerencias,
+    String? modo,
+    num? total,
     bool borrar = false,
   }) => _post('socialComidaEditar', {
+    'modo': ?modo,
+    'total': ?total,
     'categoriaId': ?categoriaId,
     'nombre': ?nombre,
     'unidad': ?unidad,
@@ -207,6 +211,14 @@ class CategoriaComida {
   num get aportado => (raw['aportado'] as num?) ?? 0;
   bool get cerrada => raw['cerrada'] == true;
   bool get falta => raw['falta'] == true;
+
+  /// 'meta' | 'cada' (cada persona lleva N cosas) | 'total' | 'libre'.
+  String get modo => '${raw['modo'] ?? 'meta'}';
+  num? get total => raw['total'] as num?;
+
+  /// Lo mío: cosas anotadas (cada/libre) o cantidad (meta/total).
+  num get mias => (raw['mias'] as num?) ?? 0;
+  bool get porCosa => modo == 'cada' || modo == 'libre';
   List<String> get sugerencias => [for (final x in (raw['sugerencias'] as List? ?? const [])) '$x'];
   double get avance => meta <= 0 ? 0 : (aportado / meta).clamp(0, 1).toDouble();
   List<Map<String, dynamic>> get aportes => [for (final x in (raw['aportes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];

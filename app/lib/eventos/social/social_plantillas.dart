@@ -8,11 +8,12 @@ import 'package:flutter/material.dart';
 /// `piezasModulo` se guardan como columnas (amigo_secreto, regalo_robado,
 /// comida, invitados); el resto va en `social_eventos.piezas`.
 enum Pieza {
-  comida('Comida y bebida compartida', 'Categorías con meta por asistente; cada quien se anota con lo que lleva', Icons.restaurant_rounded),
+  comida('¿Qué llevamos?', 'Comida, bebida y cosas para la fiesta: cada quien se anota con lo que lleva y todxs ven qué falta', Icons.restaurant_rounded),
   playlist('Playlist colaborativa', 'Un enlace de Spotify u otra app para que todxs sumen canciones', Icons.queue_music_rounded),
   amigoSecreto('Amigo secreto', 'Sorteo con ruleta, pistas y wishlist', Icons.redeem_rounded),
   regaloRobado('Regalo robado', 'Tope, recordatorio y reglas del juego', Icons.card_giftcard_rounded),
   dress('Dress code o disfraces', 'Cómo venir vestidxs', Icons.checkroom_rounded),
+  // Ya no se elige: pasó a ser secciones de "¿Qué llevamos?" (Victor, 2026-11-20).
   traer('Lista de qué traer', 'Cosas que hacen falta; cada quien se anota', Icons.checklist_rtl_rounded),
   homenaje('Homenaje', 'Mensajes de todxs y regalo entre todxs para alguien', Icons.favorite_border_rounded),
   premios('Premios o reconocimientos', 'Lista de premios y a quién', Icons.emoji_events_outlined),

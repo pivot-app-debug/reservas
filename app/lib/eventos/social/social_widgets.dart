@@ -522,6 +522,9 @@ class _PintorRuleta extends CustomPainter {
 
 // ─── Comida compartida ────────────────────────────────────────────────────
 
+/// "¿Qué llevamos?" (Victor, 2026-11-20): comida, bebida y cosas en una sola
+/// lista de secciones. Todxs ven quién lleva qué para no repetir; quien está a
+/// cargo arma las secciones desde aquí, marca lo que hace falta y deja ideas.
 class ComidaTarjeta extends StatelessWidget {
   const ComidaTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar});
   final SocialRepo repo;
@@ -531,117 +534,165 @@ class ComidaTarjeta extends StatelessWidget {
   Future<void> _anotar(BuildContext context, CategoriaComida c, {String? sugerencia}) async {
     final cantidad = TextEditingController(text: cantidadSocial(math.max(1, c.porPersona)));
     final detalle = TextEditingController(text: sugerencia ?? '');
+    bool? paraTodxs;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (d) => AlertDialog(
-        title: Text('Llevo ${c.nombre.toLowerCase()}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: detalle,
-              autofocus: true,
-              maxLength: 80,
-              decoration: const InputDecoration(labelText: '¿Qué llevas?', hintText: 'Ej.: Limonada'),
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text(c.nombre),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: detalle,
+                  autofocus: sugerencia == null,
+                  maxLength: 80,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', hintText: 'Ej.: Vino tinto'),
+                ),
+                if (!c.porCosa)
+                  TextField(
+                    controller: cantidad,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: 'Cantidad', suffixText: c.unidad),
+                  ),
+                const SizedBox(height: 12),
+                const Text('¿Para quién?'),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    ChoiceChip(label: const Text('Para todxs'), selected: paraTodxs == true, onSelected: (_) => set(() => paraTodxs = true)),
+                    ChoiceChip(label: const Text('Solo para mí'), selected: paraTodxs == false, onSelected: (_) => set(() => paraTodxs = false)),
+                  ],
+                ),
+                if (c.meta > 0 && !c.porCosa) ...[const SizedBox(height: 8), Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.')],
+              ],
             ),
-            TextField(
-              controller: cantidad,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: 'Cantidad', suffixText: c.unidad),
-            ),
-            const SizedBox(height: 8),
-            Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me anoto')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Anotarme')),
-        ],
       ),
     );
-    final n = num.tryParse(cantidad.text.replaceAll(',', '.'));
-    final texto = detalle.text;
+    final n = c.porCosa ? 1 : num.tryParse(cantidad.text.replaceAll(',', '.'));
+    final texto = detalle.text.trim();
     cantidad.dispose();
     detalle.dispose();
     if (ok != true || !context.mounted) return;
-    if (n == null || n <= 0) {
-      avisarSocial(context, 'Indica cuánto llevas.');
-      return;
-    }
+    if (c.porCosa && texto.isEmpty) return avisarSocial(context, 'Escribe qué llevas.');
+    if (n == null || n <= 0) return avisarSocial(context, 'Indica cuánto llevas.');
     try {
-      await repo.anotarComida(c.id, n, texto);
+      await repo.anotarComida(c.id, n, texto, paraTodxs: paraTodxs);
       alCambiar();
     } catch (e) {
       if (context.mounted) avisarSocial(context, e.toString());
     }
   }
 
-  // ─── Quien está a cargo de la comida (Victor, 2026-11-20) ────────────────
+  // ─── Quien está a cargo ──────────────────────────────────────────────────
 
   Future<void> _editar(BuildContext context, [CategoriaComida? c]) async {
     final nombre = TextEditingController(text: c?.nombre ?? '');
-    final unidad = TextEditingController(text: c?.unidad ?? 'porciones');
+    final unidad = TextEditingController(text: c == null || c.porCosa ? 'porciones' : c.unidad);
     final porPersona = TextEditingController(text: c == null ? '1' : cantidadSocial(c.porPersona));
+    final total = TextEditingController(text: c?.total == null ? '' : cantidadSocial(c!.total!));
     final ideas = TextEditingController(text: (c?.sugerencias ?? const []).join(', '));
+    var modo = c?.modo ?? 'libre';
     final ok = await showDialog<bool>(
       context: context,
-      builder: (d) => AlertDialog(
-        title: Text(c == null ? 'Agregar categoría' : 'Editar ${c.nombre}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nombre,
-                autofocus: c == null,
-                maxLength: 60,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Categoría', hintText: 'Ej.: Hielo'),
-              ),
-              TextField(
-                controller: unidad,
-                maxLength: 30,
-                decoration: const InputDecoration(labelText: 'Unidad', hintText: 'Ej.: bolsas, litros, porciones'),
-              ),
-              TextField(
-                controller: porPersona,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Cuánto por persona', helperText: 'La meta se calcula con quienes confirmaron.'),
-              ),
-              TextField(
-                controller: ideas,
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Ideas de qué traer (opcional)', hintText: 'Separadas por coma: jugos, gaseosas, agua'),
-              ),
-            ],
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text(c == null ? 'Agregar sección' : 'Editar ${c.nombre}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nombre,
+                  autofocus: c == null,
+                  maxLength: 60,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Sección', hintText: 'Ej.: Plato salado, Hielo, Decoración'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: modo,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: '¿Cuánto se pide?'),
+                  items: const [
+                    DropdownMenuItem(value: 'libre', child: Text('Libre, sin cantidad')),
+                    DropdownMenuItem(value: 'cada', child: Text('Cada persona lleva un número de cosas')),
+                    DropdownMenuItem(value: 'total', child: Text('Un total fijo')),
+                    DropdownMenuItem(value: 'meta', child: Text('Según cuántxs van (por persona)')),
+                  ],
+                  onChanged: (v) => set(() => modo = v ?? 'libre'),
+                ),
+                if (modo == 'meta' || modo == 'cada')
+                  TextField(
+                    controller: porPersona,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: modo == 'cada' ? 'Cuántas cosas lleva cada persona' : 'Cuánto por persona'),
+                  ),
+                if (modo == 'total')
+                  TextField(
+                    controller: total,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Total'),
+                  ),
+                if (modo == 'meta' || modo == 'total')
+                  TextField(
+                    controller: unidad,
+                    maxLength: 30,
+                    decoration: const InputDecoration(labelText: 'Unidad', hintText: 'Ej.: bolsas, litros, porciones'),
+                  ),
+                TextField(
+                  controller: ideas,
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Ideas de qué traer (opcional)', hintText: 'Separadas por coma: luces, guirnaldas'),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Guardar')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Guardar')),
-        ],
       ),
     );
-    final n = nombre.text.trim(), u = unidad.text.trim(), pp = num.tryParse(porPersona.text.replaceAll(',', '.'));
+    final n = nombre.text.trim(), u = unidad.text.trim();
+    final pp = num.tryParse(porPersona.text.replaceAll(',', '.')), tt = num.tryParse(total.text.replaceAll(',', '.'));
     final sug = [
       for (final x in ideas.text.split(','))
         if (x.trim().isNotEmpty) x.trim(),
     ];
-    for (final t in [nombre, unidad, porPersona, ideas]) {
+    for (final t in [nombre, unidad, porPersona, total, ideas]) {
       t.dispose();
     }
     if (ok != true || !context.mounted) return;
-    if (n.isEmpty) return avisarSocial(context, 'Escribe el nombre de la categoría.');
+    if (n.isEmpty) return avisarSocial(context, 'Escribe el nombre de la sección.');
     try {
-      await repo.editarComida(categoriaId: c?.id, nombre: n, unidad: u, porPersona: pp, sugerencias: sug);
+      await repo.editarComida(
+        categoriaId: c?.id,
+        nombre: n,
+        unidad: modo == 'cada' || modo == 'libre' ? 'cosas' : u,
+        porPersona: pp,
+        modo: modo,
+        total: tt,
+        sugerencias: sug,
+      );
       alCambiar();
     } catch (e) {
       if (context.mounted) avisarSocial(context, e.toString());
     }
   }
 
-  Future<void> _accionCategoria(BuildContext context, CategoriaComida c, String accion) async {
+  Future<void> _accionSeccion(BuildContext context, CategoriaComida c, String accion) async {
     try {
       switch (accion) {
         case 'editar':
@@ -678,6 +729,8 @@ class ComidaTarjeta extends StatelessWidget {
     }
   }
 
+  static String _para(Object? v) => v == true ? ' · para todxs' : (v == false ? ' · solo para sí' : '');
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -686,12 +739,12 @@ class ComidaTarjeta extends StatelessWidget {
     final total = estado.conteo['total'] ?? 0;
     final admin = estado.puedeComida;
     return TarjetaSocial(
-      titulo: 'Comida compartida',
+      titulo: '¿Qué llevamos?',
       icono: Icons.restaurant_rounded,
-      accion: admin ? IconButton(tooltip: 'Agregar categoría', icon: const Icon(Icons.add_rounded), onPressed: () => _editar(context)) : null,
+      accion: admin ? IconButton(tooltip: 'Agregar sección', icon: const Icon(Icons.add_rounded), onPressed: () => _editar(context)) : null,
       children: [
         Text(
-          'La meta se calcula con $total ${total == 1 ? 'persona confirmada' : 'personas confirmadas'} (con sus +1).',
+          'Mira lo que ya lleva cada quien para no repetir. Van $total ${total == 1 ? 'persona' : 'personas'} (con sus +1).',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
         if (!estado.asiste) ...[
@@ -701,98 +754,197 @@ class ComidaTarjeta extends StatelessWidget {
         if (cats.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text('Quien organiza todavía no armó las categorías.', style: TextStyle(color: p.textoSecundario)),
-          ),
-        for (final c in cats)
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        c.nombre,
-                        style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                      ),
-                    ),
-                    Text('${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)} ${c.unidad}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                    if (admin)
-                      PopupMenuButton<String>(
-                        tooltip: 'Opciones',
-                        iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                        position: PopupMenuPosition.under,
-                        onSelected: (a) => _accionCategoria(context, c, a),
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                          PopupMenuItem(value: 'falta', child: Text(c.falta ? 'Ya no hace falta' : 'Hace falta')),
-                          const PopupMenuItem(value: 'borrar', child: Text('Quitar')),
-                        ],
-                      ),
-                  ],
-                ),
-                if (c.falta && !c.cerrada) ...[const SizedBox(height: 4), Etiqueta(texto: 'Hace falta', icono: Icons.priority_high_rounded)],
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(PivotRadios.chip),
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: c.avance),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 8, backgroundColor: p.suave, color: p.marca),
-                  ),
-                ),
-                for (final a in c.aportes)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${a['mio'] == true ? 'Tú' : a['nombre']}: ${cantidadSocial(a['cantidad'] as num)} ${c.unidad}${'${a['detalle']}'.isEmpty ? '' : ' · ${a['detalle']}'}',
-                            style: TextStyle(fontSize: 13, color: p.texto),
-                          ),
-                        ),
-                        if (a['mio'] == true)
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            tooltip: 'Quitar',
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            onPressed: () => _quitar(context, '${a['id']}'),
-                          ),
-                      ],
-                    ),
-                  ),
-                // Ideas de qué traer: tocar una anota con eso.
-                if (c.sugerencias.isNotEmpty && !c.cerrada) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final s in c.sugerencias)
-                        ActionChip(
-                          label: Text(s),
-                          onPressed: estado.asiste ? () => _anotar(context, c, sugerencia: s) : null,
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: c.cerrada
-                      ? Etiqueta(texto: 'Completo', icono: Icons.check_rounded)
-                      : TextButton.icon(
-                          onPressed: estado.asiste ? () => _anotar(context, c) : null,
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Me anoto'),
-                        ),
-                ),
-              ],
+            child: Text(
+              admin ? 'Todavía no hay secciones. Toca + para agregar la primera.' : 'Quien organiza todavía no armó la lista.',
+              style: TextStyle(color: p.textoSecundario),
             ),
           ),
+        for (final c in cats) _seccion(context, p, c, admin),
+      ],
+    );
+  }
+
+  Widget _seccion(BuildContext context, PivotPaleta p, CategoriaComida c, bool admin) {
+    final tomadas = {
+      for (final a in c.aportes)
+        if ('${a['detalle'] ?? ''}'.trim().isNotEmpty) '${a['detalle']}'.trim().toLowerCase(): a['mio'] == true ? 'ti' : '${a['nombre']}',
+    };
+    final pide = switch (c.modo) {
+      'cada' => 'Cada persona lleva ${cantidadSocial(c.porPersona)} ${c.porPersona == 1 ? 'cosa' : 'cosas'}',
+      'total' => 'Hacen falta ${cantidadSocial(c.meta)} ${c.unidad}',
+      'libre' => '',
+      _ => '${cantidadSocial(c.porPersona)} ${c.unidad} por persona',
+    };
+    final mio = c.aportes.any((a) => a['mio'] == true);
+    final faltanMias = c.modo == 'cada' ? (c.porPersona - c.mias).ceil() : 0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  c.nombre,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                ),
+              ),
+              if (c.meta > 0)
+                Text(
+                  c.porCosa
+                      ? '${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)}'
+                      : '${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)} ${c.unidad}',
+                  style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                ),
+              if (admin)
+                PopupMenuButton<String>(
+                  tooltip: 'Opciones',
+                  iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                  position: PopupMenuPosition.under,
+                  onSelected: (a) => _accionSeccion(context, c, a),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                    PopupMenuItem(value: 'falta', child: Text(c.falta ? 'Ya no hace falta' : 'Hace falta')),
+                    const PopupMenuItem(value: 'borrar', child: Text('Quitar')),
+                  ],
+                ),
+            ],
+          ),
+          if (pide.isNotEmpty) Text(pide, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          if (c.falta && !c.cerrada) ...[const SizedBox(height: 4), Etiqueta(texto: 'Hace falta', icono: Icons.priority_high_rounded)],
+          if (c.meta > 0) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(PivotRadios.chip),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: c.avance),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 8, backgroundColor: p.suave, color: p.marca),
+              ),
+            ),
+          ],
+          // Quién lleva qué: lo ven todxs para no repetir.
+          for (final a in c.aportes)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${a['mio'] == true ? 'Tú' : a['nombre']}: '
+                      '${c.porCosa ? '' : '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}'
+                      '${'${a['detalle']}'.isEmpty ? '' : '${c.porCosa ? '' : ' · '}${a['detalle']}'}${_para(a['paraTodxs'])}',
+                      style: TextStyle(fontSize: 13, color: p.texto),
+                    ),
+                  ),
+                  if (a['mio'] == true)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Quitar',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () => _quitar(context, '${a['id']}'),
+                    ),
+                ],
+              ),
+            ),
+          // Ideas: las ya tomadas se ven tachadas con quién las lleva.
+          if (c.sugerencias.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final s in c.sugerencias)
+                  if (tomadas[s.trim().toLowerCase()] case final quien?)
+                    Chip(
+                      label: Text(
+                        '$s · lo lleva $quien',
+                        style: TextStyle(decoration: TextDecoration.lineThrough, color: p.textoSecundario),
+                      ),
+                    )
+                  else
+                    ActionChip(
+                      label: Text(s),
+                      onPressed: estado.asiste && !c.cerrada ? () => _anotar(context, c, sugerencia: s) : null,
+                    ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: c.cerrada
+                ? Etiqueta(texto: 'Completado', icono: Icons.check_circle_rounded)
+                : TextButton.icon(
+                    onPressed: estado.asiste ? () => _anotar(context, c) : null,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(
+                      c.modo == 'cada' && mio
+                          ? (faltanMias > 0
+                                ? 'Llevas ${cantidadSocial(c.mias)} de ${cantidadSocial(c.porPersona)} · Agregar otra'
+                                : 'Llevas ${cantidadSocial(c.mias)} · Agregar otra')
+                          : mio
+                          ? 'Agregar otra'
+                          : 'Me anoto',
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Lo que llevas": todo lo que te anotaste en "¿Qué llevamos?" (Victor, 2026-11-20).
+class LoQueLlevasTarjeta extends StatelessWidget {
+  const LoQueLlevasTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar});
+  final SocialRepo repo;
+  final EstadoSocial estado;
+  final VoidCallback alCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final mias = [
+      for (final c in estado.comida)
+        for (final a in c.aportes)
+          if (a['mio'] == true) (c, a),
+    ];
+    if (mias.isEmpty) return const SizedBox.shrink();
+    return TarjetaSocial(
+      titulo: 'Lo que llevas',
+      icono: Icons.shopping_bag_outlined,
+      children: [
+        for (final (c, a) in mias)
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${'${a['detalle'] ?? ''}'.isEmpty ? c.nombre : a['detalle']}'
+                  '${c.porCosa ? '' : ' · ${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}'
+                  '${ComidaTarjeta._para(a['paraTodxs'])}',
+                  style: TextStyle(color: p.texto),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Quitar',
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () async {
+                  try {
+                    await repo.quitarAporte('${a['id']}');
+                    alCambiar();
+                  } catch (e) {
+                    if (context.mounted) avisarSocial(context, e.toString());
+                  }
+                },
+              ),
+            ],
+          ),
+        const SizedBox(height: 4),
+        Text('Te lo recordamos el día anterior.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
       ],
     );
   }

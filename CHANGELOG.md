@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 ("¿Qué llevamos?")
+- **Comida y "Qué traer" en una sola lista, "¿Qué llevamos?"**, con secciones (Plato salado, Postres, Hielo, Decoración, Vasos y platos…). Cada sección pide: según cuántxs van (por persona, en una unidad), "cada persona lleva N cosas", un total fijo o libre.
+- **Varias cosas por sección:** "Llevas 1 de 2 · Agregar otra". Cada anotación dice qué llevas y si es "Para todxs" o "Solo para mí".
+- **Todxs ven quién lleva qué**; las ideas ya tomadas se ven tachadas con quién las lleva, para no repetir. Al completarse: "Completado" con un check.
+- **Quien está a cargo** agrega, edita o quita secciones desde la tarjeta, marca "Hace falta" y deja ideas.
+- **"Lo que llevas"** arriba en el evento, y el recordatorio del día anterior ahora dice "Mañana llevas: …".
+- Los ítems de "Qué traer" de la Naviquinde (Adornos, Vasos y platos) pasaron a secciones libres, con lo que ya había anotado cada persona.
+- Encargadxs: permisos con un toggle por cosa.
+
 ## 2026-11-20 (actualización obligatoria en la web y la PWA)
 - Cada publicación de la web lleva su número (`WEB_BUILD` = corrida del CI) y se publica `web_version.json` con el último. Al abrir la app y al volver a ella, si hay uno más nuevo aparece la misma pantalla que en Android ("Hay una nueva versión de Pivot") y no se puede seguir sin actualizar.
 - "Actualizar ahora" borra la caché del navegador (sin tocar el service worker de las notificaciones), vuelve a pedir los archivos principales sin caché y recarga. No cierra la sesión.

@@ -206,7 +206,7 @@ class TraerTarjeta extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: it['completo'] == true
-                      ? Etiqueta(texto: 'Cubierto', icono: Icons.check_rounded)
+                      ? Etiqueta(texto: 'Completado', icono: Icons.check_circle_rounded)
                       : (it['personas'] as List? ?? const []).any((a) => a is Map && a['mio'] == true)
                       ? const SizedBox.shrink()
                       : TextButton.icon(

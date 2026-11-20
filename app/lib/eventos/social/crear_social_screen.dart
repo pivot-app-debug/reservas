@@ -13,17 +13,25 @@ import 'social_widgets.dart';
 
 enum _P { plantilla, datos, invitados, piezas, config, homenaje, encargados, resumen }
 
+/// Sección de "¿Qué llevamos?". Modo: 'meta' (asistentes × cantidad en una
+/// unidad), 'cada' (cada persona lleva N cosas), 'total' (total fijo) o
+/// 'libre' (sin meta).
 class _Cat {
-  _Cat({this.id, String nombre = '', String unidad = 'porciones', num porPersona = 1})
+  _Cat({this.id, String nombre = '', String unidad = 'porciones', num porPersona = 1, this.modo = 'meta', num? total, List<String> ideas = const []})
     : nombre = TextEditingController(text: nombre),
       unidad = TextEditingController(text: unidad),
-      porPersona = TextEditingController(text: cantidadSocial(porPersona));
+      porPersona = TextEditingController(text: cantidadSocial(porPersona)),
+      total = TextEditingController(text: total == null ? '' : cantidadSocial(total)),
+      ideas = TextEditingController(text: ideas.join(', '));
   final String? id;
-  final TextEditingController nombre, unidad, porPersona;
+  String modo;
+  final TextEditingController nombre, unidad, porPersona, total, ideas;
   void dispose() {
     nombre.dispose();
     unidad.dispose();
     porPersona.dispose();
+    total.dispose();
+    ideas.dispose();
   }
 }
 
@@ -188,7 +196,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       if (piezas[k] != null) _piezas.add(pz);
     }
     for (final c in a.comida) {
-      _cats.add(_Cat(id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: c.porPersona));
+      _cats.add(_Cat(id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: c.porPersona, modo: c.modo, total: c.total, ideas: c.sugerencias));
     }
     if (_cats.isEmpty) _cats.addAll(_catsSugeridas());
     final pl = (piezas['playlist'] as Map?) ?? const {};
@@ -248,9 +256,14 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     for (final t in _traer) {
       t.dispose();
     }
-    _traer
-      ..clear()
-      ..addAll([for (final t in s.traer) _Item(texto: t)]);
+    // Lo que la plantilla sugería en "qué traer" son secciones libres de "¿Qué llevamos?".
+    _traer.clear();
+    if (s.traer.isNotEmpty || _piezas.contains(Pieza.traer)) {
+      _piezas
+        ..remove(Pieza.traer)
+        ..add(Pieza.comida);
+      _cats.addAll([for (final t in s.traer) _Cat(nombre: t, unidad: 'cosas', modo: 'libre')]);
+    }
     for (final x in _premios) {
       x.dispose();
     }
@@ -833,7 +846,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
-        for (final pz in Pieza.values)
+        for (final pz in Pieza.values.where((x) => x != Pieza.traer))
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             secondary: Icon(pz.icono, color: _piezas.contains(pz) ? p.marcaTexto : p.textoSecundario),
@@ -916,41 +929,91 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     final secciones = <Widget>[];
     if (_piezas.contains(Pieza.comida) && _puedePieza(Pieza.comida)) {
       secciones.addAll([
-        _titulo('Comida y bebida', ayuda: 'Cantidad por asistente: la meta es asistentes (con sus +1) × cantidad.'),
+        _titulo('¿Qué llevamos?', ayuda: 'Secciones de comida, bebida y cosas. Cada quien se anota con lo que lleva y todxs ven qué falta.'),
         for (final c in _cats)
           Padding(
             key: ObjectKey(c),
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 5,
-                  child: TextField(
-                    controller: c.nombre,
-                    decoration: const InputDecoration(labelText: 'Categoría'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: c.nombre,
+                        decoration: const InputDecoration(labelText: 'Sección', hintText: 'Ej.: Postres, Hielo, Decoración'),
+                      ),
+                    ),
+                    _quitar(() {
+                      setState(() => _cats.remove(c));
+                      WidgetsBinding.instance.addPostFrameCallback((_) => c.dispose());
+                    }),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 4,
-                  child: TextField(
-                    controller: c.unidad,
-                    decoration: const InputDecoration(labelText: 'Unidad'),
-                  ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: c.modo,
+                  decoration: const InputDecoration(labelText: '¿Cuánto se pide?'),
+                  items: const [
+                    DropdownMenuItem(value: 'meta', child: Text('Según cuántxs van (por persona)')),
+                    DropdownMenuItem(value: 'cada', child: Text('Cada persona lleva un número de cosas')),
+                    DropdownMenuItem(value: 'total', child: Text('Un total fijo')),
+                    DropdownMenuItem(value: 'libre', child: Text('Libre, sin cantidad')),
+                  ],
+                  onChanged: (v) => setState(() => c.modo = v ?? 'meta'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: c.porPersona,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Por persona'),
-                  ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  child: switch (c.modo) {
+                    'meta' => Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: c.porPersona,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Por persona'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: c.unidad,
+                            decoration: const InputDecoration(labelText: 'Unidad', hintText: 'litros, porciones'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    'cada' => TextField(
+                      controller: c.porPersona,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Cuántas cosas lleva cada persona'),
+                    ),
+                    'total' => Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: c.total,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Total'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: c.unidad,
+                            decoration: const InputDecoration(labelText: 'Unidad', hintText: 'bolsas, botellas'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    _ => const SizedBox(width: double.infinity),
+                  },
                 ),
-                _quitar(() {
-                  setState(() => _cats.remove(c));
-                  WidgetsBinding.instance.addPostFrameCallback((_) => c.dispose());
-                }),
+                TextField(
+                  controller: c.ideas,
+                  decoration: const InputDecoration(labelText: 'Ideas de qué traer (opcional)', hintText: 'Separadas por coma'),
+                ),
               ],
             ),
           ),
@@ -963,7 +1026,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                 label: Text(sc.nombre),
                 onPressed: () => setState(() => _cats.add(_Cat(nombre: sc.nombre, unidad: sc.unidad, porPersona: sc.porPersona))),
               ),
-            ActionChip(avatar: const Icon(Icons.add_rounded, size: 16), label: const Text('Otra'), onPressed: () => setState(() => _cats.add(_Cat()))),
+            ActionChip(avatar: const Icon(Icons.add_rounded, size: 16), label: const Text('Otra sección'), onPressed: () => setState(() => _cats.add(_Cat()))),
           ],
         ),
       ]);
@@ -1359,25 +1422,21 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                     _nombres({u}),
                     style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final (clave, texto, icono) in _areas)
-                        FilterChip(
-                          avatar: Icon(icono, size: 16),
-                          label: Text(texto),
-                          selected: _permisos[u]?.contains(clave) ?? false,
-                          onSelected: !_todo
-                              ? null
-                              : (v) => setState(() {
-                                  final s = _permisos.putIfAbsent(u, () => {..._permisosPorDefecto});
-                                  v ? s.add(clave) : s.remove(clave);
-                                }),
-                        ),
-                    ],
-                  ),
+                  // Un toggle por cosa (Victor, 2026-11-20).
+                  for (final (clave, texto, icono) in _areas)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      secondary: Icon(icono, size: 20, color: p.textoSecundario),
+                      title: Text(texto),
+                      value: _permisos[u]?.contains(clave) ?? false,
+                      onChanged: !_todo
+                          ? null
+                          : (v) => setState(() {
+                              final s = _permisos.putIfAbsent(u, () => {..._permisosPorDefecto});
+                              v ? s.add(clave) : s.remove(clave);
+                            }),
+                    ),
                 ],
               ),
             ),
@@ -1544,7 +1603,18 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         'categorias': [
           for (final c in _cats)
             if (c.nombre.text.trim().isNotEmpty)
-              {'id': c.id, 'nombre': c.nombre.text.trim(), 'unidad': c.unidad.text.trim(), 'porPersona': _n(c.porPersona) ?? 1},
+              {
+                'id': c.id,
+                'nombre': c.nombre.text.trim(),
+                'unidad': c.modo == 'cada' || c.modo == 'libre' ? 'cosas' : c.unidad.text.trim(),
+                'porPersona': _n(c.porPersona) ?? 1,
+                'modo': c.modo,
+                'total': _n(c.total),
+                'sugerencias': [
+                  for (final x in c.ideas.text.split(','))
+                    if (x.trim().isNotEmpty) x.trim(),
+                ],
+              },
         ],
       'piezas': piezas,
       'sorpresa': _sorpresa,

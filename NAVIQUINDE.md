@@ -31,3 +31,5 @@ Catálogo `currency_tiers.json` + 5 lotes de 300 regalos (id, titles es/en, pric
 - **Aprobación:** un Pivot aprueba antes de que se publique en el calendario. Nunca lo aprueba una persona homenajeada ni alguien que no deba enterarse. Si todos los Pivots son homenajeadxs o no deben enterarse, el evento se publica sin aprobación (decisión de Claude, Victor pidió ayuda con esto el 20/11).
 - **Sorpresa:** al crear o al editar se eligen las personas homenajeadas y quiénes no deben enterarse. Ellas ven el evento como uno normal (nombre neutro, lugar y hora) sin el motivo, el homenaje, los regalos ni los mensajes, y no saben que es sorpresa. El resto ve "Sorpresa para X" y todo el detalle. Si el evento ya existe se puede editar para agregar el homenaje y la sorpresa.
 - La Naviquinde es una "Festividad de temporada: Navidad" con amigo secreto, regalo robado, comida y +1.
+
+- **"¿Qué llevamos?" (Victor, 20/11):** comida y qué traer en una sola lista de secciones (por persona, cada persona N cosas, total o libre), varias cosas por persona, "Para todxs / Solo para mí", todxs ven quién lleva qué, "Hace falta" e ideas, "Lo que llevas" y recordatorio "Mañana llevas".

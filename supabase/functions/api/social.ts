@@ -466,14 +466,17 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     out.comida = (cats ?? []).map((c: any) => {
       const ap = (aportes ?? []).filter((a: any) => a.categoria_id === c.id);
       const aportado = ap.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
-      const meta = Math.ceil(total * Number(c.por_persona ?? 0));
+            const meta = _metaSeccion(c, total);
+      const mias = ap.filter((a: any) => a.clave === q.clave);
       return {
-                id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
+        id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
+        modo: c.modo ?? 'meta', total: c.total == null ? null : Number(c.total),
+        mias: c.modo === 'cada' || c.modo === 'libre' ? mias.length : mias.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0),
         falta: c.falta === true, sugerencias: Array.isArray(c.sugerencias) ? c.sugerencias : [],
         cerrada: meta > 0 && aportado >= meta,
         // Lxs +1 solo ven lo que llevan ellxs.
         aportes: ap.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({
-          id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave,
+                    id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave, paraTodxs: a.para_todxs ?? null,
         })),
       };
     });
@@ -601,7 +604,8 @@ function _leerPiezas(v: any): Record<string, any> {
   const out: Record<string, any> = {};
   if (p.playlist) out.playlist = { link: _link(p.playlist.link), nota: _texto(p.playlist.nota, 200) };
   if (p.dress) out.dress = { texto: _textoLargo(p.dress.texto, 400) };
-  if (p.traer) {
+    // "Qué traer" pasó a ser secciones de "¿Qué llevamos?" (Victor, 2026-11-20): ya no se guarda aquí.
+  if (false && p.traer) {
     const items = (Array.isArray(p.traer.items) ? p.traer.items : []).slice(0, 40).map((x: any) => ({
       id: typeof x?.id === 'string' && /^[\w-]{1,40}$/.test(x.id) ? x.id : _idCorto(),
       texto: _texto(x?.texto, 80),
@@ -735,8 +739,22 @@ async function _leerDatos(db: any, d: any, previa: any, creador: string | null, 
   return { fila, ev, categorias };
 }
 
+const MODOS_SECCION = ['meta', 'cada', 'total', 'libre'];
+
+/// Meta de una sección de "¿Qué llevamos?" según su modo.
+function _metaSeccion(c: any, asistentes: number): number {
+  const pp = Number(c.por_persona ?? 0);
+  switch (c.modo) {
+    case 'cada': return Math.ceil(asistentes * pp);
+    case 'total': return Number(c.total ?? 0);
+    case 'libre': return 0;
+    default: return Math.ceil(asistentes * pp);
+  }
+}
+
 /// Categorías de la comida: por id; las que se quitan se borran solo si
-/// nadie se anotó todavía.
+/// nadie se anotó todavía. Una app vieja (sin `modo`) no borra ninguna: no
+/// conoce las secciones nuevas.
 async function _guardarCategorias(db: any, liga: string, idEvento: string, cats: any[]): Promise<string[]> {
   const avisos: string[] = [];
   const { data: actuales } = await db.from('social_comida_categorias').select('id, nombre').eq('id_evento', idEvento);
@@ -745,7 +763,9 @@ async function _guardarCategorias(db: any, liga: string, idEvento: string, cats:
   for (const x of cats.slice(0, 20)) {
     const nombre = _texto(x?.nombre, 60);
     if (!nombre) continue;
-        const datos: Record<string, any> = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
+            const datos: Record<string, any> = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
+    if (x?.modo !== undefined) datos.modo = MODOS_SECCION.includes(String(x.modo)) ? String(x.modo) : 'meta';
+    if (x?.total !== undefined) datos.total = _num(x.total);
     if (x?.falta !== undefined) datos.falta = x.falta === true;
     if (x?.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(x.sugerencias);
     const id = typeof x?.id === 'string' && (actuales ?? []).some((a: any) => a.id === x.id) ? x.id : null;
@@ -756,8 +776,9 @@ async function _guardarCategorias(db: any, liga: string, idEvento: string, cats:
       await db.from('social_comida_categorias').insert({ ...datos, id_evento: idEvento, liga_id: liga });
     }
   }
+    const appNueva = cats.some((x: any) => x?.modo !== undefined);
   for (const a of actuales ?? []) {
-    if (vistos.has(a.id)) continue;
+    if (vistos.has(a.id) || !appNueva) continue;
     const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', a.id);
     if ((count ?? 0) > 0) avisos.push(`"${a.nombre}" no se quitó porque ya hay personas anotadas.`);
     else await db.from('social_comida_categorias').delete().eq('id', a.id);
@@ -1299,7 +1320,9 @@ async function socialComidaEditar(params: Record<string, any>, deps: DepsSocial)
     nombre, unidad: _texto(params.unidad ?? actual?.unidad, 30) || 'porciones',
     por_persona: _num(params.porPersona) ?? Number(actual?.por_persona ?? 1),
   };
-  if (params.falta !== undefined) datos.falta = params.falta === true || params.falta === 'true';
+    if (params.falta !== undefined) datos.falta = params.falta === true || params.falta === 'true';
+  if (params.modo !== undefined) datos.modo = MODOS_SECCION.includes(String(params.modo)) ? String(params.modo) : 'meta';
+  if (params.total !== undefined) datos.total = _num(params.total);
   if (params.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(_json(params.sugerencias) ?? params.sugerencias);
   if (actual) {
     await db.from('social_comida_categorias').update(datos).eq('id', id);
@@ -1332,8 +1355,11 @@ async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial)
   const cfgC = await _config(db, cat.id_evento);
   const vC = _vista(q, cfgC);
   if (vC === 'oculta' || !piezaVisible(cfgC, 'comida', vC)) return { exito: false, error: 'No encontramos esa categoría.' };
-  const cantidad = _num(params.cantidad);
+    // En secciones "cada persona lleva N" o libres, cada anotación es una cosa.
+  const porCosa = cat.modo === 'cada' || cat.modo === 'libre';
+  const cantidad = porCosa ? 1 : _num(params.cantidad);
   if (!cantidad || cantidad <= 0) return { exito: false, error: 'Indica cuánto llevas.' };
+  if (porCosa && !_texto(params.detalle, 80)) return { exito: false, error: 'Escribe qué llevas.' };
   const [asisten, invitados, aportes] = await Promise.all([
     _asistentes(db, cat.id_evento),
     _invitados(db, cat.id_evento),
@@ -1341,11 +1367,13 @@ async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial)
   ]);
   if (!_asiste(q, asisten)) return { exito: false, error: 'Primero confirma tu asistencia para anotarte.' };
   const total = asisten.size + invitados.filter((i) => asisten.has(i.anfitrion)).length;
-  const meta = Math.ceil(total * Number(cat.por_persona ?? 0));
+    const meta = _metaSeccion(cat, total);
   const aportado = aportes.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
-  if (meta > 0 && aportado >= meta) return { exito: false, error: `${cat.nombre} ya está completo. Elige otra categoría.` };
+  if (meta > 0 && aportado >= meta) return { exito: false, error: `${cat.nombre} ya está completo. Elige otra sección.` };
+  const pt = params.paraTodxs;
   const { error } = await db.from('social_comida_aportes').insert({
     categoria_id: cat.id, clave: q.clave, nombre: q.nombre, cantidad, detalle: _texto(params.detalle, 80) || null, liga_id: liga,
+    para_todxs: pt === true || pt === 'true' ? true : pt === false || pt === 'false' ? false : null,
   });
   if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
   return { exito: true };
@@ -1379,7 +1407,7 @@ async function socialAnotarTraer(params: Record<string, any>, deps: DepsSocial):
   const { data: ya } = await db.from('social_traer_anotes').select('clave').eq('id_evento', q.idEvento).eq('item', it.id);
   if ((ya ?? []).some((a: any) => a.clave === q.clave)) return { exito: false, error: 'Ya te anotaste con esto.' };
   const cantidad = _num(it.cantidad);
-  if (cantidad && (ya ?? []).length >= cantidad) return { exito: false, error: `"${it.texto}" ya está cubierto.` };
+  if (cantidad && (ya ?? []).length >= cantidad) return { exito: false, error: `"${it.texto}" ya está completo.` };
   const { error } = await db.from('social_traer_anotes').insert({
     id_evento: q.idEvento, item: it.id, clave: q.clave, nombre: q.nombre, detalle: _texto(params.detalle, 80) || null, liga_id: liga,
   });
@@ -1605,7 +1633,7 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
   for (const ev of evs ?? []) {
     if (/cancel|sin entren|no se entrena|eliminado/i.test(String(ev.estado ?? ''))) continue;
     const cfg = await _config(db, ev.id_evento);
-    if (!cfg || !('recordatorio_enviado_en' in cfg) || !publicado(cfg) || cfg.recordatorio_enviado_en || !(cfg.amigo_secreto || cfg.regalo_robado)) continue;
+        if (!cfg || !('recordatorio_enviado_en' in cfg) || !publicado(cfg) || cfg.recordatorio_enviado_en || !(cfg.amigo_secreto || cfg.regalo_robado || cfg.comida)) continue;
     const asisten = [...(await _asistentes(db, ev.id_evento))];
     await db.from('social_eventos').update({ recordatorio_enviado_en: new Date().toISOString() }).eq('id_evento', ev.id_evento);
     if (!asisten.length) continue;
@@ -1615,25 +1643,35 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
       cfg.amigo_secreto && cfg.sorteado_en && piezaVisible(cfg, 'amigoSecreto', vista) ? `el regalo de tu amigo secreto${tope(cfg.tope_amigo)}` : '',
       cfg.regalo_robado && piezaVisible(cfg, 'regaloRobado', vista) ? `un regalo envuelto para el regalo robado${tope(cfg.tope_robado)}` : '',
     ].filter(Boolean);
-    const personas = await _personas(db, homenajeadxs(cfg));
+        const personas = await _personas(db, homenajeadxs(cfg));
     const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
-    const grupos: [string[], Vista][] = [
-      [asisten.filter((u) => !esSecretoPara(cfg, u)), 'completa'],
-      [asisten.filter((u) => esSecretoPara(cfg, u)), 'neutral'],
-    ];
-    for (const [us, vista] of grupos) {
-      const partes = partesDe(vista);
-      if (!us.length || !partes.length) continue;
+    // Lo que cada quien anotó en "¿Qué llevamos?" (Victor, 2026-11-20): "Mañana llevas: …".
+    const llevo = new Map<string, string[]>();
+    if (cfg.comida) {
+      const { data: cats } = await db.from('social_comida_categorias').select('id, nombre, unidad, modo').eq('id_evento', ev.id_evento);
+      const ids = (cats ?? []).map((c: any) => c.id);
+      const { data: aps } = ids.length ? await db.from('social_comida_aportes').select('categoria_id, clave, cantidad, detalle').in('categoria_id', ids) : { data: [] };
+      for (const a of aps ?? []) {
+        const c = (cats ?? []).find((x: any) => x.id === a.categoria_id);
+        const que = a.detalle || (c?.modo === 'cada' || c?.modo === 'libre' ? c?.nombre : `${Number(a.cantidad)} ${c?.unidad ?? ''} de ${c?.nombre ?? ''}`.trim());
+        if (que) llevo.set(a.clave, [...(llevo.get(a.clave) ?? []), String(que).toLowerCase()]);
+      }
+    }
+    for (const u of asisten) {
+      const vista: Vista = esSecretoPara(cfg, u) ? 'neutral' : 'completa';
+      const mio = vista === 'completa' || piezaVisible(cfg, 'comida', vista) ? (llevo.get(u) ?? []) : [];
+      const partes = [...partesDe(vista), ...mio];
+      if (!partes.length) continue;
       try {
         await deps.push({
           tipo: 'recordatorio_1dia',
-          include_external_user_ids: us,
+          include_external_user_ids: [u],
           headings: { es: `¡Mañana es ${tituloPara(cfg, vista, nombreDe)}!` },
-          contents: { es: `No olvides llevar ${partes.join(' y ')}.` },
+          contents: { es: mio.length ? `Mañana llevas: ${listaEs(partes)}.` : `No olvides llevar ${partes.join(' y ')}.` },
           url: _url(deps, ev.id_evento),
           evento: { idEvento: ev.id_evento },
         });
-        enviados += us.length;
+        enviados++;
       } catch { /* best-effort */ }
     }
   }

@@ -395,6 +395,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         key: const ValueKey('social'),
         children: [
           EncabezadoSocial(estado: e),
+          if (e.modulo('comida')) LoQueLlevasTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
