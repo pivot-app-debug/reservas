@@ -5,6 +5,8 @@
 // (par o impar) y nadie queda en un "par cerrado" aparte. Reglas:
 //  - nadie se toca a sí mismx;
 //  - personas del mismo `grupo` (una persona y sus +1) nunca se tocan entre sí;
+//  - parejas que quien organiza marcó como "no se tocan" (`noTocar`, por
+//    ejemplo una pareja de la vida real) nunca se tocan, en ningún sentido;
 //  - se evita repetir quién le regaló a quién el año anterior (`previas`);
 //    si con esa regla no hay forma, se sortea sin ella y se avisa.
 // Si las reglas fijas lo hacen imposible, devuelve un error claro.
@@ -65,7 +67,12 @@ function _intercalado(ps: ParticipanteSorteo[], permitido: (a: ParticipanteSorte
   return out.every((p, i) => permitido(p, out[(i + 1) % n])) ? out : null;
 }
 
-export function sortearAmigoSecreto(ps: ParticipanteSorteo[], previas: ParejaSorteo[] = [], rng: () => number = Math.random): ResultadoSorteo {
+export function sortearAmigoSecreto(
+  ps: ParticipanteSorteo[],
+  previas: ParejaSorteo[] = [],
+  rng: () => number = Math.random,
+  noTocar: [string, string][] = [],
+): ResultadoSorteo {
   const claves = new Set(ps.map((p) => p.clave));
   if (claves.size !== ps.length) return { ok: false, error: 'Hay personas repetidas en el sorteo.' };
   if (ps.length < 2) return { ok: false, error: 'Se necesitan al menos 2 personas inscritas para sortear.' };
@@ -83,7 +90,9 @@ export function sortearAmigoSecreto(ps: ParticipanteSorteo[], previas: ParejaSor
     };
   }
   const prev = new Set(previas.map((x) => `${x.da}\u0000${x.recibe}`));
-  const base = (a: ParticipanteSorteo, b: ParticipanteSorteo) => a.clave !== b.clave && a.grupo !== b.grupo;
+    const prohibidas = new Set(noTocar.flatMap(([x, y]) => [`${x}\u0000${y}`, `${y}\u0000${x}`]));
+  const base = (a: ParticipanteSorteo, b: ParticipanteSorteo) =>
+    a.clave !== b.clave && a.grupo !== b.grupo && !prohibidas.has(`${a.clave}\u0000${b.clave}`);
   const sinRepetir = (a: ParticipanteSorteo, b: ParticipanteSorteo) => base(a, b) && !prev.has(`${a.clave}\u0000${b.clave}`);
   let repiteAnterior = false;
   let ciclo = prev.size ? _ciclo(ps, sinRepetir, rng) : null;
@@ -91,7 +100,14 @@ export function sortearAmigoSecreto(ps: ParticipanteSorteo[], previas: ParejaSor
     ciclo = _ciclo(ps, base, rng) ?? _intercalado(ps, base, rng);
     repiteAnterior = prev.size > 0 && !!ciclo && ciclo.some((p, i) => prev.has(`${p.clave}\u0000${ciclo![(i + 1) % ciclo!.length].clave}`));
   }
-  if (!ciclo) return { ok: false, error: 'No se encontró una forma de sortear con estas reglas. Revisa lxs inscritxs e intenta de nuevo.' };
+    if (!ciclo) {
+    return {
+      ok: false,
+      error: noTocar.length
+        ? 'No se encontró una forma de sortear con estas reglas. Quita alguna pareja de "No se pueden tocar" o espera a que se inscriban más personas.'
+        : 'No se encontró una forma de sortear con estas reglas. Revisa lxs inscritxs e intenta de nuevo.',
+    };
+  }
   const pares = ciclo.map((p, i) => ({ da: p.clave, recibe: ciclo![(i + 1) % ciclo!.length].clave }));
   return { ok: true, pares, repiteAnterior };
 }

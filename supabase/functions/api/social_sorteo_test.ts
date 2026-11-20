@@ -93,3 +93,18 @@ Deno.test('si no hay forma sin repetir, sortea igual y avisa', () => {
   afirmar(r.ok && r.repiteAnterior, 'sortea y avisa');
   cicloValido(ps, r.pares);
 });
+
+Deno.test('parejas que no se pueden tocar nunca se tocan', () => {
+  const ps = ['a', 'b', 'c', 'd', 'e'].map((c) => ({ clave: c, grupo: c }));
+  for (let i = 0; i < 50; i++) {
+    const r = sortearAmigoSecreto(ps, [], Math.random, [['a', 'b']]);
+    if (!r.ok) throw new Error('debía sortear');
+    for (const x of r.pares) if ((x.da === 'a' && x.recibe === 'b') || (x.da === 'b' && x.recibe === 'a')) throw new Error('a y b se tocaron');
+  }
+});
+
+Deno.test('sin forma de sortear con las parejas prohibidas avisa', () => {
+  const ps = ['a', 'b', 'c'].map((c) => ({ clave: c, grupo: c }));
+  const r = sortearAmigoSecreto(ps, [], Math.random, [['a', 'b'], ['b', 'c']]);
+  if (r.ok) throw new Error('no debía poder');
+});

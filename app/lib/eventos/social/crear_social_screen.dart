@@ -84,6 +84,9 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
   final _playlist = TextEditingController(), _playlistNota = TextEditingController();
   final _topeAmigo = TextEditingController(), _topeRobado = TextEditingController(), _recordatorio = TextEditingController(), _reglas = TextEditingController();
   DateTime? _cierre;
+
+  /// Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
+  final List<(String, String)> _noTocar = [];
   final _dress = TextEditingController();
   final List<_Item> _traer = [];
   final List<_Premio> _premios = [];
@@ -171,6 +174,9 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     _recordatorio.text = a.recordatorioRobado;
     _reglas.text = a.reglasRobado;
     _cierre = a.cierre;
+    for (final x in (piezas['noTocar'] as List? ?? const [])) {
+      if (x is List && x.length == 2) _noTocar.add(('${x[0]}', '${x[1]}'));
+    }
     _dress.text = '${((piezas['dress'] as Map?) ?? const {})['texto'] ?? ''}';
     for (final x in (((piezas['traer'] as Map?) ?? const {})['items'] as List? ?? const [])) {
       final m = x as Map;
@@ -807,6 +813,18 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     if (f != null) setState(() => _cierre = f);
   }
 
+  Future<void> _agregarNoTocar() async {
+    final r = await _elegirPersonas('Elige 2 personas que no se pueden tocar', const {});
+    if (r == null || !mounted) return;
+    if (r.length != 2) {
+      avisarSocial(context, 'Elige exactamente 2 personas.');
+      return;
+    }
+    final l = r.toList()..sort();
+    if (_noTocar.any((x) => x.$1 == l[0] && x.$2 == l[1])) return;
+    setState(() => _noTocar.add((l[0], l[1])));
+  }
+
   Widget _numero(TextEditingController c, String etiqueta) => TextField(
     controller: c,
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -902,6 +920,29 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
             '${_cierreJusto ? '\nCon menos de 2 semanas, la gente tiene poco tiempo para comprar el regalo.' : ''}',
           ),
           onTap: _elegirCierre,
+        ),
+        // Reglas: personas que no se pueden tocar (por ejemplo, una pareja). Solo lo ve quien organiza.
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'No se pueden tocar',
+            style: TextStyle(fontWeight: FontWeight.w700, color: context.pivot.texto),
+          ),
+        ),
+        Text(
+          'Por ejemplo, una pareja o personas que viven juntas: no se regalan entre sí en ningún sentido. Solo lo ves tú y quienes organizan.',
+          style: TextStyle(fontSize: 13, color: context.pivot.textoSecundario),
+        ),
+        for (final (i, (a, b)) in _noTocar.indexed)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.block_rounded),
+            title: Text('${_nombres({a})} y ${_nombres({b})}'),
+            trailing: _quitar(() => setState(() => _noTocar.removeAt(i))),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(onPressed: _agregarNoTocar, icon: const Icon(Icons.add_rounded), label: const Text('Agregar personas que no se pueden tocar')),
         ),
       ]);
     }
@@ -1319,6 +1360,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           ],
         },
       if (_piezas.contains(Pieza.homenaje)) 'homenaje': {'mensajes': _mensajes, 'regalo': _regalo, 'regaloNota': _regaloNota.text.trim()},
+      if (_piezas.contains(Pieza.amigoSecreto) && _noTocar.isNotEmpty)
+        'noTocar': [
+          for (final (a, b) in _noTocar) [a, b],
+        ],
       'ocultas': _sorpresa
           ? [
               for (final pz in _ocultas)

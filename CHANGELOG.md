@@ -4,6 +4,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 
 ## 2026-11-20 (Social o fiesta: homenaje y cierre)
 - El paso "Homenaje y sorpresa" del asistente ya no aparece si no elegiste la pieza Homenaje. El resumen sigue igual y en esa fila dice "Sin homenaje ni sorpresa" (desde ahí se puede agregar).
+- **Amigo secreto, "No se pueden tocar":** en la configuración, quien organiza agrega parejas de personas que no se regalan entre sí en ningún sentido (por ejemplo, una pareja). Solo lo ve quien organiza. Si con esas reglas no hay forma de sortear, el sorteo avisa y pide quitar alguna.
 - **Cierre del amigo secreto libre:** por defecto 2 semanas antes; quien organiza puede elegir cualquier fecha hasta 1 día antes del evento. Si queda a menos de 2 semanas, avisa que la gente tiene poco tiempo para comprar el regalo. Si el evento es en menos de 2 semanas, el cierre por defecto es el día anterior.
 
 ## 2026-11-20 (Social o fiesta: dónde se crea)

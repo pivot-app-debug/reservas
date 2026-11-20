@@ -547,6 +547,20 @@ function _leerPiezas(v: any): Record<string, any> {
     out.premios = { lista };
   }
   if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
+    // Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
+  // Solo las ve y edita quien organiza; valen en los dos sentidos.
+  if (Array.isArray(p.noTocar)) {
+    const vistas = new Set<string>();
+    const pares: [string, string][] = [];
+    for (const x of p.noTocar.slice(0, 60)) {
+      const a = _texto(Array.isArray(x) ? x[0] : '', 80), b = _texto(Array.isArray(x) ? x[1] : '', 80);
+      const k = [a, b].sort().join('\u0000');
+      if (!a || !b || a === b || vistas.has(k)) continue;
+      vistas.add(k);
+      pares.push([a, b]);
+    }
+    if (pares.length) out.noTocar = pares;
+  }
   // Sorpresa por pieza: las que NO ven homenajeadxs ni quienes no deben enterarse.
   if (Array.isArray(p.ocultas)) {
     const ocultas = [...new Set<string>(p.ocultas.map((x: unknown) => String(x)))].filter((k) => (PIEZAS_ELEGIBLES as readonly string[]).includes(k));
@@ -1341,7 +1355,8 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   const anio = Number(String(ev.fecha).substring(0, 4));
   // Historial: quién le regaló a quién el año anterior en esta liga.
   const { data: previas } = await db.from('social_sorteo').select('da, recibe').eq('liga_id', liga).eq('anio', anio - 1).neq('id_evento', idEvento);
-  const r = sortearAmigoSecreto(ps, previas ?? []);
+    const noTocar: [string, string][] = Array.isArray(_piezas(cfg).noTocar) ? _piezas(cfg).noTocar : [];
+  const r = sortearAmigoSecreto(ps, previas ?? [], Math.random, noTocar);
   if (!r.ok) return { exito: false, error: (r as { error: string }).error };
   await db.from('social_sorteo').delete().eq('id_evento', idEvento);
   const { error } = await db.from('social_sorteo').insert(r.pares.map((x) => ({ id_evento: idEvento, da: x.da, recibe: x.recibe, anio, liga_id: liga })));
