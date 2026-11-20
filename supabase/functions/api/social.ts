@@ -466,7 +466,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
       ? await db.from('social_comida_aportes').select('*').in('categoria_id', ids).order('created_at')
             : { data: [] };
     // Fotos de quienes llevan algo (para los avatares de la lista).
-    const fotos = await _personas(db, [...new Set((aportes ?? []).map((a: any) => String(a.clave)).filter((k: string) => !k.startsWith('inv:')))]);
+    const fotos = await _personas(db, [...new Set<string>((aportes ?? []).map((a: any) => String(a.clave)).filter((k: string) => !k.startsWith("inv:")))]);
     out.comida = (cats ?? []).map((c: any) => {
       const ap = (aportes ?? []).filter((a: any) => a.categoria_id === c.id);
       const aportado = ap.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
