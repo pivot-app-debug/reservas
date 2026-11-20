@@ -5029,12 +5029,13 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
   };
 }
 
-/// Eventos de los últimos 7 días que ya terminaron, con quiénes de sus
+/// Eventos de los últimos 2 días (Victor, 2026-11-20: antes 7; es un
+/// recordatorio, no una obligación) que ya terminaron, con quiénes de sus
 /// equipos vinieron y a cuántas ya evaluó (Victor, 2026-11-17: abrir Coach
 /// y ver "vinieron ayer estas personas, ¿las evaluamos?").
 async function _porEvaluar(c: { user: string; equipos: string[] }): Promise<any[]> {
   const hoy = _hoyEcuadorISO();
-  const desde = new Date(Date.parse(hoy + 'T12:00:00-05:00') - 7 * 86400000).toISOString().slice(0, 10);
+    const desde = new Date(Date.parse(hoy + 'T12:00:00-05:00') - 2 * 86400000).toISOString().slice(0, 10);
   const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina, tipo_evento, estado').gte('fecha', desde).lte('fecha', hoy).order('fecha', { ascending: false });
   const ahora = Date.now();
   const out: any[] = [];
@@ -5123,7 +5124,7 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
         { id_evento: idEvento, fecha, equipo, da, coach: c.user, bloques, compartido: params.compartido === true || params.compartido === 'true', actualizado_en: new Date().toISOString() },
         { onConflict: 'liga_id,id_evento,equipo' },
       );
-      if (error) return { exito: false, error: error.message };
+      if (error) return { exito: false, error: 'No se pudo guardar. Intenta de nuevo; si sigue fallando, avísale a un Pivot.' };
     }
   } else if (accion === 'asignarPlan') {
     // Plan sin fecha a un evento (si ese evento ya tiene plan de ese equipo, se reemplaza).
@@ -5343,7 +5344,7 @@ async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<
     }
     if (!filas.length) return { exito: false, error: 'No hay nada para guardar.' };
     const { error } = await supabase.from('coach_feedback').insert(filas);
-    if (error) return { exito: false, error: error.message };
+    if (error) return { exito: false, error: 'No se pudo guardar. Intenta de nuevo; si sigue fallando, avísale a un Pivot.' };
   }
   const vinieron = await _vinieron(idEvento, c);
   const quien = await _mapaEquipoPorNombre();
