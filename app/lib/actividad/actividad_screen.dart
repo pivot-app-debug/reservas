@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
+import '../core/banner_ayuda.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -96,26 +98,30 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   }
 
   static String nombre(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => 'Avisos',
+    PestanaActividad.notificaciones => 'Notificaciones',
     PestanaActividad.tareas => 'Tareas',
     PestanaActividad.clases => 'Cursos',
     PestanaActividad.eventos => 'Eventos',
     PestanaActividad.pagos => 'Pagos y suscripciones',
   };
 
+  /// Texto corto del pill (el título dice el nombre completo).
+  static String _corto(PestanaActividad x) => x == PestanaActividad.pagos ? 'Pagos' : nombre(x);
+
+  // Material Symbols (Victor, 2026-11-20): los mismos íconos de Google Fonts.
   static IconData _icono(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => Icons.notifications_rounded,
-    PestanaActividad.tareas => Icons.checklist_rounded,
-    PestanaActividad.clases => Icons.school_rounded,
-    PestanaActividad.eventos => Icons.event_rounded,
-    PestanaActividad.pagos => Icons.payments_rounded,
+    PestanaActividad.notificaciones => Symbols.notifications,
+    PestanaActividad.tareas => Symbols.checklist,
+    PestanaActividad.clases => Symbols.school,
+    PestanaActividad.eventos => Symbols.event,
+    PestanaActividad.pagos => Symbols.payments,
   };
 
-  /// Pestañas con íconos grandes (Victor, 2026-11-20); el nombre va en el título.
-  Widget _pestana(PivotPaleta p, PestanaActividad x) {
-    final icono = Icon(_icono(x), size: 26);
+  /// Ícono con su punto o número de novedades.
+  Widget _iconoCon(PivotPaleta p, PestanaActividad x, Color color, bool lleno) {
+    final icono = Icon(_icono(x), size: 24, color: color, fill: lleno ? 1 : 0);
     Widget punto(bool ver) => Badge(isLabelVisible: ver, smallSize: 9, backgroundColor: p.marca, child: icono);
-    final Widget hijo = switch (x) {
+    return switch (x) {
       PestanaActividad.notificaciones => ListenableBuilder(listenable: widget.bandeja, builder: (_, _) => punto(widget.bandeja.hayNovedades)),
       PestanaActividad.tareas => ListenableBuilder(
         listenable: widget.tareas,
@@ -129,14 +135,69 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
       PestanaActividad.clases => punto(_cursosNuevos),
       PestanaActividad.eventos || PestanaActividad.pagos => icono,
     };
-    return Tab(
-      height: 52,
-      child: Tooltip(
-        message: nombre(x),
-        child: Semantics(label: nombre(x), child: hijo),
-      ),
-    );
   }
+
+  /// Navegación por pills (Victor, 2026-11-20): la elegida se expande con su
+  /// ícono y su nombre en el color de énfasis; las demás quedan solo con ícono.
+  Widget _pills(PivotPaleta p) => AnimatedBuilder(
+    animation: _tabs.animation!,
+    builder: (context, _) {
+      final actual = _tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (i, x) in _pestanas.indexed)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Tooltip(
+                    message: nombre(x),
+                    child: Semantics(
+                      selected: i == actual,
+                      button: true,
+                      label: nombre(x),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(PivotRadios.chip),
+                        onTap: () => _tabs.animateTo(i),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          height: 44,
+                          padding: EdgeInsets.symmetric(horizontal: i == actual ? 16 : 12),
+                          decoration: BoxDecoration(color: i == actual ? p.marca : p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _iconoCon(p, x, i == actual ? p.sobreMarca : p.textoSecundario, i == actual),
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                                child: i == actual
+                                    ? Padding(
+                                        padding: const EdgeInsets.only(left: 8),
+                                        child: Text(
+                                          _corto(x),
+                                          style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreMarca),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 
   Widget _cuerpo(PestanaActividad x) {
     final s = widget.eventos.sesion;
@@ -181,7 +242,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
             );
           },
         ),
-        bottom: TabBar(controller: _tabs, dividerColor: Colors.transparent, tabs: [for (final x in _pestanas) _pestana(p, x)]),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(54), child: _pills(p)),
       ),
       body: TabBarView(controller: _tabs, children: [for (final x in _pestanas) _cuerpo(x)]),
     );
@@ -257,8 +318,19 @@ class _PanelEventos extends StatelessWidget {
           body: ListView(
             padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
+              BannerAyuda(
+                titulo: '¿Qué hay en Eventos?',
+                texto: 'Lo que viene en la liga: los eventos de esta semana, los cumpleaños del mes y las próximas fiestas.',
+                pasos: [
+                  (Icons.touch_app_outlined, 'Toca un evento para ver quiénes van y responder si vas.'),
+                  if (eventos.sesion.esAdmin)
+                    (Icons.add_circle_outline_rounded, 'Crea entrenamientos, partidos, reuniones o fiestas: aparecen en el calendario de quienes invites.')
+                  else if (puede)
+                    (Icons.celebration_outlined, 'Crea fiestas y eventos sociales: invitación, qué lleva cada quien, amigo secreto, regalo robado y más.'),
+                ],
+              ),
               if (proximos.isEmpty) ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 10),
                 Text(
                   'No hay eventos próximos.',
                   textAlign: TextAlign.center,

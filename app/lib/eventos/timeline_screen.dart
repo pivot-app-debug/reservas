@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/sincroniza.dart';
 
@@ -883,7 +884,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
               smallSize: 9,
               backgroundColor: p.marca,
               label: _bandeja.esPivot && _bandeja.total > 0 ? Text('${_bandeja.total}') : null,
-              child: const Icon(Icons.home_outlined),
+              child: const Icon(Symbols.home),
             ),
             onPressed: () => _abrirActividad(),
           ),

@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Actividad con pills)
+- En vez de pestañas, Actividad tiene una barra de pills: la sección elegida se expande con su ícono y su nombre en el color de énfasis, y el título también cambia.
+- Íconos de Google Material Symbols (los de Google Fonts): la casita de la barra y los de cada sección. Esto arregla el ícono de Cursos, que se veía como un cuadro negro.
+- "Avisos" vuelve a llamarse "Notificaciones".
+- Banners de ayuda en Tareas (cómo funcionan, quién aprueba, cómo se ganan los puntos), Eventos y Pagos y suscripciones (adjuntar comprobantes, cómo se revisan y un botón "Pagar o reservar").
+
 ## 2026-11-20 (Eventos, Pagos y asistentes)
 - Actividad → Eventos (antes Fiestas) muestra los eventos de esta semana, los cumpleaños del mes y las próximas fiestas.
   - Crear: un Pivot usa Nuevo evento, que también tiene Social o fiesta. Un Pivot solo de fiestas usa el asistente de fiestas. Quien no es Pivot no ve el botón.

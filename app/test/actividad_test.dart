@@ -25,9 +25,9 @@ void main() {
     );
     await t.pump(const Duration(seconds: 1));
     // Título según la pestaña; pestañas con íconos.
-    expect(find.text('Avisos'), findsOneWidget);
+    expect(find.text('Notificaciones'), findsWidgets);
     expect(find.byTooltip('Cursos'), findsOneWidget);
-    await t.tap(find.byIcon(Icons.event_rounded));
+    await t.tap(find.byTooltip('Eventos'));
     await t.pumpAndSettle();
     expect(find.text('Eventos'), findsWidgets);
     expect(find.text('No hay eventos próximos.'), findsOneWidget);

@@ -2,6 +2,8 @@ import '../equipo/equipo_repo.dart';
 
 import 'package:flutter/material.dart';
 
+import '../core/banner_ayuda.dart';
+
 import '../core/sincroniza.dart';
 
 import '../ajustes/componentes.dart';
@@ -222,6 +224,21 @@ class _TareasScreenState extends State<TareasScreen> {
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
       children: [
+        // Cómo funcionan las tareas (Victor, 2026-11-20).
+        BannerAyuda(
+          titulo: '¿Cómo funcionan las tareas?',
+          texto: 'Son cosas que el equipo necesita y que suman puntos a quien las hace.',
+          pasos: [
+            (Icons.front_hand_outlined, 'Toma una tarea disponible y termínala antes de que venza. Cada tarea dice cuántos puntos da.'),
+            (Icons.verified_outlined, 'Cuando la marcas como hecha, un Pivot la revisa: si está bien, la aprueba y recibes los puntos.'),
+            (
+              Icons.add_task_rounded,
+              repo.esAdmin
+                  ? 'Puedes crear una tarea para el equipo cuando quieras: eliges los puntos, los cupos y el plazo.'
+                  : 'Puedes proponer una tarea cuando quieras: un Pivot la revisa, le pone los puntos y la publica.',
+            ),
+          ],
+        ),
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
 
         // Sin tareas propias, la sección no aparece (Victor, 2026-11-16).

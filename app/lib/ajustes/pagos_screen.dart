@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/banner_ayuda.dart';
+
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../eventos/anticipada.dart';
@@ -82,6 +84,22 @@ class _PagosScreenState extends State<PagosScreen> {
       key: const ValueKey('lista'),
       padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
       children: [
+        // Cómo funcionan los pagos (Victor, 2026-11-20).
+        BannerAyuda(
+          titulo: '¿Cómo funcionan los pagos?',
+          texto: 'Aquí ves tu cuota, tus reservas y suscripciones, y el recibo de cada pago.',
+          pasos: const [
+            (Icons.receipt_long_outlined, 'Después de cada pago, adjunta siempre tu comprobante.'),
+            (
+              Icons.fact_check_outlined,
+              'Un Pivot de finanzas lo revisa: lo aprueba si el monto y el comprobante coinciden con lo que se pagó, o lo rechaza y te dice por qué.',
+            ),
+            (Icons.notifications_outlined, 'Si se rechaza, te llega una notificación con el motivo; si se aprueba, aquí aparece como Pagado.'),
+          ],
+          boton: ReservasRepo(widget.repo.sesion).opciones.isEmpty
+              ? null
+              : FilledButton.icon(onPressed: () => _pagarOReservar(context), icon: const Icon(Icons.add_card_rounded), label: const Text('Pagar o reservar')),
+        ),
         _Estado(cuota: c, enRevision: enRevision, cantidadRevision: pendientes.length, alPagar: () => _pagarCuota(context)),
         if (activas.isNotEmpty) ...[
           const SizedBox(height: 22),
@@ -122,6 +140,38 @@ class _PagosScreenState extends State<PagosScreen> {
 
   static DateTime _fechaDe(Map<String, dynamic> r) =>
       DateTime.tryParse('${r['fecha_pago'] ?? ''}') ?? DateTime.tryParse('${r['created_at'] ?? ''}')?.toLocal() ?? DateTime(2000);
+
+  /// Reservar una clase o pagar una mensualidad (otros meses incluidos).
+  Future<void> _pagarOReservar(BuildContext context) async {
+    final ops = ReservasRepo(widget.repo.sesion).opciones;
+    final nav = Navigator.of(context);
+    TipoReserva? t = ops.length == 1 ? ops.first : null;
+    t ??= await showModalBottomSheet<TipoReserva>(
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final o in ops)
+              ListTile(
+                leading: Icon(o == TipoReserva.clase ? Icons.event_available_outlined : Icons.calendar_month_outlined),
+                title: Text(o == TipoReserva.clase ? 'Reservar una clase' : 'Pagar una mensualidad'),
+                subtitle: Text(o == TipoReserva.clase ? 'Pagas solo las clases que tomas.' : 'Este mes u otros meses, con tu suscripción.'),
+                onTap: () => Navigator.pop(h, o),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (t == null) return;
+    await nav.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReservaScreen(repo: widget.repo, tipo: t!),
+      ),
+    );
+    await widget.repo.recargarCuota();
+  }
 
   void _pagarCuota(BuildContext context) {
     Navigator.of(context).push(
