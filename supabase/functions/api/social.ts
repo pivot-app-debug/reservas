@@ -1381,16 +1381,10 @@ async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial)
   const cantidad = porCosa ? 1 : _num(params.cantidad);
   if (!cantidad || cantidad <= 0) return { exito: false, error: 'Indica cuánto llevas.' };
   if (porCosa && !_texto(params.detalle, 80)) return { exito: false, error: 'Escribe qué llevas.' };
-  const [asisten, invitados, aportes] = await Promise.all([
-    _asistentes(db, cat.id_evento),
-    _invitados(db, cat.id_evento),
-    db.from('social_comida_aportes').select('cantidad').eq('categoria_id', cat.id).then((r: any) => r.data ?? []),
-  ]);
+  const asisten = await _asistentes(db, cat.id_evento);
   if (!_asiste(q, asisten)) return { exito: false, error: 'Primero confirma tu asistencia para anotarte.' };
-  const total = asisten.size + invitados.filter((i) => asisten.has(i.anfitrion)).length;
-    const meta = _metaSeccion(cat, total);
-  const aportado = aportes.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
-  if (meta > 0 && aportado >= meta) return { exito: false, error: `${cat.nombre} ya está completo. Elige otra sección.` };
+  // Siempre se puede llevar de más, aunque la sección ya esté completa (Victor, 2026-11-20).
+
   const pt = params.paraTodxs;
   const { error } = await db.from('social_comida_aportes').insert({
     categoria_id: cat.id, clave: q.clave, nombre: q.nombre, cantidad, detalle: _texto(params.detalle, 80) || null, liga_id: liga,

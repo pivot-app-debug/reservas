@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (tu parte en "Qué lleva cada quien")
+- Al anotarte en comida, la app pregunta para cuántas personas alcanza (una persona come unas 2 porciones) y en bebida cuántos litros llevas.
+- Si escribes algo conocido (un pollo entero, una pizza grande, una botella de vino, "3 litros") calcula solo cuánto rinde y, si el número no cuadra, avisa con "Ajustar".
+- "Tu parte": lo que llevas para todxs en comida o bebida suma y compensa entre secciones; con una sola cosa que rinda bastante puedes cubrir el 100 %.
+- Siempre se puede llevar de más, aunque ya cubriste tu parte o la sección esté completa.
+- Las plantillas nuevas usan 2 porciones y 1 litro por persona.
+
 ## 2026-11-20 (ventanas que no se cortan)
 - La ventana para anotarse en "Qué lleva cada quien" ya no tiene ejemplo ("Ej.: Vino tinto"), muestra arriba lo que falta y elige "Para todxs / Solo para mí" en una sola fila.
 - Todas las ventanas con campos para escribir (19 en la app) se desplazan enteras con el teclado abierto, así no se corta el contenido.

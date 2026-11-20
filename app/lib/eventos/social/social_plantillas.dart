@@ -55,10 +55,10 @@ class Sugerencias {
 }
 
 const _comidaBase = [
-  CategoriaSugerida('Bebidas', 'litros', 0.5),
-  CategoriaSugerida('Salado', 'porciones', 1),
-  CategoriaSugerida('Snacks', 'porciones', 1),
-  CategoriaSugerida('Postres', 'porciones', 1),
+  CategoriaSugerida('Bebidas', 'litros', 1),
+  CategoriaSugerida('Salado', 'porciones', 2),
+  CategoriaSugerida('Snacks', 'porciones', 2),
+  CategoriaSugerida('Postres', 'porciones', 2),
 ];
 
 class Plantilla {
@@ -90,7 +90,7 @@ const kPlantillas = [
     Sugerencias(
       piezas: {Pieza.comida, Pieza.playlist, Pieza.homenaje},
       nombre: 'Cumpleaños',
-      comida: [CategoriaSugerida('Pastel', 'porciones', 1), CategoriaSugerida('Bebidas', 'litros', 0.5), CategoriaSugerida('Snacks', 'porciones', 1)],
+      comida: [CategoriaSugerida('Pastel', 'porciones', 2), CategoriaSugerida('Bebidas', 'litros', 1), CategoriaSugerida('Snacks', 'porciones', 2)],
       traer: ['Velas', 'Globos', 'Tarjeta para firmar'],
       sorpresa: true,
     ),
@@ -133,10 +133,10 @@ const kFestividades = [
       piezas: {Pieza.comida, Pieza.amigoSecreto, Pieza.regaloRobado, Pieza.invitados},
       nombre: 'Fiesta de Navidad',
       comida: [
-        CategoriaSugerida('Bebidas', 'litros', 0.5),
-        CategoriaSugerida('Platos salados', 'porciones', 1),
-        CategoriaSugerida('Postres navideños', 'porciones', 1),
-        CategoriaSugerida('Snacks', 'porciones', 1),
+        CategoriaSugerida('Bebidas', 'litros', 1),
+        CategoriaSugerida('Platos salados', 'porciones', 2),
+        CategoriaSugerida('Postres navideños', 'porciones', 2),
+        CategoriaSugerida('Snacks', 'porciones', 2),
       ],
       dress: ['Suéter navideño', 'Rojo y verde', 'Gorro de Navidad'],
       traer: ['Adornos', 'Vasos y platos', 'Hielo'],
@@ -166,7 +166,7 @@ const kFestividades = [
     Sugerencias(
       piezas: {Pieza.dress, Pieza.comida, Pieza.playlist, Pieza.premios, Pieza.invitados},
       nombre: 'Fiesta de Halloween',
-      comida: [CategoriaSugerida('Bebidas', 'litros', 0.5), CategoriaSugerida('Snacks de miedo', 'porciones', 1), CategoriaSugerida('Dulces', 'bolsas', 0.3)],
+      comida: [CategoriaSugerida('Bebidas', 'litros', 1), CategoriaSugerida('Snacks de miedo', 'porciones', 2), CategoriaSugerida('Dulces', 'bolsas', 0.3)],
       dress: ['Disfraz libre', 'Disfraz en grupo', 'Personajes de terror'],
       traer: ['Calabazas', 'Decoración de miedo'],
       premios: ['Mejor disfraz', 'Disfraz más original', 'Disfraz más terrorífico'],
@@ -180,9 +180,9 @@ const kFestividades = [
       piezas: {Pieza.comida, Pieza.traer},
       nombre: 'Pascua',
       comida: [
-        CategoriaSugerida('Fanesca', 'porciones', 1),
+        CategoriaSugerida('Fanesca', 'porciones', 2),
         CategoriaSugerida('Huevos de chocolate', 'unidades', 2),
-        CategoriaSugerida('Bebidas', 'litros', 0.5),
+        CategoriaSugerida('Bebidas', 'litros', 1),
       ],
       dress: ['Orejas de conejo', 'Colores pastel'],
       traer: ['Huevos para esconder', 'Canastas'],

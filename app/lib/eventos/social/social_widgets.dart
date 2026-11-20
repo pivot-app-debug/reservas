@@ -9,6 +9,7 @@ import '../../core/tema.dart';
 import '../widgets_comunes.dart';
 import 'mensajeria.dart';
 import 'pistas_screen.dart';
+import 'que_lleva_calculo.dart';
 import 'social_repo.dart';
 
 /// Piezas del evento Social que comparten la cuenta del equipo (detalle del
@@ -531,69 +532,150 @@ class ComidaTarjeta extends StatelessWidget {
   final EstadoSocial estado;
   final VoidCallback alCambiar;
 
+  /// Anotarse (Victor, 2026-11-20): la comida se pregunta en personas que
+  /// alcanza y la bebida en litros; si lo que escribes se reconoce (un pollo,
+  /// una botella de vino) se calcula solo y avisa si el número no cuadra.
+  /// Siempre se puede llevar de más, aunque la sección o tu parte ya estén cubiertas.
   Future<void> _anotar(BuildContext context, CategoriaComida c, {String? sugerencia}) async {
-    final cantidad = TextEditingController(text: cantidadSocial(math.max(1, c.porPersona)));
+    final e = estado;
+    final ref = e.refDe(c);
+    final porPersonas = c.enPorciones && ref > 0;
+    final enLitros = c.liquida;
+    final inicial = sugerencia == null ? null : rendimientoDe(sugerencia);
+    num? sugeridoDe(Rendimiento? r) => r == null ? null : (porPersonas ? r.personas : (enLitros ? r.litros : null));
+    final valor = TextEditingController(text: _num(sugeridoDe(inicial) ?? (porPersonas ? 1 : (enLitros ? (ref > 0 ? ref : 1) : math.max(1, c.porPersona)))));
     final detalle = TextEditingController(text: sugerencia ?? '');
     bool? paraTodxs;
+    var tocado = false;
+    final yaParte = e.miParte;
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => StatefulBuilder(
-        // scrollable: con el teclado abierto se desplaza entera y no se corta (Victor, 2026-11-20).
-        builder: (d, set) => AlertDialog(
-          scrollable: true,
-          title: Text(c.nombre),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (c.meta > 0 && !c.porCosa) ...[
-                Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.', style: TextStyle(color: d.pivot.textoSecundario)),
-                const SizedBox(height: 12),
-              ],
-              TextField(
-                controller: detalle,
-                autofocus: sugerencia == null,
-                maxLength: 80,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
-              ),
-              if (!c.porCosa) ...[
-                const SizedBox(height: 12),
+        builder: (d, set) {
+          final p = d.pivot;
+          final n = num.tryParse(valor.text.replaceAll(',', '.')) ?? 0;
+          final cantidad = porPersonas ? n * ref : n;
+          final r = rendimientoDe(detalle.text);
+          final sug = sugeridoDe(r);
+          final parte = paraTodxs == false || !e.asiste ? 0.0 : e.parteDe(c, cantidad);
+          final secundario = TextStyle(fontSize: 13, color: p.textoSecundario);
+          return AlertDialog(
+            // scrollable: con el teclado abierto se desplaza entera y no se corta.
+            scrollable: true,
+            title: Text(c.nombre),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (c.cerrada)
+                  Text('Esta sección ya está completa, pero igual puedes llevar más.', style: secundario)
+                else if (c.meta > 0 && !c.porCosa)
+                  Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.', style: secundario),
+                if (c.cerrada || (c.meta > 0 && !c.porCosa)) const SizedBox(height: 12),
                 TextField(
-                  controller: cantidad,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: 'Cantidad', suffixText: c.unidad),
+                  controller: detalle,
+                  autofocus: sugerencia == null,
+                  maxLength: 80,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
+                  onChanged: (v) => set(() {
+                    final s = sugeridoDe(rendimientoDe(v));
+                    if (!tocado && s != null) valor.text = _num(s);
+                  }),
                 ),
-              ],
-              const SizedBox(height: 16),
-              const Text('¿Para quién?'),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<bool>(
-                  emptySelectionAllowed: true,
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('Para todxs')),
-                    ButtonSegment(value: false, label: Text('Solo para mí')),
+                if (!c.porCosa) ...[
+                  const SizedBox(height: 16),
+                  Text(porPersonas ? '¿Para cuántas personas alcanza?' : (enLitros ? '¿Cuántos litros llevas?' : '¿Cuánto llevas?')),
+                  const SizedBox(height: 6),
+                  _Contador(
+                    controller: valor,
+                    paso: porPersonas ? 1 : (enLitros ? 0.5 : 1),
+                    sufijo: porPersonas ? (n == 1 ? 'persona' : 'personas') : c.unidad,
+                    alCambiar: () => set(() => tocado = true),
+                  ),
+                  const SizedBox(height: 6),
+                  if (porPersonas) Text('Una persona come unas ${_num(ref)} ${c.unidad}. Son ${_num(cantidad)} ${c.unidad}.', style: secundario),
+                  if (enLitros && ref > 0)
+                    Text(
+                      'Una persona toma unos ${_num(ref)} litros. '
+                      '${n / ref < 1 ? 'Alcanza para menos de 1 persona.' : 'Alcanza para unas ${(n / ref).round()} personas.'}',
+                      style: secundario,
+                    ),
+                  // Ayuda para no equivocarse: un pollo no rinde 1 porción.
+                  if (r != null && sug != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.sobreSuave),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              porPersonas
+                                  ? '${r.texto} suele alcanzar para unas ${_num(sug)} personas.'
+                                  : (r.texto.startsWith('Escribiste') ? '${r.texto}.' : '${r.texto} tiene unos ${_num(sug)} litros.'),
+                              style: TextStyle(fontSize: 13, color: p.sobreSuave),
+                            ),
+                          ),
+                          if (n != sug)
+                            TextButton(
+                              onPressed: () => set(() {
+                                valor.text = _num(sug);
+                                tocado = true;
+                              }),
+                              child: const Text('Ajustar'),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
-                  selected: {?paraTodxs},
-                  onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+                ],
+                const SizedBox(height: 16),
+                const Text('¿Para quién?'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<bool>(
+                    emptySelectionAllowed: true,
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: true, label: Text('Para todxs')),
+                      ButtonSegment(value: false, label: Text('Solo para mí')),
+                    ],
+                    selected: {?paraTodxs},
+                    onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+                  ),
                 ),
-              ),
+                if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    yaParte >= 1
+                        ? 'Ya cubriste tu parte. Esto suma de más, ¡gracias!'
+                        : (yaParte + parte >= 1 ? 'Con esto cubres tu parte ✓' : 'Con esto llegas al ${((yaParte + parte) * 100).round()} % de tu parte.'),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+              FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me anoto')),
             ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me anoto')),
-          ],
-        ),
+          );
+        },
       ),
     );
-    final n = c.porCosa ? 1 : num.tryParse(cantidad.text.replaceAll(',', '.'));
+    final v = c.porCosa ? 1 : num.tryParse(valor.text.replaceAll(',', '.'));
+    final n = v == null ? null : (porPersonas ? v * ref : v);
     final texto = detalle.text.trim();
-    cantidad.dispose();
-    detalle.dispose();
+    // Se liberan cuando terminó de cerrarse la ventana (la animación todavía los usa).
+    Future.delayed(const Duration(milliseconds: 400), () {
+      valor.dispose();
+      detalle.dispose();
+    });
     if (ok != true || !context.mounted) return;
     if (c.porCosa && texto.isEmpty) return avisarSocial(context, 'Escribe qué llevas.');
     if (n == null || n <= 0) return avisarSocial(context, 'Indica cuánto llevas.');
@@ -604,6 +686,9 @@ class ComidaTarjeta extends StatelessWidget {
       if (context.mounted) avisarSocial(context, e.toString());
     }
   }
+
+  /// Número corto: 1, 1.5, 0.75.
+  static String _num(num n) => n == n.roundToDouble() ? '${n.toInt()}' : n.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
 
   // ─── Quien está a cargo ──────────────────────────────────────────────────
 
@@ -799,6 +884,7 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           '${e.asiste ? 'Mira lo que ya lleva cada quien para no repetir.' : 'Confirma tu asistencia para anotarte.'}',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
+        if (e.asiste && e.seccionesParte.isNotEmpty) _TuParte(valor: e.miParte),
         if (mias.isNotEmpty)
           Container(
             width: double.infinity,
@@ -958,12 +1044,12 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
                     ),
                   ),
                   indicador,
-                  if (!c.cerrada)
-                    IconButton(
-                      tooltip: 'Me anoto',
-                      icon: Icon(Icons.add_circle_outline_rounded, color: _e.asiste ? p.marcaTexto : p.textoSecundario),
-                      onPressed: _e.asiste ? () => t._anotar(context, c) : null,
-                    ),
+                  // Siempre se puede llevar de más (Victor, 2026-11-20).
+                  IconButton(
+                    tooltip: c.cerrada ? 'Llevar más' : 'Me anoto',
+                    icon: Icon(Icons.add_circle_outline_rounded, color: _e.asiste ? p.marcaTexto : p.textoSecundario),
+                    onPressed: _e.asiste ? () => t._anotar(context, c) : null,
+                  ),
                   if (admin)
                     PopupMenuButton<String>(
                       tooltip: 'Opciones',
@@ -1150,6 +1236,95 @@ class ACargoTarjeta extends StatelessWidget {
             },
           ),
       ],
+    );
+  }
+}
+
+/// − [número] + para anotarse.
+class _Contador extends StatelessWidget {
+  const _Contador({required this.controller, required this.paso, required this.sufijo, required this.alCambiar});
+  final TextEditingController controller;
+  final num paso;
+  final String sufijo;
+  final VoidCallback alCambiar;
+
+  void _mover(int dir) {
+    final v = num.tryParse(controller.text.replaceAll(',', '.')) ?? 0;
+    final n = math.max(paso, v + dir * paso);
+    controller.text = ComidaTarjeta._num(n);
+    alCambiar();
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      IconButton.outlined(tooltip: 'Menos', icon: const Icon(Icons.remove_rounded), onPressed: () => _mover(-1)),
+      const SizedBox(width: 8),
+      Expanded(
+        child: TextField(
+          controller: controller,
+          textAlign: TextAlign.center,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(suffixText: sufijo, isDense: true),
+          onChanged: (_) => alCambiar(),
+        ),
+      ),
+      const SizedBox(width: 8),
+      IconButton.outlined(tooltip: 'Más', icon: const Icon(Icons.add_rounded), onPressed: () => _mover(1)),
+    ],
+  );
+}
+
+/// Cuánto cubriste de lo que te toca llevar.
+class _TuParte extends StatelessWidget {
+  const _TuParte({required this.valor});
+  final double valor;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final lista = valor >= 1;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Tu parte',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                ),
+              ),
+              if (lista)
+                Icon(Icons.check_circle_rounded, size: 20, color: p.marcaTexto)
+              else
+                Text(
+                  '${(valor * 100).round()} %',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(PivotRadios.chip),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: valor.clamp(0, 1).toDouble()),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 6, backgroundColor: p.suave, color: p.marca),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            lista
+                ? 'Ya cubriste tu parte. Si quieres, puedes llevar más.'
+                : 'Lo que llevas para todxs en comida o bebida suma. Con una sola cosa que rinda bastante puedes cubrirla.',
+            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+          ),
+        ],
+      ),
     );
   }
 }

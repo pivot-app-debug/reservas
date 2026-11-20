@@ -252,7 +252,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     _cats
       ..clear()
       ..addAll(_catsSugeridas());
-    if (_cats.isEmpty) _cats.add(_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 0.5));
+    if (_cats.isEmpty) _cats.add(_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 1));
     for (final t in _traer) {
       t.dispose();
     }
@@ -859,7 +859,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                 : (v) => setState(() {
                     v ? _piezas.add(pz) : _piezas.remove(pz);
                     if (v && pz == Pieza.comida && _cats.isEmpty) {
-                      _cats.addAll(_catsSugeridas().isEmpty ? [_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 0.5)] : _catsSugeridas());
+                      _cats.addAll(_catsSugeridas().isEmpty ? [_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 1)] : _catsSugeridas());
                     }
                   }),
           ),
