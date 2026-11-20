@@ -61,11 +61,18 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           _estado = e;
           _error = null;
         });
+        // Recién marcó Asistiré: ¿participa del amigo secreto y del regalo robado?
+        if (!_preguntado && e.asiste && !e.respondioParticipa) {
+          _preguntado = true;
+          unawaited(preguntarParticipacion(context, _social, e, _cargar));
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
   }
+
+  bool _preguntado = false;
 
   Future<void> _configurar() async {
     final ok = await Navigator.of(context).push<bool>(

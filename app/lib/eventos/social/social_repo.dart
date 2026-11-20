@@ -30,6 +30,9 @@ class SocialRepo {
   Future<Map<String, dynamic>> guardarConfig(Map<String, Object?> config, List<Map<String, Object?>> categorias) =>
       _post('socialGuardarConfig', {'config': jsonEncode(config), 'categorias': jsonEncode(categorias)});
 
+  /// ¿Participa del amigo secreto y del regalo robado? (Victor, 2026-11-20).
+  Future<void> participar({bool? amigo, bool? robado}) => _post('socialParticipar', {'amigo': ?amigo, 'robado': ?robado});
+
   /// Editar una tarjeta sin pasar por el asistente (Victor, 2026-11-20):
   /// 'amigo', 'robado', 'playlist', 'dress' o 'invitados'.
   Future<void> editarPieza(String pieza, Map<String, Object?> datos) => _post('socialEditarPieza', {'pieza': pieza, 'datos': jsonEncode(datos)});
@@ -211,6 +214,12 @@ class EstadoSocial {
   /// Configuración completa para editar (solo quien organiza).
   Map<String, dynamic>? get editable => raw['editable'] is Map ? Map<String, dynamic>.from(raw['editable'] as Map) : null;
   bool get asiste => yo['asiste'] == true;
+
+  /// Participa del amigo secreto / del regalo robado (sin responder = sí).
+  Map<String, dynamic> get _participa => Map<String, dynamic>.from((yo['participa'] as Map?) ?? const {});
+  bool get participaAmigo => _participa['amigo'] != false;
+  bool get participaRobado => _participa['robado'] != false;
+  bool get respondioParticipa => _participa['respondio'] == true;
 
   /// +1 que todavía no escribió su nombre.
   bool get necesitaNombre => yo['necesitaNombre'] == true;

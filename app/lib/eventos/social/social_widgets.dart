@@ -115,6 +115,64 @@ Future<bool?> hojaFormulario(
   );
 }
 
+/// Al marcar Asistiré en una fiesta (Victor, 2026-11-20): ¿participas del
+/// amigo secreto y del regalo robado? Se pregunta una vez; si se cierra sin
+/// responder, cuenta como que sí participa.
+Future<void> preguntarParticipacion(BuildContext context, SocialRepo repo, EstadoSocial e, VoidCallback alCambiar) async {
+  final fase = e.juegoRobado['fase'];
+  final amigo = e.modulo('amigoSecreto') && e.inscripcionAbierta && !e.sorteado;
+  final robado = e.modulo('regaloRobado') && (fase == null || fase == 'pila');
+  if (!e.asiste || e.respondioParticipa || (!amigo && !robado)) return;
+  var siAmigo = e.participaAmigo, siRobado = e.participaRobado;
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (h) => StatefulBuilder(
+      builder: (h, set) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('¡Vas a la fiesta!', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(
+                'Cuéntanos si participas, así se te toma en cuenta. Lo puedes cambiar después desde cada tarjeta.',
+                style: TextStyle(color: h.pivot.textoSecundario),
+              ),
+              const SizedBox(height: 8),
+              if (amigo)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.redeem_rounded),
+                  title: const Text('Participo del amigo secreto'),
+                  value: siAmigo,
+                  onChanged: (v) => set(() => siAmigo = v),
+                ),
+              if (robado)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.card_giftcard_rounded),
+                  title: const Text('Juego al regalo robado'),
+                  value: siRobado,
+                  onChanged: (v) => set(() => siRobado = v),
+                ),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: () => Navigator.pop(h), child: const Text('Listo')),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  try {
+    await repo.participar(amigo: amigo ? siAmigo : null, robado: robado ? siRobado : null);
+    alCambiar();
+  } catch (_) {}
+}
+
 void avisarSocial(BuildContext context, String texto) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 }
@@ -263,6 +321,15 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     if (ficha != null) widget.alCambiar();
   }
 
+  Future<void> _participar(bool si) async {
+    try {
+      await widget.repo.participar(amigo: si);
+      widget.alCambiar();
+    } catch (e) {
+      if (mounted) avisarSocial(context, e.toString());
+    }
+  }
+
   Future<void> _pistas() async {
     final cambio = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -286,6 +353,17 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
       contenido.add(const SizedBox(height: 6));
     }
     switch (estado) {
+      case 'sin_sorteo' when e.asiste && !e.participaAmigo:
+        // Eligió no participar (Victor, 2026-11-20).
+        contenido.add(Text('Elegiste no participar del amigo secreto. Igual vienes a la fiesta.', style: TextStyle(color: p.textoSecundario)));
+        if (e.inscripcionAbierta) {
+          contenido.add(
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(onPressed: () => _participar(true), child: const Text('Quiero participar')),
+            ),
+          );
+        }
       case 'sin_sorteo':
         contenido.add(
           Text(
@@ -300,6 +378,14 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
             style: TextStyle(color: p.textoSecundario),
           ),
         );
+        if (e.asiste && e.inscripcionAbierta) {
+          contenido.add(
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(onPressed: () => _participar(false), child: const Text('No voy a participar')),
+            ),
+          );
+        }
       case 'fuera':
         // Fuera del sorteo: se dice por qué y no se piden pistas (Victor, 2026-11-20).
         contenido.add(
@@ -314,7 +400,9 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    e.asiste
+                    e.asiste && !e.participaAmigo
+                        ? 'Elegiste no participar del amigo secreto. Igual vienes a la fiesta.'
+                        : e.asiste
                         ? 'No participas en el amigo secreto: marcaste Asistiré después de que se hizo el sorteo. Igual vienes a la fiesta.'
                         : 'El sorteo del amigo secreto ya se hizo. Si marcas Asistiré, vienes a la fiesta pero no participas en el amigo secreto.',
                     style: TextStyle(color: p.sobreSuave),
@@ -362,7 +450,7 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
         );
     }
     contenido.add(const SizedBox(height: 12));
-    final fuera = estado == 'fuera';
+    final fuera = estado == 'fuera' || (e.asiste && !e.participaAmigo);
     contenido.add(
       ListTile(
         // Fuera del sorteo, las pistas y la wishlist quedan deshabilitadas.
@@ -1325,6 +1413,31 @@ class RegaloRobadoTarjeta extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ¿Juega? (Victor, 2026-11-20): se cambia hasta que el juego pasa de la pila.
+          if (repo != null && estado.asiste && (fase == null || fase == 'pila')) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    estado.participaRobado ? 'Juegas al regalo robado.' : 'Elegiste no jugar al regalo robado.',
+                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await repo!.participar(robado: !estado.participaRobado);
+                      alCambiar?.call();
+                    } catch (e) {
+                      if (context.mounted) avisarSocial(context, e.toString());
+                    }
+                  },
+                  child: Text(estado.participaRobado ? 'No voy a jugar' : 'Quiero jugar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           FilledButton.icon(
             onPressed: activo ? () => _jugar(context) : null,
             icon: const Icon(Icons.casino_rounded),

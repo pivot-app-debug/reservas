@@ -51,7 +51,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
         'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
-    'socialJuego', 'socialEditarPieza',
+      'socialJuego', 'socialEditarPieza', 'socialParticipar',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -189,7 +189,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
       case 'socialMensaje': return await socialMensaje(params, deps);
             case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
             case 'socialJuego': return await socialJuego(params, deps);
-      case 'socialEditarPieza': return await socialEditarPieza(params, deps);
+            case 'socialEditarPieza': return await socialEditarPieza(params, deps);
+      case 'socialParticipar': return await socialParticipar(params, deps);
       case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
@@ -314,6 +315,13 @@ async function _asistentes(db: any, idEvento: string): Promise<Set<string>> {
   const ultimo = new Map<string, string>();
   for (const f of data ?? []) ultimo.set(String(f.nombre_usuario), String(f.estado));
   return new Set([...ultimo].filter(([, e]) => e === 'Asistiré').map(([u]) => u));
+}
+
+/// Quiénes dijeron que NO participan del amigo secreto o del regalo robado
+/// (Victor, 2026-11-20). Sin fila = participa.
+async function _participacion(db: any, idEvento: string): Promise<Map<string, { amigo: boolean; robado: boolean }>> {
+  const { data } = await db.from('social_participacion').select('clave, amigo, robado').eq('id_evento', idEvento);
+  return new Map((data ?? []).map((r: any) => [String(r.clave), { amigo: r.amigo !== false, robado: r.robado !== false }]));
 }
 
 async function _invitados(db: any, idEvento: string): Promise<any[]> {
@@ -454,7 +462,12 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   };
 
   const out: Record<string, any> = { exito: true, social, evento, esPivot: q.esPivot, tipo: q.tipo, organiza, vista };
-    out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null, necesitaNombre: esInv && !q.nombre };
+        out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null, necesitaNombre: esInv && !q.nombre } as Record<string, any>;
+  // ¿Participa del amigo secreto y del regalo robado? (y si ya respondió).
+  if (q.clave) {
+    const { data: pa } = await db.from('social_participacion').select('amigo, robado').eq('id_evento', q.idEvento).eq('clave', q.clave).maybeSingle();
+    out.yo.participa = { amigo: pa ? pa.amigo !== false : true, robado: pa ? pa.robado !== false : true, respondio: !!pa };
+  }
   if (esInv) out.yo.anfitrion = (await _personas(db, [q.invitado.anfitrion])).get(q.invitado.anfitrion)?.nombre ?? '';
   // Lxs +1 no ven la lista de asistentes, solo cuántxs son (para la comida).
   out.conteo = { asistentes: asisten.size, invitados: invitadosQueCuentan.length, total };
@@ -608,7 +621,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
       nombres: Object.fromEntries([...personas].map(([u, p]) => [u, p.nombre])),
       migracion: 'aprobado_en' in cfg,
     };
-    const ps = _participantes(asisten, invitados);
+        const noAmigo = await _participacion(db, q.idEvento);
+    const ps = _participantes(asisten, invitados).filter((x) => noAmigo.get(x.clave)?.amigo !== false);
     out.admin = {
       participantes: ps.length,
       invitados: invitadosQueCuentan.length,
@@ -1556,6 +1570,39 @@ async function socialQuitarTraer(params: Record<string, any>, deps: DepsSocial):
   return { exito: true };
 }
 
+// ─── ¿Participas? (Victor, 2026-11-20) ──────────────────────────────────────
+// Al marcar Asistiré, cada quien (también lxs +1) dice si participa del amigo
+// secreto y del regalo robado. El amigo se cambia hasta el cierre o el sorteo;
+// el regalo robado, hasta que el juego pase de la pila.
+
+async function socialParticipar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (!q.clave) return { exito: false, error: 'Inicia sesión para responder.' };
+  const cfg = await _config(db, q.idEvento);
+  if (!cfg) return { exito: false, error: 'Este evento no tiene amigo secreto ni regalo robado.' };
+  const asisten = await _asistentes(db, q.idEvento);
+  if (!_asiste(q, asisten)) return { exito: false, error: 'Primero marca Asistiré.' };
+  const { data: antes } = await db.from('social_participacion').select('amigo, robado').eq('id_evento', q.idEvento).eq('clave', q.clave).maybeSingle();
+  const fila: Record<string, any> = { id_evento: q.idEvento, clave: q.clave, liga_id: liga, amigo: antes?.amigo ?? true, robado: antes?.robado ?? true, respondido_en: new Date().toISOString() };
+  const si = (v: unknown) => v === true || v === 'true';
+  if (params.amigo !== undefined && si(params.amigo) !== fila.amigo) {
+    const cierre = cfg.cierre ?? null;
+    if (cfg.sorteado_en || (cierre && _hoyEc() > cierre)) return { exito: false, error: 'La inscripción del amigo secreto ya cerró.' };
+    fila.amigo = si(params.amigo);
+  }
+  if (params.robado !== undefined && si(params.robado) !== fila.robado) {
+    const { data: jr } = await db.from('social_regalo_juego').select('estado').eq('id_evento', q.idEvento).maybeSingle();
+    const fase = jr?.estado?.fase;
+    if (fase && fase !== 'pila' && fase !== 'terminado') return { exito: false, error: 'El regalo robado ya empezó.' };
+    fila.robado = si(params.robado);
+  }
+  const { error } = await db.from('social_participacion').upsert(fila, { onConflict: 'id_evento,clave' });
+  if (error) return { exito: false, error: 'No se pudo guardar.' };
+  return { exito: true, participa: { amigo: fila.amigo, robado: fila.robado, respondio: true } };
+}
+
 // ─── Editar una tarjeta (Victor, 2026-11-20) ───────────────────────────────
 // Quien organiza cambia una pieza desde su tarjeta, sin pasar por el asistente.
 
@@ -1661,8 +1708,9 @@ async function socialJuego(params: Record<string, any>, deps: DepsSocial): Promi
   if (accion === 'iniciar') {
     if (!hoy) return { exito: false, error: 'El juego se activa el día del evento.' };
     if (estado && estado.fase !== 'terminado') return responder();
-    const [asisten, invitados] = await Promise.all([_asistentes(db, q.idEvento), _invitados(db, q.idEvento)]);
-    const ps = _participantes(asisten, invitados);
+        const [asisten, invitados, part] = await Promise.all([_asistentes(db, q.idEvento), _invitados(db, q.idEvento), _participacion(db, q.idEvento)]);
+    // Quien dijo que no juega al regalo robado no entra a la lista.
+    const ps = _participantes(asisten, invitados).filter((x) => part.get(x.clave)?.robado !== false);
     const nombres = await _personas(db, ps.filter((x) => !x.clave.startsWith('inv:')).map((x) => x.clave));
     const inv = new Map(invitados.map((i: any) => [`inv:${i.id}`, String(i.nombre ?? '')]));
     const lista = ps.map((x) => ({ clave: x.clave, nombre: (x.clave.startsWith('inv:') ? inv.get(x.clave) : nombres.get(x.clave)?.nombre) || 'Alguien' }))
@@ -1784,7 +1832,10 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   const [asisten, invitados] = await Promise.all([_asistentes(db, idEvento), _invitados(db, idEvento)]);
   // Amigo secreto escondido a quienes no deben enterarse: no entran al sorteo (ni sus +1).
   const fuera = (u: string) => !piezaVisible(cfg, 'amigoSecreto', esSecretoPara(cfg, u) ? 'neutral' : 'completa');
-  const ps = _participantes(new Set([...asisten].filter((u) => !fuera(u))), invitados.filter((i) => !fuera(i.anfitrion)));
+    // Quien dijo que no participa del amigo secreto, tampoco entra (Victor, 2026-11-20).
+  const part = await _participacion(db, idEvento);
+  const ps = _participantes(new Set([...asisten].filter((u) => !fuera(u))), invitados.filter((i) => !fuera(i.anfitrion)))
+    .filter((x) => part.get(x.clave)?.amigo !== false);
   const anio = Number(String(ev.fecha).substring(0, 4));
   // Historial: quién le regaló a quién el año anterior en esta liga.
   const { data: previas } = await db.from('social_sorteo').select('da, recibe').eq('liga_id', liga).eq('anio', anio - 1).neq('id_evento', idEvento);

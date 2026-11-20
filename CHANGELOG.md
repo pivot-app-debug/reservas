@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (¿participas?)
+- Al marcar Asistiré en una fiesta, aparece "¡Vas a la fiesta!" con dos preguntas: si participas del amigo secreto y si juegas al regalo robado. Si cierras sin responder, cuenta como que sí. Lxs +1 también lo ven.
+- Se cambia desde cada tarjeta: el amigo secreto hasta el cierre o el sorteo ("No voy a participar" / "Quiero participar"), y el regalo robado hasta que el juego pasa de la pila.
+- Quien dice que no queda fuera del sorteo y de la lista del juego.
+- Quienes ya habían marcado Asistiré quedaron participando en los dos.
+
 ## 2026-11-20 (lo que falta, más directo)
 - Qué lleva cada quien: "Faltan" pasó a decir "Todavía falta para el grupo", con la cantidad que falta en cada sección (por ejemplo, "Platos salados (6 porciones)").
 - "Tu parte" dice en una frase qué te toca: "Te toca llevar algo: con comida o bebida para 3 personas en cualquier sección cubres tu parte", "Te falta poco…" o "Ya cubriste tu parte ✓".

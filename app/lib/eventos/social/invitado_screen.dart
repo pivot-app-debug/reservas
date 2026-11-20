@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -35,6 +37,8 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
     _cargar();
   }
 
+  bool _preguntado = false;
+
   Future<void> _cargar() async {
     try {
       final e = await _repo.cargar();
@@ -43,6 +47,10 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
         _estado = e;
         _error = null;
       });
+      if (!_preguntado && e.asiste && !e.respondioParticipa && !e.necesitaNombre) {
+        _preguntado = true;
+        unawaited(preguntarParticipacion(context, _repo, e, _cargar));
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
