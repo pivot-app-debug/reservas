@@ -70,7 +70,7 @@ void main() {
     expect(e.parteDe(s, 8), closeTo(4 / 3, 0.001));
   });
 
-  testWidgets('Anotarse en comida: pregunta personas, calcula con lo que escribes y deja llevar de más', (t) async {
+  testWidgets('Anotarse en comida: cada quien dice cuánto rinde y se puede llevar de más', (t) async {
     t.view.physicalSize = const Size(360 * 3, 640 * 3);
     t.view.devicePixelRatio = 3;
     addTearDown(t.view.reset);
@@ -104,24 +104,15 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byTooltip('Llevar más'));
     await t.pumpAndSettle();
-    expect(find.text('¿Para cuántas personas alcanza?'), findsOneWidget);
+    // Cuánto rinde lo decide quien lleva: sin cálculos ni sugerencias de la app.
+    expect(find.text('¿Cuántas porciones rinde lo que llevas?'), findsOneWidget);
+    expect(find.text('Tú decides cuánto rinde.'), findsOneWidget);
     await t.enterText(find.byType(TextField).first, 'Pollo entero');
+    await t.enterText(find.byType(TextField).at(1), '8');
     await t.pumpAndSettle();
-    expect(find.text('Un pollo entero suele alcanzar para unas 4 personas.'), findsOneWidget);
-    expect(find.text('Una persona come unas 2 porciones. Son 8 porciones.'), findsOneWidget);
+    expect(find.textContaining('suele alcanzar'), findsNothing);
+    // 8 porciones = 4 personas en una de 2 secciones: cubre la parte.
     expect(find.text('Con esto cubres tu parte ✓'), findsOneWidget);
-    // Si bajas a 1 persona, avisa con Ajustar.
-    await t.tap(find.byTooltip('Menos'));
-    await t.tap(find.byTooltip('Menos'));
-    await t.tap(find.byTooltip('Menos'));
-    await t.pumpAndSettle();
-    expect(find.text('Ajustar'), findsOneWidget);
-    await t.ensureVisible(find.text('Ajustar'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('Ajustar'));
-    await t.pumpAndSettle();
-    expect(find.text('Son 8 porciones.', findRichText: false), findsNothing);
-    expect(find.text('Una persona come unas 2 porciones. Son 8 porciones.'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 

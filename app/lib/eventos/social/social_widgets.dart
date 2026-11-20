@@ -675,21 +675,17 @@ class ComidaTarjeta extends StatelessWidget {
   final EstadoSocial estado;
   final VoidCallback alCambiar;
 
-  /// Anotarse (Victor, 2026-11-20): la comida se pregunta en personas que
-  /// alcanza y la bebida en litros; si lo que escribes se reconoce (un pollo,
-  /// una botella de vino) se calcula solo y avisa si el número no cuadra.
+  /// Anotarse (Victor, 2026-11-20): cuánto rinde lo que llevas lo decides tú,
+  /// en la unidad de la sección (porciones, litros…).
   /// Siempre se puede llevar de más, aunque la sección o tu parte ya estén cubiertas.
   Future<void> _anotar(BuildContext context, CategoriaComida c, {String? sugerencia}) async {
     final e = estado;
-    final ref = e.refDe(c);
-    final porPersonas = c.enPorciones && ref > 0;
+    // Cuánto rinde lo decide quien lleva (Victor, 2026-11-20: "un pollo rinde
+    // más"): se pregunta en la unidad de la sección, sin cálculos de la app.
     final enLitros = c.liquida;
-    final inicial = sugerencia == null ? null : rendimientoDe(sugerencia);
-    num? sugeridoDe(Rendimiento? r) => r == null ? null : (porPersonas ? r.personas : (enLitros ? r.litros : null));
-    final valor = TextEditingController(text: _num(sugeridoDe(inicial) ?? (porPersonas ? 1 : (enLitros ? (ref > 0 ? ref : 1) : math.max(1, c.porPersona)))));
+    final valor = TextEditingController(text: c.enPorciones || enLitros ? '' : _num(math.max(1, c.porPersona)));
     final detalle = TextEditingController(text: sugerencia ?? '');
     bool? paraTodxs;
-    var tocado = false;
     final yaParte = e.miParte;
     final ok = await hojaFormulario(
       context,
@@ -698,9 +694,7 @@ class ComidaTarjeta extends StatelessWidget {
       contenido: (d, set) {
         final p = d.pivot;
         final n = num.tryParse(valor.text.replaceAll(',', '.')) ?? 0;
-        final cantidad = porPersonas ? n * ref : n;
-        final r = rendimientoDe(detalle.text);
-        final sug = sugeridoDe(r);
+        final cantidad = n;
         final parte = paraTodxs == false || !e.asiste ? 0.0 : e.parteDe(c, cantidad);
         final secundario = TextStyle(fontSize: 13, color: p.textoSecundario);
         return Column(
@@ -723,60 +717,14 @@ class ComidaTarjeta extends StatelessWidget {
               maxLength: 80,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
-              onChanged: (v) => set(() {
-                final s = sugeridoDe(rendimientoDe(v));
-                if (!tocado && s != null) valor.text = _num(s);
-              }),
+              onChanged: (_) => set(() {}),
             ),
             if (!c.porCosa) ...[
               const SizedBox(height: 16),
-              Text(porPersonas ? '¿Para cuántas personas alcanza?' : (enLitros ? '¿Cuántos litros llevas?' : '¿Cuánto llevas?')),
+              Text(c.enPorciones ? '¿Cuántas porciones rinde lo que llevas?' : (enLitros ? '¿Cuántos litros llevas?' : '¿Cuánto llevas?')),
               const SizedBox(height: 6),
-              _Contador(
-                controller: valor,
-                paso: porPersonas ? 1 : (enLitros ? 0.5 : 1),
-                sufijo: porPersonas ? (n == 1 ? 'persona' : 'personas') : c.unidad,
-                alCambiar: () => set(() => tocado = true),
-              ),
-              const SizedBox(height: 6),
-              if (porPersonas) Text('Una persona come unas ${_num(ref)} ${c.unidad}. Son ${_num(cantidad)} ${c.unidad}.', style: secundario),
-              if (enLitros && ref > 0)
-                Text(
-                  'Una persona toma unos ${_num(ref)} litros. '
-                  '${n / ref < 1 ? 'Alcanza para menos de 1 persona.' : 'Alcanza para unas ${(n / ref).round()} personas.'}',
-                  style: secundario,
-                ),
-              // Ayuda para no equivocarse: un pollo no rinde 1 porción.
-              if (r != null && sug != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-                  decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.sobreSuave),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          porPersonas
-                              ? '${r.texto} suele alcanzar para unas ${_num(sug)} personas.'
-                              : (r.texto.startsWith('Escribiste') ? '${r.texto}.' : '${r.texto} tiene unos ${_num(sug)} litros.'),
-                          style: TextStyle(fontSize: 13, color: p.sobreSuave),
-                        ),
-                      ),
-                      if (n != sug)
-                        TextButton(
-                          onPressed: () => set(() {
-                            valor.text = _num(sug);
-                            tocado = true;
-                          }),
-                          child: const Text('Ajustar'),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+              _Contador(controller: valor, paso: enLitros ? 0.5 : 1, sufijo: c.unidad, alCambiar: () => set(() {})),
+              if (c.enPorciones || enLitros) ...[const SizedBox(height: 6), Text('Tú decides cuánto rinde.', style: secundario)],
             ],
             // "¿Para quién?" solo con cosas de uso personal (vasos, platos,
             // cubiertos): la comida o las servilletas son para todxs (Victor, 2026-11-20).
@@ -812,7 +760,7 @@ class ComidaTarjeta extends StatelessWidget {
       },
     );
     final v = c.porCosa ? 1 : num.tryParse(valor.text.replaceAll(',', '.'));
-    final n = v == null ? null : (porPersonas ? v * ref : v);
+    final n = v;
     final texto = detalle.text.trim();
     // Se liberan cuando terminó de cerrarse la ventana (la animación todavía los usa).
     Future.delayed(const Duration(milliseconds: 400), () {
