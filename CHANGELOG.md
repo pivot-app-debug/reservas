@@ -4,7 +4,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 
 ## 2026-11-20 (temporadas de descanso y fiestas)
 - **Las temporadas de descanso ya no eliminan fiestas ni festividades** (Social o fiesta). Se devolvió la Naviquinde del 19/12, que había quitado la temporada del 15/12 al 10/01.
-- **Antes de crear o editar una temporada** se muestra la lista de eventos que se van a eliminar (fecha, hora, tipo y lugar) junto con los cursos que se mueven, y se confirma con "Crear" o "Guardar".
+- **Antes de crear o editar una temporada** se muestra la lista de eventos con casillas para elegir cuáles se cancelan: entrenamientos marcados por defecto; partidos, reuniones y otros sin marcar. Los que se dejan quedan guardados en la temporada (`reglas.conservar`) y no se tocan al editarla. También se listan los cursos que se mueven.
 
 ## 2026-11-20 (Social o fiesta: íconos, mensajería y pronombres)
 - **Ícono según la festividad** en el calendario (Navidad, Año nuevo, Halloween, Pascua; cumpleaños, aniversario y despedida por plantilla) y **ícono a elección** para una festividad propia. Sin "Día de muertos" en las festividades.

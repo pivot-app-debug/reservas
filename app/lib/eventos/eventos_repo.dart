@@ -671,6 +671,7 @@ class EventosRepo extends ChangeNotifier {
     bool congela = false,
     bool sinCuota = false,
     String? cuota,
+    List<String>? conservar,
   }) async {
     final res = await _api.post('adminGuardarTemporadaDescanso', {
       'adminToken': _adminToken,
@@ -681,6 +682,7 @@ class EventosRepo extends ChangeNotifier {
       'congela': congela,
       'sinCuota': sinCuota,
       'cuota': ?cuota,
+      if (conservar != null) 'conservar': jsonEncode(conservar),
     });
     if (res['exito'] != true) throw ApiException((res['error'] ?? 'No se pudo guardar la temporada.').toString());
     await cargar(forzar: true);
@@ -689,9 +691,10 @@ class EventosRepo extends ChangeNotifier {
 
   /// Eventos que una temporada de descanso eliminaría (sin fiestas), para
   /// mostrarlos antes de crearla (Victor, 2026-11-20).
-  Future<List<Map<String, dynamic>>> eventosParaDescanso(DateTime desde, DateTime hasta) async {
+  Future<List<Map<String, dynamic>>> eventosParaDescanso(DateTime desde, DateTime hasta, {String? id}) async {
     final res = await _api.post('adminGuardarTemporadaDescanso', {
       'adminToken': _adminToken,
+      'id': id ?? '',
       'desde': Fechas.iso(desde),
       'hasta': Fechas.iso(hasta),
       'soloContar': true,

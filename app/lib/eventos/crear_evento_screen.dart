@@ -246,8 +246,9 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     // (Victor, 2026-11-20). Las fiestas y festividades nunca se tocan.
     var eventos = <Map<String, dynamic>>[];
     var afectados = <String>[];
+    List<String>? conservar;
     try {
-      eventos = await widget.repo.eventosParaDescanso(_descDesde!, _descHasta!);
+      eventos = await widget.repo.eventosParaDescanso(_descDesde!, _descHasta!, id: widget.temporada?.id);
     } catch (_) {}
     try {
       afectados = await _cursosAfectados(_descDesde!, _descHasta!);
@@ -256,39 +257,75 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
       String fila(Map<String, dynamic> e) {
         final f = DateTime.tryParse('${e['fecha']}');
         final h = '${e['inicia'] ?? ''}';
-        return '• ${f == null ? '' : Fechas.corta(f)}${h.length >= 5 ? ' · ${h.substring(0, 5)}' : ''} · ${etiquetaTipoEvento('${e['tipo']}')}'
-            '${'${e['lugar'] ?? ''}'.isEmpty ? '' : ' · ${e['lugar']}'}';
+        return '${f == null ? '' : Fechas.corta(f)}${h.length >= 5 ? ' · ${h.substring(0, 5)}' : ''}';
       }
 
+      // Elegir qué se cancela (Victor, 2026-11-20): entrenamientos marcados por
+      // defecto; partidos, reuniones y otros se preguntan (sin marcar).
+      final cancelar = {
+        for (final e in eventos)
+          if (e['tipo'] == 'Entrenamiento' && e['conservado'] != true) '${e['id']}',
+      };
+      final p = context.pivot;
       final ok = await showDialog<bool>(
         context: context,
-        builder: (d) => AlertDialog(
-          title: Text(widget.temporada != null ? '¿Guardar los cambios?' : '¿Crear la temporada de descanso?'),
-          content: SingleChildScrollView(
-            child: Text(
-              [
-                if (eventos.isNotEmpty) ...[
-                  eventos.length == 1 ? 'Se elimina 1 evento:' : 'Se eliminan ${eventos.length} eventos:',
-                  ...eventos.take(15).map(fila),
-                  if (eventos.length > 15) '…y ${eventos.length - 15} más.',
-                  'Vuelven si borras la temporada. Las fiestas y festividades no se tocan.',
+        builder: (d) => StatefulBuilder(
+          builder: (d, set) => AlertDialog(
+            title: Text(widget.temporada != null ? '¿Guardar los cambios?' : '¿Crear la temporada de descanso?'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  if (eventos.isNotEmpty) ...[
+                    Text(
+                      'Marca los eventos que se cancelan:',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                    ),
+                    for (final e in eventos)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: cancelar.contains('${e['id']}'),
+                        onChanged: (v) => set(() => v == true ? cancelar.add('${e['id']}') : cancelar.remove('${e['id']}')),
+                        title: Text(
+                          '${etiquetaTipoEvento('${e['tipo']}')}${'${e['lugar'] ?? ''}'.isEmpty ? '' : ' · ${e['lugar']}'}',
+                          style: TextStyle(color: p.texto),
+                        ),
+                        subtitle: Text(fila(e)),
+                      ),
+                    Text(
+                      'Los que cancelas vuelven si borras la temporada. Las fiestas y festividades no se tocan.',
+                      style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                    ),
+                  ],
+                  if (afectados.isNotEmpty) ...[
+                    if (eventos.isNotEmpty) const SizedBox(height: 12),
+                    Text(
+                      afectados.length == 1 ? 'Un curso tiene clases en el descanso:' : '${afectados.length} cursos tienen clases en el descanso:',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                    ),
+                    for (final x in afectados) Text('• $x', style: TextStyle(color: p.texto)),
+                    Text(
+                      'Se pausan y siguen después del descanso, el mismo día de la semana. Se avisa a quienes están inscritxs.',
+                      style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                    ),
+                  ],
                 ],
-                if (afectados.isNotEmpty) ...[
-                  if (eventos.isNotEmpty) '',
-                  afectados.length == 1 ? 'Un curso tiene clases en el descanso:' : '${afectados.length} cursos tienen clases en el descanso:',
-                  ...afectados.map((x) => '• $x'),
-                  'Se pausan y siguen después del descanso, el mismo día de la semana. Se avisa a quienes están inscritxs.',
-                ],
-              ].join('\n'),
+              ),
             ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+              FilledButton(onPressed: () => Navigator.of(d).pop(true), child: Text(widget.temporada != null ? 'Guardar' : 'Crear')),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
-            FilledButton(onPressed: () => Navigator.of(d).pop(true), child: Text(widget.temporada != null ? 'Guardar' : 'Crear')),
-          ],
         ),
       );
       if (ok != true || !mounted) return;
+      conservar = [
+        for (final e in eventos)
+          if (!cancelar.contains('${e['id']}')) '${e['id']}',
+      ];
     }
     if (!mounted) return;
     setState(() => _guardando = true);
@@ -301,6 +338,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
         congela: _descCongela,
         sinCuota: _descCuota == null ? _descSinCuota : _descCuota == 'no',
         cuota: _descCuota,
+        conservar: conservar,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

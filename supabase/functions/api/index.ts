@@ -11908,9 +11908,11 @@ async function _restaurarEventosDescanso(idTemporada: string, soloFuera?: { desd
   return n;
 }
 
-async function _eliminarEventosDescanso(idTemporada: string, desde: string, hasta: string): Promise<number> {
+async function _eliminarEventosDescanso(idTemporada: string, desde: string, hasta: string, conservar: string[] = []): Promise<number> {
   let n = 0;
+  const quedan = new Set(conservar);
   for (const r of await _eventosParaDescanso(desde, hasta)) {
+    if (quedan.has(r.id_evento)) continue;
     const { error } = await supabase.from('asistencias').update({
       estado: 'Eliminado',
       es_excepcion: true,
@@ -11935,16 +11937,30 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
         let id = params.id ? String(params.id) : '';
   const si = (v: unknown) => v === true || v === 'true';
   // Antes de crear o editar: qué eventos se eliminarían (Victor, 2026-11-20).
-  if (si(params.soloContar)) {
+    if (si(params.soloContar)) {
     const evs = await _eventosParaDescanso(desde, hasta);
-    return { exito: true, eventos: evs.map((r) => ({ id: r.id_evento, fecha: r.fecha, tipo: r.tipo_evento ?? '', inicia: r.inicia ?? '', lugar: r.donde ?? '' })) };
+    const antes = id ? (await supabase.from('temporadas_descanso').select('reglas').eq('id', id).maybeSingle()).data?.reglas : null;
+    const quedan = new Set<string>(Array.isArray(antes?.conservar) ? antes.conservar : []);
+    return {
+      exito: true,
+      eventos: evs.map((r) => ({ id: r.id_evento, fecha: r.fecha, tipo: r.tipo_evento ?? '', inicia: r.inicia ?? '', lugar: r.donde ?? '', conservado: quedan.has(r.id_evento) })),
+    };
   }
   const reglas: Record<string, any> = { congela: si(params.congela), sinCuota: si(params.sinCuota) };
   // "Cuota durante el descanso" (Victor, 2026-11-19): solo descansos nuevos (o
   // que ya la tenían). Los de antes siguen con `sinCuota` tal cual.
   const cuota = ['entera', 'proporcional', 'no'].includes(String(params.cuota)) ? String(params.cuota) : '';
   const previa = id ? (await supabase.from('temporadas_descanso').select('reglas').eq('id', id).maybeSingle()).data?.reglas : null;
-  if (cuota && (!id || previa?.cuota)) { reglas.cuota = cuota; reglas.sinCuota = cuota === 'no'; }
+    if (cuota && (!id || previa?.cuota)) { reglas.cuota = cuota; reglas.sinCuota = cuota === 'no'; }
+  // Eventos que quien crea el descanso eligió conservar (Victor, 2026-11-20).
+  let conservar: string[] = Array.isArray(previa?.conservar) ? previa.conservar : [];
+  if (params.conservar !== undefined) {
+    try {
+      const v = typeof params.conservar === 'string' ? JSON.parse(params.conservar) : params.conservar;
+            if (Array.isArray(v)) conservar = [...new Set(v.map((x: unknown) => String(x)).filter(Boolean))].slice(0, 500);
+    } catch { /* sin cambios */ }
+  }
+  if (conservar.length) reglas.conservar = conservar;
   else if (id && previa?.cuota) { reglas.cuota = previa.cuota; reglas.sinCuota = previa.cuota === 'no'; }
   if (id) {
     const { error } = await supabase.from('temporadas_descanso').update({ nombre, fecha_inicio: desde, fecha_fin: hasta, reglas }).eq('id', id);
@@ -11956,7 +11972,7 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
     if (error || !data) return { exito: false, error: error?.message ?? 'No se pudo crear la temporada.' };
     id = (data as any).id;
   }
-    const eliminados = await _eliminarEventosDescanso(id, desde, hasta);
+        const eliminados = await _eliminarEventosDescanso(id, desde, hasta, conservar);
   const cursosMovidos = await _posponerCursos(desde, hasta);
   if (!params.id && hasta >= _hoyEcuadorISO()) {
     await sendPush({
