@@ -392,6 +392,8 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
           if (e.social?['traer'] == true) TraerTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.premios != null) PremiosTarjeta(lista: e.premios!),
+          // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
+          if (e.aCargo.isNotEmpty) ACargoTarjeta(personas: e.aCargo),
         ],
       );
     }
@@ -404,5 +406,24 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
       ),
       child: contenido,
     );
+  }
+}
+
+/// Editar un Social o fiesta con su asistente desde el menú del evento
+/// (Victor, 2026-11-20). Devuelve true si se guardaron cambios.
+Future<bool?> editarSocial(BuildContext context, EventosRepo repo, Evento ev) async {
+  final s = repo.sesion;
+  final social = SocialRepo.miembro(s.api, idEvento: ev.id, adminToken: s.adminToken);
+  try {
+    final estado = await social.cargar();
+    if (!context.mounted) return null;
+    return await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CrearSocialScreen(sesion: s, repo: social, actual: estado),
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo abrir: $e')));
+    return null;
   }
 }

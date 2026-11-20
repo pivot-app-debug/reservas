@@ -51,9 +51,9 @@ export const ACCIONES_SOCIAL = new Set([
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
-/// `{tope}` se reemplaza en la app por el tope configurado.
+/// Sin monto (Victor, 2026-11-20): el tope se muestra aparte. Reglas viejas con `{tope}` se reemplazan en la app.
 export const PLANTILLA_REGALO_ROBADO = [
-  '1. Cada persona trae un regalo envuelto y sin nombre, de hasta {tope}. Solo juega quien trajo regalo.',
+  '1. Cada persona trae un regalo envuelto y sin nombre. Solo juega quien trajo regalo.',
   '2. Todos los regalos se ponen juntos en una pila.',
   '3. Se sortea el orden de los turnos.',
   '4. En tu turno eliges: abres un regalo de la pila o robas uno que ya esté abierto.',
@@ -472,6 +472,18 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
       };
     }
     out.homenaje = bloque;
+  }
+    // Personas a cargo con su contacto (Victor, 2026-11-20), para consultarles
+  // dudas. Solo para gente de la liga (lxs +1 no ven teléfonos).
+  if (!esInv) {
+    const aCargo = [...new Set([cfg.creador, ...encargadxs(cfg)].filter((u: unknown) => typeof u === 'string' && u && !String(u).includes('@')))] as string[];
+    if (aCargo.length) {
+      const { data: cs } = await db.from('equipo').select('username, nombre_derby, foto_perfil, telefono, prefijo, email').in('username', aCargo);
+      out.aCargo = (cs ?? []).map((r: any) => ({
+        username: r.username, nombre: (r.nombre_derby ?? '').trim() || r.username, foto: r.foto_perfil ?? '',
+        telefono: r.telefono ?? '', prefijo: r.prefijo ?? '', email: r.email ?? '', organiza: r.username === cfg.creador, yo: r.username === q.username,
+      })).sort((a: any, b: any) => Number(b.organiza) - Number(a.organiza));
+    }
   }
   // Mensajes para la persona homenajeada: después del evento o cuando se liberan.
   if (yoHomenajeadx && piezas.homenaje && piezas.homenaje.mensajes !== false && mensajesAbiertos(cfg, _termino(ev))) {
@@ -1422,7 +1434,9 @@ export async function filtrarEventosSociales(eventos: any[], params: Record<stri
       socialTitulo: tituloPara(cfg, vista, nombreDe),
       socialSorpresa: etiquetaSorpresa(cfg, vista, nombreDe),
       socialEstado: _estado(cfg),
-      socialOrganiza: vista === 'organiza',
+            socialOrganiza: vista === 'organiza',
+      // Ícono de fiesta en el calendario, nunca para quien no debe enterarse.
+      socialFestivo: vista !== 'neutral',
     });
   }
   return out;

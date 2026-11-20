@@ -50,6 +50,9 @@ class _DetalleScreenState extends State<DetalleScreen> {
   EventosRepo get repo => widget.repo;
   bool _confirmacionPedida = false;
 
+  /// Sube al editar el Social o fiesta para recargar sus piezas.
+  int _versionSocial = 0;
+
   // Tour del detalle de un evento (Victor, 2026-11-15).
   final _kResumen = GlobalKey(debugLabel: 'tour-ev-resumen');
   final _kRespuesta = GlobalKey(debugLabel: 'tour-ev-respuesta');
@@ -128,6 +131,13 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
     if (!mounted || accion == null) return;
     switch (accion) {
+      case 'editar' when ev.tipo == kTipoSocial:
+        // Social o fiesta: se edita con su asistente (Victor, 2026-11-20).
+        final ok = await editarSocial(context, repo, ev);
+        if (ok == true && mounted) {
+          setState(() => _versionSocial++);
+          _avisar('Cambios guardados.');
+        }
       case 'editar':
         final guardado = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
@@ -339,7 +349,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
             children: [
               KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
               // Plan del coach: "Qué veremos" si lo compartió (Victor, 2026-11-16).
-              PlanEnEvento(sesion: repo.sesion, evento: ev),
+              // Un Social o fiesta no lleva plan: ya se arma con sus piezas (2026-11-20).
+              if (ev.tipo != kTipoSocial) PlanEnEvento(sesion: repo.sesion, evento: ev),
               if ((_esAdmin || repo.sesion.esCoach) && ev.sePuedeTomarAsistencia)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -362,7 +373,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
               // Pasado o cancelado (Victor, 2026-11-12): sin botones de respuesta.
               if (!ev.finalizado && !ev.cancelado) KeyedSubtree(key: _kRespuesta, child: _tuAsistencia(context, ev)),
               // Evento social (Naviquinde): +1, amigo secreto, regalo robado y comida.
-              if (ev.tipo == kTipoSocial && !ev.cancelado) SocialEnEvento(repo: repo, evento: ev),
+              if (ev.tipo == kTipoSocial && !ev.cancelado) SocialEnEvento(key: ValueKey('social-$_versionSocial'), repo: repo, evento: ev),
               if (!ev.cancelado) _tuReserva(context, ev),
               if (ev.cancelado)
                 _ibanAIr(context, ev)
@@ -564,7 +575,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
           // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
-          if (repo.anticipada.disponible) ...[const SizedBox(height: 12), _botonAnticipada(context)],
+          // Sin asistencia anticipada en un Social o fiesta: es un evento especial (2026-11-20).
+          if (repo.anticipada.disponible && ev.tipo != kTipoSocial) ...[const SizedBox(height: 12), _botonAnticipada(context)],
         ],
       ),
     );

@@ -105,7 +105,7 @@ class FichaAmigoVista extends StatelessWidget {
       if ((pf.tallas['medias'] ?? '').isNotEmpty) 'Medias: ${pf.tallas['medias']}',
       if ((pf.tallas['otra'] ?? '').isNotEmpty) '${pf.tallas['otra']}',
     ];
-    final deseos = [...pf.wishlist]..sort((a, b) => (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
+    final deseos = pf.wishlist;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -147,7 +147,7 @@ class FichaAmigoVista extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              leading: Icon(d.favorito ? Icons.star_rounded : Icons.card_giftcard_rounded, color: d.favorito ? p.marcaTexto : p.textoSecundario),
+              leading: Icon(Icons.card_giftcard_rounded, color: p.textoSecundario),
               title: Text(d.texto, style: TextStyle(color: p.texto)),
               subtitle: d.nota.isEmpty ? null : Text(d.nota),
               trailing: d.link.isEmpty
@@ -680,6 +680,63 @@ class RegaloRobadoTarjeta extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Personas a cargo del evento con botones de contacto.
+class ACargoTarjeta extends StatelessWidget {
+  const ACargoTarjeta({super.key, required this.personas});
+  final List<Map<String, dynamic>> personas;
+
+  static String _digitos(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return TarjetaSocial(
+      titulo: '¿Dudas? Pregúntales',
+      icono: Icons.support_agent_rounded,
+      children: [
+        for (final x in personas)
+          Builder(
+            builder: (context) {
+              var tel = _digitos('${x['telefono'] ?? ''}');
+              final pre = _digitos('${x['prefijo'] ?? ''}');
+              if (tel.startsWith('0')) tel = tel.substring(1);
+              final completo = tel.isEmpty ? '' : '${pre.isEmpty ? '593' : pre}$tel';
+              final email = '${x['email'] ?? ''}';
+              final yo = x['yo'] == true;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: AvatarPersona(nombre: '${x['nombre'] ?? ''}', foto: '${x['foto'] ?? ''}', tamano: 40),
+                title: Text('${x['nombre'] ?? ''}${yo ? ' (tú)' : ''}', style: TextStyle(color: p.texto)),
+                subtitle: Text(x['organiza'] == true ? 'Organiza' : 'Encargadx'),
+                trailing: yo
+                    ? null
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (completo.isNotEmpty)
+                            IconButton(
+                              tooltip: 'WhatsApp',
+                              icon: const Icon(Icons.chat_rounded),
+                              onPressed: () => launchUrl(Uri.parse('https://wa.me/$completo'), mode: LaunchMode.externalApplication),
+                            ),
+                          if (completo.isNotEmpty)
+                            IconButton(tooltip: 'Llamar', icon: const Icon(Icons.call_rounded), onPressed: () => launchUrl(Uri.parse('tel:+$completo'))),
+                          if (completo.isEmpty && email.contains('@'))
+                            IconButton(
+                              tooltip: 'Correo',
+                              icon: const Icon(Icons.mail_outline_rounded),
+                              onPressed: () => launchUrl(Uri(scheme: 'mailto', path: email)),
+                            ),
+                        ],
+                      ),
+              );
+            },
           ),
       ],
     );

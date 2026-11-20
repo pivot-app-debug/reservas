@@ -142,6 +142,10 @@ class EstadoSocial {
   String get reglasRobado => '${social?['reglasRobado'] ?? ''}';
   bool get reglasPorDefecto => social?['reglasPorDefecto'] != false;
   List<Map<String, dynamic>> get traer => [for (final x in (raw['traer'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+
+  /// Quien organiza y lxs encargadxs, con su contacto (solo gente de la liga).
+  List<Map<String, dynamic>> get aCargo => [for (final x in (raw['aCargo'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+
   Map<String, dynamic>? get homenaje => raw['homenaje'] is Map ? Map<String, dynamic>.from(raw['homenaje'] as Map) : null;
   List<Map<String, dynamic>>? get paraTi => raw['paraTi'] is List ? [for (final x in raw['paraTi'] as List) Map<String, dynamic>.from(x as Map)] : null;
 

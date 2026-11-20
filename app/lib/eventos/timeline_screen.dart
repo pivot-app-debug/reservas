@@ -1763,14 +1763,29 @@ class _TarjetaEvento extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          ev.titulo,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: apagado ? p.apagado : p.texto,
-                            decoration: apagado ? TextDecoration.lineThrough : null,
-                          ),
+                        Row(
+                          children: [
+                            // Social o fiesta: ícono propio (regalo si es sorpresa), nunca para quien no debe enterarse.
+                            if (ev.socialFestivo) ...[
+                              Icon(
+                                ev.socialSorpresa != null ? Icons.card_giftcard_rounded : Icons.celebration_rounded,
+                                size: 18,
+                                color: apagado ? p.apagado : p.marcaTexto,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Flexible(
+                              child: Text(
+                                ev.titulo,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: apagado ? p.apagado : p.texto,
+                                  decoration: apagado ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 3),
                         Text(ev.lugar, style: TextStyle(fontSize: 13, color: apagado ? p.apagado : p.textoSecundario)),

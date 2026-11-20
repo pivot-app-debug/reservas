@@ -140,14 +140,6 @@ class _PistasScreenState extends State<PistasScreen> {
     });
   }
 
-  void _favorito(ItemDeseo d) {
-    if (!d.favorito && _p.wishlist.where((x) => x.favorito).length >= 2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Puedes marcar hasta 2 favoritos.')));
-      return;
-    }
-    _cambio(() => d.favorito = !d.favorito);
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -211,7 +203,7 @@ class _PistasScreenState extends State<PistasScreen> {
                 ),
               ],
             ),
-            Text('Marca con la estrella hasta 2 favoritos.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+
             if (ideas.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text('Ideas desde lo que te gusta', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
@@ -237,19 +229,8 @@ class _PistasScreenState extends State<PistasScreen> {
                   for (final d in _p.wishlist)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: IconButton(
-                        tooltip: d.favorito ? 'Quitar de favoritos' : 'Marcar como favorito',
-                        icon: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
-                          child: Icon(
-                            d.favorito ? Icons.star_rounded : Icons.star_outline_rounded,
-                            key: ValueKey(d.favorito),
-                            color: d.favorito ? p.marcaTexto : p.textoSecundario,
-                          ),
-                        ),
-                        onPressed: () => _favorito(d),
-                      ),
+                      // Sin favoritos con estrella (Victor, 2026-11-20).
+                      leading: Icon(Icons.card_giftcard_rounded, color: p.textoSecundario),
                       title: Text(d.texto),
                       subtitle: (d.nota.isEmpty && d.link.isEmpty)
                           ? null

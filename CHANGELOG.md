@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: ajustes de Victor, 11:20)
+- Sin "Plan del evento" ni "Asistencia anticipada" en un Social o fiesta (ya se arma con sus piezas; es un evento especial).
+- **Ícono en el calendario:** globos de fiesta, o un regalo si es sorpresa. Nunca para quien no debe enterarse (el servidor manda `socialFestivo` solo a quien puede saberlo y no se guarda sin señal).
+- **Editar desde el botón del evento** abre el mismo asistente por pasos que "Editar" en la tarjeta.
+- **"¿Dudas? Pregúntales":** quien organiza y lxs encargadxs con botones de WhatsApp y llamar (o correo si no hay teléfono). Solo para gente de la liga; lxs +1 no ven teléfonos.
+- Reglas del regalo robado: la plantilla ya no menciona el monto (el tope se muestra aparte).
+- Wishlist sin favoritos con estrella.
+
 ## 2026-11-20 (Social o fiesta: homenaje y cierre)
 - El paso "Homenaje y sorpresa" del asistente ya no aparece si no elegiste la pieza Homenaje. El resumen sigue igual y en esa fila dice "Sin homenaje ni sorpresa" (desde ahí se puede agregar).
 - **Amigo secreto, "No se pueden tocar":** en la configuración, quien organiza agrega parejas de personas que no se regalan entre sí en ningún sentido (por ejemplo, una pareja). Solo lo ve quien organiza. Si con esas reglas no hay forma de sortear, el sorteo avisa y pide quitar alguna.

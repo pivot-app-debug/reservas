@@ -227,7 +227,7 @@ const kSugerenciasNeutras = ['Reunión del equipo', 'Junta de la liga', 'Entrena
 
 /// Reglas de siempre del regalo robado (igual que `PLANTILLA_REGALO_ROBADO`
 /// del servidor): sirven de punto de partida para editarlas.
-const kReglasRegaloRobado = '''1. Cada persona trae un regalo envuelto y sin nombre, de hasta {tope}. Solo juega quien trajo regalo.
+const kReglasRegaloRobado = '''1. Cada persona trae un regalo envuelto y sin nombre. Solo juega quien trajo regalo.
 2. Todos los regalos se ponen juntos en una pila.
 3. Se sortea el orden de los turnos.
 4. En tu turno eliges: abres un regalo de la pila o robas uno que ya esté abierto.

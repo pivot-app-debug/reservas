@@ -83,6 +83,7 @@ class Evento {
     this.socialTitulo,
     this.socialSorpresa,
     this.socialEstado,
+    this.socialFestivo = false,
   }) : asistentes = asistentes ?? [];
 
   /// "Social o fiesta" (Victor, 2026-11-20): nombre que le toca ver a esta
@@ -91,6 +92,10 @@ class Evento {
   final String? socialTitulo;
   final String? socialSorpresa;
   final String? socialEstado;
+
+  /// Ícono de fiesta en el calendario: el servidor lo manda solo a quien puede
+  /// saber que es una fiesta (nunca a quien no debe enterarse; no se guarda sin señal).
+  final bool socialFestivo;
 
   /// Título de la tarjeta: el nombre del Social o fiesta, o el tipo.
   String get titulo => (socialTitulo ?? '').trim().isNotEmpty ? socialTitulo!.trim() : etiquetaTipoEvento(tipo);
@@ -205,6 +210,7 @@ class Evento {
       socialTitulo: raw['socialTitulo'] as String?,
       socialSorpresa: raw['socialSorpresa'] as String?,
       socialEstado: raw['socialEstado'] as String?,
+      socialFestivo: raw['socialFestivo'] == true,
     );
   }
 }
