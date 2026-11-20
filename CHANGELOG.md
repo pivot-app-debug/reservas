@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 ("Qué lleva cada quien" rediseñado)
+- Cada sección es una fila compacta (nombre, qué se pide, barra fina y un solo indicador: "3 de 10", "Hace falta", "Te falta 1" o un check) con un **+** para anotarse; se despliega al tocarla.
+- Abiertas solo las que hacen falta y las que te faltan; las completas van al final en "Completadas (N)", cerradas.
+- Quién lleva qué con su avatar ("Victor · Luces navideñas · para todxs"). Solo se muestran las ideas que nadie tomó.
+- Arriba: "Tú llevas" y "Faltan: …".
+
 ## 2026-11-20 ("Qué lleva cada quien")
 - "¿Qué llevamos?" pasa a llamarse **"Qué lleva cada quien"** y lo que llevas tú va arriba dentro de la misma tarjeta ("Tú llevas"), en vez de una tarjeta aparte. Ya no se muestra la tarjeta vieja de "Qué traer".
 - El conteo dice "Van X personas" y solo menciona invitadxs si hay (antes decía "(con sus +1)" aunque nadie llevara).

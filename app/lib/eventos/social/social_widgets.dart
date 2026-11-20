@@ -729,37 +729,68 @@ class ComidaTarjeta extends StatelessWidget {
     }
   }
 
-  static String _para(Object? v) => v == true ? ' · para todxs' : (v == false ? ' · solo para sí' : '');
+  static String _para(Object? v) => v == true ? 'para todxs' : (v == false ? 'solo para sí' : '');
+
+  @override
+  Widget build(BuildContext context) => _ListaQueLleva(t: this);
+}
+
+/// Rediseño de "Qué lleva cada quien" (Victor, 2026-11-20): cada sección es
+/// una fila compacta (nombre, barra fina y un indicador) que se despliega con
+/// quién lleva qué. Abiertas solo las que hacen falta y las que te faltan;
+/// las completas van al final, agrupadas.
+class _ListaQueLleva extends StatefulWidget {
+  const _ListaQueLleva({required this.t});
+  final ComidaTarjeta t;
+
+  @override
+  State<_ListaQueLleva> createState() => _ListaQueLlevaState();
+}
+
+class _ListaQueLlevaState extends State<_ListaQueLleva> {
+  final Map<String, bool> _abierta = {};
+  bool _verCompletadas = false;
+
+  EstadoSocial get _e => widget.t.estado;
+
+  bool _teFalta(CategoriaComida c) => _e.asiste && c.modo == 'cada' && !c.cerrada && c.mias < c.porPersona;
+  bool _abiertaPorDefecto(CategoriaComida c) => !c.cerrada && (c.falta || _teFalta(c));
 
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    // Lo que hace falta va primero.
-    final cats = [...estado.comida.where((c) => c.falta && !c.cerrada), ...estado.comida.where((c) => !c.falta || c.cerrada)];
-    final total = estado.conteo['total'] ?? 0;
-    final masUno = estado.conteo['invitados'] ?? 0;
-    final admin = estado.puedeComida;
-    // Lo que llevas tú, arriba en la misma tarjeta (Victor, 2026-11-20: todo junto).
+    final t = widget.t;
+    final e = _e;
+    final total = e.conteo['total'] ?? 0;
+    final masUno = e.conteo['invitados'] ?? 0;
+    final admin = e.puedeComida;
+    final abiertas = e.comida.where((c) => !c.cerrada).toList()..sort((a, b) => (b.falta ? 1 : 0) - (a.falta ? 1 : 0));
+    final completas = e.comida.where((c) => c.cerrada).toList();
+    final faltan = [
+      for (final c in abiertas)
+        if (c.falta || (c.meta > 0 && c.aportado < c.meta)) c.nombre,
+    ];
     final mias = [
-      for (final c in estado.comida)
+      for (final c in e.comida)
         for (final a in c.aportes)
           if (a['mio'] == true) (c, a),
     ];
     return TarjetaSocial(
       titulo: 'Qué lleva cada quien',
       icono: Icons.restaurant_rounded,
-      accion: admin ? IconButton(tooltip: 'Agregar sección', icon: const Icon(Icons.add_rounded), onPressed: () => _editar(context)) : null,
+      accion: admin ? IconButton(tooltip: 'Agregar sección', icon: const Icon(Icons.add_rounded), onPressed: () => t._editar(context)) : null,
       children: [
         Text(
-          'Mira lo que ya lleva cada quien para no repetir. Van $total ${total == 1 ? 'persona' : 'personas'}'
-          '${masUno > 0 ? ' (${masUno == 1 ? 'incluye 1 invitadx' : 'incluye $masUno invitadxs'})' : ''}.',
+          'Van $total ${total == 1 ? 'persona' : 'personas'}'
+          '${masUno > 0 ? ' (${masUno == 1 ? 'incluye 1 invitadx' : 'incluye $masUno invitadxs'})' : ''}. '
+          '${e.asiste ? 'Mira lo que ya lleva cada quien para no repetir.' : 'Confirma tu asistencia para anotarte.'}',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
         if (mias.isNotEmpty)
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 8),
             decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,8 +804,11 @@ class ComidaTarjeta extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '${'${a['detalle'] ?? ''}'.isEmpty ? c.nombre : a['detalle']}'
-                          '${c.porCosa ? '' : ' · ${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}${_para(a['paraTodxs'])}',
+                          [
+                            '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
+                            if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
+                            if (ComidaTarjeta._para(a['paraTodxs']).isNotEmpty) ComidaTarjeta._para(a['paraTodxs']),
+                          ].join(' · '),
                           style: TextStyle(color: p.sobreSuave),
                         ),
                       ),
@@ -782,7 +816,7 @@ class ComidaTarjeta extends StatelessWidget {
                         visualDensity: VisualDensity.compact,
                         tooltip: 'Quitar',
                         icon: Icon(Icons.close_rounded, size: 18, color: p.sobreSuave),
-                        onPressed: () => _quitar(context, '${a['id']}'),
+                        onPressed: () => t._quitar(context, '${a['id']}'),
                       ),
                     ],
                   ),
@@ -790,11 +824,24 @@ class ComidaTarjeta extends StatelessWidget {
               ],
             ),
           ),
-        if (!estado.asiste) ...[
-          const SizedBox(height: 6),
-          Text('Confirma tu asistencia para anotarte.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+        if (faltan.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Faltan: ',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                ),
+                TextSpan(
+                  text: faltan.join(', '),
+                  style: TextStyle(color: p.texto),
+                ),
+              ],
+            ),
+          ),
         ],
-        if (cats.isEmpty)
+        if (e.comida.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
@@ -802,135 +849,188 @@ class ComidaTarjeta extends StatelessWidget {
               style: TextStyle(color: p.textoSecundario),
             ),
           ),
-        for (final c in cats) _seccion(context, p, c, admin),
+        const SizedBox(height: 8),
+        for (final c in abiertas) _seccion(context, p, c, admin),
+        if (completas.isNotEmpty) ...[
+          InkWell(
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            onTap: () => setState(() => _verCompletadas = !_verCompletadas),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 20, color: p.textoSecundario),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Completadas (${completas.length})',
+                      style: TextStyle(fontWeight: FontWeight.w600, color: p.textoSecundario),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _verCompletadas ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _verCompletadas ? Column(children: [for (final c in completas) _seccion(context, p, c, admin)]) : const SizedBox(width: double.infinity),
+          ),
+        ],
       ],
     );
   }
 
   Widget _seccion(BuildContext context, PivotPaleta p, CategoriaComida c, bool admin) {
-    final tomadas = {
-      for (final a in c.aportes)
-        if ('${a['detalle'] ?? ''}'.trim().isNotEmpty) '${a['detalle']}'.trim().toLowerCase(): a['mio'] == true ? 'ti' : '${a['nombre']}',
-    };
+    final t = widget.t;
+    final abierta = _abierta[c.id] ?? _abiertaPorDefecto(c);
+    final teFalta = _teFalta(c);
     final pide = switch (c.modo) {
-      'cada' => 'Cada persona lleva ${cantidadSocial(c.porPersona)} ${c.porPersona == 1 ? 'cosa' : 'cosas'}',
-      'total' => 'Hacen falta ${cantidadSocial(c.meta)} ${c.unidad}',
-      'libre' => '',
+      'cada' => 'Cada persona lleva ${cantidadSocial(c.porPersona)}',
+      'total' => '${cantidadSocial(c.meta)} ${c.unidad} en total',
+      'libre' => 'Libre',
       _ => '${cantidadSocial(c.porPersona)} ${c.unidad} por persona',
     };
-    final mio = c.aportes.any((a) => a['mio'] == true);
-    final faltanMias = c.modo == 'cada' ? (c.porPersona - c.mias).ceil() : 0;
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
+    // Un solo indicador a la derecha.
+    final Widget indicador = c.cerrada
+        ? Icon(Icons.check_circle_rounded, size: 22, color: p.marcaTexto)
+        : c.falta
+        ? Etiqueta(texto: 'Hace falta', icono: Icons.priority_high_rounded)
+        : teFalta
+        ? Text(
+            'Te ${(c.porPersona - c.mias).ceil() == 1 ? 'falta 1' : 'faltan ${(c.porPersona - c.mias).ceil()}'}',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.marcaTexto),
+          )
+        : Text(
+            c.meta > 0 ? '${cantidadSocial(c.aportado)} de ${cantidadSocial(c.meta)}' : (c.aportes.isEmpty ? 'Nadie aún' : '${c.aportes.length}'),
+            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+          );
+    final tomadas = {for (final a in c.aportes) '${a['detalle'] ?? ''}'.trim().toLowerCase()};
+    final ideas = [
+      for (final s in c.sugerencias)
+        if (!tomadas.contains(s.trim().toLowerCase())) s,
+    ];
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.falta && !c.cerrada ? p.marca : p.bordeSuave),
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  c.nombre,
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                ),
-              ),
-              if (c.meta > 0)
-                Text(
-                  c.porCosa
-                      ? '${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)}'
-                      : '${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)} ${c.unidad}',
-                  style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                ),
-              if (admin)
-                PopupMenuButton<String>(
-                  tooltip: 'Opciones',
-                  iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                  position: PopupMenuPosition.under,
-                  onSelected: (a) => _accionSeccion(context, c, a),
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                    PopupMenuItem(value: 'falta', child: Text(c.falta ? 'Ya no hace falta' : 'Hace falta')),
-                    const PopupMenuItem(value: 'borrar', child: Text('Quitar')),
-                  ],
-                ),
-            ],
-          ),
-          if (pide.isNotEmpty) Text(pide, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-          if (c.falta && !c.cerrada) ...[const SizedBox(height: 4), Etiqueta(texto: 'Hace falta', icono: Icons.priority_high_rounded)],
-          if (c.meta > 0) ...[
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(PivotRadios.chip),
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: c.avance),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
-                builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 8, backgroundColor: p.suave, color: p.marca),
-              ),
-            ),
-          ],
-          // Quién lleva qué: lo ven todxs para no repetir.
-          for (final a in c.aportes)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
+          InkWell(
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            onTap: () => setState(() => _abierta[c.id] = !abierta),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      '${a['mio'] == true ? 'Tú' : a['nombre']}: '
-                      '${c.porCosa ? '' : '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}'
-                      '${'${a['detalle']}'.isEmpty ? '' : '${c.porCosa ? '' : ' · '}${a['detalle']}'}${_para(a['paraTodxs'])}',
-                      style: TextStyle(fontSize: 13, color: p.texto),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.nombre,
+                          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                        ),
+                        Text(pide, style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+                      ],
                     ),
                   ),
-                  if (a['mio'] == true)
+                  indicador,
+                  if (!c.cerrada)
                     IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Quitar',
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: () => _quitar(context, '${a['id']}'),
+                      tooltip: 'Me anoto',
+                      icon: Icon(Icons.add_circle_outline_rounded, color: _e.asiste ? p.marcaTexto : p.textoSecundario),
+                      onPressed: _e.asiste ? () => t._anotar(context, c) : null,
+                    ),
+                  if (admin)
+                    PopupMenuButton<String>(
+                      tooltip: 'Opciones',
+                      iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                      position: PopupMenuPosition.under,
+                      onSelected: (a) => t._accionSeccion(context, c, a),
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                        PopupMenuItem(value: 'falta', child: Text(c.falta ? 'Ya no hace falta' : 'Hace falta')),
+                        const PopupMenuItem(value: 'borrar', child: Text('Quitar')),
+                      ],
                     ),
                 ],
               ),
             ),
-          // Ideas: las ya tomadas se ven tachadas con quién las lleva.
-          if (c.sugerencias.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final s in c.sugerencias)
-                  if (tomadas[s.trim().toLowerCase()] case final quien?)
-                    Chip(
-                      label: Text(
-                        '$s · lo lleva $quien',
-                        style: TextStyle(decoration: TextDecoration.lineThrough, color: p.textoSecundario),
-                      ),
-                    )
-                  else
-                    ActionChip(
-                      label: Text(s),
-                      onPressed: estado.asiste && !c.cerrada ? () => _anotar(context, c, sugerencia: s) : null,
-                    ),
-              ],
+          ),
+          if (c.meta > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(PivotRadios.chip),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: c.avance),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 4, backgroundColor: p.suave, color: p.marca),
+                ),
+              ),
             ),
-          ],
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: c.cerrada
-                ? Etiqueta(texto: 'Completado', icono: Icons.check_circle_rounded)
-                : TextButton.icon(
-                    onPressed: estado.asiste ? () => _anotar(context, c) : null,
-                    icon: const Icon(Icons.add_rounded),
-                    label: Text(
-                      c.modo == 'cada' && mio
-                          ? (faltanMias > 0
-                                ? 'Llevas ${cantidadSocial(c.mias)} de ${cantidadSocial(c.porPersona)} · Agregar otra'
-                                : 'Llevas ${cantidadSocial(c.mias)} · Agregar otra')
-                          : mio
-                          ? 'Agregar otra'
-                          : 'Me anoto',
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: !abierta
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (c.aportes.isEmpty) Text('Nadie se anotó todavía.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                        // Quién lleva qué, con su avatar.
+                        for (final a in c.aportes)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Row(
+                              children: [
+                                AvatarPersona(nombre: '${a['nombre'] ?? ''}', foto: '${a['foto'] ?? ''}', tamano: 28),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    [
+                                      a['mio'] == true ? 'Tú' : '${a['nombre']}',
+                                      if ('${a['detalle'] ?? ''}'.isNotEmpty) '${a['detalle']}',
+                                      if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
+                                      if (ComidaTarjeta._para(a['paraTodxs']).isNotEmpty) ComidaTarjeta._para(a['paraTodxs']),
+                                    ].join(' · '),
+                                    style: TextStyle(fontSize: 13, color: p.texto),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        // Solo las ideas que nadie tomó todavía.
+                        if (ideas.isNotEmpty && !c.cerrada) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final s in ideas)
+                                ActionChip(
+                                  avatar: const Icon(Icons.add_rounded, size: 16),
+                                  label: Text(s),
+                                  onPressed: _e.asiste ? () => t._anotar(context, c, sugerencia: s) : null,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
           ),
