@@ -5,6 +5,7 @@ import '../core/fechas.dart';
 import '../eventos/anticipada.dart';
 import '../sesion/sesion.dart';
 import '../core/moneda.dart';
+import '../core/periodos_sin_cobro.dart';
 
 /// Fase 3: reservas y pagos desde el "+", con la misma lógica que la web
 /// (js/reservas.js: `cargarFechas()`, `actualizarTotalS4()`,
@@ -37,10 +38,13 @@ class FechaClase {
 }
 
 class MesReserva {
-  const MesReserva(this.mes, {required this.pagado, this.pasado = false});
+  const MesReserva(this.mes, {required this.pagado, this.pasado = false, this.sinCobro = false});
   final DateTime mes; // primer día del mes
   final bool pagado;
   final bool pasado; // adeudado de antes del mes actual
+
+  /// Mes sin cobro de su equipo (Victor, 2026-11-20): no se elige ni se paga.
+  final bool sinCobro;
 }
 
 class Precios {
@@ -54,7 +58,29 @@ class Precios {
     this.recargoMensual = false,
     this.descuentoPct = 0,
     this.factorPorMes = const {},
+    this.periodos = const [],
   });
+
+  /// Meses y periodos sin cobro que le tocan (ya filtrados por su equipo; Victor, 2026-11-20).
+  final List<PeriodoSinCobro> periodos;
+
+  /// % que se cobra de una clase de esa fecha (100 = precio normal, 0 = no se cobra).
+  int pctClase(DateTime? fecha) => PeriodoSinCobro.pctClase(periodos, fecha);
+
+  /// Ese mes no se cobra (ni la cuota ni las clases).
+  bool sinCobro(DateTime mes) => PeriodoSinCobro.mesSinCobro(periodos, mes);
+
+  /// La cuota de `mes` baja por un periodo sin cobro (si no, por un descanso).
+  bool porPeriodo(DateTime mes) {
+    final ini = DateTime(mes.year, mes.month), fin = DateTime(mes.year, mes.month + 1, 0);
+    return periodos.any((p) => !p.porMes && p.cuotaProporcional && !p.desde!.isAfter(fin) && !p.hasta!.isBefore(ini));
+  }
+
+  /// Avisos para la pantalla de suscribirse: los que no terminaron.
+  List<String> get avisos => [
+    for (final p in periodos)
+      if (!p.terminado) p.aviso,
+  ];
 
   /// Meses con cuota proporcional por un descanso ('aaaa-mm' → fracción de la
   /// mensualidad; Victor, 2026-11-19). Lo calcula el servidor.
@@ -112,12 +138,17 @@ class Total {
     this.descuento = 0,
     this.mensualidades = 0,
     this.proporcional = false,
+    this.sinCobro = 0,
   });
 
   /// Suma de las mensualidades sin recargo y si alguna es proporcional por un
-  /// descanso (Victor, 2026-11-19).
+  /// descanso (Victor, 2026-11-19). En clases: suma de las cobradas y si alguna
+  /// va con el % de un periodo sin cobro (Victor, 2026-11-20).
   final double mensualidades;
   final bool proporcional;
+
+  /// Clases elegidas que no se cobran por un mes o periodo sin cobro.
+  final int sinCobro;
 
   /// Cupón manual aplicado (monto), en la primera cuota o clase cobrada.
   final double descuento;
@@ -375,6 +406,7 @@ class ReservasRepo {
         for (final e in ((r['factorPorMes'] as Map?) ?? const {}).entries)
           if (e.value is num) '${e.key}': (e.value as num).toDouble(),
       },
+      periodos: PeriodoSinCobro.lista(r['periodosSinCobro']),
     );
   }
 
@@ -432,7 +464,8 @@ class ReservasRepo {
 
   /// 12 meses desde el actual (más los adeudados de antes, como en la web) y
   /// cuáles ya están pagados o pendientes de revisión.
-  List<MesReserva> meses(Cuota c) {
+  List<MesReserva> meses(Cuota c, {Precios? precios}) {
+    bool libre(DateTime m) => precios?.sinCobro(m) ?? false;
     final hoy = Fechas.hoy();
     final actual = DateTime(hoy.year, hoy.month);
     final res = <MesReserva>[];
@@ -443,12 +476,12 @@ class ReservasRepo {
     }
     if (ultimo != null) {
       for (var m = DateTime(ultimo.year, ultimo.month + 1); m.isBefore(actual); m = DateTime(m.year, m.month + 1)) {
-        res.add(MesReserva(m, pagado: false, pasado: true));
+        if (!libre(m)) res.add(MesReserva(m, pagado: false, pasado: true));
       }
     }
     for (var i = 0; i < 12; i++) {
       final m = DateTime(hoy.year, hoy.month + i);
-      res.add(MesReserva(m, pagado: c.mesPagado(m.month, m.year)));
+      res.add(MesReserva(m, pagado: c.mesPagado(m.month, m.year), sinCobro: libre(m)));
     }
     return res;
   }
@@ -460,7 +493,7 @@ class ReservasRepo {
       for (final m in meses)
         if (m.pasado) m.mes,
     };
-    final libre = meses.where((m) => !m.pasado && !m.pagado).firstOrNull;
+    final libre = meses.where((m) => !m.pasado && !m.pagado && !m.sinCobro).firstOrNull;
     if (libre != null) sel.add(libre.mes);
     return sel;
   }
@@ -472,6 +505,7 @@ class ReservasRepo {
     required int creditos,
     required bool cupon,
     Iterable<DateTime> meses = const [],
+    Iterable<DateTime?> fechasClases = const [],
     DateTime? hoy,
     double saldo = 0,
     double deudaObligatoria = 0,
@@ -504,21 +538,33 @@ class ReservasRepo {
         proporcional: meses.any((m) => p.mensualDe(m) != p.mensual),
       );
     }
-    final aFavor = creditos < cantidad ? creditos : cantidad;
-    final conCupon = cupon && cantidad > aFavor ? 1 : 0;
-    final cobradas = cantidad - aFavor - conCupon;
+    // Clases en un mes o periodo sin cobro (Victor, 2026-11-20): las que no se
+    // cobran no gastan clases a favor ni el cupón; las demás valen su %.
+    final pcts = fechasClases.length == cantidad ? [for (final f in fechasClases) p.pctClase(f)] : List.filled(cantidad, 100);
+    final pagables = [
+      for (final x in pcts)
+        if (x > 0) x,
+    ];
+    final aFavor = creditos < pagables.length ? creditos : pagables.length;
+    final conCupon = cupon && pagables.length > aFavor ? 1 : 0;
+    final cobradas = pagables.length - aFavor - conCupon;
+    final precioDe = [for (final x in pagables.skip(aFavor + conCupon)) double.parse((p.porClase * x / 100).toStringAsFixed(2))];
+    final subtotal = precioDe.fold<double>(0, (a, b) => a + b);
     // Clases que pasaron a deuda: se pagan con la primera clase cobrada.
     final deuda = cobradas > 0 ? deudaObligatoria : 0.0;
-    final desc = cobradas > 0 ? double.parse((p.porClase * p.descuentoPct / 100).toStringAsFixed(2)) : 0.0;
+    final desc = cobradas > 0 ? double.parse((precioDe.first * p.descuentoPct / 100).toStringAsFixed(2)) : 0.0;
     return Total(
       cantidad: cantidad,
       aFavor: aFavor,
       cupon: conCupon,
       cobradas: cobradas,
-      monto: double.parse((cobradas * p.porClase + deuda - desc).toStringAsFixed(2)),
+      monto: double.parse((subtotal + deuda - desc).toStringAsFixed(2)),
       precio: p.porClase,
       saldo: -deuda,
       descuento: desc,
+      sinCobro: cantidad - pagables.length,
+      mensualidades: subtotal,
+      proporcional: pagables.skip(aFavor + conCupon).any((x) => x < 100),
     );
   }
 
@@ -591,6 +637,7 @@ class ReservasRepo {
     required List<DateTime> meses,
     required Map<String, String> tallaPorFecha,
     required Total total,
+    Precios? precios,
     String? medio,
     String? medioNombre,
   }) async {
@@ -632,10 +679,12 @@ class ReservasRepo {
     } else {
       var aFavor = total.aFavor, cupon = total.cupon;
       for (final c in clases) {
-        final gratis = aFavor > 0 || cupon > 0;
-        if (aFavor > 0) {
+        // No se cobra por un mes o periodo sin cobro: no gasta clase a favor ni cupón.
+        final sinCobro = (precios?.pctClase(c.fecha) ?? 100) == 0;
+        final gratis = !sinCobro && (aFavor > 0 || cupon > 0);
+        if (gratis && aFavor > 0) {
           aFavor--;
-        } else if (cupon > 0) {
+        } else if (gratis) {
           cupon--;
         }
         final etiqueta = _etiquetaClase(c);
@@ -646,10 +695,10 @@ class ReservasRepo {
             'talla': tallaPorFecha[c.id] ?? tallaBase,
             'protecciones': protec,
             if (equipoEsta != null) 'equipo': jsonEncode(equipoEsta),
-            'monto': gratis ? '0.00' : total.precio.toStringAsFixed(2),
+            'monto': gratis || sinCobro ? '0.00' : total.precio.toStringAsFixed(2),
             'email': email,
-            if (!gratis) 'medio': ?medio,
-            if (!gratis) 'medioNombre': ?medioNombre,
+            if (!gratis && !sinCobro) 'medio': ?medio,
+            if (!gratis && !sinCobro) 'medioNombre': ?medioNombre,
           });
           if (r['exito'] == false) throw ApiException('${r['mensaje'] ?? r['error'] ?? 'No se pudo guardar'}');
           guardados.add(etiqueta);

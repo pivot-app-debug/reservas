@@ -9,6 +9,7 @@ import '../sesion/sesion.dart';
 import 'api.dart';
 import 'iconos_marca.dart';
 import 'pagos.dart';
+import 'periodos_sin_cobro.dart';
 import 'moneda.dart';
 
 /// Ajustes de la liga (`getConfigLiga`, Victor 2026-11-13): canal para
@@ -115,6 +116,9 @@ class ConfigLiga extends ChangeNotifier {
     for (final e in ((reglas['graciaClases'] as Map?) ?? const {'Quindes': 1}).entries) '${e.key}': (e.value as num?)?.toInt() ?? 0,
   };
   int? graciaClases(String equipo) => graciaPorEquipo[equipo];
+
+  /// Meses y periodos sin cobro (Mi Liga → Reglas de la liga, Victor 2026-11-20).
+  List<PeriodoSinCobro> get periodosSinCobro => PeriodoSinCobro.lista(reglas['periodosSinCobro']);
 
   /// Salud: opciones de "Dónde te atiendes" y seguros privados (Mi Liga, por país).
   static const atencionPorDefecto = ['MSP (Ministerio de Salud Pública)', 'IESS', 'Seguro Privado'];

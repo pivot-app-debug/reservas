@@ -5,7 +5,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AsyncLocalStorage } from 'node:async_hooks';
 // Evento social (Naviquinde, 2026-11-19): acciones social* en su propio módulo.
-import { ACCIONES_SOCIAL, accionSocial } from './social.ts';
+import { ACCIONES_SOCIAL, accionSocial, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales } from './social.ts';
+function _depsSocial(): DepsSocial {
+  return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, appUrl: APP_URL };
+}
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -1318,6 +1321,12 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
     };
     // Herramientas de la liga (Victor, 2026-11-19): activar o desactivar Finanzas y Coach.
     for (const k of ['finanzasActiva', 'coachActivo']) if (reglasNuevas[k] !== undefined) r[k] = reglasNuevas[k] !== false && reglasNuevas[k] !== 'false';
+    // Meses y periodos sin cobro (Victor, 2026-11-20): la lista completa.
+    if (reglasNuevas.periodosSinCobro !== undefined) {
+      const v = _validarPeriodosSinCobro(reglasNuevas.periodosSinCobro, antes.periodosSinCobro, hoy);
+      if (typeof v === 'string') return { exito: false, error: v };
+      r.periodosSinCobro = v;
+    }
                 if (reglasNuevas.estados && typeof reglasNuevas.estados === 'object') {
       const e: Record<string, any> = { ...(antes.estados ?? {}) };
       for (const [k, v] of Object.entries(reglasNuevas.estados as Record<string, any>)) {
@@ -2305,6 +2314,9 @@ async function getPreciosClases(params: Record<string, any> = {}, equipo?: strin
     precioPorClase: cobro.precioClase ?? map['precio_por_clase'] ?? null, precioMensual: cobro.precioMensual ?? map['precio_mensual'] ?? null,
         modoCobro: cobro.modo,
     descuentoPct,
+    // Meses y periodos sin cobro que le tocan (Victor, 2026-11-20): la app avisa y calcula.
+    equipoCobro: eq ?? null,
+    periodosSinCobro: _periodosSinCobro(r, eq),
     cuota: { venceDia: Number(r.cuotaVenceDia) || 0, graciaDias: Number(r.cuotaGraciaDias) || 0, recargo: Number(r.cuotaRecargo) || 0, recargoTipo: r.cuotaRecargoTipo === 'porcentaje' ? 'porcentaje' : 'fijo', recargoModo: r.cuotaRecargoModo === 'mensual' ? 'mensual' : 'unico' },
   };
 }
@@ -4354,7 +4366,8 @@ async function getEventosRango(params: Record<string, any>): Promise<Record<stri
     };
   });
   eventos.sort((a: any, b: any) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0);
-  return { eventos };
+  // Evento social sin aprobar: solo lo ven Pivots y encargadxs (social.ts).
+  return { eventos: await filtrarEventosSociales(eventos, params, _depsSocial()) };
 }
 
 // ── Cumpleaños ──────────────────────────────────────────────────────────
@@ -4558,6 +4571,7 @@ async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Rec
         headings: { es: 'Baja de asistencia' },
         contents: { es: `${nombre} no asistirá al ${ev.tipo_evento || 'evento'} de ${esHoy ? 'hoy' : _fechaEs(ev.fecha)} · ${_horaEs(ev.inicia)} · ${ev.donde || ''}` },
         url: APP_URL + '/?tab=eventos',
+        evento: { idEvento: String(idEvento) },
       });
     }
   }
@@ -5571,6 +5585,9 @@ async function _renombrarEquipoEnReglas(viejo: string, nuevo: string): Promise<v
     const m = r[k];
     if (m && typeof m === 'object' && viejo in m) { m[nuevo] = m[viejo]; delete m[viejo]; cambio = true; }
   }
+  for (const x of Array.isArray(r.periodosSinCobro) ? r.periodosSinCobro : []) {
+    if (Array.isArray(x?.equipos) && x.equipos.includes(viejo)) { x.equipos = x.equipos.map((e: string) => (e === viejo ? nuevo : e)); cambio = true; }
+  }
   if (cambio) await supabase.from('config_app').upsert({ key: 'reglas_liga', value: JSON.stringify(r) }, { onConflict: 'liga_id,key' });
   const { data } = await supabase.from('config_app').select('value').eq('key', 'valores_puntos').maybeSingle();
   try {
@@ -6193,13 +6210,25 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     const equipoReserva = (await supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle()).data?.categoria ?? null;
   const precios = await getPreciosClases({}, equipoReserva);
     let montoFinal = esMensual ? Number(precios.precioMensual ?? 0) : Number(precios.precioPorClase ?? 0);
+  // Clase dentro de un mes o periodo sin cobro (Victor, 2026-11-20): gratis o con su %.
+  let pctClase = 100;
+  if (!esMensual) {
+    const { data: evF } = await supabase.from('asistencias').select('fecha').eq('id_evento', fecha).limit(1).maybeSingle();
+    if (evF?.fecha) pctClase = _pctClaseEn(await _reglasLiga(), equipoReserva, String(evF.fecha));
+    if (pctClase < 100) montoFinal = _num2(montoFinal * pctClase / 100);
+  }
   // Recargo fijo por pagar la cuota después del vencimiento + gracia (Mi Liga → Cobros).
     let recargo = 0;
   let saldoAplicado: number | null = null;
   if (esMensual) {
     const vig = _vigenciaMensualISO(fecha, new Date().toISOString().substring(0, 10), anioMes);
     // Descanso con cuota proporcional en ese mes (Victor, 2026-11-19): nunca el mes entero.
-    const fp = vig ? await _factorCuotaMes(vig.slice(0, 7)) : null;
+    // Meses y periodos sin cobro de su equipo (Victor, 2026-11-20).
+    const fp = vig ? await _factorCuotaMes(vig.slice(0, 7), equipoReserva) : null;
+    if (fp?.sinCobro) {
+      const nm = _MESES_ES[Number(vig!.slice(5, 7)) - 1];
+      return { exito: false, mensaje: `${nm.charAt(0).toUpperCase() + nm.slice(1)} no se cobra: no necesitas suscribirte.` };
+    }
     if (fp) montoFinal = _num2(montoFinal * fp.factor);
         recargo = vig ? _recargoCuota(vig.slice(0, 7), _hoyEcuadorISO(), await _reglasDeEquipo(equipoReserva), montoFinal) : 0;
                                 montoFinal += recargo;
@@ -6250,7 +6279,8 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
     // Consumir crédito o cupón -- solo cuando el cliente pidió esa clase gratis
   // (manda monto 0, web y app, 2026-11-07); antes se aplicaba siempre, aunque
   // la persona no hubiera elegido el cupón o fuera una cuota mensual.
-  const pideGratis = params.monto === undefined || Number(params.monto) === 0;
+  // Una clase que no se cobra no gasta la clase a favor, el plan ni el cupón.
+  const pideGratis = (params.monto === undefined || Number(params.monto) === 0) && pctClase > 0;
     const credito = pideGratis ? await _consumirCreditoReal(nombre) : false;
   let usoCupon = false;
   // Clase de un plan de clases (antes que el cupón de bienvenida).
@@ -6862,7 +6892,9 @@ async function _deudaVinoSinReserva(nombre: string, idEvento: string): Promise<v
   if (cobro.modo === 'mes' || cobro.modo === 'sin_cobro') return; // paga por mes (clases de gracia) o no paga
   const mes = String(e.fecha).slice(0, 7);
   if ((await _estadosCuotaMes([nombre], mes))[nombre] !== 'debe') return;
-  const monto = _num2(Number((await getPreciosClases({}, p.categoria)).precioPorClase) || 0);
+  // Mes o periodo sin cobro (Victor, 2026-11-20): no se cobra o se cobra su %.
+  const pct = _pctClaseEn(await _reglasLiga(), p.categoria, String(e.fecha));
+  const monto = _num2((Number((await getPreciosClases({}, p.categoria)).precioPorClase) || 0) * pct / 100);
   if (!(monto > 0)) return;
   const que = `Clase del ${_fechaCorta(e.fecha)}`;
   const { data: mov } = await supabase.from('saldos_movimientos').insert({
@@ -7084,7 +7116,7 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
       if (!debe) { base(p.username).estado = 'debe'; continue; }
       const x = debe[p.username];
       if (!x) continue; // mes futuro o su equipo no paga por mes
-      Object.assign(base(p.username), { estado: x.debe ? 'debe' : 'no_vino', monto: x.monto, motivo: x.motivo });
+      Object.assign(base(p.username), { estado: x.sinCobro ? 'sin_cobro' : x.debe ? 'debe' : 'no_vino', monto: x.monto, motivo: x.motivo });
     }
     for (const r of res ?? []) {
       const f = base(r.nombre_usuario);
@@ -10175,11 +10207,18 @@ async function _novedadesEquipo(yo: string): Promise<any[]> {
   const esPivotAsistencia = !!yoFila?.email && (await _adminDestinatariosPush(undefined, 'asistencia')).includes(yo);
   const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, inicia, termina, tipo_evento, estado').gte('fecha', hoy).lte('fecha', manana);
   const ahora = Date.now();
-  const vigentes = (evs ?? []).filter((e: any) => {
+  const enHorario = (evs ?? []).filter((e: any) => {
     if (['Cancelado', 'Sin entrenamiento'].includes(String(e.estado))) return false;
     const fin = new Date(`${String(e.fecha).slice(0, 10)}T${String(e.termina || e.inicia || '23:59').slice(0, 5)}:00-05:00`).getTime();
     return isFinite(fin) && fin > ahora;
   });
+  // Asistencia solo de eventos de mis equipos (mismo alcance que los avisos, Victor 2026-11-20).
+  const equiposPorEvento = await _equiposDeEventos(enHorario.map((e: any) => String(e.id_evento)));
+  const vigentes: any[] = [];
+  for (const e of enHorario) {
+    const equipos = equiposPorEvento[String(e.id_evento)] ?? [];
+    if (!equipos.length || (await _filtrarDestinatariosEvento({ equipos }, [yo], { soloEquipos: true })).length) vigentes.push(e);
+  }
   if (vigentes.length) {
     const ids = vigentes.map((e: any) => e.id_evento);
     const { data: rs } = await supabase.from('log_asistencias').select('id_evento, nombre_usuario, estado, marca_temporal')
@@ -10820,18 +10859,31 @@ async function sendPush(payload: {
   url?: string;
   web_buttons?: { id: string; text: string; url: string }[];
   data?: Record<string, any>;
+  // Evento del aviso: aplica el alcance (`_filtrarDestinatariosEvento`).
+  // Sin esto, los tipos de TIPOS_PUSH_EVENTO lo toman de `data.evento_id`
+  // o de `?evento=` en la url.
+  evento?: AlcanceEvento | null;
+  // Aviso personal con un tipo de evento (ej. curso movido, clase a favor):
+  // no se filtra por estado ni por equipo.
+  personal?: boolean;
 }): Promise<void> {
   if (!CATALOGO_CLAVES.has(payload.tipo)) {
     console.error('sendPush: tipo no registrado en el catálogo, no se envía:', payload.tipo);
     return;
   }
+  const aplicaAlcance = !payload.personal && (TIPOS_PUSH_EVENTO.has(payload.tipo) || !!payload.evento);
   let destinatarios: string[];
   if (payload.broadcastEquipo) {
-    const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias').is('eliminado_en', null);
+    const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).is('eliminado_en', null);
     const excluir = new Set(payload.excluirUsernames ?? []);
     destinatarios = (filas ?? [])
       .filter((r: any) => r.username && !excluir.has(r.username) && _personaQuierePush(r, payload.tipo))
       .map((r: any) => r.username);
+    if (aplicaAlcance) {
+      const porUsername: Record<string, any> = {};
+      (filas ?? []).forEach((r: any) => { porUsername[r.username] = r; });
+      destinatarios = await _filtrarDestinatariosEvento(_alcanceDePush(payload), destinatarios, { filas: porUsername });
+    }
   } else {
     const usernames = payload.include_external_user_ids ?? [];
     if (!usernames.length) return;
@@ -10845,10 +10897,11 @@ async function sendPush(payload: {
     // fila directamente no volvería y `porUsername[u]` quedaría
     // `undefined`, cayendo al MISMO default "sin fila = mandar igual" que
     // un alias admin -- justo lo que no se quiere acá.
-        const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en, pronombres').in('username', usernames);
+        const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en, pronombres' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).in('username', usernames);
     const porUsername: Record<string, any> = {};
     (filas ?? []).forEach((r: any) => { porUsername[r.username] = r; });
         destinatarios = usernames.filter((u) => !_estaArchivado(porUsername[u]) && _personaQuierePush(porUsername[u], payload.tipo));
+    if (aplicaAlcance) destinatarios = await _filtrarDestinatariosEvento(_alcanceDePush(payload), destinatarios, { filas: porUsername });
     // Un aviso para una sola persona habla según sus pronombres (Victor, 2026-11-16).
     if (destinatarios.length === 1) {
       const pr = porUsername[destinatarios[0]]?.pronombres;
@@ -10972,6 +11025,93 @@ function _instanteEventoUTC(fecha: string | null, hora: string | null): number |
 // marcó 'Asistiré', eso no cambia).
 const EQUIPO_ACTIVO_FILTRO = (r: { estado_miembro?: string | null }) =>
   r.estado_miembro !== 'Lesionadx' && r.estado_miembro !== 'Ausente' && r.estado_miembro !== 'De viaje';
+
+// ─── Alcance de los avisos de eventos (Victor, 2026-11-20) ────────────────
+// Avisos de eventos y de asistencia (evento nuevo, cambios, cancelación,
+// recordatorios, confirmaciones y cambios de asistencia de otras personas):
+//  1. Solo a personas Activx (`estado_miembro` vacío o 'Activx'); nunca a
+//     archivadxs. Inactivx (Ausente), Lesionadx, De viaje, Enfermedad, etc.
+//     no los reciben. Una cuenta admin sin fila en `equipo` recibe igual.
+//  2. Evento con `asistencias.equipos` no vacío: solo personas de esos
+//     equipos (`equipo.categoria`), coaches aprobadxs de esos equipos o de
+//     toda la liga (`coaches.equipos` vacío) y Pivots (`admins` no tiene
+//     equipo: todo Pivot es de toda la liga). Vacío = toda la liga.
+// Pagos, cuotas, comprobantes, cursos y avisos personales no pasan por acá.
+// `sendPush()` lo aplica solo a los tipos de TIPOS_PUSH_EVENTO (salvo
+// `personal: true`) y a cualquier envío con `evento` (ej. avisos_admin de
+// un evento). La bandeja "Del equipo" usa el mismo filtro (`soloEquipos`).
+const TIPOS_PUSH_EVENTO = new Set(['recordatorio_1h', 'recordatorio_1dia', 'entrenamiento_hoy', 'evento_creado', 'evento_editado', 'evento_cancelado', 'descanso_programado', 'cambios_asistencia']);
+const COLS_ALCANCE = 'email, estado_miembro, categoria, eliminado_en';
+type AlcanceEvento = { idEvento?: string | null; equipos?: string[] | null };
+
+function _esActivx(row: { estado_miembro?: string | null } | null | undefined): boolean {
+  const e = String(row?.estado_miembro ?? '').trim();
+  return !e || e === 'Activx';
+}
+
+/// Lista de equipos de un parámetro (array o texto separado por comas).
+function _listaEquipos(v: unknown): string[] {
+  const l = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : [];
+  return [...new Set(l.map((x) => String(x ?? '').trim()).filter(Boolean))];
+}
+
+/// `asistencias.equipos` por evento. Sin la columna (migración
+/// 20261120030000 sin aplicar) o si la lectura falla: toda la liga.
+async function _equiposDeEventos(ids: string[]): Promise<Record<string, string[]>> {
+  const out: Record<string, string[]> = {};
+  const unicos = [...new Set(ids.map(String).filter(Boolean))];
+  if (!unicos.length) return out;
+  const { data, error } = await supabase.from('asistencias').select('id_evento, equipos').in('id_evento', unicos);
+  if (error) return out;
+  (data ?? []).forEach((r: any) => { out[String(r.id_evento)] = _listaEquipos(r.equipos); });
+  return out;
+}
+
+/// Evento de un envío: `evento`, o `data.evento_id`, o `?evento=` de la url.
+function _alcanceDePush(p: { evento?: AlcanceEvento | null; data?: Record<string, any>; url?: string }): AlcanceEvento | null {
+  if (p.evento) return p.evento;
+  const id = p.data?.evento_id ?? /[?&]evento=([^&#]+)/.exec(String(p.url ?? ''))?.[1];
+  if (!id) return null;
+  try { return { idEvento: decodeURIComponent(String(id)) }; } catch { return { idEvento: String(id) }; }
+}
+
+/// Filtro central: de `usernames`, deja solo a quien le corresponde un aviso
+/// del `evento` (reglas arriba). Mantiene el orden. `filas`: filas de
+/// `equipo` ya leídas (con COLS_ALCANCE); si no, las lee. `soloEquipos`: no
+/// mira el estado de la persona (bandeja "Del equipo").
+async function _filtrarDestinatariosEvento(evento: AlcanceEvento | null, usernames: string[], opts: { filas?: Record<string, any>; soloEquipos?: boolean } = {}): Promise<string[]> {
+  if (!usernames.length) return [];
+  let filas = opts.filas;
+  if (!filas) {
+    const mapa: Record<string, any> = {};
+    const { data } = await supabase.from('equipo').select('username, ' + COLS_ALCANCE).in('username', [...new Set(usernames)]);
+    (data ?? []).forEach((r: any) => { mapa[r.username] = r; });
+    filas = mapa;
+  }
+  const equipos = !evento ? [] : evento.equipos != null ? _listaEquipos(evento.equipos)
+    : evento.idEvento ? ((await _equiposDeEventos([String(evento.idEvento)]))[String(evento.idEvento)] ?? []) : [];
+  const coaches: Record<string, string[]> = {};
+  const pivots = new Set<string>();
+  if (equipos.length) {
+    const [{ data: cs }, { data: ads }] = await Promise.all([
+      supabase.from('coaches').select('username, equipos').eq('estado', 'aprobado'),
+      supabase.from('admins').select('email'),
+    ]);
+    (cs ?? []).forEach((c: any) => { coaches[c.username] = _listaEquipos(c.equipos); });
+    [ADMIN_PRINCIPAL, ...(ads ?? []).map((a: any) => a.email)].forEach((e) => { if (e) pivots.add(String(e).toLowerCase()); });
+  }
+  return usernames.filter((u) => {
+    const f = filas![u];
+    if (!f) return true; // cuenta admin sin fila ('admin_'+email): Pivot de toda la liga
+    if (_estaArchivado(f)) return false;
+    if (!opts.soloEquipos && !_esActivx(f)) return false;
+    if (!equipos.length) return true;
+    if (equipos.includes(String(f.categoria ?? ''))) return true;
+    if (f.email && pivots.has(String(f.email).toLowerCase())) return true;
+    const ce = coaches[u];
+    return !!ce && (!ce.length || ce.some((e) => equipos.includes(e)));
+  });
+}
 
 // ─── Cómo nombrar un evento en el texto de una push (2026-11-06) ──────────
 // Pedido explícito: "este sábado" si es esta semana (lunes a domingo),
@@ -11131,17 +11271,21 @@ async function cronRecordatorio1Dia(): Promise<Record<string, any>> {
   await supabase.from('push_enviados').delete().lt('enviado_en', new Date(ahora - 30 * 24 * 3600 * 1000).toISOString());
   if (!enVentana.length) return { exito: true, eventos: 0, enviados: 0 };
 
-  const { data: equipoRows } = await supabase.from('equipo').select('username, estado_miembro').is('eliminado_en', null);
-  const activos: string[] = (equipoRows ?? []).filter((r: any) => r.username && EQUIPO_ACTIVO_FILTRO(r)).map((r: any) => r.username);
+  // Quién recibe: alcance de cada evento (_filtrarDestinatariosEvento, Victor 2026-11-20).
+  const { data: equipoRows } = await supabase.from('equipo').select('username, ' + COLS_ALCANCE).is('eliminado_en', null);
+  const filasEquipo: Record<string, any> = {};
+  (equipoRows ?? []).forEach((r: any) => { if (r.username) filasEquipo[r.username] = r; });
+  const todos = Object.keys(filasEquipo);
 
   const ids = enVentana.map((e: any) => String(e.id_evento));
-  const [asistPorEvento, yaEnviados] = await Promise.all([_ultimaAsistenciaPorPersonaTodas(ids), _pushYaEnviados('recordatorio_1dia', ids)]);
+  const [asistPorEvento, yaEnviados, equiposPorEvento] = await Promise.all([_ultimaAsistenciaPorPersonaTodas(ids), _pushYaEnviados('recordatorio_1dia', ids), _equiposDeEventos(ids)]);
   if (!yaEnviados) return { exito: false, error: 'No se pudo leer push_enviados; no se envió nada.' };
   let enviados = 0;
   for (const ev of enVentana) {
     const idEv = String(ev.id_evento);
     const respondieron = new Set((asistPorEvento[ev.id_evento] ?? []).map((a: any) => a.nombre));
-    const pendientes = activos.filter((u) => !respondieron.has(u) && !yaEnviados.has(idEv + '|' + u));
+    const pendientes = await _filtrarDestinatariosEvento({ idEvento: idEv, equipos: equiposPorEvento[idEv] ?? [] },
+      todos.filter((u) => !respondieron.has(u) && !yaEnviados.has(idEv + '|' + u)), { filas: filasEquipo });
     const evento = _eventoFrase(ev.tipo_evento, ev.fecha);
     const detalle = [_horaEs(ev.inicia), ev.donde].filter(Boolean).join(' · ');
     const url = _urlEvento(idEv);
@@ -11157,6 +11301,7 @@ async function cronRecordatorio1Dia(): Promise<Record<string, any>> {
         url,
         data: { token, evento_id: idEv, url },
         web_buttons: [_BTN_ASISTIRE, _BTN_NO_ASISTIRE],
+        evento: { idEvento: idEv, equipos: equiposPorEvento[idEv] ?? [] },
       });
       enviados++;
     }));
@@ -11223,6 +11368,7 @@ async function cronAdminEvento(): Promise<Record<string, any>> {
         url,
         data: { url, evento_id: String(ev.id_evento) },
         web_buttons: [{ id: 'cancelar', text: `Cancelar ${tipo}`, url: _urlEvento(String(ev.id_evento), '&accion=cancelar') }],
+        evento: { idEvento: String(ev.id_evento) },
       });
     } else {
       await Promise.allSettled(adminDestinatarios.map(async (admin: string) => {
@@ -11236,6 +11382,7 @@ async function cronAdminEvento(): Promise<Record<string, any>> {
           url,
           data: token ? { url, token, evento_id: String(ev.id_evento) } : { url, evento_id: String(ev.id_evento) },
           web_buttons: token ? [_BTN_NO_ASISTIRE] : undefined,
+          evento: { idEvento: String(ev.id_evento) },
         });
       }));
     }
@@ -11264,8 +11411,9 @@ async function pushAsistenciaCambio(params: Record<string, any>): Promise<Record
   const { data: equipoRows } = await supabase.from('equipo').select('username, nombre_derby, estado_miembro').is('eliminado_en', null);
   const propio = (equipoRows ?? []).find((r: any) => r.username === username);
   const nombreMostrar = propio?.nombre_derby || username;
+  // Estado y equipos: los filtra sendPush() con el alcance del evento.
   const destinatarios: string[] = (equipoRows ?? [])
-    .filter((r: any) => r.username && r.username !== username && EQUIPO_ACTIVO_FILTRO(r))
+    .filter((r: any) => r.username && r.username !== username)
     .map((r: any) => r.username);
   if (!destinatarios.length) return { exito: true };
 
@@ -11277,6 +11425,7 @@ async function pushAsistenciaCambio(params: Record<string, any>): Promise<Record
     contents: { es: `${nombreMostrar} cambió su asistencia a ${estadoNuevo}` },
     url: urlEventos,
     data: { url: urlEventos },
+    evento: { idEvento: String(idEvento) },
   });
   return { exito: true };
 }
@@ -11510,13 +11659,14 @@ async function _notificarCambioAsistenciaCore(username: string, idEventoRaw: unk
     contents: { es: texto },
     url,
     data: { url },
+    evento: { idEvento },
   });
   if (estadoAnterior === 'Asistiré' && estadoNuevo === 'No asistiré') {
-    const { data: miembros } = await supabase.from('equipo').select('username, estado_miembro').is('eliminado_en', null);
+    // Estado y equipos: los filtra sendPush() con el alcance del evento.
+    const { data: miembros } = await supabase.from('equipo').select('username').is('eliminado_en', null);
     const destinatarios = (miembros ?? [])
-      .filter((m: any) => m.username && EQUIPO_ACTIVO_FILTRO(m))
       .map((m: any) => m.username)
-      .filter((u: string) => u !== username);
+      .filter((u: string) => u && u !== username);
     if (destinatarios.length > 0) {
       await sendPush({
         tipo: 'cambios_asistencia',
@@ -11525,6 +11675,7 @@ async function _notificarCambioAsistenciaCore(username: string, idEventoRaw: unk
         contents: { es: texto },
         url,
         data: { url },
+        evento: { idEvento },
       });
     }
   }
@@ -11568,12 +11719,21 @@ async function _firmarTokenAccion(username: string, idEvento: string): Promise<s
   return payloadB64 + '.' + _b64urlEncode(new Uint8Array(firma));
 }
 
+/// Alcance de un aviso pedido por la app: `equipos` (si lo manda) o el del
+/// evento `idEvento`. Sin ninguno, toda la liga (igual filtra por estado).
+async function _alcanceDeParams(params: Record<string, any>): Promise<AlcanceEvento | null> {
+  const idEvento = params.idEvento != null && String(params.idEvento).trim() ? String(params.idEvento).trim() : null;
+  if (params.equipos != null) return { idEvento, equipos: _listaEquipos(params.equipos) };
+  return idEvento ? { idEvento, equipos: (await _equiposDeEventos([idEvento]))[idEvento] ?? [] } : null;
+}
+
 async function pushEventoCreado(params: Record<string, any>): Promise<Record<string, any>> {
   const adminEmail = await _validarAdminToken(params.adminToken);
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
   const { tipo, fecha, hora, lugar, idEvento } = params;
   const headings = { es: `Nuevo ${tipo || 'evento'}: ${_fechaEs(fecha)}` };
   const contents = { es: `${_horaEs(hora)} · ${lugar || ''}` };
+  const alcance = await _alcanceDeParams(params);
 
   // Con idEvento -- RSVP directo desde los 2 botones de acción, respondiendo
   // en BACKGROUND (sin abrir la app, ver OneSignalSDKWorker.js) vía un token
@@ -11593,7 +11753,8 @@ async function pushEventoCreado(params: Record<string, any>): Promise<Record<str
   // `evento_creado` desactivado tampoco recibe el botón de RSVP.
   if (idEvento && PUSH_TOKEN_SECRET) {
     const { data: equipoRows } = await supabase.from('equipo').select('username').is('eliminado_en', null);
-    const usernames: string[] = (equipoRows ?? []).map((r: any) => r.username).filter(Boolean);
+    // Solo a quien le corresponde el evento (sin firmar tokens de más).
+    const usernames: string[] = await _filtrarDestinatariosEvento(alcance, (equipoRows ?? []).map((r: any) => r.username).filter(Boolean));
     await Promise.allSettled(usernames.map(async (username) => {
       const token = await _firmarTokenAccion(username, String(idEvento));
       if (!token) return;
@@ -11607,6 +11768,7 @@ async function pushEventoCreado(params: Record<string, any>): Promise<Record<str
           { id: 'asistire', text: 'Asistiré', url: '_osp=do_not_open' },
           { id: 'no-asistire', text: 'No asistiré', url: '_osp=do_not_open' },
         ],
+        evento: alcance,
       });
     }));
     return { exito: true };
@@ -11614,7 +11776,7 @@ async function pushEventoCreado(params: Record<string, any>): Promise<Record<str
 
   // Sin idEvento, o sin PUSH_TOKEN_SECRET configurado todavía -- broadcast
   // simple sin botones de acción (comportamiento previo, sin cambios).
-  await sendPush({ tipo: 'evento_creado', broadcastEquipo: true, headings, contents, url: APP_URL + '/?tab=eventos' });
+  await sendPush({ tipo: 'evento_creado', broadcastEquipo: true, headings, contents, url: APP_URL + '/?tab=eventos', evento: alcance });
   return { exito: true };
 }
 
@@ -11628,6 +11790,7 @@ async function pushEventoCancelado(params: Record<string, any>): Promise<Record<
     headings: { es: 'Evento cancelado' },
     contents: { es: `${tipo || 'Evento'} del ${_fechaEs(fecha)} · ${lugar || ''} · ${_horaEs(hora)}` },
     url: APP_URL + '/?tab=eventos',
+    evento: await _alcanceDeParams(params),
   });
   return { exito: true };
 }
@@ -11676,6 +11839,7 @@ async function pushEventoEditado(params: Record<string, any>): Promise<Record<st
     headings: { es: `Evento actualizado: ${_fechaEs(ev.fecha)}` },
     contents: { es: diffs.join(' · ') },
     url: APP_URL + '/?tab=eventos',
+    evento: { idEvento },
   });
   return { exito: true };
 }
@@ -11809,7 +11973,7 @@ async function _posponerCursos(desde: string, hasta: string): Promise<number> {
     const quienes = (ins ?? []).map((x: any) => x.username);
     if (quienes.length) {
       await sendPush({
-        tipo: 'descanso_programado', include_external_user_ids: quienes,
+        tipo: 'descanso_programado', include_external_user_ids: quienes, personal: true, // curso en el que está inscritx
         headings: { es: `${c.nombre}: clases movidas` },
         contents: { es: `Por el descanso, el curso sigue desde el ${_fechaEs(fechas[i].fecha)}. Revisa las fechas nuevas en el calendario.` },
         url: APP_URL + '/?tab=eventos',
@@ -11839,6 +12003,8 @@ async function adminEliminarTemporadaDescanso(params: Record<string, any>): Prom
 // con el header `x-cron-secret` -- validado en el router (Deno.serve), no
 // acá, porque necesita leer `req.headers`, no `params`.
 async function cronDiario(): Promise<Record<string, any>> {
+  // Evento social: aviso del día antes (amigo secreto / regalo robado).
+  try { await cronSocialRecordatorios(_depsSocial()); } catch (e) { console.error('[social] recordatorio:', e); }
     try { await _extenderExcepcionesIndefinidas(); } catch (e) { console.error('[excepciones] extender:', e); }
   try { await _avisarNovedadesFicha(); } catch (e) { console.error('[coach] novedades:', e); }
   // Puntos de asistencia del mes actual y el anterior (bug 2026-11-13: antes solo con botón manual).
@@ -11879,6 +12045,7 @@ async function cronDiario(): Promise<Record<string, any>> {
       headings: { es: `${ev.tipo_evento || 'Entrenamiento'} hoy a las ${_horaEs(ev.inicia)}` },
       contents: { es: `${asistentes} ${asistentes === 1 ? 'persona asistirá' : 'personas asistirán'} · ${ev.donde || ''}` },
       url: APP_URL + '/?tab=eventos',
+      evento: { idEvento: String(ev.id_evento) },
     });
   }
 
@@ -11978,35 +12145,113 @@ async function cronDiario(): Promise<Record<string, any>> {
 // Proporcional: precio mensual × (entrenamientos que sí hay en el mes ÷ los
 // que habría sin el descanso). Los que el descanso quitó quedan como
 // 'Eliminado' con `eliminado_por_descanso` (la ventana se genera a 365 días).
-/** null = ese mes se cobra entero. */
-async function _factorCuotaMes(mes: string): Promise<{ factor: number; hay: number; normales: number } | null> {
+// ─── Meses y periodos sin cobro (Victor, 2026-11-20) ─────────────────────────
+// `reglas_liga.periodosSinCobro` (Mi Liga → Reglas de la liga), para toda la
+// liga (`equipos` vacío) o algunos equipos:
+// - tipo 'mes' (`meses: ['aaaa-mm']`): ese mes no se cobra la cuota mensual ni
+//   las clases sueltas, y se marca Asistiré sin suscripción.
+// - tipo 'periodo' (`desde`/`hasta` aaaa-mm-dd): las clases sueltas de esas
+//   fechas valen `clasesPct` % (0 = no se cobran). Con `cuota: 'proporcional'`
+//   cada entrenamiento del mes dentro del periodo pesa `clasesPct` % en la
+//   cuota (como el descanso proporcional); 'entera' = la cuota no cambia.
+// Rige desde que se crea: las reservas, pagos y cargos ya hechos no cambian.
+function _periodosSinCobro(reglas: Record<string, any>, equipo?: string | null): any[] {
+  const eq = String(equipo ?? '');
+  const l = Array.isArray(reglas.periodosSinCobro) ? reglas.periodosSinCobro : [];
+  return l.filter((p: any) => p && (!Array.isArray(p.equipos) || !p.equipos.length || p.equipos.includes(eq)));
+}
+function _mesSinCobro(reglas: Record<string, any>, equipo: string | null | undefined, mes: string): boolean {
+  return _periodosSinCobro(reglas, equipo).some((p: any) => p.tipo === 'mes' && Array.isArray(p.meses) && p.meses.includes(mes));
+}
+const _pctPeriodo = (p: any) => Math.max(0, Math.min(100, Number(p?.clasesPct) || 0));
+/** % que se cobra de una clase suelta de esa fecha (100 = precio normal). */
+function _pctClaseEn(reglas: Record<string, any>, equipo: string | null | undefined, fecha: string): number {
+  const f = String(fecha ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return 100;
+  if (_mesSinCobro(reglas, equipo, f.slice(0, 7))) return 0;
+  let pct = 100;
+  for (const p of _periodosSinCobro(reglas, equipo)) if (p.tipo === 'periodo' && String(p.desde) <= f && f <= String(p.hasta)) pct = Math.min(pct, _pctPeriodo(p));
+  return pct;
+}
+/** Valida la lista que manda la app. Lo que ya terminó se conserva tal cual (es
+ *  historial de cobros); lo nuevo no puede quedar en el pasado. */
+function _validarPeriodosSinCobro(v: unknown, antesV: unknown, hoy: string): any[] | string {
+  if (!Array.isArray(v)) return 'La lista de meses y periodos sin cobro no es válida.';
+  const antes: any[] = Array.isArray(antesV) ? antesV.filter((p: any) => p && typeof p === 'object') : [];
+  const mesHoy = hoy.slice(0, 7);
+  const terminado = (p: any) => p.tipo === 'mes' ? (p.meses ?? []).every((m: string) => m < mesHoy) : String(p.hasta) < hoy;
+  const previo = new Map(antes.map((p: any) => [String(p.id), p]));
+  const out: any[] = antes.filter(terminado);
+  const fecha = (x: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(x ?? '')) ? String(x) : null;
+  for (const x of v.slice(0, 40) as any[]) {
+    if (!x || typeof x !== 'object') continue;
+    const id = String(x.id ?? '').trim().slice(0, 40) || crypto.randomUUID();
+    const ant = previo.get(id);
+    if (ant && terminado(ant)) continue; // ya está en `out`
+    const equipos = Array.isArray(x.equipos) ? [...new Set(x.equipos.map((e: unknown) => String(e ?? '').trim().slice(0, 60)).filter(Boolean))].slice(0, 30) : [];
+    let p: Record<string, any>;
+    if (x.tipo === 'mes') {
+      const meses = [...new Set((Array.isArray(x.meses) ? x.meses : []).map(String).filter((m: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m)))].sort().slice(0, 24) as string[];
+      if (!meses.length) return 'Elige al menos un mes.';
+      const antMeses: string[] = ant?.tipo === 'mes' ? (ant.meses ?? []) : [];
+      if (meses.some((m) => m < mesHoy && !antMeses.includes(m))) return 'Solo puedes elegir el mes actual o los que vienen.';
+      // Un mes que ya pasó no se quita: cambiaría lo que se debía.
+      for (const m of antMeses) if (m < mesHoy && !meses.includes(m)) meses.push(m);
+      p = { id, tipo: 'mes', meses: meses.sort(), equipos };
+    } else if (x.tipo === 'periodo') {
+      const desde = fecha(x.desde), hasta = fecha(x.hasta);
+      if (!desde || !hasta || desde > hasta) return 'Revisa las fechas del periodo: el inicio va antes del final.';
+      if (Date.parse(hasta) - Date.parse(desde) > 366 * 86400000) return 'Un periodo dura como máximo un año.';
+      if (hasta < hoy) return 'El periodo tiene que terminar hoy o después.';
+      const pct = Math.round(Number(x.clasesPct));
+      p = { id, tipo: 'periodo', desde, hasta, clasesPct: Number.isFinite(pct) ? Math.max(0, Math.min(99, pct)) : 0, cuota: x.cuota === 'entera' ? 'entera' : 'proporcional', equipos };
+    } else continue;
+    p.creado = ant?.creado ?? hoy;
+    out.push(p);
+  }
+  return out;
+}
+
+/** null = ese mes se cobra entero. Con `equipo`, suma sus meses y periodos sin
+ *  cobro (sin `equipo`, solo los de toda la liga). `sinCobro` = el mes no se cobra. */
+async function _factorCuotaMes(mes: string, equipo?: string | null, reglasDadas?: Record<string, any>): Promise<{ factor: number; hay: number; normales: number; sinCobro?: boolean; periodo?: boolean } | null> {
+  const reglas = reglasDadas ?? await _reglasLiga();
+  if (_mesSinCobro(reglas, equipo, mes)) return { factor: 0, hay: 0, normales: 0, sinCobro: true };
   const [y, m] = mes.split('-').map(Number);
   const desde = `${mes}-01`, ultimo = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const periodos = _periodosSinCobro(reglas, equipo)
+    .filter((p: any) => p.tipo === 'periodo' && p.cuota !== 'entera' && String(p.desde) <= ultimo && String(p.hasta) >= desde);
   const { data: ts } = await supabase.from('temporadas_descanso').select('id, reglas').lte('fecha_inicio', ultimo).gte('fecha_fin', desde);
   const prop = new Set((ts ?? []).filter((t: any) => t.reglas?.cuota === 'proporcional').map((t: any) => String(t.id)));
-  if (!prop.size) return null;
-  const { data: evs } = await supabase.from('asistencias').select('estado, eliminado_por_descanso')
+  if (!prop.size && !periodos.length) return null;
+  const { data: evs } = await supabase.from('asistencias').select('fecha, estado, eliminado_por_descanso')
     .eq('tipo_evento', 'Entrenamiento').gte('fecha', desde).lte('fecha', ultimo);
-  let hay = 0, quitados = 0;
+  let hay = 0, quitados = 0, pesos = 0;
   for (const e of evs ?? []) {
     if (e.estado === 'Eliminado') { if (prop.has(String(e.eliminado_por_descanso ?? ''))) quitados++; continue; }
     if (e.estado === 'Evento Cancelado' || e.estado === 'No se entrena') continue;
     hay++;
+    // Entrenamiento dentro de un periodo sin cobro: pesa lo que vale la clase ese día.
+    const f = String(e.fecha).slice(0, 10);
+    let w = 1;
+    for (const p of periodos) if (String(p.desde) <= f && f <= String(p.hasta)) w = Math.min(w, _pctPeriodo(p) / 100);
+    pesos += w;
   }
   const normales = hay + quitados;
-  if (!quitados || !normales) return null;
-  return { factor: hay / normales, hay, normales };
+  if (!normales || (!quitados && pesos >= hay)) return null;
+  return { factor: pesos / normales, hay, normales, ...(pesos < hay ? { periodo: true } : {}) };
 }
 
 /** Precio de la cuota de `mes` para un equipo, ya proporcional si corresponde (sin recargo). */
 async function _precioCuotaMes(equipo: string | null | undefined, mes: string, factor?: { factor: number } | null): Promise<number> {
   const base = Number((await getPreciosClases({}, equipo ?? null)).precioMensual) || 0;
-  const f = factor === undefined ? await _factorCuotaMes(mes) : factor;
+  const f = factor === undefined ? await _factorCuotaMes(mes, equipo) : factor;
   return f ? _num2(base * f.factor) : base;
 }
 
-/** Meses (desde el actual, 12 adelante) con cuota proporcional: {aaaa-mm: {factor, hay, normales}}. */
-async function _mesesProporcionales(): Promise<Record<string, { factor: number; hay: number; normales: number }>> {
+/** Meses (desde el actual, 12 adelante) con cuota proporcional o sin cobro
+ *  para ese equipo: {aaaa-mm: {factor, hay, normales}} (factor 0 = no se cobra). */
+async function _mesesProporcionales(equipo?: string | null): Promise<Record<string, { factor: number; hay: number; normales: number }>> {
   const hoy = _hoyEcuadorISO();
   const { data: ts } = await supabase.from('temporadas_descanso').select('fecha_inicio, fecha_fin, reglas').gte('fecha_fin', `${hoy.slice(0, 7)}-01`);
   const out: Record<string, { factor: number; hay: number; normales: number }> = {};
@@ -12019,7 +12264,15 @@ async function _mesesProporcionales(): Promise<Record<string, { factor: number; 
       if (`${k}-31` >= String(t.fecha_inicio) && `${k}-01` <= String(t.fecha_fin)) meses.add(k);
     }
   }
-  for (const k of meses) { const f = await _factorCuotaMes(k); if (f) out[k] = f; }
+  // Meses y periodos sin cobro (Victor, 2026-11-20).
+  const reglas = await _reglasLiga();
+  for (const p of _periodosSinCobro(reglas, equipo)) {
+    for (let i = 0; i <= 12; i++) {
+      const k = _mesClave(y0, m0 + i);
+      if (p.tipo === 'mes' ? (p.meses ?? []).includes(k) : p.cuota !== 'entera' && `${k}-31` >= String(p.desde) && `${k}-01` <= String(p.hasta)) meses.add(k);
+    }
+  }
+  for (const k of meses) { const f = await _factorCuotaMes(k, equipo, reglas); if (f) out[k] = f; }
   return out;
 }
 
@@ -12033,8 +12286,8 @@ async function _mesesProporcionales(): Promise<Record<string, { factor: number; 
 // precio del mes (proporcional si hay descanso) + recargo de `_recargoCuota`.
 // No mira pagos: eso lo cruza quien la llama.
 const CUOTA_POR_ASISTENCIA_DESDE = '2026-11';
-async function _debeCuotaMes(gente: any[], mes: string): Promise<Record<string, { debe: boolean; monto: number; motivo: string }>> {
-  const out: Record<string, { debe: boolean; monto: number; motivo: string }> = {};
+async function _debeCuotaMes(gente: any[], mes: string): Promise<Record<string, { debe: boolean; monto: number; motivo: string; sinCobro?: boolean }>> {
+  const out: Record<string, { debe: boolean; monto: number; motivo: string; sinCobro?: boolean }> = {};
   const hoy = _hoyEcuadorISO();
   if (mes > hoy.slice(0, 7)) return out;
   const reglas = await _reglasLiga();
@@ -12049,18 +12302,23 @@ async function _debeCuotaMes(gente: any[], mes: string): Promise<Record<string, 
   const nombres = (v: unknown) => String(v ?? '').split(',').map((n) => n.trim().toUpperCase()).filter(Boolean);
   const vino: Record<string, number> = {};
   for (const e of evs ?? []) for (const n of new Set([...nombres(e.a_horario), ...nombres(e.tarde)])) vino[n] = (vino[n] ?? 0) + 1;
-  const factor = await _factorCuotaMes(mes);
+  // Factor por equipo: descanso proporcional y meses o periodos sin cobro (Victor, 2026-11-20).
+  const factorEq: Record<string, Awaited<ReturnType<typeof _factorCuotaMes>>> = {};
   const precioEq: Record<string, number> = {};
   const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? '' : 's'}`;
+  const nombreMes = _MESES_ES[m - 1].charAt(0).toUpperCase() + _MESES_ES[m - 1].slice(1);
   for (const p of porMes) {
     const eq = String(p.categoria ?? '');
+    const factor = eq in factorEq ? factorEq[eq] : (factorEq[eq] = await _factorCuotaMes(mes, eq, reglas));
+    if (factor?.sinCobro) { out[p.username] = { debe: false, monto: 0, motivo: `${nombreMes} no se cobra`, sinCobro: true }; continue; }
     const n = vino[String(p.username).toUpperCase()] ?? 0;
     const g = Math.max(0, Number(gracia[eq]) || 0);
     const precio = precioEq[eq] ??= await _precioCuotaMes(eq, mes, factor);
     const recargo = _recargoCuota(mes, hoy, await _reglasDeEquipo(eq), precio);
     const vinoTxt = n === 0 ? 'No vino a entrenamientos' : `Vino ${plural(n, 'entrenamiento')}`;
     const partes = [vinoTxt, `tiene ${g} de gracia`];
-    if (factor) partes.push(`cuota proporcional: ${factor.hay} de ${factor.normales} entrenamientos por el descanso`);
+    if (factor?.periodo) partes.push(`cuota proporcional: ${Math.round(factor.factor * 100)} % del mes por un periodo sin cobro`);
+    else if (factor) partes.push(`cuota proporcional: ${factor.hay} de ${factor.normales} entrenamientos por el descanso`);
     const debe = n > g;
     if (debe && recargo > 0) partes.push(`incluye recargo de ${_monedaLiga}${recargo}`);
     out[p.username] = { debe, monto: _num2(precio + (debe ? recargo : 0)), motivo: partes.join('; ') };
@@ -12097,6 +12355,17 @@ async function _estadosCuotaMes(usernames: string[], mes: string): Promise<Recor
   (res ?? []).forEach((r: any) => { if (r.estado === 'Confirmada') out[r.nombre_usuario] = 'al_dia'; });
   (exc ?? []).forEach((r: any) => { out[r.id_miembro] = 'al_dia'; });
   (pag ?? []).forEach((r: any) => { if (r.exoneradx || Number(r.monto) > 0) out[r.nombre_usuario] = 'al_dia'; });
+  // Mes sin cobro (o con cuota 0 por un periodo) para su equipo (Victor, 2026-11-20): está al día.
+  const reglasL = await _reglasLiga();
+  if (Array.isArray(reglasL.periodosSinCobro) && reglasL.periodosSinCobro.length) {
+    const { data: cats } = await supabase.from('equipo').select('username, categoria').in('username', usernames);
+    const libre: Record<string, boolean> = {};
+    for (const c of cats ?? []) {
+      const eq = String(c.categoria ?? '');
+      if (!(eq in libre)) libre[eq] = (await _factorCuotaMes(mes, eq, reglasL))?.factor === 0;
+      if (libre[eq]) out[c.username] = 'al_dia';
+    }
+  }
   return out;
 }
 
@@ -12547,6 +12816,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
       tipo: 'evento_cancelado',
       include_external_user_ids: [reservaAntes.nombre_usuario],
       headings: { es: 'Tienes una clase a favor' },
+      personal: true, // aviso de pago, no del evento
       contents: { es: 'Tu próxima clase reservada no tendrá costo: se descuenta sola al reservar.' },
       url: APP_URL + '/?tab=eventos',
     });
@@ -12629,9 +12899,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
 
     // Evento social (Naviquinde): ver social.ts.
     if (ACCIONES_SOCIAL.has(String(action))) {
-      return json(await accionSocial(String(action), params, {
-        db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, appUrl: APP_URL,
-      }));
+      return json(await accionSocial(String(action), params, _depsSocial()));
     }
 
     switch (action) {
@@ -12679,7 +12947,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
             case 'getPreciosClases': {
               // Meses con cuota proporcional por un descanso (factor; la app multiplica la mensualidad).
               const pr = await getPreciosClases(params);
-              const mp = await _mesesProporcionales();
+              const mp = await _mesesProporcionales(pr.equipoCobro);
               return json({ ...pr, factorPorMes: Object.fromEntries(Object.entries(mp).map(([k, v]) => [k, v.factor])) });
             }
       case 'adminSetPreciosClases':           return json(await adminSetPreciosClases(params));

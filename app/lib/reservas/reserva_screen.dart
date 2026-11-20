@@ -77,7 +77,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
     _plan = _plan?.id == p?.id ? null : p;
     if (_plan != null && _esMes) {
       // N meses seguidos desde el primero sin pagar.
-      _mesesSel = {for (final m in (_meses ?? const <MesReserva>[]).where((m) => !m.pagado).take(_plan!.cantidad)) m.mes};
+      _mesesSel = {for (final m in (_meses ?? const <MesReserva>[]).where((m) => !m.pagado && !m.sinCobro).take(_plan!.cantidad)) m.mes};
     }
   });
 
@@ -113,11 +113,11 @@ class _ReservaScreenState extends State<ReservaScreen> {
         _cuota = res[1] as Cuota;
         _hayCupon = res[2] as bool;
         if (_esMes) {
-          _meses = _r.meses(_cuota!);
+          _meses = _r.meses(_cuota!, precios: _precios);
           _mesesSel = _r.preseleccion(_meses!);
           // Desde un evento: solo ese mes (web: `_evFabReservaParaEvento()`).
           final mi = widget.mesInicial;
-          if (mi != null && _meses!.any((m) => m.mes == mi && !m.pagado)) _mesesSel = {mi};
+          if (mi != null && _meses!.any((m) => m.mes == mi && !m.pagado && !m.sinCobro)) _mesesSel = {mi};
         } else {
           _clases = res[3] as List<FechaClase>;
           final ci = widget.claseInicial;
@@ -148,6 +148,10 @@ class _ReservaScreenState extends State<ReservaScreen> {
           creditos: _creditos,
           cupon: _usarCupon,
           meses: _mesesSel,
+          fechasClases: [
+            for (final c in _clases ?? const <FechaClase>[])
+              if (_clasesSel.contains(c.id)) c.fecha,
+          ],
           saldo: _aplicarSaldo ? _saldo : 0,
           deudaObligatoria: _deudaClases,
         );
@@ -244,6 +248,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
               Icons.autorenew_rounded,
               'Tienes $_creditos ${_creditos == 1 ? 'clase a favor' : 'clases a favor'} por entrenamientos cancelados. Se descuentan solas.',
             ),
+          for (final a in _precios?.avisos ?? const <String>[]) _aviso(context, Icons.money_off_rounded, a),
           _tarjetaEquipo(context),
           for (final c in clases) _tarjetaClase(context, c),
         ],
@@ -478,9 +483,17 @@ class _ReservaScreenState extends State<ReservaScreen> {
     final f = c.fecha;
     final titulo = f == null ? c.id : '${Fechas.dia(f)[0].toUpperCase()}${Fechas.dia(f).substring(1)} ${Fechas.corta(f)}';
     final detalle = [if (c.hora.isNotEmpty) c.hora, if (c.lugar.isNotEmpty) c.lugar].join(' · ');
+    // Mes o periodo sin cobro (Victor, 2026-11-20).
+    final pct = _precios?.pctClase(f) ?? 100;
     final String? nota = !c.elegible
         ? c.razon
-        : (c.tallaAgotada ? (otraTalla != null ? 'Con patines talla $otraTalla' : 'Sin patines de tu talla: toca para elegir otra') : null);
+        : (c.tallaAgotada
+              ? (otraTalla != null ? 'Con patines talla $otraTalla' : 'Sin patines de tu talla: toca para elegir otra')
+              : pct == 0
+              ? 'No se cobra'
+              : pct < 100
+              ? 'Se cobra al $pct %'
+              : null);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AnimatedOpacity(
@@ -608,6 +621,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
       children: [
         _tarjetasPlanes(context),
         if (meses.any((m) => m.pasado)) _aviso(context, Icons.info_outline_rounded, 'Tienes meses anteriores sin pagar; ya están marcados.'),
+        for (final a in _precios?.avisos ?? const <String>[]) _aviso(context, Icons.money_off_rounded, a),
         GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
@@ -622,7 +636,9 @@ class _ReservaScreenState extends State<ReservaScreen> {
                 m,
                 sel: _mesesSel.contains(m.mes),
                 // Con un plan de meses, los meses los fija el plan.
-                alTocar: m.pagado || _plan != null ? null : () => setState(() => _mesesSel.contains(m.mes) ? _mesesSel.remove(m.mes) : _mesesSel.add(m.mes)),
+                alTocar: m.pagado || m.sinCobro || _plan != null
+                    ? null
+                    : () => setState(() => _mesesSel.contains(m.mes) ? _mesesSel.remove(m.mes) : _mesesSel.add(m.mes)),
               ),
           ],
         ),
@@ -631,10 +647,10 @@ class _ReservaScreenState extends State<ReservaScreen> {
   }
 
   Widget _celdaMes(PivotPaleta p, MesReserva m, {required bool sel, VoidCallback? alTocar}) {
-    final sub = m.pagado ? 'Pagado' : (m.pasado ? 'Adeudado' : '${m.mes.year}');
+    final sub = m.pagado ? 'Pagado' : (m.sinCobro ? 'No se cobra' : (m.pasado ? 'Adeudado' : '${m.mes.year}'));
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
-      opacity: m.pagado ? 0.5 : 1,
+      opacity: m.pagado || m.sinCobro ? 0.5 : 1,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
@@ -659,7 +675,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
                   sub,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: m.pagado || m.pasado ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: m.pagado || m.pasado || m.sinCobro ? FontWeight.w600 : FontWeight.w400,
                     color: m.pasado ? p.marcaTexto : p.textoSecundario,
                   ),
                 ),
@@ -675,7 +691,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
 
   Widget _pasoPago(BuildContext context, Total t) {
     final p = context.pivot;
-    final cuponPosible = !_esMes && _hayCupon && _cantidad > t.aFavor;
+    final cuponPosible = !_esMes && _hayCupon && _cantidad - t.sinCobro > t.aFavor;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
@@ -754,8 +770,11 @@ class _ReservaScreenState extends State<ReservaScreen> {
         ? (_mesesSel.toList()..sort()).map((m) => ReglaAnticipada.nombreMes(m)).toList()
         : _clases!.where((c) => _clasesSel.contains(c.id)).map(ReservasRepo.etiquetaClase).toList();
     final partes = [
-      if (t.cobradas > 0 && t.proporcional)
-        '${t.cobradas} ${t.cobradas == 1 ? 'mes' : 'meses'} ${ReservasRepo.dinero(t.mensualidades)} (proporcional por el descanso)'
+      if (t.cobradas > 0 && t.proporcional && !_esMes)
+        '${t.cobradas} ${t.cobradas == 1 ? 'clase' : 'clases'} ${ReservasRepo.dinero(t.mensualidades)} (con el periodo sin cobro)'
+      else if (t.cobradas > 0 && t.proporcional)
+        '${t.cobradas} ${t.cobradas == 1 ? 'mes' : 'meses'} ${ReservasRepo.dinero(t.mensualidades)} '
+            '(proporcional ${_mesesSel.any((m) => _precios?.porPeriodo(m) ?? false) ? 'por el periodo sin cobro' : 'por el descanso'})'
       else if (t.cobradas > 0)
         '${t.cobradas} ${_esMes ? (t.cobradas == 1 ? 'mes' : 'meses') : (t.cobradas == 1 ? 'clase' : 'clases')} × ${ReservasRepo.dinero(t.precio)}',
       if (t.recargos > 0) 'recargo por pagar tarde ${ReservasRepo.dinero(t.recargo)}',
@@ -763,6 +782,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
       if (t.saldo < 0) '${ReservasRepo.dinero(-t.saldo)} pendientes de antes',
 
       if (t.aFavor > 0) '${t.aFavor} a favor',
+      if (t.sinCobro > 0) '${t.sinCobro} sin cobro',
       if (t.cupon > 0) '1 con cupón',
     ];
     return Container(
@@ -900,6 +920,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
             meses: _mesesSel.toList()..sort(),
             tallaPorFecha: _tallaPorFecha,
             total: total,
+            precios: _precios,
             // Dónde dice que pagó, para que el Pivot sepa dónde revisar.
             medio: total.monto == 0 ? null : medio,
             medioNombre: total.monto == 0 ? null : medioNombre,

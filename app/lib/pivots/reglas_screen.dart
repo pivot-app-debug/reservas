@@ -9,6 +9,7 @@ import 'buscador_liga.dart';
 import 'cobro_equipo_screen.dart';
 
 import 'editores_liga.dart';
+import 'periodos_sin_cobro_screen.dart';
 import 'recompensas_asistencia.dart';
 import 'recompensas_screen.dart';
 
@@ -174,6 +175,13 @@ class _ReglasScreenState extends State<ReglasScreen> {
                       ? 'Apagada'
                       : (!c.cuponVuelve ? 'Una por persona nueva; no vuelve si cancela' : 'Una por persona nueva; vuelve si cancela a tiempo'),
                   editar: () => SubAjustes.abrir(context, ClaseBienvenidaScreen(config: c)),
+                ),
+                _regla(
+                  'sinCobro',
+                  Icons.money_off_rounded,
+                  'Meses y periodos sin cobro',
+                  textoPeriodosSinCobro(c),
+                  editar: () => SubAjustes.abrir(context, PeriodosSinCobroScreen(config: c, equipos: _equipos)),
                 ),
                 _regla('sinReserva', Icons.person_off_outlined, 'Vino sin reserva', 'Si debía pagar esa clase, queda la deuda del valor por clase'),
                 _regla('sinPago', Icons.how_to_reg_outlined, 'Asistiré sin pago', 'Si paga por mes y no ha pagado, al marcar Asistiré se le pide pagar'),

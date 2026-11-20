@@ -75,6 +75,13 @@ const entradasLiga = [
   ),
   EntradaAjuste('reservas', 'Reservas por clase', 'Mi Liga › Reglas', 'reservar clases cierre sin aprobar próximas', dentro: 'reglas'),
   EntradaAjuste('cupon', 'Clase gratis de bienvenida', 'Mi Liga › Reglas', 'cupón primera clase gratis nueva persona cancelar', dentro: 'reglas'),
+  EntradaAjuste(
+    'sinCobro',
+    'Meses y periodos sin cobro',
+    'Mi Liga › Reglas',
+    'no se cobra gratis vacaciones diciembre descuento porcentaje periodo fechas cuota clases',
+    dentro: 'reglas',
+  ),
   EntradaAjuste('equipos', 'Clases de gracia', 'Mi Liga › Equipos › cada equipo', 'gracia gratis sin pagar primera clase cuota equipo'),
   EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
   EntradaAjuste('equipos', 'Préstamo de equipamiento', 'Mi Liga › Equipos › cada equipo', 'prestar patines protecciones excepcional emergencia'),

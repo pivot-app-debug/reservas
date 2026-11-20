@@ -8,6 +8,7 @@ import '../core/config_liga.dart';
 import '../core/api.dart';
 import '../core/cola_offline.dart';
 import '../core/fechas.dart';
+import '../core/periodos_sin_cobro.dart';
 import '../sesion/sesion.dart';
 import 'anticipada.dart';
 import 'modelos.dart';
@@ -384,6 +385,8 @@ class EventosRepo extends ChangeNotifier {
     // Clases de gracia por equipo (Mi Liga → Cobros; por defecto Quindes 1).
     final n = ConfigLiga.de(sesion).graciaClases('${d['categoria'] ?? ''}');
     if (n == null) return null;
+    // Mes sin cobro o clase gratis por un periodo sin cobro (Victor, 2026-11-20): marca Asistiré sin suscripción.
+    if (PeriodoSinCobro.pctClase(ConfigLiga.de(sesion).periodosSinCobro, ev.fecha, equipo: '${d['categoria'] ?? ''}') == 0) return null;
     final c = _cuota;
     if (c == null) return null;
     if (d['exenta_cuota'] == true || d['exenta_cuota'] == 'true') return null;
@@ -790,7 +793,14 @@ class EventosRepo extends ChangeNotifier {
     if (res['exito'] == false) throw ApiException((res['error'] ?? 'No se pudo cancelar el evento.').toString());
     if (!ev.finalizado) {
       _api
-          .get('pushEventoCancelado', {'adminToken': token, 'tipo': ev.tipo, 'fecha': Fechas.iso(ev.fecha), 'hora': ev.horaInicio, 'lugar': ev.lugar})
+          .get('pushEventoCancelado', {
+            'adminToken': token,
+            'idEvento': ev.id,
+            'tipo': ev.tipo,
+            'fecha': Fechas.iso(ev.fecha),
+            'hora': ev.horaInicio,
+            'lugar': ev.lugar,
+          })
           .catchError((_) => <String, dynamic>{});
     }
     await cargar(forzar: true);

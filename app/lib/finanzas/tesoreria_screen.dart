@@ -1961,6 +1961,7 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
     ('en_revision', 'En revisión'),
     ('debe', 'Deben'),
     ('no_vino', 'No vino / dentro de la gracia'),
+    ('sin_cobro', 'Mes sin cobro'),
     ('exenta', 'Exentas o con excepción'),
   ];
 
@@ -1976,6 +1977,7 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
   static const _explicacion = {
     'debe': 'Su equipo paga por mes y vino a más entrenamientos que sus clases de gracia, sin pago registrado.',
     'no_vino': 'Su equipo paga por mes, pero no vino a entrenar o está dentro de sus clases de gracia. Todavía no debe.',
+    'sin_cobro': 'Este mes no se cobra para su equipo (Reglas de la liga → Meses y periodos sin cobro).',
   };
   static const _porQueDebeAntes = 'Está activx, paga cuota y no tiene pago, exención ni excepción registrada este mes.';
 
@@ -2148,7 +2150,7 @@ class _CuotasMesScreenState extends State<CuotasMesScreen> {
                         x['monto'] is num ? 'Debe ${plata(x['monto'] as num)}' : 'Sin pago registrado este mes',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.marcaTexto),
                       ),
-                    if ('${x['motivo'] ?? ''}'.isNotEmpty && (x['estado'] == 'debe' || x['estado'] == 'no_vino'))
+                    if ('${x['motivo'] ?? ''}'.isNotEmpty && (x['estado'] == 'debe' || x['estado'] == 'no_vino' || x['estado'] == 'sin_cobro'))
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text('${x['motivo']}', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),

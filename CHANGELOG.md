@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (meses sin cobro y avisos por equipo)
+- **Meses y periodos sin cobro** (Mi Liga → Reglas de la liga → Pagos): por mes (no se cobran cuota ni clases; Asistiré sin suscripción) o por fechas (clases gratis o con un %, cuota proporcional o entera), para toda la liga o algunos equipos. La pantalla de suscribirse lo avisa ("Diciembre no se cobra") y Cuotas del mes muestra el grupo "Mes sin cobro". Lo ya pagado no cambia.
+- **Avisos de eventos y asistencia solo para personas activas**: quien está inactivx, lesionadx, de viaje, archivadx u otro estado no los recibe (sí los de suscripciones, cursos y personales) y no le sale la pantalla "Activa las notificaciones".
+- **Avisos por equipo** listos en el servidor: un evento para algunos equipos solo avisa a esos equipos, sus coaches y los Pivots (falta la columna `asistencias.equipos` y elegir equipos al crear el evento).
+- Evento social: primera parte de encargadxs y aprobación de un Pivot en el servidor (sin pantalla todavía; se rediseña como "Social o fiesta").
+
 ## 2026-11-19 (noche: decisiones de Victor)
 - **Evento social (Naviquinde):** tipo "Social" con amigo secreto (sorteo en ronda con exclusiones, cada quien gira su ruleta y ve solo a quien le tocó), regalo robado (tope y recordatorio), comida compartida con metas por asistente e invitadxs +1 con enlace sin cuenta. Pistas y wishlist quedan guardadas para el año siguiente. Nuevo evento: Entrenamiento, Partido, Reunión de equipo, Social, Otro (antes "Evento") y Personalizado.
 - **Cuotas del mes:** desde noviembre debe solo quien vino a más entrenamientos que sus clases de gracia, en equipos que cobran por mes; muestra monto y motivo, y un grupo "No vino / dentro de la gracia". No había deudas guardadas por la regla vieja.

@@ -92,7 +92,10 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     }
     if (!mounted || Tour.activo) return;
     // Notificaciones casi obligatorias (Victor, 2026-11-18): primero que todo.
-    await PantallaAvisos.siCorresponde(context, widget.sesion.api);
+    // Solo a personas activas: quien no está Activx no recibe avisos de
+    // eventos (Victor, 2026-11-20), así que no se le pide activarlos.
+    final estado = '${widget.sesion.datos['estado_miembro'] ?? ''}'.trim();
+    if (estado.isEmpty || estado == 'Activx') await PantallaAvisos.siCorresponde(context, widget.sesion.api);
     if (!mounted) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);
