@@ -84,4 +84,9 @@ void main() {
     expect(e.homenaje, isNotNull);
     expect(e.editable?['sorpresa'], isTrue);
   });
+
+  test('Las claves de las piezas que se pueden esconder coinciden con el servidor (PIEZAS_ELEGIBLES)', () {
+    final elegibles = [Pieza.comida, Pieza.playlist, Pieza.amigoSecreto, Pieza.regaloRobado, Pieza.dress, Pieza.traer, Pieza.invitados];
+    expect(elegibles.map((p) => p.name), ['comida', 'playlist', 'amigoSecreto', 'regaloRobado', 'dress', 'traer', 'invitados']);
+  });
 }

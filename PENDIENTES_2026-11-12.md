@@ -46,7 +46,8 @@ Trabajar lo de esta sección y lo que Victor mande desde el 17/11 a las 18:45 (s
 **Estado 20/11, 00:30 (Ecuador):**
 - [x] Regla de cuotas por asistencia (desde noviembre; no había deudas guardadas que corregir), Pedir comprobante (24 h), descanso con cuota proporcional, Herramientas de la liga, Coach/habilidades en Equipo, meses y periodos sin cobro, avisos solo para personas activas.
 - [x] Migraciones `20261119120000_evento_social.sql` y `20261120030000_notificaciones_alcance.sql` aplicadas por Victor en el editor SQL (20/11). **Migraciones nuevas: el conector de Supabase pide una confirmación que no le llega a Victor (ni apply_migration ni execute_sql de escritura); se le pasa el archivo para que lo pegue en el editor SQL.**
-- [ ] Migración `20261120100000_social_o_fiesta.sql`: pendiente de que Victor la pegue en el editor SQL.
+- [x] Migración `20261120100000_social_o_fiesta.sql` aplicada por Victor (20/11).
+- [ ] Social o fiesta: probar de punta a punta con la app (crear, aprobar, sorpresa, sorteo, +1); un push por cada guardado del asistente.
 - [x] **"Social o fiesta"** construido el 20/11 (falta la migración y probarlo; pendientes: aviso de cambios al editar hora/lugar, +1 sin mensajes ni regalo, web vieja). Diseño original: asistente por pasos según el tipo (fiesta, festividad, cumpleaños, aniversario, despedida, personalizado), cualquiera lo crea y un Pivot aprueba, opción sorpresa (quien es homenajeadx no se entera; si es Pivot aprueba otrx). Esperando respuestas en "Preguntas de claude". En `social.ts` quedó una primera parte de encargadxs y aprobación (sin pantalla ni migración).
 - [ ] Elegir equipos al crear un evento (para que el filtro de avisos por equipo tenga efecto).
 

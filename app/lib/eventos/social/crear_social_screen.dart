@@ -89,6 +89,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
   final List<_Premio> _premios = [];
 
   final Set<String> _homenajeados = {}, _noEnterarse = {}, _encargados = {};
+
+  /// Sorpresa por pieza: las que NO ven homenajeadxs ni quienes no deben enterarse (por defecto, todas se ven).
+  final Set<Pieza> _ocultas = {};
+  static const _elegibles = [Pieza.comida, Pieza.playlist, Pieza.amigoSecreto, Pieza.regaloRobado, Pieza.dress, Pieza.traer, Pieza.invitados];
   bool _sorpresa = false, _mensajes = true, _regalo = false;
   final _neutro = TextEditingController(), _regaloTope = TextEditingController(), _regaloNota = TextEditingController();
   String? _regaloCompra;
@@ -186,6 +190,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     _homenajeados.addAll([for (final x in (ed['homenajeados'] as List? ?? const [])) '$x']);
     _noEnterarse.addAll([for (final x in (ed['noEnterarse'] as List? ?? const [])) '$x']);
     _encargados.addAll([for (final x in (ed['encargados'] as List? ?? const [])) '$x']);
+    final ocultas = {for (final x in (piezas['ocultas'] as List? ?? const [])) '$x'};
+    _ocultas.addAll(_elegibles.where((pz) => ocultas.contains(pz.name)));
   }
 
   List<_Cat> _catsSugeridas() => [for (final c in _sug.comida) _Cat(nombre: c.nombre, unidad: c.unidad, porPersona: c.porPersona)];
@@ -1142,11 +1148,18 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                   });
                 }
               }, vacio: 'Solo las personas homenajeadas.'),
+              _titulo('¿Qué piezas ven?', ayuda: 'Homenaje, mensajes, regalo entre todxs y premios nunca los ven. Lo demás, sí, salvo que lo apagues.'),
+              for (final pz in _elegibles.where(_piezas.contains))
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: Icon(pz.icono, color: _ocultas.contains(pz) ? p.textoSecundario : p.marcaTexto),
+                  title: Text(pz.titulo),
+                  subtitle: Text(_ocultas.contains(pz) ? 'No lo ve la persona homenajeada' : 'Lo ve la persona homenajeada'),
+                  value: !_ocultas.contains(pz),
+                  onChanged: (v) => setState(() => v ? _ocultas.remove(pz) : _ocultas.add(pz)),
+                ),
               const SizedBox(height: 8),
-              Text(
-                'Lo que escribas en comida, qué traer, dress code y playlist también lo ven quienes no deben enterarse: escríbelo sin pistas.',
-                style: TextStyle(fontSize: 13, color: p.textoSecundario),
-              ),
+              Text('Lo que sí ven, escríbelo sin pistas de la sorpresa.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
             ],
           ),
         ),
@@ -1277,6 +1290,12 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           ],
         },
       if (_piezas.contains(Pieza.homenaje)) 'homenaje': {'mensajes': _mensajes, 'regalo': _regalo, 'regaloNota': _regaloNota.text.trim()},
+      'ocultas': _sorpresa
+          ? [
+              for (final pz in _ocultas)
+                if (_piezas.contains(pz)) pz.name,
+            ]
+          : <String>[],
     };
     return {
       'plantilla': _plantilla ?? 'personalizado',

@@ -123,3 +123,77 @@ export function tituloPara(cfg: CfgSocial | null | undefined, vista: Vista, nomb
 export function mensajesAbiertos(cfg: CfgSocial | null | undefined, eventoTermino: boolean): boolean {
   return eventoTermino || !!cfg?.mensajes_liberados_en;
 }
+
+// ─── Sorpresa por pieza (Victor, 2026-11-20, 3ª ronda) ────────────────────
+
+/// Piezas que quien organiza puede esconder a homenajeadxs y a quienes no
+/// deben enterarse (`piezas.ocultas`). Por defecto las ven. Homenaje,
+/// mensajes, regalo entre todxs y premios no están aquí: siempre se esconden.
+export const PIEZAS_ELEGIBLES = ['comida', 'playlist', 'amigoSecreto', 'regaloRobado', 'dress', 'traer', 'invitados'] as const;
+const SIEMPRE_OCULTAS = new Set(['homenaje', 'premios', 'descripcion', 'nombre']);
+
+export function piezasOcultas(cfg: { piezas?: any } | null | undefined): string[] {
+  const l = cfg?.piezas?.ocultas;
+  return Array.isArray(l) ? l.map(String).filter((k) => (PIEZAS_ELEGIBLES as readonly string[]).includes(k)) : [];
+}
+
+/// ¿Ve esta vista la pieza? Solo la vista neutral puede no verla.
+export function piezaVisible(cfg: { piezas?: any } | null | undefined, pieza: string, vista: Vista): boolean {
+  if (vista !== 'neutral') return true;
+  if (SIEMPRE_OCULTAS.has(pieza)) return false;
+  return !piezasOcultas(cfg).includes(pieza);
+}
+
+/// Un cambio entre dos versiones del evento: `que` es el texto del aviso y
+/// `pieza` la parte del evento a la que pertenece (null = fecha, hora, lugar).
+/// `soloNeutral`: solo le importa a la vista neutral (el nombre neutro).
+export interface Cambio {
+  que: string;
+  pieza: string | null;
+  soloNeutral?: boolean;
+}
+
+/// Foto comparable del evento (la arma social.ts con la fila y el evento).
+export type Foto = Record<string, unknown>;
+
+const CAMPOS: [string, string, string | null, boolean?][] = [
+  // [clave de la foto, texto, pieza, soloNeutral]
+  ['nombre', 'el nombre', 'nombre'],
+  ['nombreNeutro', 'el nombre', null, true],
+  ['descripcion', 'la descripción', 'descripcion'],
+  ['fecha', 'la fecha', null],
+  ['hora', 'la hora', null],
+  ['lugar', 'el lugar', null],
+  ['mapa', 'cómo llegar', null],
+  ['comida', 'la comida y bebida', 'comida'],
+  ['amigoSecreto', 'el amigo secreto', 'amigoSecreto'],
+  ['regaloRobado', 'el regalo robado', 'regaloRobado'],
+  ['invitados', 'los +1', 'invitados'],
+  ['playlist', 'la playlist', 'playlist'],
+  ['dress', 'el dress code', 'dress'],
+  ['traer', 'la lista de qué traer', 'traer'],
+  ['premios', 'los premios', 'premios'],
+  ['homenaje', 'el homenaje', 'homenaje'],
+];
+
+export function diferencias(antes: Foto, despues: Foto): Cambio[] {
+  const out: Cambio[] = [];
+  for (const [k, que, pieza, soloNeutral] of CAMPOS) {
+    if (JSON.stringify(antes[k] ?? null) !== JSON.stringify(despues[k] ?? null)) out.push({ que, pieza, ...(soloNeutral ? { soloNeutral } : {}) });
+  }
+  return out;
+}
+
+/// Qué cambios se le cuentan a una vista (con la configuración nueva).
+export function cambiosPara(cambios: Cambio[], cfg: { piezas?: any } | null | undefined, vista: Vista): string[] {
+  const l = cambios.filter((c) => {
+    if (vista !== 'neutral') return !c.soloNeutral;
+    return c.soloNeutral || c.pieza === null || piezaVisible(cfg, c.pieza, vista);
+  }).map((c) => c.que);
+  return [...new Set(l)];
+}
+
+export function listaEs(xs: string[]): string {
+  if (xs.length <= 1) return xs.join('');
+  return xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+}

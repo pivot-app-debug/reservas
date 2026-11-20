@@ -139,6 +139,8 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
             if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
             if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
             if (e.social?['traer'] == true) TraerTarjeta(repo: _repo, estado: e, alCambiar: _cargar),
+            // Homenaje: lxs +1 solo aportan al regalo entre todxs (sin mensajes).
+            if (e.homenaje != null) HomenajeTarjeta(repo: _repo, estado: e, alCambiar: _cargar, simbolo: simbolo),
           ],
         ),
       );

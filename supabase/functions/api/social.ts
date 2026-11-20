@@ -28,8 +28,8 @@
 
 import { type ParticipanteSorteo, sortearAmigoSecreto } from './social_sorteo.ts';
 import {
-  aprobadores, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, homenajeadxs, mensajesAbiertos, noEnterarse, personasEnSecreto, publicado,
-  puedeAprobar, tituloPara, type Vista, vistaDe,
+  aprobadores, cambiosPara, diferencias, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, type Foto, homenajeadxs, listaEs, mensajesAbiertos,
+  noEnterarse, PIEZAS_ELEGIBLES, personasEnSecreto, piezaVisible, publicado, puedeAprobar, tituloPara, type Vista, vistaDe,
 } from './social_reglas.ts';
 
 export interface DepsSocial {
@@ -331,6 +331,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   if (!cfg) return { exito: true, social: null, evento, esPivot: q.esPivot, organiza, vista };
 
   const piezas = _piezas(cfg);
+  // Sorpresa por pieza: la vista neutral no recibe las piezas que se le esconden.
+  const ve = (k: string) => piezaVisible(cfg, k, vista);
   const hom = homenajeadxs(cfg);
   const yoHomenajeadx = !!q.username && hom.includes(q.username);
   const [asisten, invitados, sorteo, personas] = await Promise.all([
@@ -345,7 +347,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   const cierre = cfg.cierre ?? _restarDias(ev.fecha, DIAS_CIERRE);
   // Lo que ve la vista neutral: nada del motivo, del homenaje ni de la sorpresa.
   const social: Record<string, any> = {
-    amigoSecreto: cfg.amigo_secreto, regaloRobado: cfg.regalo_robado, comida: cfg.comida, invitados: cfg.invitados,
+    amigoSecreto: !!cfg.amigo_secreto && ve('amigoSecreto'), regaloRobado: !!cfg.regalo_robado && ve('regaloRobado'),
+    comida: !!cfg.comida && ve('comida'), invitados: !!cfg.invitados && ve('invitados'),
     topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
     cierre, inscripcionAbierta: !cfg.sorteado_en && _hoyEc() <= cierre, sorteado: !!cfg.sorteado_en,
     reglasRobado: cfg.reglas_robado ?? PLANTILLA_REGALO_ROBADO, reglasPorDefecto: !cfg.reglas_robado,
@@ -357,11 +360,12 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     estado: _estado(cfg),
     rechazoMotivo: organiza ? (cfg.rechazo_motivo ?? '') : '',
     aprobado: publicado(cfg),
-    playlist: piezas.playlist ? { link: piezas.playlist.link ?? '', nota: piezas.playlist.nota ?? '' } : null,
-    dress: piezas.dress ? { texto: piezas.dress.texto ?? '' } : null,
-    traer: !!piezas.traer,
+    playlist: piezas.playlist && ve('playlist') ? { link: piezas.playlist.link ?? '', nota: piezas.playlist.nota ?? '' } : null,
+    dress: piezas.dress && ve('dress') ? { texto: piezas.dress.texto ?? '' } : null,
+    traer: !!piezas.traer && ve('traer'),
     premios: !neutral && !esInv && piezas.premios ? (piezas.premios.lista ?? []) : null,
-    homenaje: !neutral && !esInv && !yoHomenajeadx && !!piezas.homenaje && hom.length > 0,
+    // Lxs +1 (de alguien que no está en las listas) ven el homenaje solo para aportar al regalo.
+    homenaje: !neutral && !yoHomenajeadx && !!piezas.homenaje && hom.length > 0 && (!esInv || piezas.homenaje.regalo === true),
   };
 
   const out: Record<string, any> = { exito: true, social, evento, esPivot: q.esPivot, tipo: q.tipo, organiza, vista };
@@ -379,7 +383,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   if (q.clave) out.perfil = await _perfil(db, liga, q.clave);
 
   // Amigo secreto: estado y, si ya se reveló, la ficha de quien le tocó.
-  if (cfg.amigo_secreto && q.clave) {
+  if (social.amigoSecreto && q.clave) {
     const mio = sorteo.find((s: any) => s.da === q.clave);
     if (!cfg.sorteado_en) out.amigo = { estado: 'sin_sorteo' };
     else if (!mio) out.amigo = { estado: 'fuera' };
@@ -387,7 +391,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     else out.amigo = { estado: 'revelado', ficha: await _ficha(db, liga, mio.recibe) };
   }
 
-  if (cfg.comida) {
+  if (social.comida) {
     const { data: cats } = await db.from('social_comida_categorias').select('*').eq('id_evento', q.idEvento).order('orden');
     const ids = (cats ?? []).map((c: any) => c.id);
     const { data: aportes } = ids.length
@@ -409,7 +413,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   }
 
   // Qué traer: lo arma quien organiza; cada quien se anota.
-  if (piezas.traer) {
+  if (social.traer) {
     const items: any[] = Array.isArray(piezas.traer.items) ? piezas.traer.items : [];
     const { data: anotes } = await db.from('social_traer_anotes').select('*').eq('id_evento', q.idEvento).order('created_at');
     out.traer = items.map((it: any) => {
@@ -428,10 +432,10 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     const bloque: Record<string, any> = {
       personas: hom.map((u) => ({ username: u, nombre: nombreDe(u), foto: personas.get(u)?.foto ?? '' })),
       liberados: !!cfg.mensajes_liberados_en,
-      mensajes: h.mensajes !== false,
+      mensajes: h.mensajes !== false && !esInv,
       regalo: null,
     };
-    if (h.mensajes !== false) {
+    if (h.mensajes !== false && !esInv) {
       const { data: ms } = await db.from('social_mensajes').select('para, clave, texto').eq('id_evento', q.idEvento);
       const conteo: Record<string, number> = {};
       const mios: Record<string, string> = {};
@@ -444,13 +448,15 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     }
     if (h.regalo) {
       const { data: ap } = await db.from('social_regalo_aportes').select('*').eq('id_evento', q.idEvento).order('created_at');
-      const lista = (ap ?? []).map((a: any) => ({ id: a.id, nombre: a.nombre, monto: Number(a.monto), mio: a.clave === q.clave }));
+      const todos = (ap ?? []).map((a: any) => ({ id: a.id, nombre: a.nombre, monto: Number(a.monto), mio: a.clave === q.clave }));
+      // Lxs +1 ven el total y lo suyo, no los nombres del resto.
+      const lista = esInv ? todos.filter((a: any) => a.mio) : todos;
       bloque.regalo = {
         tope: cfg.regalo_tope == null ? null : Number(cfg.regalo_tope),
         nota: _texto(h.regaloNota, 300),
         compra: cfg.regalo_compra ? { username: cfg.regalo_compra, nombre: nombreDe(cfg.regalo_compra) } : null,
         aportes: lista,
-        total: lista.reduce((s: number, a: any) => s + a.monto, 0),
+        total: todos.reduce((s: number, a: any) => s + a.monto, 0),
       };
     }
     out.homenaje = bloque;
@@ -532,6 +538,11 @@ function _leerPiezas(v: any): Record<string, any> {
     out.premios = { lista };
   }
   if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
+  // Sorpresa por pieza: las que NO ven homenajeadxs ni quienes no deben enterarse.
+  if (Array.isArray(p.ocultas)) {
+    const ocultas = [...new Set<string>(p.ocultas.map((x: unknown) => String(x)))].filter((k) => (PIEZAS_ELEGIBLES as readonly string[]).includes(k));
+    if (ocultas.length) out.ocultas = ocultas;
+  }
   return out;
 }
 
@@ -794,6 +805,8 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
   const creador = previa?.creador ?? null;
   const r = await _leerDatos(db, d, previa ? { ...previa, __fecha: ev.fecha } : { __fecha: ev.fecha }, creador ?? q.username, q.categoria);
   if ('error' in r) return { exito: false, error: r.error };
+  // Foto de antes para avisar los cambios de un evento ya publicado.
+  const fotoAntes = previa && publicado(previa) ? await _foto(db, previa, ev) : null;
   const fila: Record<string, any> = { ...r.fila };
   if (previa && 'actualizado_en' in previa) fila.actualizado_en = new Date().toISOString();
   if (!fila.cierre && !previa?.cierre) fila.cierre = _restarDias(r.ev.fecha ?? ev.fecha, DIAS_CIERRE);
@@ -822,7 +835,60 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
       await _avisarPorAprobar(deps, cfg, { ...ev, fecha: r.ev.fecha ?? ev.fecha }, elegibles.map((p) => p.username), q.nombre);
     }
   }
-  return { exito: true, avisos, publicado: publicado(await _config(db, idEvento)) };
+  const final = await _config(db, idEvento);
+  if (fotoAntes && final && publicado(final)) {
+    const evNuevo = (await _evento(db, idEvento)) ?? ev;
+    await _avisarCambios(deps, final, evNuevo, diferencias(fotoAntes, await _foto(db, final, evNuevo)), q.username);
+  }
+  return { exito: true, avisos, publicado: publicado(final) };
+}
+
+/// Lo que se compara para saber qué cambió (una entrada por parte del evento).
+async function _foto(db: any, cfg: any, ev: any): Promise<Foto> {
+  const p = _piezas(cfg);
+  const { data: cats } = await db.from('social_comida_categorias').select('nombre, unidad, por_persona, orden').eq('id_evento', ev.id_evento).order('orden');
+  const h = (x: unknown) => String(x ?? '').substring(0, 5);
+  return {
+    nombre: cfg.nombre ?? null, nombreNeutro: cfg.nombre_neutro ?? null, descripcion: cfg.descripcion ?? null,
+    fecha: String(ev.fecha ?? '').substring(0, 10), hora: `${h(ev.inicia)}-${h(ev.termina)}`, lugar: ev.donde ?? '', mapa: ev.google_maps ?? '',
+    comida: [!!cfg.comida, (cats ?? []).map((c: any) => [c.nombre, c.unidad, Number(c.por_persona)])],
+    amigoSecreto: [!!cfg.amigo_secreto, cfg.tope_amigo == null ? null : Number(cfg.tope_amigo), cfg.cierre ?? null],
+    regaloRobado: [!!cfg.regalo_robado, cfg.tope_robado == null ? null : Number(cfg.tope_robado), cfg.recordatorio_robado ?? null, cfg.reglas_robado ?? null],
+    invitados: !!cfg.invitados,
+    playlist: p.playlist ?? null, dress: p.dress ?? null, traer: p.traer ?? null, premios: p.premios ?? null,
+    homenaje: [p.homenaje ?? null, homenajeadxs(cfg), cfg.regalo_tope == null ? null : Number(cfg.regalo_tope), cfg.regalo_compra ?? null],
+  };
+}
+
+/// Un solo aviso "Cambios en …" por guardado, con el resumen de qué cambió.
+/// Quienes no deben enterarse reciben la versión neutra y solo de lo que ven
+/// (si no ven nada de lo que cambió, no les llega). El filtro de personas
+/// activas y de invitadxs lo aplica sendPush (`evento`).
+async function _avisarCambios(deps: DepsSocial, cfg: any, ev: any, cambios: ReturnType<typeof diferencias>, editor: string | null): Promise<void> {
+  if (!deps.push || !cambios.length) return;
+  try {
+    const db = deps.db;
+    const { data: filas } = await db.from('equipo').select('username, categoria').is('eliminado_en', null);
+    const inv = (filas ?? []).filter((f: any) => f.username && f.username !== editor && estaInvitadx(cfg, f.username, f.categoria)).map((f: any) => String(f.username));
+    const personas = await _personas(db, homenajeadxs(cfg));
+    const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
+    const grupos: [string[], Vista][] = [
+      [inv.filter((u: string) => !esSecretoPara(cfg, u)), 'completa'],
+      [inv.filter((u: string) => esSecretoPara(cfg, u)), 'neutral'],
+    ];
+    const ahora = [_fechaCorta(ev.fecha), String(ev.inicia ?? '').substring(0, 5), ev.donde].filter(Boolean).join(' · ');
+    await Promise.allSettled(grupos.map(([us, vista]) => {
+      const que = cambiosPara(cambios, cfg, vista);
+      if (!us.length || !que.length) return Promise.resolve();
+      const general = que.some((x) => ['la fecha', 'la hora', 'el lugar'].includes(x));
+      return deps.push!({
+        tipo: 'evento_editado', include_external_user_ids: us, evento: { idEvento: ev.id_evento },
+        headings: { es: `Cambios en ${tituloPara(cfg, vista, nombreDe)}` },
+        contents: { es: `Cambió ${listaEs(que)}.${general ? ` Ahora: ${ahora}.` : ''}` },
+        url: _url(deps, ev.id_evento),
+      });
+    }));
+  } catch { /* el aviso no frena el guardado */ }
 }
 
 // ─── Aprobación (Pivots) ──────────────────────────────────────────────────
@@ -984,7 +1050,8 @@ async function socialAgregarInvitado(params: Record<string, any>, deps: DepsSoci
   if ('error' in q) return { exito: false, error: q.error };
   if (q.tipo !== 'miembro') return { exito: false, error: 'Solo personas de la liga pueden sumar invitadxs.' };
   const cfg = await _config(db, q.idEvento);
-  if (!cfg?.invitados || _vista(q, cfg) === 'oculta') return { exito: false, error: 'Este evento no admite invitadxs.' };
+  const vInv = cfg ? _vista(q, cfg) : 'oculta';
+  if (!cfg?.invitados || vInv === 'oculta' || !piezaVisible(cfg, 'invitados', vInv)) return { exito: false, error: 'Este evento no admite invitadxs.' };
   const asisten = await _asistentes(db, q.idEvento);
   if (!asisten.has(q.clave!)) return { exito: false, error: 'Primero marca Asistiré para sumar a tu +1.' };
   const nombre = _texto(params.nombre, 60);
@@ -1090,6 +1157,9 @@ async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial)
   const q = await _quien({ ...params, idEvento: cat.id_evento }, deps);
   if ('error' in q) return { exito: false, error: q.error };
   if (!q.clave || q.idEvento !== cat.id_evento) return { exito: false, error: 'No encontramos esa categoría.' };
+  const cfgC = await _config(db, cat.id_evento);
+  const vC = _vista(q, cfgC);
+  if (vC === 'oculta' || !piezaVisible(cfgC, 'comida', vC)) return { exito: false, error: 'No encontramos esa categoría.' };
   const cantidad = _num(params.cantidad);
   if (!cantidad || cantidad <= 0) return { exito: false, error: 'Indica cuánto llevas.' };
   const [asisten, invitados, aportes] = await Promise.all([
@@ -1128,7 +1198,8 @@ async function socialAnotarTraer(params: Record<string, any>, deps: DepsSocial):
   const q = await _quien(params, deps);
   if ('error' in q) return { exito: false, error: q.error };
   const cfg = await _config(db, q.idEvento);
-  if (!q.clave || !cfg || _vista(q, cfg) === 'oculta') return { exito: false, error: 'No encontramos este evento.' };
+  const vT = cfg ? _vista(q, cfg) : 'oculta';
+  if (!q.clave || !cfg || vT === 'oculta' || !piezaVisible(cfg, 'traer', vT)) return { exito: false, error: 'No encontramos este evento.' };
   const items: any[] = _piezas(cfg).traer?.items ?? [];
   const it = items.find((x) => x.id === String(params.item ?? ''));
   if (!it) return { exito: false, error: 'Esa cosa ya no está en la lista.' };
@@ -1164,7 +1235,7 @@ async function _paraHomenaje(params: Record<string, any>, deps: DepsSocial): Pro
   if ('error' in q) return q;
   const cfg = await _config(deps.db, q.idEvento);
   const v = cfg ? _vista(q, cfg) : 'oculta';
-  if (!cfg || q.tipo === 'invitado' || !q.clave || (v !== 'completa' && v !== 'organiza') || !_piezas(cfg).homenaje || homenajeadxs(cfg).includes(q.clave)) {
+  if (!cfg || !q.clave || (v !== 'completa' && v !== 'organiza') || !_piezas(cfg).homenaje || homenajeadxs(cfg).includes(q.clave)) {
     return { error: 'No encontramos este evento.' };
   }
   return { q, cfg };
@@ -1175,6 +1246,7 @@ async function socialMensaje(params: Record<string, any>, deps: DepsSocial): Pro
   const r = await _paraHomenaje(params, deps);
   if ('error' in r) return { exito: false, error: r.error };
   const { q, cfg } = r;
+  if (q.tipo === 'invitado') return { exito: false, error: 'Lxs +1 pueden aportar al regalo, pero no escribir mensajes.' };
   if (_piezas(cfg).homenaje.mensajes === false) return { exito: false, error: 'Este homenaje no tiene mensajes.' };
   const para = _texto(params.para, 80);
   if (!homenajeadxs(cfg).includes(para)) return { exito: false, error: 'Elige a quién le escribes.' };
@@ -1254,7 +1326,9 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   const rehacer = params.rehacer === true || params.rehacer === 'true';
   if (cfg.sorteado_en && !rehacer) return { exito: false, error: 'El sorteo ya se hizo.' };
   const [asisten, invitados] = await Promise.all([_asistentes(db, idEvento), _invitados(db, idEvento)]);
-  const ps = _participantes(asisten, invitados);
+  // Amigo secreto escondido a quienes no deben enterarse: no entran al sorteo (ni sus +1).
+  const fuera = (u: string) => !piezaVisible(cfg, 'amigoSecreto', esSecretoPara(cfg, u) ? 'neutral' : 'completa');
+  const ps = _participantes(new Set([...asisten].filter((u) => !fuera(u))), invitados.filter((i) => !fuera(i.anfitrion)));
   const anio = Number(String(ev.fecha).substring(0, 4));
   // Historial: quién le regaló a quién el año anterior en esta liga.
   const { data: previas } = await db.from('social_sorteo').select('da, recibe').eq('liga_id', liga).eq('anio', anio - 1).neq('id_evento', idEvento);
@@ -1357,11 +1431,10 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
     if (!asisten.length) continue;
     const { data: ligaRow } = await db.from('ligas').select('moneda').eq('id', liga).maybeSingle();
     const tope = (n: any) => (n == null ? '' : ` (hasta ${Number(n)}${ligaRow?.moneda ? ' ' + ligaRow.moneda : ''})`);
-    const partes = [
-      cfg.amigo_secreto && cfg.sorteado_en ? `el regalo de tu amigo secreto${tope(cfg.tope_amigo)}` : '',
-      cfg.regalo_robado ? `un regalo envuelto para el regalo robado${tope(cfg.tope_robado)}` : '',
+    const partesDe = (vista: Vista) => [
+      cfg.amigo_secreto && cfg.sorteado_en && piezaVisible(cfg, 'amigoSecreto', vista) ? `el regalo de tu amigo secreto${tope(cfg.tope_amigo)}` : '',
+      cfg.regalo_robado && piezaVisible(cfg, 'regaloRobado', vista) ? `un regalo envuelto para el regalo robado${tope(cfg.tope_robado)}` : '',
     ].filter(Boolean);
-    if (!partes.length) continue;
     const personas = await _personas(db, homenajeadxs(cfg));
     const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
     const grupos: [string[], Vista][] = [
@@ -1369,7 +1442,8 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
       [asisten.filter((u) => esSecretoPara(cfg, u)), 'neutral'],
     ];
     for (const [us, vista] of grupos) {
-      if (!us.length) continue;
+      const partes = partesDe(vista);
+      if (!us.length || !partes.length) continue;
       try {
         await deps.push({
           tipo: 'recordatorio_1dia',

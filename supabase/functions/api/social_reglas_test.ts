@@ -77,3 +77,26 @@ Deno.test('mensajes: después del evento o al liberarlos', () => {
   igual(mensajesAbiertos(base, true), true);
   igual(mensajesAbiertos({ ...base, mensajes_liberados_en: '2026-12-01' }, false), true);
 });
+
+import { cambiosPara, diferencias, listaEs, piezaVisible } from './social_reglas.ts';
+
+Deno.test('sorpresa por pieza: por defecto la ven; homenaje y premios nunca', () => {
+  const c = { ...base, piezas: { ocultas: ['playlist', 'homenaje'] } };
+  igual(piezaVisible(c, 'comida', 'neutral'), true);
+  igual(piezaVisible(c, 'playlist', 'neutral'), false);
+  igual(piezaVisible(c, 'playlist', 'completa'), true);
+  igual(piezaVisible({ piezas: {} }, 'homenaje', 'neutral'), false);
+  igual(piezaVisible({ piezas: {} }, 'premios', 'neutral'), false);
+});
+
+Deno.test('avisos de cambios: la vista neutral solo se entera de lo que ve', () => {
+  const antes = { nombre: 'Cumple de Caro', nombreNeutro: 'Reunión', hora: '19:00', playlist: { link: 'a' }, homenaje: { regalo: false }, comida: [1] };
+  const cfg = { piezas: { ocultas: ['playlist'] } };
+  const soloOcultos = diferencias(antes, { ...antes, playlist: { link: 'b' }, homenaje: { regalo: true }, nombre: 'Cumple 30' });
+  igual(cambiosPara(soloOcultos, cfg, 'neutral'), [], 'nada que vea: no le llega');
+  igual(cambiosPara(soloOcultos, cfg, 'completa'), ['el nombre', 'la playlist', 'el homenaje']);
+  const varios = diferencias(antes, { ...antes, hora: '20:00', comida: [2], nombreNeutro: 'Junta' });
+  igual(cambiosPara(varios, cfg, 'neutral'), ['el nombre', 'la hora', 'la comida y bebida']);
+  igual(cambiosPara(varios, cfg, 'completa'), ['la hora', 'la comida y bebida']);
+  igual(listaEs(['a', 'b', 'c']), 'a, b y c');
+});

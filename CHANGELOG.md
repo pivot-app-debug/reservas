@@ -8,7 +8,8 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **Sorpresa:** homenajeadxs y quienes no deben enterarse ven un evento normal con nombre neutro y sin nada del homenaje; el resto ve "Sorpresa para X". Lo controla el servidor, también en los avisos.
 - El regalo entre todxs solo anota quién aporta y quién compra; no pasa por Finanzas.
 - Arreglo: los avisos del sorteo del amigo secreto no salían (tipo de aviso que no existía).
-- Migraciones del evento social y de `asistencias.equipos` aplicadas por Victor en el editor SQL.
+- Migraciones del evento social, de `asistencias.equipos` y de Social o fiesta aplicadas por Victor en el editor SQL.
+- **Ajustes (pedido de Victor):** quien organiza elige por pieza (comida, qué traer, dress code, playlist, amigo secreto, regalo robado, +1) si la ven homenajeadxs y quienes no deben enterarse; cada cambio en un evento publicado manda un aviso "Cambios en…" con el resumen (con la versión neutra para quien no debe enterarse); lxs +1 pueden aportar al regalo entre todxs (sin mensajes).
 
 ## 2026-11-20 (meses sin cobro y avisos por equipo)
 - **Meses y periodos sin cobro** (Mi Liga → Reglas de la liga → Pagos): por mes (no se cobran cuota ni clases; Asistiré sin suscripción) o por fechas (clases gratis o con un %, cuota proporcional o entera), para toda la liga o algunos equipos. La pantalla de suscribirse lo avisa ("Diciembre no se cobra") y Cuotas del mes muestra el grupo "Mes sin cobro". Lo ya pagado no cambia.
