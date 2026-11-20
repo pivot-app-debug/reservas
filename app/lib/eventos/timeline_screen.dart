@@ -877,7 +877,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           // el número de pendientes.
           IconButton(
             key: _kBandeja,
-            tooltip: _bandeja.hayNovedades ? 'Avisos, tareas, cursos y fiestas (hay novedades)' : 'Avisos, tareas, cursos y fiestas',
+            tooltip: _bandeja.hayNovedades ? 'Avisos, tareas, cursos, eventos y pagos (hay novedades)' : 'Avisos, tareas, cursos, eventos y pagos',
             icon: Badge(
               isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos,
               smallSize: 9,
@@ -1302,6 +1302,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         cursosNuevos: _cursos.nuevos,
         inicial: inicial,
         alCrearSocial: _alCrearSocial,
+        alCrearEvento: _alCrearEvento,
         alVerCursos: () {
           unawaited(marcarCursosVistos(_cursos.ids));
           setState(() => _cursos = EstadoCursos(_cursos.ids, false));
@@ -1426,20 +1427,20 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     final nombres = [for (final a in _acciones) verbos[a.texto] ?? a.texto.toLowerCase()];
     final lista = nombres.length <= 1 ? nombres.join() : '${nombres.sublist(0, nombres.length - 1).join(', ')} o ${nombres.last}';
     final reserva = ReservasRepo(repo.sesion).opciones.isNotEmpty;
-    final tituloMas = reserva ? 'Reserva tu lugar' : (_esAdmin ? 'Crea eventos' : 'Asistencia anticipada');
+    final tituloMas = reserva ? 'Reserva tu lugar' : 'Asistencia anticipada';
     final textoMas = 'Toca aquí para $lista.';
     await Tour.mostrarSiCorresponde(
       context,
       // v2 (2026-11-15): tour nuevo para la app nueva, también para quien vio el anterior.
       preferencia: 'tour.calendario.v2',
       pasos: [
-        PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
+        if (_acciones.isNotEmpty) PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Avisos, tareas, cursos y fiestas',
+          titulo: 'Avisos, tareas, cursos, eventos y pagos',
           texto: _esAdmin
-              ? 'Aquí están tus notificaciones (pagos, reservas, rectificaciones y pedidos por revisar), las tareas, las clases y las fiestas y eventos sociales.'
-              : 'Aquí están tus notificaciones y pedidos, las tareas para tomar, las clases y las fiestas y eventos sociales. Si la campana tiene un punto, hay novedades.',
+              ? 'Aquí están tus avisos (pagos, reservas, rectificaciones y pedidos por revisar), las tareas, los cursos, los eventos (donde se crean) y los pagos.'
+              : 'Aquí están tus avisos y pedidos, las tareas para tomar, los cursos, los eventos de la semana y tus pagos. Si la casita tiene un punto, hay novedades.',
         ),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
         // Barra nueva (Victor, 2026-11-20): Filtros y Buscar al lado de la campana.
@@ -1484,7 +1485,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       t == TipoReserva.clase
           ? _Accion(Icons.event_available_outlined, 'Reserva por clase', () => _reservar(t))
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
-    if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
+    // Crear eventos pasó a Actividad → Eventos (Victor, 2026-11-20): aquí
+    // quedan reservas, pagos y suscripciones.
     // Social o fiesta (Victor, 2026-11-20): los Pivots lo crean en Nuevo evento →
     // Único; el resto, en ⋯ → "Crear un evento".
 
@@ -1518,9 +1520,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     elegida?.alTocar();
   }
 
-  Future<void> _nuevoEvento() async {
-    _cerrarCalendario();
-    final r = await Navigator.of(context).push<Object>(MaterialPageRoute(builder: (_) => CrearEventoScreen(repo: repo)));
+  /// Resultado de Nuevo evento (se crea desde Actividad → Eventos).
+  Future<void> _alCrearEvento(Object? r) async {
     if (r == null || !mounted) return;
     if (r is Map) {
       // Temporada de descanso: la pantalla ya avisó; se lleva al inicio del período.

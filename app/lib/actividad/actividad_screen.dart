@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
+import '../ajustes/pagos_screen.dart';
 import '../cursos/cursos_screen.dart';
+import '../eventos/crear_evento_screen.dart';
 import '../eventos/detalle_screen.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
@@ -16,7 +18,7 @@ import '../tareas/tareas_repo.dart';
 import '../tareas/tareas_screen.dart' show TareasScreen;
 
 /// Pestañas de Actividad.
-enum PestanaActividad { notificaciones, tareas, clases, sociales }
+enum PestanaActividad { notificaciones, tareas, clases, eventos, pagos }
 
 /// Actividad (Victor, 2026-11-20): lo que se abre con la campana del
 /// Calendario. Junta en pestañas Notificaciones, Tareas, Clases (cursos y
@@ -32,6 +34,7 @@ class ActividadScreen extends StatefulWidget {
     this.cursosNuevos = false,
     this.inicial = PestanaActividad.notificaciones,
     this.alCrearSocial,
+    this.alCrearEvento,
     this.alVerCursos,
   });
 
@@ -47,6 +50,9 @@ class ActividadScreen extends StatefulWidget {
   /// Al crear una fiesta: el Calendario recarga y salta a la fecha.
   final void Function(Map r)? alCrearSocial;
 
+  /// Al crear un evento desde Nuevo evento (resultado de `CrearEventoScreen`).
+  final void Function(Object r)? alCrearEvento;
+
   /// Al entrar a Clases (quita el punto de cursos nuevos).
   final VoidCallback? alVerCursos;
 
@@ -59,7 +65,8 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones,
     PestanaActividad.tareas,
     if (widget.verClases) PestanaActividad.clases,
-    PestanaActividad.sociales,
+    PestanaActividad.eventos,
+    PestanaActividad.pagos,
   ];
   late final TabController _tabs = TabController(
     length: _pestanas.length,
@@ -92,14 +99,16 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones => 'Avisos',
     PestanaActividad.tareas => 'Tareas',
     PestanaActividad.clases => 'Cursos',
-    PestanaActividad.sociales => 'Fiestas',
+    PestanaActividad.eventos => 'Eventos',
+    PestanaActividad.pagos => 'Pagos y suscripciones',
   };
 
   static IconData _icono(PestanaActividad x) => switch (x) {
     PestanaActividad.notificaciones => Icons.notifications_rounded,
     PestanaActividad.tareas => Icons.checklist_rounded,
     PestanaActividad.clases => Icons.school_rounded,
-    PestanaActividad.sociales => Icons.celebration_rounded,
+    PestanaActividad.eventos => Icons.event_rounded,
+    PestanaActividad.pagos => Icons.payments_rounded,
   };
 
   /// Pestañas con íconos grandes (Victor, 2026-11-20); el nombre va en el título.
@@ -118,7 +127,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         ),
       ),
       PestanaActividad.clases => punto(_cursosNuevos),
-      PestanaActividad.sociales => icono,
+      PestanaActividad.eventos || PestanaActividad.pagos => icono,
     };
     return Tab(
       height: 52,
@@ -135,7 +144,8 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
       PestanaActividad.notificaciones => BandejaPivotsScreen(repo: widget.bandeja, embebida: true),
       PestanaActividad.tareas => TareasScreen(repo: widget.tareas, embebida: true),
       PestanaActividad.clases => s.esAdmin ? CursosScreen(sesion: s, embebida: true) : CursosAbiertosScreen(sesion: s, embebida: true),
-      PestanaActividad.sociales => _PanelSociales(eventos: widget.eventos, alCrear: widget.alCrearSocial),
+      PestanaActividad.eventos => _PanelEventos(eventos: widget.eventos, alCrearSocial: widget.alCrearSocial, alCrearEvento: widget.alCrearEvento),
+      PestanaActividad.pagos => PagosScreen(repo: widget.eventos, embebida: true),
     };
   }
 
@@ -178,122 +188,121 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   }
 }
 
-/// Fiestas y eventos sociales: qué se puede crear y los próximos de la liga.
-class _PanelSociales extends StatelessWidget {
-  const _PanelSociales({required this.eventos, this.alCrear});
+/// Eventos (Victor, 2026-11-20): esta semana, cumpleaños del mes y próximas
+/// fiestas. Crear: un Pivot con todas las herramientas usa Nuevo evento (que
+/// incluye Social o fiesta); un Pivot solo de fiestas, el asistente de fiestas;
+/// sin ser Pivot no se crea. Sin ningún evento próximo, el botón va en la
+/// lista en vez de flotar.
+class _PanelEventos extends StatelessWidget {
+  const _PanelEventos({required this.eventos, this.alCrearSocial, this.alCrearEvento});
   final EventosRepo eventos;
-  final void Function(Map r)? alCrear;
+  final void Function(Map r)? alCrearSocial;
+  final void Function(Object r)? alCrearEvento;
+
+  bool get _puede => eventos.sesion.esAdmin || eventos.sesion.puedeCrearSocial;
 
   Future<void> _crear(BuildContext context) async {
     final nav = Navigator.of(context);
-    final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: eventos.sesion)));
+    final s = eventos.sesion;
+    if (s.esAdmin) {
+      final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearEventoScreen(repo: eventos)));
+      if (r == null) return;
+      nav.pop();
+      alCrearEvento?.call(r);
+      return;
+    }
+    final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: s)));
     if (r is! Map) return;
     nav.pop();
-    alCrear?.call(r);
-  }
-
-  List<Evento> get _proximos {
-    final hoy = Fechas.hoy();
-    return eventos.eventos.where((e) => e.tipo == kTipoSocial && !e.fecha.isBefore(hoy)).toList()..sort((a, b) => a.fecha.compareTo(b.fecha));
+    alCrearSocial?.call(r);
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final puede = eventos.sesion.puedeCrearSocial;
     return ListenableBuilder(
       listenable: eventos,
       builder: (context, _) {
-        final proximos = _proximos;
-        Widget paso(IconData i, String t) => Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(i, size: 18, color: p.sobreSuave),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(t, style: TextStyle(height: 1.35, color: p.sobreSuave)),
-              ),
-            ],
+        final hoy = Fechas.hoy();
+        final finSemana = hoy.add(const Duration(days: 7));
+        final proximos = eventos.eventos.where((e) => !e.fecha.isBefore(hoy)).toList()..sort((a, b) => a.fecha.compareTo(b.fecha));
+        final semana = proximos.where((e) => e.fecha.isBefore(finSemana)).toList();
+        final fiestas = proximos.where((e) => e.tipo == kTipoSocial && !e.fecha.isBefore(finSemana)).toList();
+        final cumples = eventos.cumples.where((c) => c.fecha.month == hoy.month).toList()..sort((a, b) => a.fecha.day.compareTo(b.fecha.day));
+        final puede = _puede;
+        Widget titulo(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 18, 4, 2),
+          child: Text(
+            t,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
           ),
+        );
+        Widget vacio(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+          child: Text(t, style: TextStyle(color: p.textoSecundario)),
         );
         return Scaffold(
           extendBodyBehindAppBar: true,
-          // Con fiestas próximas, el "+" flota; sin ninguna, el botón va en la lista (como Tareas y Cursos).
+          // Con eventos próximos, el "+" flota; sin ninguno, el botón va en la lista (como Cursos).
           floatingActionButton: AnimatedScale(
             scale: puede && proximos.isNotEmpty ? 1 : 0,
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutBack,
-            child: FloatingActionButton.extended(onPressed: () => _crear(context), icon: const Icon(Icons.add_rounded), label: const Text('Nueva fiesta')),
+            child: FloatingActionButton.extended(
+              onPressed: () => _crear(context),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(eventos.sesion.esAdmin ? 'Nuevo evento' : 'Nueva fiesta'),
+            ),
           ),
           body: ListView(
-            padding: EdgeInsets.fromLTRB(16, 12 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Fiestas y eventos sociales',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      puede
-                          ? 'Fiestas, festividades, cumpleaños, aniversarios o despedidas para la liga. Tú eliges qué tendrá cada una.'
-                          : 'Las fiestas y eventos sociales de la liga. Los crea un Pivot de fiestas y eventos sociales.',
-                      style: TextStyle(height: 1.35, color: p.sobreSuave),
-                    ),
-                    paso(Icons.mail_outline_rounded, 'Invitación con fecha, lugar y quién organiza.'),
-                    paso(Icons.restaurant_rounded, 'Qué lleva cada quien, para no repetir.'),
-                    paso(Icons.redeem_rounded, 'Amigo secreto, regalo robado, playlist, dress code y más.'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              if (proximos.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Column(
-                    children: [
-                      Text(
-                        'No hay fiestas próximas.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        puede ? 'Arma la primera: aparece en el calendario de toda la liga.' : 'Cuando haya una, la verás aquí y en el calendario.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: p.textoSecundario),
-                      ),
-                      if (puede) ...[
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(56),
-                              textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                            ),
-                            onPressed: () => _crear(context),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Crear una fiesta'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-              else ...[
+              if (proximos.isEmpty) ...[
+                const SizedBox(height: 24),
                 Text(
-                  'PRÓXIMAS',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  'No hay eventos próximos.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
                 ),
-                for (final e in proximos) _fila(context, p, e),
+                const SizedBox(height: 4),
+                Text(
+                  puede ? 'Crea el primero: aparece en el calendario de quienes invites.' : 'Cuando haya uno, lo verás aquí y en el calendario.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: p.textoSecundario),
+                ),
+                if (puede) ...[
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                      textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () => _crear(context),
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
+                  ),
+                ],
+              ] else ...[
+                titulo('ESTA SEMANA'),
+                if (semana.isEmpty) vacio('No hay eventos esta semana.'),
+                for (final e in semana) _fila(context, p, e),
+              ],
+              titulo('CUMPLEAÑOS ESTE MES'),
+              if (cumples.isEmpty) vacio('Nadie cumple años este mes.'),
+              for (final c in cumples)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  leading: Icon(c.esAniversario ? Icons.workspace_premium_outlined : Icons.cake_outlined, color: p.marcaTexto),
+                  title: Text(c.nombre),
+                  subtitle: Text(
+                    '${c.fecha.day} de ${Fechas.mes(c.fecha)}'
+                    '${c.esAniversario ? ' · ${c.aniosEquipo} ${c.aniosEquipo == 1 ? 'año' : 'años'} en el equipo' : (c.edad != null ? ' · cumple ${c.edad}' : '')}',
+                  ),
+                ),
+              if (proximos.isNotEmpty) ...[
+                titulo('PRÓXIMAS FIESTAS Y EVENTOS SOCIALES'),
+                if (fiestas.isEmpty) vacio('No hay más fiestas próximas.'),
+                for (final e in fiestas) _fila(context, p, e),
               ],
             ],
           ),
@@ -305,8 +314,14 @@ class _PanelSociales extends StatelessWidget {
   Widget _fila(BuildContext context, PivotPaleta p, Evento e) => Card(
     margin: const EdgeInsets.only(top: 8),
     child: ListTile(
-      leading: Icon(e.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(e.socialIcono), color: p.marcaTexto),
-      title: Text(e.socialTitulo ?? e.lugar, style: const TextStyle(fontWeight: FontWeight.w600)),
+      leading: Icon(
+        e.tipo == kTipoSocial ? (e.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(e.socialIcono)) : Icons.event_outlined,
+        color: p.marcaTexto,
+      ),
+      title: Text(
+        e.tipo == kTipoSocial ? (e.socialTitulo ?? e.lugar) : '${etiquetaTipoEvento(e.tipo)} · ${e.lugar}',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
       subtitle: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.rangoHorario}'),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(

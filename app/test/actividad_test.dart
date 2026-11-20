@@ -27,12 +27,13 @@ void main() {
     // Título según la pestaña; pestañas con íconos.
     expect(find.text('Avisos'), findsOneWidget);
     expect(find.byTooltip('Cursos'), findsOneWidget);
-    await t.tap(find.byIcon(Icons.celebration_rounded));
+    await t.tap(find.byIcon(Icons.event_rounded));
     await t.pumpAndSettle();
-    expect(find.text('Fiestas'), findsWidgets);
-    expect(find.text('No hay fiestas próximas.'), findsOneWidget);
-    expect(find.textContaining('Los crea un Pivot de fiestas y eventos sociales'), findsOneWidget);
-    expect(find.text('Crear evento'), findsNothing);
+    expect(find.text('Eventos'), findsWidgets);
+    expect(find.text('No hay eventos próximos.'), findsOneWidget);
+    expect(find.text('CUMPLEAÑOS ESTE MES'), findsOneWidget);
+    expect(find.text('Crear un evento'), findsNothing);
+    expect(find.byTooltip('Pagos y suscripciones'), findsOneWidget);
     expect(s.puedeCrearSocial, isFalse);
     // Un Pivot solo de fiestas no ve las herramientas de Pivot.
     s

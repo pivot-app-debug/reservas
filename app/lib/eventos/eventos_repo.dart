@@ -712,14 +712,16 @@ class EventosRepo extends ChangeNotifier {
 
   /// Nuevo lugar (como `_evLugarGuardar()` de la web): queda sin horario
   /// hasta que se use para crear un evento.
-  Future<Map<String, dynamic>> crearLugar({required String nombre, required String mapsUrl, required String tipo, String? video}) async {
+  /// Sin tipo (Victor, 2026-11-20): un lugar sirve para cualquier evento. La
+  /// ubicación es opcional y se puede agregar después.
+  Future<Map<String, dynamic>> crearLugar({required String nombre, String mapsUrl = '', String? video}) async {
     _adminToken;
     final fila = await _api.restPostDevolver('venues', {
       'lugar': nombre.trim(),
-      'google_maps': mapsUrl.trim(),
+      'google_maps': mapsUrl.trim().isEmpty ? null : mapsUrl.trim(),
       'video_instructivo': (video ?? '').trim().isEmpty ? null : video!.trim(),
-      'tipo_icono': tipo,
-      'requiere_reserva': tipo == 'Entrenamiento',
+      'tipo_icono': null,
+      'requiere_reserva': false,
       'tipo': null,
     });
     _lugares = null;

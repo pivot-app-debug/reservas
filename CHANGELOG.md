@@ -2,6 +2,17 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Eventos, Pagos y asistentes)
+- Actividad → Eventos (antes Fiestas) muestra los eventos de esta semana, los cumpleaños del mes y las próximas fiestas.
+  - Crear: un Pivot usa Nuevo evento, que también tiene Social o fiesta. Un Pivot solo de fiestas usa el asistente de fiestas. Quien no es Pivot no ve el botón.
+  - Sin eventos próximos, en vez del botón flotante aparece "Crear un evento" en la lista.
+- El "+" del Calendario ya no crea eventos: queda solo para reservas, pagos y suscripciones.
+- Nueva pestaña Pagos y suscripciones en Actividad (lo que antes era Mis pagos y reservas).
+- Social o fiesta: el asistente ahora tiene pasos separados: nombre, "¿Dónde será?" (lista de lugares de la liga o "Agregar un lugar"), día con calendario y horario. Son los mismos pasos y el mismo estilo que Nuevo evento.
+- Agregar un lugar: primero el nombre y después la ubicación en el mapa, que es opcional ("Seguir sin ubicación"). Ya no pide el tipo de evento.
+- La lista de lugares dice "Con ubicación en el mapa" o "Sin ubicación todavía" en vez del tipo de evento.
+- Nueva recompensa usa el mismo marco que el resto de los asistentes.
+
 ## 2026-11-20 (Actividad con íconos)
 - En la barra del Calendario, la campana pasa a ser una casita, con un punto rojo cuando hay novedades.
 - Las pestañas de Actividad ahora son íconos grandes: Avisos, Tareas, Cursos y Fiestas. El título de arriba cambia según la pestaña.

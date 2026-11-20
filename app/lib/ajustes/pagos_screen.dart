@@ -20,7 +20,10 @@ import '../core/esqueleto.dart';
 /// o reagendar) y el historial como recibos por mes, con el detalle de cada
 /// uno (tipo, talla, protecciones, cupón, monto y estado).
 class PagosScreen extends StatefulWidget {
-  const PagosScreen({super.key, required this.repo});
+  const PagosScreen({super.key, required this.repo, this.embebida = false});
+
+  /// Dentro de una pestaña de Actividad: sin barra propia.
+  final bool embebida;
   final EventosRepo repo;
 
   /// ¿Mostrar la fila en Ajustes?
@@ -41,13 +44,15 @@ class _PagosScreenState extends State<PagosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Mis pagos y reservas', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              flexibleSpace: const Vidrio(child: SizedBox.expand()),
+              title: const Text('Mis pagos y reservas', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
       body: ListenableBuilder(
         listenable: widget.repo,
         builder: (context, _) {

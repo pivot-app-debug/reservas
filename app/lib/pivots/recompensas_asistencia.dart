@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../core/asistente.dart';
+
 import 'package:flutter/services.dart';
 
 import '../core/api.dart';
 import '../core/tema.dart';
-import '../core/vidrio.dart';
 import '../sesion/sesion.dart';
 import '../core/moneda.dart';
 
@@ -432,88 +434,24 @@ class _RecompensaAsistenteScreenState extends State<RecompensaAsistenteScreen> {
 
   static const _titulos = ['¿Qué quieres premiar?', '¿Cuánto?', '¿Para quién?', '¿Qué se recibe?', 'Revisa y guarda'];
 
+  // Mismo marco que el resto de los asistentes (Victor, 2026-11-20).
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
     final ultimo = _paso == _titulos.length - 1;
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text(widget.regla == null ? 'Nueva recompensa' : 'Editar recompensa', style: const TextStyle(fontWeight: FontWeight.w700)),
-        actions: [if (widget.regla?.id != null) IconButton(tooltip: 'Borrar', icon: const Icon(Icons.delete_outline_rounded), onPressed: _borrar)],
-      ),
-      body: Column(
-        children: [
-          SizedBox(height: altoBarra(context)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              children: [
-                for (var i = 0; i < _titulos.length; i++)
-                  Expanded(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 240),
-                      height: 4,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(color: i <= _paso ? p.marca : p.bordeSuave, borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              transitionBuilder: (child, a) => FadeTransition(
-                opacity: a,
-                child: SlideTransition(
-                  position: Tween(begin: Offset(_adelante ? 0.08 : -0.08, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-                  child: child,
-                ),
-              ),
-              child: ListView(
-                key: ValueKey(_paso),
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-                children: [
-                  Text(
-                    _titulos[_paso],
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: p.texto),
-                  ),
-                  if (_paso == 0) ...[
-                    const SizedBox(height: 6),
-                    Text('Se da sola cuando alguien cumple la condición, con un aviso.', style: TextStyle(fontSize: 14, color: p.textoSecundario)),
-                  ],
-                  const SizedBox(height: 16),
-                  _contenido(),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.paddingOf(context).bottom),
-            child: Row(
-              children: [
-                if (_paso > 0) ...[
-                  Expanded(
-                    child: OutlinedButton(onPressed: () => _ir(-1), child: const Text('Atrás')),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-                Expanded(
-                  child: FilledButton(
-                    onPressed: !_pasoListo || _guardando ? null : (ultimo ? _guardar : () => _ir(1)),
-                    child: Text(ultimo ? (_guardando ? 'Guardando…' : 'Guardar') : 'Siguiente'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return Asistente(
+      titulo: widget.regla == null ? 'Nueva recompensa' : 'Editar recompensa',
+      indice: _paso,
+      total: _titulos.length,
+      tituloPaso: _titulos[_paso],
+      ayuda: _paso == 0 ? 'Se da sola cuando alguien cumple la condición, con un aviso.' : null,
+      clavePaso: _paso,
+      adelante: _adelante,
+      alAtras: () => _paso == 0 ? Navigator.of(context).maybePop() : _ir(-1),
+      acciones: [if (widget.regla?.id != null) IconButton(tooltip: 'Borrar', icon: const Icon(Icons.delete_outline_rounded), onPressed: _borrar)],
+      cuerpo: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [_contenido()]),
+      textoBoton: ultimo ? 'Guardar' : 'Siguiente',
+      alContinuar: !_pasoListo ? null : (ultimo ? _guardar : () => _ir(1)),
+      ocupado: _guardando,
     );
   }
 }

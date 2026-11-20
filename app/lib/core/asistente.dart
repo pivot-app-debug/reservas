@@ -26,7 +26,11 @@ class Asistente extends StatelessWidget {
     this.textoBoton,
     this.alContinuar,
     this.ocupado = false,
+    this.acciones = const [],
   });
+
+  /// Botones a la derecha de la barra (ej. Borrar al editar).
+  final List<Widget> acciones;
 
   final String titulo;
   final int indice;
@@ -67,6 +71,7 @@ class Asistente extends StatelessWidget {
             titulo,
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: p.textoSecundario),
           ),
+          actions: acciones,
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(4),
             child: TweenAnimationBuilder<double>(

@@ -7,11 +7,16 @@ import '../../core/moneda.dart';
 import '../../core/selector_hora.dart';
 import '../../core/tema.dart';
 import '../../sesion/sesion.dart';
+import '../eventos_repo.dart';
+import '../lista_lugares.dart';
+import '../nuevo_lugar_screen.dart';
+import '../selector_fechas.dart';
 import 'social_plantillas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
 
-enum _P { plantilla, datos, invitados, piezas, config, homenaje, encargados, resumen }
+// Nombre, lugar, día y horario en pasos separados, como Nuevo evento (Victor, 2026-11-20).
+enum _P { plantilla, nombre, lugar, fecha, hora, invitados, piezas, config, homenaje, encargados, resumen }
 
 /// Sección de "¿Qué llevamos?". Modo: 'meta' (asistentes × cantidad en una
 /// unidad), 'cada' (cada persona lleva N cosas), 'total' (total fijo) o
@@ -143,7 +148,41 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
   void initState() {
     super.initState();
     _cargarEquipo();
+    _cargarLugares();
     if (_editando) _desdeActual(widget.actual!);
+  }
+
+  // ─── Lugares de la liga (paso "¿Dónde será?") ──────────────────────────
+  List<Map<String, dynamic>>? _lugares;
+  String? _errorLugares;
+
+  Future<void> _cargarLugares() async {
+    setState(() => _errorLugares = null);
+    try {
+      final filas = await widget.sesion.api.restGet('venues?select=lugar,google_maps&order=lugar.asc');
+      if (mounted) setState(() => _lugares = filas.whereType<Map<String, dynamic>>().toList());
+    } catch (_) {
+      if (mounted) setState(() => _errorLugares = 'No se pudieron cargar los lugares.');
+    }
+  }
+
+  void _elegirLugar(Map<String, dynamic> v) {
+    setState(() {
+      _lugar.text = '${v['lugar'] ?? ''}'.trim();
+      _mapa.text = '${v['google_maps'] ?? ''}'.trim();
+    });
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted && _paso == _P.lugar) _siguiente();
+    });
+  }
+
+  /// Lugar nuevo: no se guarda en la lista de la liga hasta crear el evento.
+  Future<void> _agregarLugar() async {
+    final nuevo = await Navigator.of(context)
+        .push<Map<String, dynamic>>(MaterialPageRoute(builder: (_) => NuevoLugarScreen(repo: EventosRepo(widget.sesion), guardar: false)));
+    if (nuevo == null || !mounted) return;
+    setState(() => _lugares = [...?_lugares, nuevo]);
+    _elegirLugar(nuevo);
   }
 
   Future<void> _cargarEquipo() async {
@@ -352,16 +391,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           : _plantilla == 'festividad' && (_festividad == null || (_festividad == 'Otra' && _festividadOtra.text.trim().isEmpty))
           ? 'Elige la festividad.'
           : null,
-    _P.datos =>
-      _nombre.text.trim().isEmpty
-          ? 'Ponle un nombre.'
-          : _fecha == null
-          ? 'Elige la fecha.'
-          : _inicia == null
-          ? 'Elige la hora.'
-          : _lugar.text.trim().isEmpty
-          ? 'Escribe dónde será.'
-          : null,
+    _P.nombre => _nombre.text.trim().isEmpty ? 'Ponle un nombre.' : null,
+    _P.lugar => _lugar.text.trim().isEmpty ? 'Elige dónde será.' : null,
+    _P.fecha => _fecha == null ? 'Elige el día.' : null,
+    _P.hora => _inicia == null ? 'Elige a qué hora empieza.' : null,
     _P.invitados =>
       _para == 'equipo' && (_equipo?.miEquipo ?? '').isEmpty
           ? 'No tienes equipo asignado: elige otra opción.'
@@ -385,7 +418,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   static const _titulos = {
     _P.plantilla: '¿Qué vas a armar?',
-    _P.datos: 'Nombre, fecha y lugar',
+    _P.nombre: '¿Cómo se llama?',
+    _P.lugar: '¿Dónde será?',
+    _P.fecha: '¿Qué día?',
+    _P.hora: 'Horario',
     _P.invitados: '¿A quién invitas?',
     _P.piezas: '¿Qué tendrá tu fiesta?',
     _P.config: 'Configura lo que tendrá',
@@ -396,6 +432,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   String? get _ayuda => switch (_paso) {
     _P.plantilla => 'La plantilla solo propone qué tendrá y algunas sugerencias. Todo se puede cambiar.',
+    _P.nombre => 'Así se verá en el calendario.',
+    _P.lugar => 'Elige un lugar de la liga o agrega uno nuevo.',
     _P.invitados => 'Solo quienes invites lo ven en su calendario y reciben los avisos.',
     _P.piezas => 'Elige lo que tendrá. Puedes cambiarlo después.',
     _P.homenaje => 'Opcional. Las personas homenajeadas y quienes no deben enterarse lo ven como un evento normal.',
@@ -435,7 +473,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   Widget _cuerpo(BuildContext context) => switch (_paso) {
     _P.plantilla => _pasoPlantilla(context),
-    _P.datos => _pasoDatos(context),
+    _P.nombre => _pasoNombre(context),
+    _P.lugar => _pasoLugar(context),
+    _P.fecha => _pasoFecha(context),
+    _P.hora => _pasoHora(context),
     _P.invitados => _pasoInvitados(context),
     _P.piezas => _pasoPiezas(context),
     _P.config => _pasoConfig(context),
@@ -579,17 +620,6 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   // ─── Paso 2: datos ──────────────────────────────────────────────────────
 
-  Future<void> _elegirFecha() async {
-    final hoy = Fechas.hoy();
-    final f = await showDatePicker(
-      context: context,
-      firstDate: hoy,
-      lastDate: hoy.add(const Duration(days: 365)),
-      initialDate: _fecha != null && !_fecha!.isBefore(hoy) ? _fecha! : hoy.add(const Duration(days: 7)),
-    );
-    if (f != null) setState(() => _fecha = f);
-  }
-
   Future<void> _elegirHora(bool inicio) async {
     final h = await elegirHora(
       context,
@@ -601,7 +631,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   String _hhmm(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  Widget _pasoDatos(BuildContext context) {
+  Widget _pasoNombre(BuildContext context) {
     final p = context.pivot;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -609,72 +639,97 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         if (!_todo)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              _puede('fecha')
-                  ? 'El nombre y la descripción los cambia quien creó el evento.'
-                  : 'La fecha, la hora y el lugar los cambia quien creó el evento o quien esté a cargo de eso.',
-              style: TextStyle(fontSize: 13, color: p.textoSecundario),
-            ),
+            child: Text('El nombre y la descripción los cambia quien creó el evento.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
           ),
         TextField(
           controller: _nombre,
           enabled: _todo,
           maxLength: 80,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej.: Fiesta de fin de año'),
+          decoration: const InputDecoration(labelText: 'Nombre', counterText: ''),
           onChanged: (_) => setState(() {}),
         ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.event_outlined, color: p.marcaTexto),
-          title: Text(_fecha == null ? 'Elige la fecha' : '${Fechas.dia(_fecha!)} ${Fechas.corta(_fecha!)}'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: _puede('fecha') ? _elegirFecha : null,
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.schedule_rounded, color: p.marcaTexto),
-                title: Text(_inicia == null ? 'Empieza' : _hhmm(_inicia!)),
-                onTap: _puede('fecha') ? () => _elegirHora(true) : null,
-              ),
-            ),
-            Expanded(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(_termina == null ? 'Termina (opcional)' : _hhmm(_termina!)),
-                trailing: _termina == null
-                    ? null
-                    : IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded, size: 18), onPressed: () => setState(() => _termina = null)),
-                onTap: _puede('fecha') ? () => _elegirHora(false) : null,
-              ),
-            ),
-          ],
-        ),
-        TextField(
-          controller: _lugar,
-          enabled: _puede('fecha'),
-          maxLength: 120,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Lugar', hintText: 'Ej.: Casa de Ana'),
-          onChanged: (_) => setState(() {}),
-        ),
-        TextField(
-          controller: _mapa,
-          enabled: _puede('fecha'),
-          maxLength: 500,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(labelText: 'Enlace del mapa (opcional)', hintText: 'Google Maps u otra app'),
-        ),
+        const SizedBox(height: 16),
         TextField(
           controller: _descripcion,
           enabled: _todo,
           maxLength: 1000,
           maxLines: null,
+          minLines: 3,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+          decoration: const InputDecoration(labelText: 'Descripción (opcional)', alignLabelWithHint: true, counterText: ''),
+        ),
+      ],
+    );
+  }
+
+  Widget _pasoLugar(BuildContext context) => ListaLugares(
+    lugares: _lugares,
+    error: _errorLugares,
+    alReintentar: _cargarLugares,
+    elegido: _lugar.text,
+    alElegir: _elegirLugar,
+    alAgregar: _agregarLugar,
+  );
+
+  Widget _pasoFecha(BuildContext context) {
+    final p = context.pivot;
+    final hoy = Fechas.hoy();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        SelectorFechas(desde: _fecha, deshabilitado: (d) => d.isBefore(hoy), alCambiar: (d, _) => setState(() => _fecha = d)),
+        const SizedBox(height: 8),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            _fecha == null ? '' : Fechas.encabezado(_fecha!),
+            key: ValueKey(_fecha),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w600, color: p.marcaTexto),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pasoHora(BuildContext context) {
+    final p = context.pivot;
+    Widget fila(String etiqueta, String valor, VoidCallback alTocar, {VoidCallback? alQuitar}) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+        tileColor: p.tarjeta,
+        leading: Icon(Icons.schedule_rounded, color: p.marcaTexto),
+        title: Text(etiqueta),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              valor,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.texto),
+            ),
+            if (alQuitar != null) IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded, size: 18), onPressed: alQuitar),
+          ],
+        ),
+        onTap: alTocar,
+      ),
+    );
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        fila('Hora de inicio', _inicia == null ? 'Elegir' : _hhmm(_inicia!), () => _elegirHora(true)),
+        fila(
+          'Hora de finalización',
+          _termina == null ? 'Opcional' : _hhmm(_termina!),
+          () => _elegirHora(false),
+          alQuitar: _termina == null ? null : () => setState(() => _termina = null),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          [_nombre.text.trim(), _lugar.text.trim(), if (_fecha != null) Fechas.encabezado(_fecha!)].where((x) => x.isNotEmpty).join('\n'),
+          textAlign: TextAlign.center,
+          style: TextStyle(color: p.textoSecundario, height: 1.5),
         ),
       ],
     );
@@ -1511,7 +1566,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     // Encargadxs: solo abren lo que les toca; el resto se ve con candado.
     bool abre(_P paso) => switch (paso) {
       _P.plantilla || _P.invitados || _P.encargados => _todo,
-      _P.datos => _todo || _puede('fecha'),
+      _P.nombre => _todo,
+      _P.lugar || _P.fecha || _P.hora => _todo || _puede('fecha'),
       _P.piezas => _todo || Pieza.values.any(_puedePieza),
       _P.config => _todo || ['amigo', 'comida', 'extras', 'invitados'].any(_puede),
       _P.homenaje => _puede('homenaje'),
@@ -1540,11 +1596,14 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
             ),
           ),
         fila(_P.plantilla, Icons.extension_outlined, 'Qué vas a armar', _textoPlantilla),
+        fila(_P.nombre, Icons.edit_note_rounded, 'Nombre', _nombre.text.trim()),
+        fila(_P.fecha, Icons.event_outlined, 'Día', _fecha == null ? '' : '${Fechas.dia(_fecha!)} ${Fechas.corta(_fecha!)}'),
+        fila(_P.hora, Icons.schedule_rounded, 'Horario', hora),
         fila(
-          _P.datos,
-          Icons.event_note_outlined,
-          _nombre.text.trim(),
-          [if (_fecha != null) '${Fechas.dia(_fecha!)} ${Fechas.corta(_fecha!)}', hora, _lugar.text.trim()].where((x) => x.isNotEmpty).join(' · '),
+          _P.lugar,
+          Icons.place_outlined,
+          'Lugar',
+          [_lugar.text.trim(), if (_lugar.text.trim().isNotEmpty && _mapa.text.trim().isEmpty) 'sin ubicación en el mapa'].join(' · '),
         ),
         fila(_P.invitados, Icons.groups_outlined, 'Invitadxs', _textoPara),
         fila(

@@ -8,10 +8,10 @@ import '../core/fechas.dart';
 import '../core/tema.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
+import 'lista_lugares.dart';
 import 'nuevo_lugar_screen.dart';
 import 'selector_fechas.dart';
 import '../core/config_liga.dart';
-import '../core/esqueleto.dart';
 import 'social/crear_social_screen.dart';
 import 'tipos_evento.dart';
 
@@ -51,7 +51,6 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   List<Map<String, dynamic>>? _venues;
   String? _errorVenues;
   Map<String, dynamic>? _venue;
-  String _busqueda = '';
   String? _categoria;
   final _otro = TextEditingController();
   final _descripcion = TextEditingController();
@@ -114,7 +113,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
       : [_Paso.tipo, _Paso.lugar, _Paso.detalles, if (_recurrente == true) _Paso.frecuencia, if (!_porSemana) _Paso.fecha, _Paso.hora];
 
   String get _tipoEvento {
-    final c = _categoria ?? (_venue?['tipo_icono'] ?? 'Entrenamiento').toString();
+    final c = _categoria ?? 'Entrenamiento';
     if (c == 'Otro') return _otro.text.trim().isEmpty ? 'Otro' : _otro.text.trim();
     return c;
   }
@@ -366,10 +365,7 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     if (nuevo == null || !mounted) return;
     await _cargarVenues();
     if (!mounted) return;
-    setState(() {
-      _venue = nuevo;
-      _categoria = _categorias.contains(nuevo['tipo_icono']) ? nuevo['tipo_icono'].toString() : _categoria;
-    });
+    setState(() => _venue = nuevo);
   }
 
   // ─── Construcción ───────────────────────────────────────────────────────
@@ -630,64 +626,16 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     );
   }
 
-  Widget _pasoLugar(BuildContext context) {
-    final p = context.pivot;
-    if (_errorVenues != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_errorVenues!),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _cargarVenues, child: const Text('Reintentar')),
-          ],
-        ),
-      );
-    }
-    if (_venues == null) return const EsqueletoFilas();
-    // Un mismo lugar puede tener varias filas (una por horario): se muestra una vez.
-    final vistos = <String>{};
-    final q = _busqueda.trim().toLowerCase();
-    final lista = [
-      for (final v in _venues!)
-        if (vistos.add(v['lugar'].toString().trim().toLowerCase()) && (q.isEmpty || v['lugar'].toString().toLowerCase().contains(q))) v,
-    ];
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        TextField(
-          decoration: const InputDecoration(hintText: 'Buscar lugar', prefixIcon: Icon(Icons.search_rounded)),
-          onChanged: (v) => setState(() => _busqueda = v),
-        ),
-        const SizedBox(height: 12),
-        if (lista.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('Ningún lugar coincide con la búsqueda.', style: TextStyle(color: p.textoSecundario)),
-          ),
-        for (final v in lista)
-          _tarjetaOpcion(
-            context,
-            icono: Icons.place_outlined,
-            titulo: v['lugar'].toString(),
-            texto: (v['tipo_icono'] ?? '').toString(),
-            activa: _venue != null && _venue!['lugar'] == v['lugar'],
-            alTocar: () => setState(() {
-              _venue = v;
-              _categoria ??= _categorias.contains(v['tipo_icono']) ? v['tipo_icono'].toString() : null;
-            }),
-          ),
-        _tarjetaOpcion(
-          context,
-          icono: Icons.add_location_alt_outlined,
-          titulo: 'Agregar lugar',
-          texto: 'Un lugar que todavía no está en la lista',
-          activa: false,
-          alTocar: _agregarLugar,
-        ),
-      ],
-    );
-  }
+  // Mismo paso que Social o fiesta (Victor, 2026-11-20). El tipo de evento ya
+  // no sale del lugar: un lugar sirve para cualquier tipo de evento.
+  Widget _pasoLugar(BuildContext context) => ListaLugares(
+    lugares: _venues,
+    error: _errorVenues,
+    alReintentar: _cargarVenues,
+    elegido: _venue?['lugar']?.toString(),
+    alElegir: (v) => setState(() => _venue = v),
+    alAgregar: _agregarLugar,
+  );
 
   Widget _pasoDetalles(BuildContext context) {
     final p = context.pivot;
