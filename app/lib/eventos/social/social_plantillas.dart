@@ -80,13 +80,7 @@ const kPlantillas = [
       playlist: 'Música para bailar',
     ),
   ),
-  Plantilla(
-    'festividad',
-    'Festividad de temporada',
-    'Navidad, Año nuevo, Halloween, Día de muertos, Pascua u otra',
-    Icons.event_available_outlined,
-    Sugerencias(),
-  ),
+  Plantilla('festividad', 'Festividad de temporada', 'Navidad, Año nuevo, Halloween, Pascua u otra', Icons.event_available_outlined, Sugerencias()),
   Plantilla(
     'cumpleanos',
     'Cumpleaños',
@@ -179,21 +173,6 @@ const kFestividades = [
     ),
   ),
   Festividad(
-    'Día de muertos',
-    Icons.local_florist_outlined,
-    Sugerencias(
-      piezas: {Pieza.comida, Pieza.traer, Pieza.dress},
-      nombre: 'Día de muertos',
-      comida: [
-        CategoriaSugerida('Colada morada', 'litros', 0.3),
-        CategoriaSugerida('Guaguas de pan', 'unidades', 1),
-        CategoriaSugerida('Pan de muerto', 'unidades', 1),
-      ],
-      dress: ['Catrina o catrín', 'Flores en el cabello'],
-      traer: ['Fotos para el altar', 'Velas', 'Flores'],
-    ),
-  ),
-  Festividad(
     'Pascua',
     Icons.egg_outlined,
     Sugerencias(
@@ -235,3 +214,33 @@ const kReglasRegaloRobado = '''1. Cada persona trae un regalo envuelto y sin nom
 6. Un mismo regalo se puede robar como máximo 3 veces. Al tercer robo se queda con esa persona.
 7. El juego termina cuando se abre el último regalo de la pila. Quien tuvo el primer turno puede, al final, cambiar su regalo por otro que todavía se pueda robar.
 8. Lo importante es pasarla bien juntxs: nada de enojos por un regalo.''';
+
+/// Íconos del Social o fiesta en el calendario (Victor, 2026-11-20). La clave
+/// la manda el servidor (`socialIcono`): la que eligió quien organiza para una
+/// festividad propia, o la de la festividad o la plantilla.
+const kIconosSocial = <String, IconData>{
+  'fiesta': Icons.celebration_rounded,
+  'navidad': Icons.park_rounded,
+  'anio_nuevo': Icons.auto_awesome_rounded,
+  'halloween': Icons.dark_mode_rounded,
+  'pascua': Icons.egg_rounded,
+  'cumple': Icons.cake_rounded,
+  'aniversario': Icons.emoji_events_rounded,
+  'despedida': Icons.waving_hand_rounded,
+  'regalo': Icons.card_giftcard_rounded,
+  'musica': Icons.music_note_rounded,
+  'baile': Icons.nightlife_rounded,
+  'comida': Icons.restaurant_rounded,
+  'bebida': Icons.local_bar_rounded,
+  'flor': Icons.local_florist_rounded,
+  'corazon': Icons.favorite_rounded,
+  'estrella': Icons.star_rounded,
+  'sol': Icons.wb_sunny_rounded,
+  'nieve': Icons.ac_unit_rounded,
+  'mascara': Icons.theater_comedy_rounded,
+  'bandera': Icons.flag_rounded,
+  'deporte': Icons.sports_rounded,
+  'viaje': Icons.luggage_rounded,
+};
+
+IconData iconoSocial(String? clave) => kIconosSocial[clave] ?? Icons.celebration_rounded;

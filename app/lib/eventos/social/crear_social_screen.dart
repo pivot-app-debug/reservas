@@ -72,6 +72,9 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   String? _plantilla, _festividad;
   final _festividadOtra = TextEditingController();
+
+  /// Ícono de una festividad propia (Victor, 2026-11-20).
+  String _icono = 'fiesta';
   final _nombre = TextEditingController(), _descripcion = TextEditingController(), _lugar = TextEditingController(), _mapa = TextEditingController();
   DateTime? _fecha;
   TimeOfDay? _inicia, _termina;
@@ -134,6 +137,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     if (fest != null && !kFestividades.any((f) => f.nombre == fest)) {
       _festividad = 'Otra';
       _festividadOtra.text = fest;
+      _icono = '${piezas['icono'] ?? 'fiesta'}';
     } else {
       _festividad = fest;
     }
@@ -483,6 +487,36 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                           onChanged: (_) => setState(() {
                             if (!_editando) _nombre.text = _festividadOtra.text.trim();
                           }),
+                        ),
+                      ),
+                    ),
+                    // Ícono de la festividad propia: se ve en el calendario.
+                    _desplegable(
+                      _festividad == 'Otra',
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ícono en el calendario',
+                              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final e in kIconosSocial.entries)
+                                  ChoiceChip(
+                                    showCheckmark: false,
+                                    label: Icon(e.value, size: 22, color: _icono == e.key ? p.marcaTexto : p.textoSecundario),
+                                    selected: _icono == e.key,
+                                    onSelected: (_) => setState(() => _icono = e.key),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1364,6 +1398,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         'noTocar': [
           for (final (a, b) in _noTocar) [a, b],
         ],
+      if (_plantilla == 'festividad' && _festividad == 'Otra') 'icono': _icono,
       'ocultas': _sorpresa
           ? [
               for (final pz in _ocultas)

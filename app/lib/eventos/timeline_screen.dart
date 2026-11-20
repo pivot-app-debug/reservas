@@ -20,6 +20,7 @@ import '../reservas/reservas_repo.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
 import 'social/crear_social_screen.dart';
+import 'social/social_plantillas.dart';
 import 'detalle_screen.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
@@ -1768,7 +1769,7 @@ class _TarjetaEvento extends StatelessWidget {
                             // Social o fiesta: ícono propio (regalo si es sorpresa), nunca para quien no debe enterarse.
                             if (ev.socialFestivo) ...[
                               Icon(
-                                ev.socialSorpresa != null ? Icons.card_giftcard_rounded : Icons.celebration_rounded,
+                                ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
                                 size: 18,
                                 color: apagado ? p.apagado : p.marcaTexto,
                               ),

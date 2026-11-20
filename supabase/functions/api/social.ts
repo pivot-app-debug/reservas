@@ -120,6 +120,13 @@ function _idCorto(): string {
   return crypto.randomUUID().substring(0, 8);
 }
 
+/** Ícono del calendario: el elegido, el de la festividad o el de la plantilla. */
+const ICONO_FESTIVIDAD: Record<string, string> = { 'Navidad': 'navidad', 'Año nuevo': 'anio_nuevo', 'Halloween': 'halloween', 'Pascua': 'pascua' };
+const ICONO_PLANTILLA: Record<string, string> = { cumpleanos: 'cumple', aniversario: 'aniversario', despedida: 'despedida' };
+function _iconoSocial(cfg: any): string {
+  return _piezas(cfg).icono || ICONO_FESTIVIDAD[cfg?.festividad ?? ''] || ICONO_PLANTILLA[cfg?.plantilla ?? ''] || 'fiesta';
+}
+
 /** 2 semanas antes; si eso ya pasó, el día anterior al evento. */
 function _cierreDefecto(fecha: string): string {
   const d = _restarDias(fecha, DIAS_CIERRE);
@@ -562,7 +569,9 @@ function _leerPiezas(v: any): Record<string, any> {
     out.premios = { lista };
   }
   if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
-    // Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
+      // Ícono elegido para una festividad propia (Victor, 2026-11-20).
+  if (typeof p.icono === 'string' && /^[a-z_]{1,20}$/.test(p.icono)) out.icono = p.icono;
+  // Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
   // Solo las ve y edita quien organiza; valen en los dos sentidos.
   if (Array.isArray(p.noTocar)) {
     const vistas = new Set<string>();
@@ -1435,8 +1444,9 @@ export async function filtrarEventosSociales(eventos: any[], params: Record<stri
       socialSorpresa: etiquetaSorpresa(cfg, vista, nombreDe),
       socialEstado: _estado(cfg),
             socialOrganiza: vista === 'organiza',
-            // Ícono de fiesta en el calendario, nunca para quien no debe enterarse.
+                  // Ícono de fiesta en el calendario, nunca para quien no debe enterarse.
       socialFestivo: vista !== 'neutral',
+      ...(vista !== 'neutral' ? { socialIcono: _iconoSocial(cfg) } : {}),
       // Cierre del amigo secreto para el aviso en "Tu asistencia" (Victor, 2026-11-20).
       ...(cfg.amigo_secreto && piezaVisible(cfg, 'amigoSecreto', vista) && e.fecha
         ? { socialCierre: cfg.cierre ?? _cierreDefecto(String(e.fecha).substring(0, 10)), socialSorteado: !!cfg.sorteado_en }
