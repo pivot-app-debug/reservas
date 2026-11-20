@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (cambiar responsables)
+- "¿Dudas? Pregúntales" tiene un lápiz para quien creó el evento (y para lxs Pivots). Abre directo el paso de Encargadxs, para cambiar o sumar responsables y elegir de qué está a cargo cada persona.
+
 ## 2026-11-20 (cada quien dice cuánto rinde)
 - Al anotarte en comida, ahora se pregunta "¿Cuántas porciones rinde lo que llevas?" y lo decides tú. La app ya no sugiere ni calcula cuánto rinde cada cosa (ni el aviso con "Ajustar"). En bebida sigue preguntando los litros.
 

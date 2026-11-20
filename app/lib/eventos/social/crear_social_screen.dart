@@ -66,7 +66,10 @@ class _Premio {
 /// encargadxs → resumen y "Enviar para aprobar". Con `actual` edita un evento
 /// ya creado: abre en el resumen y cada fila lleva a su paso.
 class CrearSocialScreen extends StatefulWidget {
-  const CrearSocialScreen({super.key, required this.sesion, this.repo, this.actual});
+  const CrearSocialScreen({super.key, required this.sesion, this.repo, this.actual, this.abrirEncargados = false});
+
+  /// Editando: abre directo en Encargadxs (desde "¿Dudas? Pregúntales").
+  final bool abrirEncargados;
   final Sesion sesion;
   final SocialRepo? repo;
   final EstadoSocial? actual;
@@ -77,7 +80,7 @@ class CrearSocialScreen extends StatefulWidget {
 
 class _CrearSocialScreenState extends State<CrearSocialScreen> {
   late final bool _editando = widget.actual != null && widget.repo != null;
-  late _P _paso = _editando ? _P.resumen : _P.plantilla;
+  late _P _paso = _editando ? (widget.abrirEncargados ? _P.encargados : _P.resumen) : _P.plantilla;
   bool _adelante = true, _guardando = false;
 
   EquipoSocial? _equipo;

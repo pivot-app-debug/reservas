@@ -86,6 +86,15 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     }
   }
 
+  Future<void> _editarResponsables() async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion, repo: _social, actual: _estado, abrirEncargados: true),
+      ),
+    );
+    if (ok == true) unawaited(_cargar());
+  }
+
   Future<void> _liberar() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -516,7 +525,13 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           // "Qué traer" ya está dentro de "Qué lleva cada quien" (Victor, 2026-11-20).
           if (e.premios != null) PremiosTarjeta(lista: e.premios!),
           // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
-          if (e.aCargo.isNotEmpty) ACargoTarjeta(personas: e.aCargo, redes: _redes),
+          if (e.aCargo.isNotEmpty)
+            ACargoTarjeta(
+              personas: e.aCargo,
+              redes: _redes,
+              // Solo quien creó el evento (o un Pivot): responsables y responsabilidades (Victor, 2026-11-20).
+              alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null,
+            ),
         ],
       );
     }

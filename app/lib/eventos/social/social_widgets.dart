@@ -1456,8 +1456,11 @@ String _aCargoDe(Map<String, dynamic> x) {
 
 /// Personas a cargo del evento con botones de contacto.
 class ACargoTarjeta extends StatelessWidget {
-  const ACargoTarjeta({super.key, required this.personas, this.redes = const []});
+  const ACargoTarjeta({super.key, required this.personas, this.redes = const [], this.alEditar});
   final List<Map<String, dynamic>> personas;
+
+  /// Quien creó el evento (o un Pivot) cambia responsables y responsabilidades.
+  final VoidCallback? alEditar;
 
   /// Apps de mensajería de la liga (Comunidad en Equipo): solo esas se ofrecen.
   final List<String> redes;
@@ -1468,6 +1471,7 @@ class ACargoTarjeta extends StatelessWidget {
     return TarjetaSocial(
       titulo: '¿Dudas? Pregúntales',
       icono: Icons.support_agent_rounded,
+      accion: alEditar == null ? null : IconButton(tooltip: 'Cambiar responsables', icon: const Icon(Icons.edit_outlined), onPressed: alEditar),
       children: [
         for (final x in personas)
           Builder(
