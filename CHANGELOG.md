@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: dónde se crea)
+- **Pivots:** Social o fiesta se crea en Nuevo evento → Único, que ahora se abre con dos opciones: "Entrenamiento, partido u otro" y "Social o fiesta". Ya no está en el +.
+- **Quien no es Pivot:** "Crear un evento" en el menú ⋯ del Calendario (junto a Buscar y Filtros), para no cargar la barra. El + queda solo con las reservas.
+
 ## 2026-11-20 (Social o fiesta)
 - **"Social o fiesta" por piezas:** cualquier persona lo crea desde el + del Calendario con un asistente: plantilla (Fiesta, Festividad de temporada —Navidad, Año nuevo, Halloween, Día de muertos, Pascua u otra—, Cumpleaños, Aniversario, Despedida o bienvenida, Personalizado), datos, a quién invita, piezas (comida y bebida, playlist, amigo secreto, regalo robado con reglas, dress code, qué traer, homenaje con mensajes y regalo entre todxs, premios, +1), sorpresa y encargadxs. Se edita después desde el mismo asistente.
 - **Aprobación:** lo publica un Pivot que no sea homenajeadx ni deba enterarse; si no hay ninguno, se publica solo. Los Pivots lo ven en Notificaciones ("Social o fiesta por aprobar") con Aprobar o Pedir cambios.

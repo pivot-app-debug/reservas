@@ -485,6 +485,9 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
     required VoidCallback alTocar,
   }) => OpcionAsistente(icono: icono, titulo: titulo, texto: texto, activa: activa, alTocar: alTocar);
 
+  /// "Único" desplegado con sus dos opciones.
+  bool _unicoAbierto = false;
+
   Widget _pasoTipo(BuildContext context) {
     void elegir(bool? recurrente) {
       setState(() {
@@ -512,21 +515,44 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
           icono: Icons.event_outlined,
           titulo: 'Único',
           texto: 'Evento que ocurre una vez',
-          activa: _recurrente == false,
-          alTocar: () => elegir(false),
+          activa: _recurrente == false || _unicoAbierto,
+          // Único se abre con sus dos opciones (Victor, 2026-11-20): evento o Social o fiesta.
+          alTocar: () => setState(() => _unicoAbierto = !_unicoAbierto),
         ),
-        // Social o fiesta: su propio asistente por piezas (Victor, 2026-11-20).
-        _tarjetaOpcion(
-          context,
-          icono: Icons.celebration_outlined,
-          titulo: 'Social o fiesta',
-          texto: 'Fiesta, festividad, cumpleaños, aniversario o despedida',
-          activa: false,
-          alTocar: () async {
-            final nav = Navigator.of(context);
-            final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion)));
-            if (r is Map && mounted) nav.pop(r);
-          },
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: !_unicoAbierto
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Column(
+                    children: [
+                      _tarjetaOpcion(
+                        context,
+                        icono: Icons.event_note_outlined,
+                        titulo: 'Entrenamiento, partido u otro',
+                        texto: 'Eliges el lugar, la fecha y la hora',
+                        activa: _recurrente == false,
+                        alTocar: () => elegir(false),
+                      ),
+                      // Social o fiesta: su propio asistente por piezas (Victor, 2026-11-20).
+                      _tarjetaOpcion(
+                        context,
+                        icono: Icons.celebration_outlined,
+                        titulo: 'Social o fiesta',
+                        texto: 'Fiesta, festividad, cumpleaños, aniversario o despedida',
+                        activa: false,
+                        alTocar: () async {
+                          final nav = Navigator.of(context);
+                          final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion)));
+                          if (r is Map && mounted) nav.pop(r);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
         ),
         if (widget.repo.sesion.esAdmin)
           _tarjetaOpcion(

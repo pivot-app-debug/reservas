@@ -928,6 +928,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                   WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
                 case 'filtros':
                   _abrirFiltros();
+                case 'social':
+                  _nuevoSocial();
               }
             },
             itemBuilder: (_) => [
@@ -949,6 +951,12 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                   subtitle: _cantidadFiltros > 0 ? Text(_cantidadFiltros == 1 ? '1 activo' : '$_cantidadFiltros activos') : null,
                 ),
               ),
+              // Social o fiesta para quien no es Pivot (Victor, 2026-11-20).
+              if (!_esAdmin && repo.sesion.activa)
+                const PopupMenuItem(
+                  value: 'social',
+                  child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.celebration_outlined), title: Text('Crear un evento')),
+                ),
             ],
           ),
           const SizedBox(width: 4),
@@ -1474,7 +1482,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(
           clave: _kFiltros,
           titulo: 'Busca y filtra',
-          texto: 'En este menú buscas eventos, tareas, cumpleaños o lugares y eliges qué ver: eventos o tareas, tipo, lugar o área.',
+          texto: _esAdmin
+              ? 'En este menú buscas eventos, tareas, cumpleaños o lugares y eliges qué ver: eventos o tareas, tipo, lugar o área.'
+              : 'En este menú buscas eventos, tareas, cumpleaños o lugares, eliges qué ver y creas un evento social o una fiesta para la liga.',
         ),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, cambiar tu respuesta y ver cómo llegar.'),
         PasoTour(
@@ -1525,8 +1535,9 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           ? _Accion(Icons.event_available_outlined, 'Reserva por clase', () => _reservar(t))
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
-    // Cualquier persona de la liga arma un Social o fiesta (Victor, 2026-11-20).
-    if (repo.sesion.activa) _Accion(Icons.celebration_outlined, 'Social o fiesta', _nuevoSocial),
+    // Social o fiesta (Victor, 2026-11-20): los Pivots lo crean en Nuevo evento →
+    // Único; el resto, en ⋯ → "Crear un evento".
+
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
     // Cursos ya no va aquí: tiene su botón arriba (Victor, 2026-11-17).
 
