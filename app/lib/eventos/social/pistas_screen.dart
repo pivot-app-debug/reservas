@@ -28,6 +28,7 @@ const _tallasCamiseta = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 class _PistasScreenState extends State<PistasScreen> {
   late final PerfilSocial _p = PerfilSocial.desde(widget.inicial.aJson());
   final _medias = TextEditingController();
+  late final _link = TextEditingController(text: _p.wishlistLink);
   bool _guardando = false, _cambios = false;
 
   @override
@@ -39,6 +40,7 @@ class _PistasScreenState extends State<PistasScreen> {
   @override
   void dispose() {
     _medias.dispose();
+    _link.dispose();
     super.dispose();
   }
 
@@ -49,6 +51,7 @@ class _PistasScreenState extends State<PistasScreen> {
 
   Future<void> _guardar() async {
     setState(() => _guardando = true);
+    _p.wishlistLink = _link.text.trim();
     final m = _medias.text.trim();
     if (m.isEmpty) {
       _p.tallas.remove('medias');
@@ -260,6 +263,25 @@ class _PistasScreenState extends State<PistasScreen> {
                     ),
                 ],
               ),
+            ),
+            // Wishlist externa (Victor, 2026-11-20): para quien prefiere armarla en otra app.
+            const SizedBox(height: 20),
+            Text(
+              '¿Prefieres armarla en otra app?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Puedes crear tu lista en Wishdeck (wishdeck.app), Amazon u otra app, con fotos y links de cualquier tienda, y pegar aquí el link para compartirla. '
+              'Solo la ve quien te regala. Ojo: cualquiera que tenga ese link puede abrir la lista.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _link,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Link de mi wishlist (opcional)', prefixIcon: Icon(Icons.link_rounded)),
+              onChanged: (_) => setState(() => _cambios = true),
             ),
           ],
         ),

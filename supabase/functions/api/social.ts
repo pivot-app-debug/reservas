@@ -262,11 +262,14 @@ async function _personas(db: any, usernames: string[]): Promise<Map<string, { no
   return out;
 }
 
-const PERFIL_VACIO = { gustos: [], sobreMi: [], noRegalar: [], tallas: {}, wishlist: [] };
+const PERFIL_VACIO = { gustos: [], sobreMi: [], noRegalar: [], tallas: {}, wishlist: [], wishlistLink: '' };
 
 function _perfilSalida(r: any): Record<string, any> {
   if (!r) return { ...PERFIL_VACIO };
-  return { gustos: r.gustos ?? [], sobreMi: r.sobre_mi ?? [], noRegalar: r.no_regalar ?? [], tallas: r.tallas ?? {}, wishlist: r.wishlist ?? [] };
+    return {
+    gustos: r.gustos ?? [], sobreMi: r.sobre_mi ?? [], noRegalar: r.no_regalar ?? [], tallas: r.tallas ?? {}, wishlist: r.wishlist ?? [],
+    wishlistLink: r.wishlist_link ?? '',
+  };
 }
 
 async function _perfil(db: any, liga: string, clave: string): Promise<Record<string, any>> {
@@ -1149,7 +1152,9 @@ async function socialGuardarPerfil(params: Record<string, any>, deps: DepsSocial
   const fila = {
     liga_id: liga, clave: q.clave,
     gustos: _lista(p.gustos), sobre_mi: _lista(p.sobreMi), no_regalar: _lista(p.noRegalar),
-    tallas, wishlist, updated_at: new Date().toISOString(),
+        tallas, wishlist, updated_at: new Date().toISOString(),
+    // Wishlist externa opcional (Wishdeck, Amazon u otra; Victor, 2026-11-20).
+    ...(p.wishlistLink !== undefined ? { wishlist_link: _link(p.wishlistLink) || null } : {}),
   };
   const { error } = await db.from('social_perfiles').upsert(fila, { onConflict: 'liga_id,clave' });
   if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };

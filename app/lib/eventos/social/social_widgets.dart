@@ -159,6 +159,15 @@ class FichaAmigoVista extends StatelessWidget {
                     ),
             ),
         ],
+        // Wishlist externa (Wishdeck, Amazon u otra).
+        if (pf.wishlistLink.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => launchUrl(Uri.parse(pf.wishlistLink), mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('Ver su wishlist en otra app'),
+          ),
+        ],
       ],
     );
   }

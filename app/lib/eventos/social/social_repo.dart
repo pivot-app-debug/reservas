@@ -190,16 +190,25 @@ class ItemDeseo {
 
 /// Pistas sobre mí + tallas + wishlist. Quedan guardadas para el año siguiente.
 class PerfilSocial {
-  PerfilSocial({List<String>? gustos, List<String>? sobreMi, List<String>? noRegalar, Map<String, String>? tallas, List<ItemDeseo>? wishlist})
-    : gustos = gustos ?? [],
-      sobreMi = sobreMi ?? [],
-      noRegalar = noRegalar ?? [],
-      tallas = tallas ?? {},
-      wishlist = wishlist ?? [];
+  PerfilSocial({
+    List<String>? gustos,
+    List<String>? sobreMi,
+    List<String>? noRegalar,
+    Map<String, String>? tallas,
+    List<ItemDeseo>? wishlist,
+    this.wishlistLink = '',
+  }) : gustos = gustos ?? [],
+       sobreMi = sobreMi ?? [],
+       noRegalar = noRegalar ?? [],
+       tallas = tallas ?? {},
+       wishlist = wishlist ?? [];
 
   final List<String> gustos, sobreMi, noRegalar;
   final Map<String, String> tallas;
   final List<ItemDeseo> wishlist;
+
+  /// Wishlist externa opcional (Wishdeck, Amazon u otra).
+  String wishlistLink;
 
   static List<String> _l(Object? v) => [for (final x in (v as List? ?? const [])) '$x'];
 
@@ -211,10 +220,11 @@ class PerfilSocial {
       noRegalar: _l(m['noRegalar']),
       tallas: {for (final e in ((m['tallas'] as Map?) ?? const {}).entries) '${e.key}': '${e.value}'},
       wishlist: [for (final x in (m['wishlist'] as List? ?? const [])) ItemDeseo.desde(x as Map)],
+      wishlistLink: '${m['wishlistLink'] ?? ''}',
     );
   }
 
-  bool get vacio => gustos.isEmpty && sobreMi.isEmpty && noRegalar.isEmpty && tallas.isEmpty && wishlist.isEmpty;
+  bool get vacio => gustos.isEmpty && sobreMi.isEmpty && noRegalar.isEmpty && tallas.isEmpty && wishlist.isEmpty && wishlistLink.isEmpty;
 
   Map<String, Object?> aJson() => {
     'gustos': gustos,
@@ -222,6 +232,7 @@ class PerfilSocial {
     'noRegalar': noRegalar,
     'tallas': tallas,
     'wishlist': [for (final w in wishlist) w.aJson()],
+    'wishlistLink': wishlistLink,
   };
 }
 
