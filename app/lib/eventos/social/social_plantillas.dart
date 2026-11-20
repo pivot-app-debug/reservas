@@ -114,7 +114,7 @@ const kPlantillas = [
     Icons.waving_hand_outlined,
     Sugerencias(piezas: {Pieza.comida, Pieza.homenaje}, nombre: 'Despedida', traer: ['Fotos juntxs', 'Tarjeta para firmar'], sorpresa: true),
   ),
-  Plantilla('personalizado', 'Personalizado', 'Eliges cada pieza desde cero', Icons.extension_outlined, Sugerencias(comida: [])),
+  Plantilla('personalizado', 'Personalizado', 'Eliges todo desde cero', Icons.extension_outlined, Sugerencias(comida: [])),
 ];
 
 class Festividad {

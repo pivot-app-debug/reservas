@@ -52,6 +52,26 @@ class SocialRepo {
 
   Future<void> quitarAporte(String id) => _post('socialQuitarAporte', {'id': id});
 
+  /// Quien está a cargo de la comida: agrega, cambia o quita una categoría,
+  /// marca "Hace falta" y deja sugerencias (Victor, 2026-11-20).
+  Future<void> editarComida({
+    String? categoriaId,
+    String? nombre,
+    String? unidad,
+    num? porPersona,
+    bool? falta,
+    List<String>? sugerencias,
+    bool borrar = false,
+  }) => _post('socialComidaEditar', {
+    'categoriaId': ?categoriaId,
+    'nombre': ?nombre,
+    'unidad': ?unidad,
+    'porPersona': ?porPersona,
+    'falta': ?falta,
+    if (sugerencias != null) 'sugerencias': jsonEncode(sugerencias),
+    if (borrar) 'accion': 'borrar',
+  });
+
   Future<Map<String, dynamic>> sortear({bool rehacer = false}) => _post('socialSortear', {'rehacer': rehacer});
 
   /// Guarda lo que se editó en el asistente ("Social o fiesta"). `reenviar`:
@@ -124,6 +144,14 @@ class EstadoSocial {
 
   /// Quien creó el evento, sus encargadxs o un Pivot (que no esté en las listas de la sorpresa).
   bool get organiza => raw['organiza'] == true;
+
+  /// Puede administrar la comida: organiza y (crea el evento, es Pivot o está a cargo de la comida).
+  bool get puedeComida {
+    if (!organiza) return false;
+    final m = editable?['misPermisos'];
+    return m is! List || m.contains('comida');
+  }
+
   bool get esInvitadx => raw['tipo'] == 'invitado';
 
   /// 'organiza' | 'completa' | 'neutral' (homenajeadx o "no debe enterarse": lo ve como un evento normal).
@@ -178,6 +206,8 @@ class CategoriaComida {
   num get meta => (raw['meta'] as num?) ?? 0;
   num get aportado => (raw['aportado'] as num?) ?? 0;
   bool get cerrada => raw['cerrada'] == true;
+  bool get falta => raw['falta'] == true;
+  List<String> get sugerencias => [for (final x in (raw['sugerencias'] as List? ?? const [])) '$x'];
   double get avance => meta <= 0 ? 0 : (aportado / meta).clamp(0, 1).toDouble();
   List<Map<String, dynamic>> get aportes => [for (final x in (raw['aportes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
 }

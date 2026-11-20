@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: permisos, comida y avisos)
+- **Regla de oro:** quien crea el evento cambia todo (los Pivots también).
+- **Permisos por encargadx** (paso Encargadxs): Fecha, hora y lugar · Amigo secreto y regalo robado · Comida y qué traer · Playlist, dress code y premios · Invitadxs (+1) · Homenaje y sorpresa. Por defecto, todo menos homenaje. En el asistente cada encargadx solo abre lo suyo (el resto se ve con candado) y el servidor guarda solo eso.
+- **Comida desde la tarjeta del evento:** quien está a cargo agrega, cambia o quita categorías (si nadie se anotó), marca "Hace falta" (va primero y avisa a quienes van) y deja ideas de qué traer; tocar una idea anota con eso.
+- **Avisos solo de lo importante:** nombre, fecha, hora, lugar, cómo llegar, amigo secreto, regalo robado y dress code. Playlist, descripción, comida, qué traer, premios, +1 y homenaje se cambian sin aviso.
+- "Piezas" pasa a llamarse **"Qué tendrá"** ("¿Qué tendrá tu fiesta?").
+
 ## 2026-11-20 (Social o fiesta: editar desde el botón del evento)
 - Sin la tarjeta con el nombre y el botón "Editar" en el detalle: solo quedan los avisos de sorpresa y de aprobación, si los hay. Se edita desde el botón del evento, que ahora también ven quienes organizan (no solo Pivots) como "Editar evento".
 - El asistente abre al toque con los datos ya cargados; si todavía no hay datos, muestra que está cargando en vez de trabarse.

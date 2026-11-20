@@ -28,7 +28,7 @@
 
 import { type ParticipanteSorteo, sortearAmigoSecreto } from './social_sorteo.ts';
 import {
-  aprobadores, cambiosPara, diferencias, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, type Foto, homenajeadxs, listaEs, mensajesAbiertos,
+  aprobadores, cambiosPara, diferencias, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, type Foto, homenajeadxs, listaEs, mensajesAbiertos, soloImportantes,
   noEnterarse, PIEZAS_ELEGIBLES, personasEnSecreto, piezaVisible, publicado, puedeAprobar, tituloPara, type Vista, vistaDe,
 } from './social_reglas.ts';
 
@@ -47,7 +47,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialGet', 'socialCrear', 'socialGuardarConfig', 'socialAgregarInvitado', 'socialQuitarInvitado', 'socialGuardarPerfil',
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
-  'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes',
+    'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -161,7 +161,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
     switch (action) {
       case 'socialGet': return await socialGet(params, deps);
       case 'socialCrear': return await socialCrear(params, deps);
-      case 'socialGuardarConfig': return await socialGuardarConfig(params, deps);
+            case 'socialGuardarConfig': return await socialGuardarConfig(params, deps);
+      case 'socialComidaEditar': return await socialComidaEditar(params, deps);
       case 'socialAgregarInvitado': return await socialAgregarInvitado(params, deps);
       case 'socialQuitarInvitado': return await socialQuitarInvitado(params, deps);
       case 'socialGuardarPerfil': return await socialGuardarPerfil(params, deps);
@@ -239,6 +240,52 @@ function _vista(q: Quien, cfg: any): Vista {
 
 function _organiza(q: Quien, cfg: any): boolean {
   return _vista(q, cfg) === 'organiza';
+}
+
+// ─── Permisos de lxs encargadxs (Victor, 2026-11-20) ──────────────────────
+// Regla de oro: quien crea el evento edita todo (los Pivots también). Cada
+// encargadx edita solo sus áreas; sin permisos guardados, todo menos homenaje.
+export const AREAS_SOCIAL = ['fecha', 'amigo', 'comida', 'extras', 'invitados', 'homenaje'] as const;
+const AREAS_POR_DEFECTO = ['fecha', 'amigo', 'comida', 'extras', 'invitados'];
+
+/// null = puede editar todo; si no, las áreas que le tocan.
+function _misPermisos(q: Quien, cfg: any): string[] | null {
+  if (!cfg || q.esPivot || (q.username && q.username === cfg.creador)) return null;
+  const p = cfg.permisos && typeof cfg.permisos === 'object' ? cfg.permisos[q.username ?? ''] : null;
+  return Array.isArray(p) ? p.filter((x: unknown) => (AREAS_SOCIAL as readonly string[]).includes(String(x))) : AREAS_POR_DEFECTO;
+}
+
+/// Saca de los datos del asistente lo que esa persona no puede cambiar.
+/// Las piezas se mezclan con las guardadas: solo cambian las de sus áreas.
+export function _filtrarPorPermisos(d: any, areas: string[], previa: any): any {
+  const puede = (a: string) => areas.includes(a);
+  const out: any = {};
+  const copiar = (k: string) => { if (d[k] !== undefined) out[k] = d[k]; };
+  if (puede('fecha')) ['fecha', 'inicia', 'termina', 'lugar', 'mapa'].forEach(copiar);
+  if (puede('amigo')) ['topeAmigo', 'topeRobado', 'recordatorioRobado', 'reglasRobado', 'cierre'].forEach(copiar);
+  if (puede('comida')) copiar('categorias');
+  if (puede('homenaje')) ['sorpresa', 'homenajeados', 'noEnterarse', 'nombreNeutro', 'regaloTope', 'regaloCompra'].forEach(copiar);
+  const m = d.modulos ?? {};
+  const modulos: any = {};
+  if (puede('amigo')) (modulos.amigoSecreto = m.amigoSecreto, modulos.regaloRobado = m.regaloRobado);
+  if (puede('comida')) modulos.comida = m.comida;
+  if (puede('invitados')) modulos.invitados = m.invitados;
+  out.modulos = Object.fromEntries(Object.entries(modulos).filter(([, v]) => v !== undefined));
+  if (d.piezas !== undefined) {
+    const antes = _piezas(previa);
+    const nuevas = d.piezas && typeof d.piezas === 'object' ? d.piezas : {};
+    const porArea: Record<string, string[]> = { amigo: ['noTocar'], comida: ['traer'], extras: ['playlist', 'dress', 'premios'], homenaje: ['homenaje', 'ocultas'] };
+    const piezas: any = { ...antes };
+    for (const [area, claves] of Object.entries(porArea)) {
+      if (!puede(area)) continue;
+      for (const k of claves) {
+        if (nuevas[k] !== undefined) piezas[k] = nuevas[k];
+        else delete piezas[k];
+      }
+    }
+    out.piezas = piezas;
+  }
+  return out;
 }
 
 function _piezas(cfg: any): Record<string, any> {
@@ -421,7 +468,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
       const aportado = ap.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
       const meta = Math.ceil(total * Number(c.por_persona ?? 0));
       return {
-        id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
+                id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
+        falta: c.falta === true, sugerencias: Array.isArray(c.sugerencias) ? c.sugerencias : [],
         cerrada: meta > 0 && aportado >= meta,
         // Lxs +1 solo ven lo que llevan ellxs.
         aportes: ap.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({
@@ -502,7 +550,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     out.editable = {
       plantilla: cfg.plantilla ?? null, festividad: cfg.festividad ?? null, nombre: cfg.nombre ?? '', nombreNeutro: cfg.nombre_neutro ?? '',
       descripcion: cfg.descripcion ?? '', para: cfg.para ?? { tipo: 'liga', valores: [] }, sorpresa: !!cfg.sorpresa,
-      homenajeados: hom, noEnterarse: noEnterarse(cfg), encargados: encargadxs(cfg), piezas,
+            homenajeados: hom, noEnterarse: noEnterarse(cfg), encargados: encargadxs(cfg), piezas,
+      permisos: cfg.permisos ?? {}, misPermisos: _misPermisos(q, cfg),
       regaloTope: cfg.regalo_tope == null ? null : Number(cfg.regalo_tope), regaloCompra: cfg.regalo_compra ?? null,
       reglasRobado: cfg.reglas_robado ?? '', creador: cfg.creador ?? null, mapa: ev.google_maps ?? '',
       nombres: Object.fromEntries([...personas].map(([u, p]) => [u, p.nombre])),
@@ -633,7 +682,16 @@ async function _leerDatos(db: any, d: any, previa: any, creador: string | null, 
   if (d.sorpresa !== undefined) fila.sorpresa = sorpresa;
   if (d.homenajeados !== undefined) fila.homenajeados = hom;
   if (d.noEnterarse !== undefined) fila.no_enterarse = sorpresa ? nadie.filter((u) => !hom.includes(u)) : [];
-  if (d.encargados !== undefined) fila.encargados = enc;
+    if (d.encargados !== undefined) fila.encargados = enc;
+  // Qué puede editar cada encargadx (solo quien crea o un Pivot lo cambia: el filtro saca `permisos` al resto).
+  if (d.permisos !== undefined && d.permisos && typeof d.permisos === 'object') {
+    const permisos: Record<string, string[]> = {};
+    for (const u of enc) {
+      const v = d.permisos[u];
+      permisos[u] = Array.isArray(v) ? [...new Set(v.map((x: unknown) => String(x)).filter((x: string) => (AREAS_SOCIAL as readonly string[]).includes(x)))] : AREAS_POR_DEFECTO;
+    }
+    fila.permisos = permisos;
+  }
   if (d.regaloCompra !== undefined) fila.regalo_compra = (await _existentes(db, [d.regaloCompra], 1))[0] ?? null;
   const secreto = new Set([...hom, ...(sorpresa ? nadie : [])]);
   if (sorpresa) {
@@ -687,7 +745,9 @@ async function _guardarCategorias(db: any, liga: string, idEvento: string, cats:
   for (const x of cats.slice(0, 20)) {
     const nombre = _texto(x?.nombre, 60);
     if (!nombre) continue;
-    const datos = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
+        const datos: Record<string, any> = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
+    if (x?.falta !== undefined) datos.falta = x.falta === true;
+    if (x?.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(x.sugerencias);
     const id = typeof x?.id === 'string' && (actuales ?? []).some((a: any) => a.id === x.id) ? x.id : null;
     if (id) {
       vistos.add(id);
@@ -848,7 +908,10 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
   const previa = await _config(db, idEvento);
   if (!previa && !q.esPivot) return { exito: false, error: 'Solo un Pivot puede configurar este evento.' };
   if (previa && !_organiza(q, previa)) return { exito: false, error: 'Solo quien creó el evento, sus encargadxs y los Pivots pueden cambiarlo.' };
-  const d = params.datos !== undefined ? (_json(params.datos) ?? {}) : _datosLegacy(params);
+    let d = params.datos !== undefined ? (_json(params.datos) ?? {}) : _datosLegacy(params);
+  // Encargadxs: solo lo de sus áreas (quien crea y los Pivots, todo).
+  const areas = previa ? _misPermisos(q, previa) : null;
+  if (areas) d = _filtrarPorPermisos(d, areas, previa);
   const creador = previa?.creador ?? null;
   const r = await _leerDatos(db, d, previa ? { ...previa, __fecha: ev.fecha } : { __fecha: ev.fecha }, creador ?? q.username, q.categoria);
   if ('error' in r) return { exito: false, error: r.error };
@@ -885,7 +948,7 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
   const final = await _config(db, idEvento);
   if (fotoAntes && final && publicado(final)) {
     const evNuevo = (await _evento(db, idEvento)) ?? ev;
-    await _avisarCambios(deps, final, evNuevo, diferencias(fotoAntes, await _foto(db, final, evNuevo)), q.username);
+        await _avisarCambios(deps, final, evNuevo, soloImportantes(diferencias(fotoAntes, await _foto(db, final, evNuevo))), q.username);
   }
   return { exito: true, avisos, publicado: publicado(final) };
 }
@@ -1198,6 +1261,66 @@ async function socialRevelar(params: Record<string, any>, deps: DepsSocial): Pro
 }
 
 // ─── Comida compartida ────────────────────────────────────────────────────
+
+function _sugerenciasComida(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    const t = _texto(x, 40);
+    if (t && !out.some((y) => y.toLowerCase() === t.toLowerCase())) out.push(t);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/// Quien está a cargo de la comida (o quien crea, o un Pivot) la administra
+/// desde la tarjeta del evento: agrega, cambia o quita categorías, marca lo que
+/// hace falta y deja sugerencias de qué traer (Victor, 2026-11-20).
+async function socialComidaEditar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const cfg = await _config(db, q.idEvento);
+  if (!cfg || !_organiza(q, cfg)) return { exito: false, error: 'Solo quienes organizan pueden cambiar la comida.' };
+  const areas = _misPermisos(q, cfg);
+  if (areas && !areas.includes('comida')) return { exito: false, error: 'No estás a cargo de la comida en este evento.' };
+  const id = String(params.categoriaId ?? '');
+  const { data: actual } = id ? await db.from('social_comida_categorias').select('*').eq('id', id).eq('id_evento', q.idEvento).maybeSingle() : { data: null };
+  if (id && !actual) return { exito: false, error: 'No encontramos esa categoría.' };
+  if (params.accion === 'borrar') {
+    const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', id);
+    if ((count ?? 0) > 0) return { exito: false, error: 'Alguien ya se anotó en esta categoría: no se puede quitar.' };
+    await db.from('social_comida_categorias').delete().eq('id', id);
+    return { exito: true };
+  }
+  const nombre = _texto(params.nombre ?? actual?.nombre, 60);
+  if (!nombre) return { exito: false, error: 'Escribe el nombre de la categoría.' };
+  const datos: Record<string, any> = {
+    nombre, unidad: _texto(params.unidad ?? actual?.unidad, 30) || 'porciones',
+    por_persona: _num(params.porPersona) ?? Number(actual?.por_persona ?? 1),
+  };
+  if (params.falta !== undefined) datos.falta = params.falta === true || params.falta === 'true';
+  if (params.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(_json(params.sugerencias) ?? params.sugerencias);
+  if (actual) {
+    await db.from('social_comida_categorias').update(datos).eq('id', id);
+    // Avisa a lxs asistentes cuando algo pasa a "hace falta".
+    if (datos.falta === true && actual.falta !== true && deps.push) {
+      const asisten = [...(await _asistentes(db, q.idEvento))].filter((u) => u !== q.username);
+      if (asisten.length) {
+        deps.push({
+          tipo: 'evento_editado', include_external_user_ids: asisten, evento: { idEvento: q.idEvento },
+          headings: { es: 'Hace falta en la fiesta' }, contents: { es: `Falta ${nombre}. Si puedes llevar, anótate en el evento.` }, url: _url(deps, q.idEvento),
+        }).catch(() => {});
+      }
+    }
+  } else {
+    const { data: ult } = await db.from('social_comida_categorias').select('orden').eq('id_evento', q.idEvento).order('orden', { ascending: false }).limit(1);
+    await db.from('social_comida_categorias').insert({ ...datos, id_evento: q.idEvento, liga_id: liga, orden: Number(ult?.[0]?.orden ?? -1) + 1 });
+    if (!cfg.comida) await db.from('social_eventos').update({ comida: true }).eq('id_evento', q.idEvento);
+  }
+  return { exito: true };
+}
+
 
 async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
   const db = deps.db, liga = deps.ligaEnCurso();

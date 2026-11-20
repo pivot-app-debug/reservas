@@ -384,7 +384,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
               titulo: 'Social o fiesta',
               icono: Icons.celebration_outlined,
               children: [
-                Text('Elige las piezas: comida, playlist, amigo secreto, regalo robado, homenaje y más.', style: TextStyle(color: p.textoSecundario)),
+                Text('Elige qué tendrá: comida, playlist, amigo secreto, regalo robado, homenaje y más.', style: TextStyle(color: p.textoSecundario)),
                 const SizedBox(height: 10),
                 FilledButton(onPressed: _configurar, child: const Text('Configurar')),
               ],

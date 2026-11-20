@@ -528,9 +528,9 @@ class ComidaTarjeta extends StatelessWidget {
   final EstadoSocial estado;
   final VoidCallback alCambiar;
 
-  Future<void> _anotar(BuildContext context, CategoriaComida c) async {
+  Future<void> _anotar(BuildContext context, CategoriaComida c, {String? sugerencia}) async {
     final cantidad = TextEditingController(text: cantidadSocial(math.max(1, c.porPersona)));
-    final detalle = TextEditingController();
+    final detalle = TextEditingController(text: sugerencia ?? '');
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
@@ -576,6 +576,99 @@ class ComidaTarjeta extends StatelessWidget {
     }
   }
 
+  // ─── Quien está a cargo de la comida (Victor, 2026-11-20) ────────────────
+
+  Future<void> _editar(BuildContext context, [CategoriaComida? c]) async {
+    final nombre = TextEditingController(text: c?.nombre ?? '');
+    final unidad = TextEditingController(text: c?.unidad ?? 'porciones');
+    final porPersona = TextEditingController(text: c == null ? '1' : cantidadSocial(c.porPersona));
+    final ideas = TextEditingController(text: (c?.sugerencias ?? const []).join(', '));
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(c == null ? 'Agregar categoría' : 'Editar ${c.nombre}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombre,
+                autofocus: c == null,
+                maxLength: 60,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Categoría', hintText: 'Ej.: Hielo'),
+              ),
+              TextField(
+                controller: unidad,
+                maxLength: 30,
+                decoration: const InputDecoration(labelText: 'Unidad', hintText: 'Ej.: bolsas, litros, porciones'),
+              ),
+              TextField(
+                controller: porPersona,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Cuánto por persona', helperText: 'La meta se calcula con quienes confirmaron.'),
+              ),
+              TextField(
+                controller: ideas,
+                maxLines: null,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Ideas de qué traer (opcional)', hintText: 'Separadas por coma: jugos, gaseosas, agua'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    final n = nombre.text.trim(), u = unidad.text.trim(), pp = num.tryParse(porPersona.text.replaceAll(',', '.'));
+    final sug = [
+      for (final x in ideas.text.split(','))
+        if (x.trim().isNotEmpty) x.trim(),
+    ];
+    for (final t in [nombre, unidad, porPersona, ideas]) {
+      t.dispose();
+    }
+    if (ok != true || !context.mounted) return;
+    if (n.isEmpty) return avisarSocial(context, 'Escribe el nombre de la categoría.');
+    try {
+      await repo.editarComida(categoriaId: c?.id, nombre: n, unidad: u, porPersona: pp, sugerencias: sug);
+      alCambiar();
+    } catch (e) {
+      if (context.mounted) avisarSocial(context, e.toString());
+    }
+  }
+
+  Future<void> _accionCategoria(BuildContext context, CategoriaComida c, String accion) async {
+    try {
+      switch (accion) {
+        case 'editar':
+          return await _editar(context, c);
+        case 'falta':
+          await repo.editarComida(categoriaId: c.id, falta: !c.falta);
+        case 'borrar':
+          final si = await showDialog<bool>(
+            context: context,
+            builder: (d) => AlertDialog(
+              title: Text('¿Quitar ${c.nombre}?'),
+              content: const Text('Solo se puede si nadie se anotó todavía.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
+                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Quitar')),
+              ],
+            ),
+          );
+          if (si != true) return;
+          await repo.editarComida(categoriaId: c.id, borrar: true);
+      }
+      alCambiar();
+    } catch (e) {
+      if (context.mounted) avisarSocial(context, e.toString());
+    }
+  }
+
   Future<void> _quitar(BuildContext context, String id) async {
     try {
       await repo.quitarAporte(id);
@@ -588,11 +681,14 @@ class ComidaTarjeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final cats = estado.comida;
+    // Lo que hace falta va primero.
+    final cats = [...estado.comida.where((c) => c.falta && !c.cerrada), ...estado.comida.where((c) => !c.falta || c.cerrada)];
     final total = estado.conteo['total'] ?? 0;
+    final admin = estado.puedeComida;
     return TarjetaSocial(
       titulo: 'Comida compartida',
       icono: Icons.restaurant_rounded,
+      accion: admin ? IconButton(tooltip: 'Agregar categoría', icon: const Icon(Icons.add_rounded), onPressed: () => _editar(context)) : null,
       children: [
         Text(
           'La meta se calcula con $total ${total == 1 ? 'persona confirmada' : 'personas confirmadas'} (con sus +1).',
@@ -622,8 +718,21 @@ class ComidaTarjeta extends StatelessWidget {
                       ),
                     ),
                     Text('${cantidadSocial(c.aportado)} / ${cantidadSocial(c.meta)} ${c.unidad}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                    if (admin)
+                      PopupMenuButton<String>(
+                        tooltip: 'Opciones',
+                        iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                        position: PopupMenuPosition.under,
+                        onSelected: (a) => _accionCategoria(context, c, a),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                          PopupMenuItem(value: 'falta', child: Text(c.falta ? 'Ya no hace falta' : 'Hace falta')),
+                          const PopupMenuItem(value: 'borrar', child: Text('Quitar')),
+                        ],
+                      ),
                   ],
                 ),
+                if (c.falta && !c.cerrada) ...[const SizedBox(height: 4), Etiqueta(texto: 'Hace falta', icono: Icons.priority_high_rounded)],
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(PivotRadios.chip),
@@ -655,6 +764,21 @@ class ComidaTarjeta extends StatelessWidget {
                       ],
                     ),
                   ),
+                // Ideas de qué traer: tocar una anota con eso.
+                if (c.sugerencias.isNotEmpty && !c.cerrada) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final s in c.sugerencias)
+                        ActionChip(
+                          label: Text(s),
+                          onPressed: estado.asiste ? () => _anotar(context, c, sugerencia: s) : null,
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerLeft,

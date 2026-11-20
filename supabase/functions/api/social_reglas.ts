@@ -176,6 +176,14 @@ const CAMPOS: [string, string, string | null, boolean?][] = [
   ['homenaje', 'el homenaje', 'homenaje'],
 ];
 
+/// Solo se avisa lo importante (Victor, 2026-11-20): nombre, fecha, hora,
+/// lugar y cómo llegar, amigo secreto, regalo robado y dress code. Playlist,
+/// descripción, comida, qué traer, premios, +1 y homenaje se cambian sin aviso.
+const IMPORTANTES = new Set(['el nombre', 'la fecha', 'la hora', 'el lugar', 'cómo llegar', 'el amigo secreto', 'el regalo robado', 'el dress code']);
+export function soloImportantes(cambios: Cambio[]): Cambio[] {
+  return cambios.filter((c) => IMPORTANTES.has(c.que));
+}
+
 export function diferencias(antes: Foto, despues: Foto): Cambio[] {
   const out: Cambio[] = [];
   for (const [k, que, pieza, soloNeutral] of CAMPOS) {

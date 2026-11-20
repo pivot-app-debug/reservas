@@ -75,6 +75,27 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   /// Ícono de una festividad propia (Victor, 2026-11-20).
   String _icono = 'fiesta';
+
+  /// Permisos de quien edita (Victor, 2026-11-20). null = todo: quien crea el
+  /// evento, un Pivot o un evento nuevo. Áreas: fecha, amigo, comida, extras,
+  /// invitados, homenaje. El servidor aplica lo mismo al guardar.
+  List<String>? get _mis {
+    final v = widget.actual?.editable?['misPermisos'];
+    return v is List ? [for (final x in v) '$x'] : null;
+  }
+
+  bool get _todo => _mis == null;
+  bool _puede(String area) => _mis == null || _mis!.contains(area);
+  bool _puedePieza(Pieza pz) => _puede(switch (pz) {
+    Pieza.comida || Pieza.traer => 'comida',
+    Pieza.amigoSecreto || Pieza.regaloRobado => 'amigo',
+    Pieza.invitados => 'invitados',
+    Pieza.homenaje => 'homenaje',
+    _ => 'extras',
+  });
+
+  /// Qué puede editar cada encargadx (solo lo cambia quien crea el evento).
+  final Map<String, Set<String>> _permisos = {};
   final _nombre = TextEditingController(), _descripcion = TextEditingController(), _lugar = TextEditingController(), _mapa = TextEditingController();
   DateTime? _fecha;
   TimeOfDay? _inicia, _termina;
@@ -200,6 +221,11 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     _homenajeados.addAll([for (final x in (ed['homenajeados'] as List? ?? const [])) '$x']);
     _noEnterarse.addAll([for (final x in (ed['noEnterarse'] as List? ?? const [])) '$x']);
     _encargados.addAll([for (final x in (ed['encargados'] as List? ?? const [])) '$x']);
+    final perms = (ed['permisos'] as Map?) ?? const {};
+    for (final u in _encargados) {
+      final v = perms[u];
+      _permisos[u] = v is List ? {for (final x in v) '$x'} : {..._permisosPorDefecto};
+    }
     final ocultas = {for (final x in (piezas['ocultas'] as List? ?? const [])) '$x'};
     _ocultas.addAll(_elegibles.where((pz) => ocultas.contains(pz.name)));
   }
@@ -324,7 +350,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           : null,
     _P.homenaje =>
       _piezas.contains(Pieza.homenaje) && _homenajeados.isEmpty
-          ? 'Elige a quién homenajean (o apaga la pieza Homenaje).'
+          ? 'Elige a quién homenajean (o apaga Homenaje en "Qué tendrá").'
           : _sorpresa && _homenajeados.isEmpty && _noEnterarse.isEmpty
           ? 'Elige quiénes no deben enterarse.'
           : _sorpresa && _neutro.text.trim().isEmpty
@@ -339,17 +365,17 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     _P.plantilla: '¿Qué vas a armar?',
     _P.datos: 'Nombre, fecha y lugar',
     _P.invitados: '¿A quién invitas?',
-    _P.piezas: 'Piezas',
-    _P.config: 'Configura cada pieza',
+    _P.piezas: '¿Qué tendrá tu fiesta?',
+    _P.config: 'Configura lo que tendrá',
     _P.homenaje: 'Homenaje y sorpresa',
     _P.encargados: 'Encargadxs',
     _P.resumen: 'Resumen',
   };
 
   String? get _ayuda => switch (_paso) {
-    _P.plantilla => 'La plantilla solo propone piezas y sugerencias. Todo se puede cambiar.',
+    _P.plantilla => 'La plantilla solo propone qué tendrá y algunas sugerencias. Todo se puede cambiar.',
     _P.invitados => 'Solo quienes invites lo ven en su calendario y reciben los avisos.',
-    _P.piezas => 'Prende las piezas que quieras. Puedes cambiarlas después.',
+    _P.piezas => 'Elige lo que tendrá. Puedes cambiarlo después.',
     _P.homenaje => 'Opcional. Las personas homenajeadas y quienes no deben enterarse lo ven como un evento normal.',
     _P.encargados => 'Opcional. Pueden editar el evento contigo.',
     _P.resumen =>
@@ -558,8 +584,19 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (!_todo)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _puede('fecha')
+                  ? 'El nombre y la descripción los cambia quien creó el evento.'
+                  : 'La fecha, la hora y el lugar los cambia quien creó el evento o quien esté a cargo de eso.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+          ),
         TextField(
           controller: _nombre,
+          enabled: _todo,
           maxLength: 80,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej.: Fiesta de fin de año'),
@@ -570,7 +607,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           leading: Icon(Icons.event_outlined, color: p.marcaTexto),
           title: Text(_fecha == null ? 'Elige la fecha' : '${Fechas.dia(_fecha!)} ${Fechas.corta(_fecha!)}'),
           trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: _elegirFecha,
+          onTap: _puede('fecha') ? _elegirFecha : null,
         ),
         Row(
           children: [
@@ -579,7 +616,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.schedule_rounded, color: p.marcaTexto),
                 title: Text(_inicia == null ? 'Empieza' : _hhmm(_inicia!)),
-                onTap: () => _elegirHora(true),
+                onTap: _puede('fecha') ? () => _elegirHora(true) : null,
               ),
             ),
             Expanded(
@@ -589,13 +626,14 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                 trailing: _termina == null
                     ? null
                     : IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded, size: 18), onPressed: () => setState(() => _termina = null)),
-                onTap: () => _elegirHora(false),
+                onTap: _puede('fecha') ? () => _elegirHora(false) : null,
               ),
             ),
           ],
         ),
         TextField(
           controller: _lugar,
+          enabled: _puede('fecha'),
           maxLength: 120,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(labelText: 'Lugar', hintText: 'Ej.: Casa de Ana'),
@@ -603,12 +641,14 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
         TextField(
           controller: _mapa,
+          enabled: _puede('fecha'),
           maxLength: 500,
           keyboardType: TextInputType.url,
           decoration: const InputDecoration(labelText: 'Enlace del mapa (opcional)', hintText: 'Google Maps u otra app'),
         ),
         TextField(
           controller: _descripcion,
+          enabled: _todo,
           maxLength: 1000,
           maxLines: null,
           textCapitalization: TextCapitalization.sentences,
@@ -800,12 +840,15 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
             title: Text(pz.titulo),
             subtitle: Text(pz.texto),
             value: _piezas.contains(pz),
-            onChanged: (v) => setState(() {
-              v ? _piezas.add(pz) : _piezas.remove(pz);
-              if (v && pz == Pieza.comida && _cats.isEmpty) {
-                _cats.addAll(_catsSugeridas().isEmpty ? [_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 0.5)] : _catsSugeridas());
-              }
-            }),
+            // Sin permiso para esa parte: se ve, pero no se cambia.
+            onChanged: !_puedePieza(pz)
+                ? null
+                : (v) => setState(() {
+                    v ? _piezas.add(pz) : _piezas.remove(pz);
+                    if (v && pz == Pieza.comida && _cats.isEmpty) {
+                      _cats.addAll(_catsSugeridas().isEmpty ? [_Cat(nombre: 'Bebidas', unidad: 'litros', porPersona: 0.5)] : _catsSugeridas());
+                    }
+                  }),
           ),
       ],
     );
@@ -871,7 +914,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     final p = context.pivot;
     final s = _sug;
     final secciones = <Widget>[];
-    if (_piezas.contains(Pieza.comida)) {
+    if (_piezas.contains(Pieza.comida) && _puedePieza(Pieza.comida)) {
       secciones.addAll([
         _titulo('Comida y bebida', ayuda: 'Cantidad por asistente: la meta es asistentes (con sus +1) × cantidad.'),
         for (final c in _cats)
@@ -925,7 +968,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.playlist)) {
+    if (_piezas.contains(Pieza.playlist) && _puedePieza(Pieza.playlist)) {
       secciones.addAll([
         _titulo('Playlist colaborativa', ayuda: 'Pega el enlace de una lista colaborativa de Spotify u otra app.'),
         TextField(
@@ -940,7 +983,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.amigoSecreto)) {
+    if (_piezas.contains(Pieza.amigoSecreto) && _puedePieza(Pieza.amigoSecreto)) {
       final cierre = _cierreElegido;
       secciones.addAll([
         _titulo('Amigo secreto'),
@@ -980,7 +1023,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.regaloRobado)) {
+    if (_piezas.contains(Pieza.regaloRobado) && _puedePieza(Pieza.regaloRobado)) {
       secciones.addAll([
         _titulo('Regalo robado'),
         _numero(_topeRobado, 'Tope del regalo (opcional)'),
@@ -1007,7 +1050,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.dress)) {
+    if (_piezas.contains(Pieza.dress) && _puedePieza(Pieza.dress)) {
       final ideas = {...s.dress, ...kFestividades.expand((f) => f.sugerencias.dress)}.take(8);
       secciones.addAll([
         _titulo('Dress code o disfraces'),
@@ -1028,7 +1071,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.traer)) {
+    if (_piezas.contains(Pieza.traer) && _puedePieza(Pieza.traer)) {
       secciones.addAll([
         _titulo('Qué traer', ayuda: 'Cada quien se anota con lo que lleva. Cantidad vacía = sin límite.'),
         for (final t in _traer)
@@ -1066,7 +1109,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.premios)) {
+    if (_piezas.contains(Pieza.premios) && _puedePieza(Pieza.premios)) {
       secciones.addAll([
         _titulo('Premios o reconocimientos', ayuda: '"Para" es opcional: puedes decidirlo después.'),
         for (final x in _premios)
@@ -1105,7 +1148,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         ),
       ]);
     }
-    if (_piezas.contains(Pieza.invitados)) {
+    if (_piezas.contains(Pieza.invitados) && _puedePieza(Pieza.invitados)) {
       secciones.addAll([
         _titulo('+1 con enlace'),
         Text(
@@ -1119,7 +1162,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Text(
-            _piezas.contains(Pieza.homenaje) ? 'El homenaje se configura en el paso siguiente.' : 'Estas piezas no necesitan configuración.',
+            _piezas.contains(Pieza.homenaje) ? 'El homenaje se configura en el paso siguiente.' : 'Lo que elegiste no necesita configuración.',
             style: TextStyle(color: p.textoSecundario),
           ),
         ),
@@ -1158,7 +1201,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Pieza Homenaje'),
+                title: const Text('Homenaje'),
                 subtitle: const Text('Mensajes y regalo entre todxs para las personas homenajeadas'),
                 value: _piezas.contains(Pieza.homenaje),
                 onChanged: (v) => setState(() => v ? _piezas.add(Pieza.homenaje) : _piezas.remove(Pieza.homenaje)),
@@ -1251,7 +1294,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
                   });
                 }
               }, vacio: 'Solo las personas homenajeadas.'),
-              _titulo('¿Qué piezas ven?', ayuda: 'Homenaje, mensajes, regalo entre todxs y premios nunca los ven. Lo demás, sí, salvo que lo apagues.'),
+              _titulo('¿Qué ven?', ayuda: 'Homenaje, mensajes, regalo entre todxs y premios nunca los ven. Lo demás, sí, salvo que lo apagues.'),
               for (final pz in _elegibles.where(_piezas.contains))
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -1272,7 +1315,18 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   // ─── Paso 7: encargadxs ─────────────────────────────────────────────────
 
+  static const _permisosPorDefecto = {'fecha', 'amigo', 'comida', 'extras', 'invitados'};
+  static const _areas = [
+    ('fecha', 'Fecha, hora y lugar', Icons.event_outlined),
+    ('amigo', 'Amigo secreto y regalo robado', Icons.redeem_rounded),
+    ('comida', 'Comida y qué traer', Icons.restaurant_rounded),
+    ('extras', 'Playlist, dress code y premios', Icons.music_note_rounded),
+    ('invitados', 'Invitadxs (+1)', Icons.person_add_alt_rounded),
+    ('homenaje', 'Homenaje y sorpresa', Icons.favorite_border_rounded),
+  ];
+
   Widget _pasoEncargados(BuildContext context) {
+    final p = context.pivot;
     final yo = widget.sesion.nombre;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1280,13 +1334,54 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         _filaPersonas('Encargadxs', _encargados, () async {
           final r = await _elegirPersonas('Encargadxs', _encargados, excluir: {?yo, if (_sorpresa) ..._homenajeados, if (_sorpresa) ..._noEnterarse});
           if (r != null) {
-            setState(
-              () => _encargados
+            setState(() {
+              _encargados
                 ..clear()
-                ..addAll(r),
-            );
+                ..addAll(r);
+              _permisos.removeWhere((u, _) => !r.contains(u));
+              for (final u in r) {
+                _permisos.putIfAbsent(u, () => {..._permisosPorDefecto});
+              }
+            });
           }
         }, vacio: 'Solo tú por ahora.'),
+        // Qué puede cambiar cada encargadx (Victor, 2026-11-20). Quien crea el evento cambia todo.
+        if (_encargados.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('Quien crea el evento puede cambiar todo. Elige qué puede cambiar cada encargadx:', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          for (final u in _encargados)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _nombres({u}),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final (clave, texto, icono) in _areas)
+                        FilterChip(
+                          avatar: Icon(icono, size: 16),
+                          label: Text(texto),
+                          selected: _permisos[u]?.contains(clave) ?? false,
+                          onSelected: !_todo
+                              ? null
+                              : (v) => setState(() {
+                                  final s = _permisos.putIfAbsent(u, () => {..._permisosPorDefecto});
+                                  v ? s.add(clave) : s.remove(clave);
+                                }),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -1312,13 +1407,22 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
   Widget _pasoResumen(BuildContext context) {
     final p = context.pivot;
     final estado = widget.actual?.estadoAprobacion;
+    // Encargadxs: solo abren lo que les toca; el resto se ve con candado.
+    bool abre(_P paso) => switch (paso) {
+      _P.plantilla || _P.invitados || _P.encargados => _todo,
+      _P.datos => _todo || _puede('fecha'),
+      _P.piezas => _todo || Pieza.values.any(_puedePieza),
+      _P.config => _todo || ['amigo', 'comida', 'extras', 'invitados'].any(_puede),
+      _P.homenaje => _puede('homenaje'),
+      _ => true,
+    };
     Widget fila(_P paso, IconData icono, String titulo, String texto) => ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icono, color: p.marcaTexto),
+      leading: Icon(icono, color: abre(paso) ? p.marcaTexto : p.textoSecundario),
       title: Text(titulo),
       subtitle: Text(texto.isEmpty ? '—' : texto),
-      trailing: Icon(Icons.edit_outlined, size: 18, color: p.textoSecundario),
-      onTap: () => _ir(paso),
+      trailing: Icon(abre(paso) ? Icons.edit_outlined : Icons.lock_outline_rounded, size: 18, color: p.textoSecundario),
+      onTap: abre(paso) ? () => _ir(paso) : () => avisarSocial(context, 'Esto lo cambia quien creó el evento.'),
     );
     final hora = [if (_inicia != null) _hhmm(_inicia!), if (_termina != null) _hhmm(_termina!)].join(' – ');
     return ListView(
@@ -1345,7 +1449,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         fila(
           _P.piezas,
           Icons.widgets_outlined,
-          'Piezas',
+          'Qué tendrá',
           [
             for (final pz in Pieza.values)
               if (_piezas.contains(pz)) pz.titulo,
@@ -1449,6 +1553,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       'regaloTope': _n(_regaloTope),
       'regaloCompra': _regaloCompra,
       'encargados': _encargados.toList(),
+      if (_todo) 'permisos': {for (final u in _encargados) u: (_permisos[u] ?? _permisosPorDefecto).toList()},
     };
   }
 
