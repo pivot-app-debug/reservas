@@ -395,7 +395,6 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         key: const ValueKey('social'),
         children: [
           EncabezadoSocial(estado: e),
-          if (e.modulo('comida')) LoQueLlevasTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
@@ -405,7 +404,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
           if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
-          if (e.social?['traer'] == true) TraerTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+          // "Qué traer" ya está dentro de "Qué lleva cada quien" (Victor, 2026-11-20).
           if (e.premios != null) PremiosTarjeta(lista: e.premios!),
           // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
           if (e.aCargo.isNotEmpty) ACargoTarjeta(personas: e.aCargo, redes: _redes),

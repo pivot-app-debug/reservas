@@ -929,7 +929,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     final secciones = <Widget>[];
     if (_piezas.contains(Pieza.comida) && _puedePieza(Pieza.comida)) {
       secciones.addAll([
-        _titulo('¿Qué llevamos?', ayuda: 'Secciones de comida, bebida y cosas. Cada quien se anota con lo que lleva y todxs ven qué falta.'),
+        _titulo('Qué lleva cada quien', ayuda: 'Secciones de comida, bebida y cosas. Cada quien se anota con lo que lleva y todxs ven qué falta.'),
         for (final c in _cats)
           Padding(
             key: ObjectKey(c),

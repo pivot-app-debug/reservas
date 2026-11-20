@@ -737,16 +737,59 @@ class ComidaTarjeta extends StatelessWidget {
     // Lo que hace falta va primero.
     final cats = [...estado.comida.where((c) => c.falta && !c.cerrada), ...estado.comida.where((c) => !c.falta || c.cerrada)];
     final total = estado.conteo['total'] ?? 0;
+    final masUno = estado.conteo['invitados'] ?? 0;
     final admin = estado.puedeComida;
+    // Lo que llevas tú, arriba en la misma tarjeta (Victor, 2026-11-20: todo junto).
+    final mias = [
+      for (final c in estado.comida)
+        for (final a in c.aportes)
+          if (a['mio'] == true) (c, a),
+    ];
     return TarjetaSocial(
-      titulo: '¿Qué llevamos?',
+      titulo: 'Qué lleva cada quien',
       icono: Icons.restaurant_rounded,
       accion: admin ? IconButton(tooltip: 'Agregar sección', icon: const Icon(Icons.add_rounded), onPressed: () => _editar(context)) : null,
       children: [
         Text(
-          'Mira lo que ya lleva cada quien para no repetir. Van $total ${total == 1 ? 'persona' : 'personas'} (con sus +1).',
+          'Mira lo que ya lleva cada quien para no repetir. Van $total ${total == 1 ? 'persona' : 'personas'}'
+          '${masUno > 0 ? ' (${masUno == 1 ? 'incluye 1 invitadx' : 'incluye $masUno invitadxs'})' : ''}.',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
+        if (mias.isNotEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
+            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tú llevas',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                ),
+                for (final (c, a) in mias)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${'${a['detalle'] ?? ''}'.isEmpty ? c.nombre : a['detalle']}'
+                          '${c.porCosa ? '' : ' · ${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}${_para(a['paraTodxs'])}',
+                          style: TextStyle(color: p.sobreSuave),
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Quitar',
+                        icon: Icon(Icons.close_rounded, size: 18, color: p.sobreSuave),
+                        onPressed: () => _quitar(context, '${a['id']}'),
+                      ),
+                    ],
+                  ),
+                Text('Te lo recordamos el día anterior.', style: TextStyle(fontSize: 12, color: p.sobreSuave)),
+              ],
+            ),
+          ),
         if (!estado.asiste) ...[
           const SizedBox(height: 6),
           Text('Confirma tu asistencia para anotarte.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
@@ -893,59 +936,6 @@ class ComidaTarjeta extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// "Lo que llevas": todo lo que te anotaste en "¿Qué llevamos?" (Victor, 2026-11-20).
-class LoQueLlevasTarjeta extends StatelessWidget {
-  const LoQueLlevasTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar});
-  final SocialRepo repo;
-  final EstadoSocial estado;
-  final VoidCallback alCambiar;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final mias = [
-      for (final c in estado.comida)
-        for (final a in c.aportes)
-          if (a['mio'] == true) (c, a),
-    ];
-    if (mias.isEmpty) return const SizedBox.shrink();
-    return TarjetaSocial(
-      titulo: 'Lo que llevas',
-      icono: Icons.shopping_bag_outlined,
-      children: [
-        for (final (c, a) in mias)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${'${a['detalle'] ?? ''}'.isEmpty ? c.nombre : a['detalle']}'
-                  '${c.porCosa ? '' : ' · ${cantidadSocial(a['cantidad'] as num)} ${c.unidad}'}'
-                  '${ComidaTarjeta._para(a['paraTodxs'])}',
-                  style: TextStyle(color: p.texto),
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Quitar',
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: () async {
-                  try {
-                    await repo.quitarAporte('${a['id']}');
-                    alCambiar();
-                  } catch (e) {
-                    if (context.mounted) avisarSocial(context, e.toString());
-                  }
-                },
-              ),
-            ],
-          ),
-        const SizedBox(height: 4),
-        Text('Te lo recordamos el día anterior.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-      ],
     );
   }
 }
