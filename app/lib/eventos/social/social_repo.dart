@@ -53,6 +53,60 @@ class SocialRepo {
   Future<void> quitarAporte(String id) => _post('socialQuitarAporte', {'id': id});
 
   Future<Map<String, dynamic>> sortear({bool rehacer = false}) => _post('socialSortear', {'rehacer': rehacer});
+
+  /// Guarda lo que se editó en el asistente ("Social o fiesta"). `reenviar`:
+  /// vuelve a mandarlo a aprobar después de que un Pivot pidió cambios.
+  Future<Map<String, dynamic>> guardar(Map<String, Object?> datos, {bool reenviar = false}) =>
+      _post('socialGuardarConfig', {'datos': jsonEncode(datos), 'reenviar': reenviar});
+
+  Future<void> anotarTraer(String item, String detalle) => _post('socialAnotarTraer', {'item': item, 'detalle': detalle});
+
+  Future<void> quitarTraer(String id) => _post('socialQuitarTraer', {'id': id});
+
+  /// Mensaje para una persona homenajeada (vacío lo borra).
+  Future<void> mensaje(String para, String texto) => _post('socialMensaje', {'para': para, 'texto': texto});
+
+  /// Regalo entre todxs: solo anota cuánto aportas (0 lo quita). No pasa por Finanzas.
+  Future<void> aportarRegalo(num monto) => _post('socialAportarRegalo', {'monto': monto});
+
+  Future<void> liberarMensajes() => _post('socialLiberarMensajes');
+
+  /// Crea un "Social o fiesta" (cualquier persona de la liga). Devuelve el
+  /// id del evento, si quedó publicado y el mensaje para mostrar.
+  static Future<Map<String, dynamic>> crear(Api api, Map<String, Object?> datos, {String? adminToken}) async {
+    final r = await api.post('socialCrear', {'datos': jsonEncode(datos), 'adminToken': ?adminToken});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo crear el evento.'}');
+    return r;
+  }
+
+  /// Personas y equipos de la liga para elegir a quién invitar, homenajear o sumar como encargadx.
+  static Future<EquipoSocial> equipo(Api api, {String? adminToken}) async {
+    final r = await api.get('socialEquipo', {'adminToken': ?adminToken});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar la liga.'}');
+    return EquipoSocial(r);
+  }
+}
+
+class PersonaSocial {
+  const PersonaSocial({required this.username, required this.nombre, this.equipo = '', this.foto = ''});
+  final String username, nombre, equipo, foto;
+}
+
+class EquipoSocial {
+  EquipoSocial(Map<String, dynamic> r)
+    : personas = [
+        for (final x in (r['personas'] as List? ?? const []))
+          if (x is Map) PersonaSocial(username: '${x['username']}', nombre: '${x['nombre']}', equipo: '${x['equipo'] ?? ''}', foto: '${x['foto'] ?? ''}'),
+      ],
+      equipos = [for (final x in (r['equipos'] as List? ?? const [])) '$x'],
+      yo = r['yo'] as String?,
+      miEquipo = r['miEquipo'] as String?;
+
+  final List<PersonaSocial> personas;
+  final List<String> equipos;
+  final String? yo, miEquipo;
+
+  String nombreDe(String u) => personas.where((p) => p.username == u).firstOrNull?.nombre ?? u;
 }
 
 /// Respuesta de `socialGet`, con lecturas tipadas de lo que usa la interfaz.
@@ -67,6 +121,32 @@ class EstadoSocial {
   Map<String, dynamic> get conteo => Map<String, dynamic>.from((raw['conteo'] as Map?) ?? const {});
   Map<String, dynamic>? get admin => raw['admin'] is Map ? Map<String, dynamic>.from(raw['admin'] as Map) : null;
   bool get esPivot => raw['esPivot'] == true;
+
+  /// Quien creó el evento, sus encargadxs o un Pivot (que no esté en las listas de la sorpresa).
+  bool get organiza => raw['organiza'] == true;
+  bool get esInvitadx => raw['tipo'] == 'invitado';
+
+  /// 'organiza' | 'completa' | 'neutral' (homenajeadx o "no debe enterarse": lo ve como un evento normal).
+  String get vista => '${raw['vista'] ?? 'completa'}';
+  String get titulo => '${social?['titulo'] ?? ''}';
+  String? get sorpresa => social?['sorpresa'] as String?;
+  String get descripcion => '${social?['descripcion'] ?? ''}';
+
+  /// 'publicado' | 'por_aprobar' | 'rechazado'.
+  String get estadoAprobacion => '${social?['estado'] ?? 'publicado'}';
+  String get rechazoMotivo => '${social?['rechazoMotivo'] ?? ''}';
+  Map<String, dynamic>? get playlist => social?['playlist'] is Map ? Map<String, dynamic>.from(social!['playlist'] as Map) : null;
+  Map<String, dynamic>? get dress => social?['dress'] is Map ? Map<String, dynamic>.from(social!['dress'] as Map) : null;
+  List<Map<String, dynamic>>? get premios =>
+      social?['premios'] is List ? [for (final x in social!['premios'] as List) Map<String, dynamic>.from(x as Map)] : null;
+  String get reglasRobado => '${social?['reglasRobado'] ?? ''}';
+  bool get reglasPorDefecto => social?['reglasPorDefecto'] != false;
+  List<Map<String, dynamic>> get traer => [for (final x in (raw['traer'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+  Map<String, dynamic>? get homenaje => raw['homenaje'] is Map ? Map<String, dynamic>.from(raw['homenaje'] as Map) : null;
+  List<Map<String, dynamic>>? get paraTi => raw['paraTi'] is List ? [for (final x in raw['paraTi'] as List) Map<String, dynamic>.from(x as Map)] : null;
+
+  /// Configuración completa para editar (solo quien organiza).
+  Map<String, dynamic>? get editable => raw['editable'] is Map ? Map<String, dynamic>.from(raw['editable'] as Map) : null;
   bool get asiste => yo['asiste'] == true;
 
   bool modulo(String k) => social?[k] == true;

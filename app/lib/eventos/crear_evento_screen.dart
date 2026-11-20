@@ -12,8 +12,7 @@ import 'nuevo_lugar_screen.dart';
 import 'selector_fechas.dart';
 import '../core/config_liga.dart';
 import '../core/esqueleto.dart';
-import 'social/social_config_screen.dart';
-import 'social/social_repo.dart';
+import 'social/crear_social_screen.dart';
 import 'tipos_evento.dart';
 
 enum _Paso { tipo, lugar, detalles, frecuencia, fecha, hora, descanso }
@@ -208,22 +207,6 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
         horaFin: _fin == null ? null : _hhmm(_fin!),
       );
       if (!mounted) return;
-      // Evento social: se sigue directo a sus opciones (amigo secreto, comida, +1).
-      final venueId = widget.repo.ultimoVenueId;
-      if (_tipoEvento == kTipoSocial && primera != null && venueId != null && widget.repo.sesion.adminToken != null) {
-        final social = SocialRepo.miembro(
-          widget.repo.sesion.api,
-          idEvento: EventosRepo.idEventoDe(venueId, primera),
-          adminToken: widget.repo.sesion.adminToken,
-        );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => SocialConfigScreen(repo: social, fechaEvento: primera),
-          ),
-          result: primera,
-        );
-        return;
-      }
       Navigator.of(context).pop(primera ?? true);
     } catch (e) {
       if (mounted) {
@@ -532,6 +515,19 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
           activa: _recurrente == false,
           alTocar: () => elegir(false),
         ),
+        // Social o fiesta: su propio asistente por piezas (Victor, 2026-11-20).
+        _tarjetaOpcion(
+          context,
+          icono: Icons.celebration_outlined,
+          titulo: 'Social o fiesta',
+          texto: 'Fiesta, festividad, cumpleaños, aniversario o despedida',
+          activa: false,
+          alTocar: () async {
+            final nav = Navigator.of(context);
+            final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion)));
+            if (r is Map && mounted) nav.pop(r);
+          },
+        ),
         if (widget.repo.sesion.esAdmin)
           _tarjetaOpcion(
             context,
@@ -619,7 +615,8 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final c in _categorias)
+            // Social o fiesta tiene su propio asistente (primer paso).
+            for (final c in _categorias.where((c) => c != kTipoSocial))
               ChoiceChip(label: Text(etiquetaOpcionTipo(c)), selected: (_categoria ?? 'Entrenamiento') == c, onSelected: (_) => setState(() => _categoria = c)),
           ],
         ),

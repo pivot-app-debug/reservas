@@ -5,7 +5,7 @@ import '../core/api.dart';
 import '../sesion/sesion.dart';
 
 /// Tipos de pedido que esperan a un Pivot.
-enum TipoPedido { reserva, rectificacion, excepcion, lesion, tarea, prestamo, equipo, revisionEquipo, coach }
+enum TipoPedido { reserva, rectificacion, excepcion, lesion, tarea, prestamo, equipo, revisionEquipo, coach, social }
 
 /// Un pedido de la Bandeja de Pivots (`adminBandeja`).
 class Pedido {
@@ -237,6 +237,8 @@ class BandejaRepo extends ChangeNotifier {
       ...lista('cambiosEquipo', TipoPedido.equipo),
       ...lista('revisionesEquipo', TipoPedido.revisionEquipo),
       ...lista('coaches', TipoPedido.coach),
+      // Social o fiesta por aprobar (Victor, 2026-11-20).
+      ...lista('sociales', TipoPedido.social),
     ];
     cargado = true;
     error = null;
@@ -316,6 +318,12 @@ class BandejaRepo extends ChangeNotifier {
         TipoPedido.coach => await _api.post('adminCoaches', {'adminToken': token, 'accion': aprobar ? 'aprobar' : 'rechazar', 'username': p.nombre, ...extra}),
         TipoPedido.prestamo => await _api.post('adminPrestamo', {'adminToken': token, 'accion': aprobar ? 'aprobar' : 'rechazar', 'id': p.id, ...extra}),
         TipoPedido.lesion => await _api.post(aprobar ? 'adminAprobarLesion' : 'adminRechazarLesion', {'adminToken': token, 'nombre': p.nombre}),
+        // Social o fiesta: aprobar lo publica; rechazar le pide cambios a quien lo creó.
+        TipoPedido.social => await _api.post(aprobar ? 'socialAprobar' : 'socialRechazar', {
+          'adminToken': token,
+          'idEvento': p.id,
+          if (!aprobar && nota.trim().isNotEmpty) 'motivo': nota.trim(),
+        }),
         TipoPedido.tarea => await _api.post('adminValidarTarea', {
           'adminToken': token,
           'idAsignacion': p.id,

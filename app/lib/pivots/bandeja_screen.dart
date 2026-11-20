@@ -265,12 +265,13 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     (TipoPedido.equipo, 'Cambios de equipo', Icons.swap_vert_rounded),
     (TipoPedido.revisionEquipo, 'Revisión de cambios de equipo', Icons.rate_review_outlined),
     (TipoPedido.coach, 'Pedidos para ser coach', Icons.sports_rounded),
+    (TipoPedido.social, 'Social o fiesta por aprobar', Icons.celebration_outlined),
   ];
 
   Future<void> _resolver(Pedido p, bool aprobar) async {
     var nota = '';
     // Al rechazar una tarea o una excepción se puede explicar por qué.
-    if (!aprobar && (p.tipo == TipoPedido.tarea || p.tipo == TipoPedido.excepcion)) {
+    if (!aprobar && (p.tipo == TipoPedido.tarea || p.tipo == TipoPedido.excepcion || p.tipo == TipoPedido.social)) {
       final n = await _pedirNota(p);
       if (n == null || !mounted) return;
       nota = n;
@@ -322,7 +323,13 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
             content: Text(
               p.tipo == TipoPedido.revisionEquipo
                   ? (aprobar ? 'Se mantiene el cambio' : 'Vuelve a su equipo anterior')
-                  : (aprobar ? 'Aprobado' : (p.tipo == TipoPedido.equipo ? 'Se queda en su equipo este mes' : 'Rechazado')),
+                  : (aprobar
+                        ? (p.tipo == TipoPedido.social ? 'Publicado en el calendario' : 'Aprobado')
+                        : (p.tipo == TipoPedido.equipo
+                              ? 'Se queda en su equipo este mes'
+                              : p.tipo == TipoPedido.social
+                              ? 'Se pidieron cambios'
+                              : 'Rechazado')),
             ),
           ),
         );
@@ -479,7 +486,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     return showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('¿Por qué se rechaza?'),
+        title: Text(p.tipo == TipoPedido.social ? '¿Qué hay que cambiar?' : '¿Por qué se rechaza?'),
         content: TextField(
           controller: c,
           autofocus: true,
@@ -490,7 +497,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(d).pop(c.text), child: const Text('Rechazar')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(c.text), child: Text(p.tipo == TipoPedido.social ? 'Pedir cambios' : 'Rechazar')),
         ],
       ),
     );
@@ -807,6 +814,19 @@ class _CuentaCorte extends StatelessWidget {
         'Pidió ser coach',
         v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de Coach en Ajustes.' : 'Mensaje: ${v('mensaje')}',
       );
+    case TipoPedido.social:
+      final ev = x.evento;
+      final piezas = [for (final x in (m['piezas'] as List? ?? const [])) '$x'];
+      return (
+        '${v('titulo')}${f == null ? '' : ' · $cuando'}${'${ev?['hora'] ?? ''}'.isEmpty ? '' : ' · ${ev!['hora']}'}',
+        [
+          if ('${ev?['lugar'] ?? ''}'.isNotEmpty) 'Lugar: ${ev!['lugar']}',
+          'Invita a: ${v('para')}',
+          if (piezas.isNotEmpty) 'Piezas: ${piezas.join(', ')}',
+          if (v('sorpresa').isNotEmpty) '${v('sorpresa')}: no le cuentes.',
+          'Al aprobarlo se publica en el calendario de quienes están invitadxs.',
+        ].join('\n'),
+      );
     case TipoPedido.tarea:
       final t = x.tarea;
       return (
@@ -927,6 +947,7 @@ class _TarjetaPedido extends StatelessWidget {
       child: Text(switch (pedido.tipo) {
         TipoPedido.equipo => 'Dejar como está',
         TipoPedido.revisionEquipo => 'Devolver a ${pedido.m['de'] ?? 'su equipo'}',
+        TipoPedido.social => 'Pedir cambios',
         _ => 'Rechazar',
       }),
     ),

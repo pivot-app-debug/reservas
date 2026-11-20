@@ -19,6 +19,7 @@ import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
+import 'social/crear_social_screen.dart';
 import 'detalle_screen.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
@@ -1524,6 +1525,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           ? _Accion(Icons.event_available_outlined, 'Reserva por clase', () => _reservar(t))
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
     if (_esAdmin) _Accion(Icons.edit_calendar_outlined, 'Nuevo evento', _nuevoEvento),
+    // Cualquier persona de la liga arma un Social o fiesta (Victor, 2026-11-20).
+    if (repo.sesion.activa) _Accion(Icons.celebration_outlined, 'Social o fiesta', _nuevoSocial),
     // Las tareas se crean solo en Tareas (Victor, 2026-11-16).
     // Cursos ya no va aquí: tiene su botón arriba (Victor, 2026-11-17).
 
@@ -1563,12 +1566,32 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       final d = r['descanso'];
       if (d is DateTime) WidgetsBinding.instance.addPostFrameCallback((_) => _irA(d));
       if (r['curso'] == true) repo.cargar(forzar: true);
+      // Social o fiesta desde "Nuevo evento".
+      if (r['social'] != null) await _alCrearSocial(r);
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Evento creado. Se avisó al equipo.')));
     if (r is DateTime) {
       _cambiarFiltros(_limpiarFiltros);
       WidgetsBinding.instance.addPostFrameCallback((_) => _irA(r));
+    }
+  }
+
+  /// Social o fiesta: lo crea cualquiera; queda por aprobar hasta que un Pivot lo apruebe.
+  Future<void> _nuevoSocial() async {
+    _cerrarCalendario();
+    final r = await Navigator.of(context).push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: repo.sesion)));
+    if (r is! Map || !mounted) return;
+    await _alCrearSocial(r);
+  }
+
+  Future<void> _alCrearSocial(Map r) async {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${r['mensaje'] ?? 'Evento creado.'}')));
+    await repo.cargar(forzar: true);
+    final f = r['fecha'];
+    if (f is DateTime && mounted) {
+      _cambiarFiltros(_limpiarFiltros);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _irA(f));
     }
   }
 
@@ -1730,7 +1753,7 @@ class _TarjetaEvento extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          etiquetaTipoEvento(ev.tipo),
+                          ev.titulo,
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
@@ -1740,6 +1763,18 @@ class _TarjetaEvento extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(ev.lugar, style: TextStyle(fontSize: 13, color: apagado ? p.apagado : p.textoSecundario)),
+                        // Social o fiesta: sorpresa o aprobación pendiente (solo quien puede verlo).
+                        if (ev.socialSorpresa != null || (ev.socialEstado != null && ev.socialEstado != 'publicado')) ...[
+                          const SizedBox(height: 4),
+                          Etiqueta(
+                            texto: ev.socialEstado == 'por_aprobar'
+                                ? 'Por aprobar'
+                                : ev.socialEstado == 'rechazado'
+                                ? 'Necesita cambios'
+                                : ev.socialSorpresa!,
+                            icono: ev.socialEstado == 'publicado' || ev.socialEstado == null ? Icons.visibility_off_outlined : Icons.hourglass_top_rounded,
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -6,6 +6,7 @@ import '../../core/cargando.dart';
 import '../../core/fechas.dart';
 import '../../core/monedas_mundo.dart';
 import '../../core/tema.dart';
+import 'social_piezas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
 
@@ -61,7 +62,10 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
       titulo: '¡Hola, ${e.yo['nombre'] ?? ''}!',
       icono: Icons.celebration_outlined,
       children: [
-        Text('${anfitrion.isEmpty ? 'Te invitaron' : '$anfitrion te invitó'} al evento${liga.isEmpty ? '' : ' de $liga'}.', style: TextStyle(color: p.texto)),
+        Text(
+          '${anfitrion.isEmpty ? 'Te invitaron' : '$anfitrion te invitó'} a ${e.titulo.isEmpty ? 'un evento' : '"${e.titulo}"'}${liga.isEmpty ? '' : ' de $liga'}.',
+          style: TextStyle(color: p.texto),
+        ),
         const SizedBox(height: 10),
         if (fecha != null)
           Row(
@@ -132,6 +136,9 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
             if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _repo, estado: e, alCambiar: _cargar, simbolo: simbolo),
             if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, simbolo: simbolo),
             if (e.modulo('comida')) ComidaTarjeta(repo: _repo, estado: e, alCambiar: _cargar),
+            if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
+            if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
+            if (e.social?['traer'] == true) TraerTarjeta(repo: _repo, estado: e, alCambiar: _cargar),
           ],
         ),
       );

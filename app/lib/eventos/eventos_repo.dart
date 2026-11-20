@@ -280,7 +280,8 @@ class EventosRepo extends ChangeNotifier {
       final d = Fechas.iso(desde), h = Fechas.iso(hasta);
       unawaited(cola.cargar());
       final resultados = await Future.wait([
-        _api.get('getEventosRango', {'desde': d, 'hasta': h}),
+        // adminToken: un Pivot ve los Social o fiesta por aprobar (el servidor filtra la sorpresa).
+        _api.get('getEventosRango', {'desde': d, 'hasta': h, 'adminToken': ?sesion.adminToken}),
         _api.get('getCumpleañosRango', {'desde': d, 'hasta': h}).catchError((_) => <String, dynamic>{}),
         _api
             .restGet('temporadas_descanso?select=id,nombre,fecha_inicio,fecha_fin,reglas&fecha_fin=gte.$d&fecha_inicio=lte.$h&order=fecha_inicio.asc')
@@ -301,10 +302,14 @@ class EventosRepo extends ChangeNotifier {
       sinConexion = false;
       cola.hayConexion();
       // Copia para abrir la app sin señal (eventos y cumpleaños públicos;
-      // nada sensible).
+      // nada sensible: del Social o fiesta no se guarda el nombre ni la sorpresa).
+      final paraCache = [
+        for (final e in (resultados[0]['eventos'] as List? ?? const []))
+          if (e is Map) ({...e}..removeWhere((k, _) => '$k'.startsWith('social'))),
+      ];
       unawaited(
         SharedPreferences.getInstance().then(
-          (p) => p.setString(_prefCache, jsonEncode({'desde': d, 'hasta': h, 'eventos': resultados[0]['eventos'], 'cumpleanos': resultados[1]['cumpleanos']})),
+          (p) => p.setString(_prefCache, jsonEncode({'desde': d, 'hasta': h, 'eventos': paraCache, 'cumpleanos': resultados[1]['cumpleanos']})),
         ),
       );
       _aplicarCola();

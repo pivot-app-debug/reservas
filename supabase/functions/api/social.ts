@@ -1,20 +1,36 @@
-// Evento social (Naviquinde, Victor 2026-11-19; ver NAVIQUINDE.md y la
-// migración 20261119120000_evento_social.sql). Módulo propio para no
-// mezclarse con el resto de index.ts: `index.ts` solo deriva aquí las
-// acciones de ACCIONES_SOCIAL con sus helpers (cliente de la liga, sesión).
+// "Social o fiesta" (antes "Social"; Naviquinde, Victor 2026-11-19/20; ver
+// NAVIQUINDE.md y las migraciones 20261119120000_evento_social.sql y
+// 20261120100000_social_o_fiesta.sql). Módulo propio para no mezclarse con
+// el resto de index.ts: `index.ts` solo deriva aquí las acciones de
+// ACCIONES_SOCIAL con sus helpers (cliente de la liga, sesión, push).
+//
+// El valor guardado sigue siendo asistencias.tipo_evento = 'Social'. Se arma
+// por piezas (amigo secreto, regalo robado, comida, +1, playlist, dress code,
+// qué traer, homenaje, premios).
 //
 // Quién pide:
-//  - cuenta del equipo: `token` de sesión (clave = username);
+//  - cuenta de la liga: `token` de sesión (clave = username). Cualquiera crea
+//    uno (`socialCrear`); quien lo crea y sus encargadxs lo editan;
 //  - invitadx +1 sin cuenta: `invitadoToken` (clave = 'inv:<id>'). Solo ve lo
 //    suyo, su amigo secreto y la comida (sin nombres de otras personas);
-//  - Pivot: `adminToken` para configurar, aprobar y sortear.
-//  - Encargadxs (2ª ronda, Victor 2026-11-20): personas del equipo que un
-//    Pivot elige. Editan la configuración (queda "pendiente de aprobación"
-//    hasta que un Pivot la aprueba) y pueden cerrar la inscripción y sortear.
-//    El evento solo se ve en el calendario del resto cuando un Pivot lo
-//    aprobó (`aprobado_en`; ver filtrarEventosSociales).
+//  - Pivot: `adminToken`. Aprueba antes de que se publique (nunca una persona
+//    homenajeada ni alguien que no debe enterarse; si no queda ningún Pivot
+//    que pueda, se publica solo) y también organiza.
+//
+// Sorpresa: lxs homenajeadxs y quienes no deben enterarse reciben la vista
+// "neutral" (nombre neutro, lugar y hora; sin motivo, homenaje, mensajes,
+// regalo, premios ni la palabra sorpresa). Se aplica aquí, en el servidor:
+// nunca se manda al cliente lo que no debe ver (reglas en social_reglas.ts).
+//
+// Sin la migración 20261120100000: las filas no traen las columnas nuevas y
+// todo evento social cuenta como publicado y sin piezas nuevas (como en la
+// primera versión); solo `socialCrear` y las piezas nuevas fallan con aviso.
 
 import { type ParticipanteSorteo, sortearAmigoSecreto } from './social_sorteo.ts';
+import {
+  aprobadores, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, homenajeadxs, mensajesAbiertos, noEnterarse, personasEnSecreto, publicado,
+  puedeAprobar, tituloPara, type Vista, vistaDe,
+} from './social_reglas.ts';
 
 export interface DepsSocial {
   db: any;
@@ -22,16 +38,19 @@ export interface DepsSocial {
   validarAdminToken: (t: string) => Promise<string | null>;
   ligaEnCurso: () => string;
   push?: (p: any) => Promise<unknown>;
+  /// Pivots de la liga con su cuenta (`_administradorxs` de index.ts).
+  pivots?: () => Promise<{ username: string; email: string; nombre?: string }[]>;
   appUrl: string;
 }
 
 export const ACCIONES_SOCIAL = new Set([
-  'socialGet', 'socialGuardarConfig', 'socialAgregarInvitado', 'socialQuitarInvitado', 'socialGuardarPerfil',
+  'socialGet', 'socialCrear', 'socialGuardarConfig', 'socialAgregarInvitado', 'socialQuitarInvitado', 'socialGuardarPerfil',
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
-  'socialEquipo', 'socialAprobar', 'socialDescartarPendiente',
+  'socialEquipo', 'socialAprobar', 'socialRechazar',
+  'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes',
 ]);
 
-/// Plantilla de reglas del regalo robado (editable por encargadxs y Pivots).
+/// Plantilla de reglas del regalo robado (editable por quien organiza).
 /// `{tope}` se reemplaza en la app por el tope configurado.
 export const PLANTILLA_REGALO_ROBADO = [
   '1. Cada persona trae un regalo envuelto y sin nombre, de hasta {tope}. Solo juega quien trajo regalo.',
@@ -44,9 +63,14 @@ export const PLANTILLA_REGALO_ROBADO = [
   '8. Lo importante es pasarla bien juntxs: nada de enojos por un regalo.',
 ].join('\n');
 
+const PLANTILLAS = ['fiesta', 'festividad', 'cumpleanos', 'aniversario', 'despedida', 'personalizado'];
+
 type Quien = {
   tipo: 'miembro' | 'invitado' | 'pivot';
   clave: string | null;
+  /// Cuenta de la persona (también la de un Pivot que entra solo con adminToken, si tiene fila en `equipo`).
+  username: string | null;
+  categoria: string | null;
   nombre: string;
   idEvento: string;
   invitado?: any;
@@ -59,9 +83,14 @@ const MAX_LISTA = 30;
 const MAX_WISHLIST = 20;
 const MAX_FAVORITOS = 2;
 const DIAS_CIERRE = 14;
+const FALTA_MIGRACION = 'Falta aplicar la migración del Social o fiesta (20261120100000). Avísale a un Pivot.';
 
 function _texto(v: unknown, max: number): string {
   return String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function _textoLargo(v: unknown, max: number): string {
+  return String(v ?? '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
 }
 
 function _json(v: unknown): any {
@@ -84,20 +113,38 @@ function _tokenNuevo(): string {
   return btoa(String.fromCharCode(...b)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+function _idCorto(): string {
+  return crypto.randomUUID().substring(0, 8);
+}
+
 function _restarDias(iso: string, dias: number): string {
   const d = new Date(iso.substring(0, 10) + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() - dias);
   return d.toISOString().substring(0, 10);
 }
 
+function _ahoraEc(): string {
+  return new Date(Date.now() - 5 * 3600 * 1000).toISOString();
+}
+
 function _hoyEc(): string {
-  return new Date(Date.now() - 5 * 3600 * 1000).toISOString().substring(0, 10);
+  return _ahoraEc().substring(0, 10);
+}
+
+function _url(deps: DepsSocial, idEvento: string): string {
+  return `${deps.appUrl.replace(/\/+$/, '')}/?evento=${encodeURIComponent(idEvento)}`;
+}
+
+function _esFaltaColumna(e: any): boolean {
+  const m = String(e?.message ?? '');
+  return /column|schema cache|does not exist|relation/i.test(m);
 }
 
 export async function accionSocial(action: string, params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
   try {
     switch (action) {
       case 'socialGet': return await socialGet(params, deps);
+      case 'socialCrear': return await socialCrear(params, deps);
       case 'socialGuardarConfig': return await socialGuardarConfig(params, deps);
       case 'socialAgregarInvitado': return await socialAgregarInvitado(params, deps);
       case 'socialQuitarInvitado': return await socialQuitarInvitado(params, deps);
@@ -108,7 +155,12 @@ export async function accionSocial(action: string, params: Record<string, any>, 
       case 'socialSortear': return await socialSortear(params, deps);
       case 'socialEquipo': return await socialEquipo(params, deps);
       case 'socialAprobar': return await socialAprobar(params, deps);
-      case 'socialDescartarPendiente': return await socialDescartarPendiente(params, deps);
+      case 'socialRechazar': return await socialRechazar(params, deps);
+      case 'socialAnotarTraer': return await socialAnotarTraer(params, deps);
+      case 'socialQuitarTraer': return await socialQuitarTraer(params, deps);
+      case 'socialMensaje': return await socialMensaje(params, deps);
+      case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
+      case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
   } catch (e) {
@@ -118,22 +170,33 @@ export async function accionSocial(action: string, params: Record<string, any>, 
 
 // ─── Identidad y lecturas comunes ─────────────────────────────────────────
 
+async function _cuentaDePivot(db: any, email: string): Promise<any | null> {
+  const { data } = await db.from('equipo').select('username, nombre_derby, categoria').ilike('email', email).is('eliminado_en', null).limit(1);
+  return (data ?? [])[0] ?? null;
+}
+
 async function _quien(params: Record<string, any>, deps: DepsSocial): Promise<Quien | { error: string }> {
   const pivotEmail = params.adminToken ? await deps.validarAdminToken(String(params.adminToken)) : null;
   if (params.invitadoToken) {
     const { data: inv } = await deps.db.from('social_invitados').select('*').eq('token', String(params.invitadoToken)).maybeSingle();
     if (!inv) return { error: 'Este enlace ya no es válido. Pide uno nuevo a quien te invitó.' };
-    return { tipo: 'invitado', clave: 'inv:' + inv.id, nombre: inv.nombre, idEvento: inv.id_evento, invitado: inv, esPivot: false, pivotEmail: null };
+    return { tipo: 'invitado', clave: 'inv:' + inv.id, username: null, categoria: null, nombre: inv.nombre, idEvento: inv.id_evento, invitado: inv, esPivot: false, pivotEmail: null };
   }
   const idEvento = _texto(params.idEvento, 200);
   if (!idEvento) return { error: 'Evento inválido.' };
   const username = params.token ? await deps.validarToken(String(params.token)) : null;
   if (username) {
-    const { data: eq } = await deps.db.from('equipo').select('username, nombre_derby').eq('username', username).maybeSingle();
+    const { data: eq } = await deps.db.from('equipo').select('username, nombre_derby, categoria').eq('username', username).maybeSingle();
     const nombre = (eq?.nombre_derby ?? '').trim() || username;
-    return { tipo: 'miembro', clave: username, nombre, idEvento, esPivot: !!pivotEmail, pivotEmail };
+    return { tipo: 'miembro', clave: username, username, categoria: eq?.categoria ?? null, nombre, idEvento, esPivot: !!pivotEmail, pivotEmail };
   }
-  if (pivotEmail) return { tipo: 'pivot', clave: null, nombre: pivotEmail, idEvento, esPivot: true, pivotEmail };
+  if (pivotEmail) {
+    const cuenta = await _cuentaDePivot(deps.db, pivotEmail);
+    return {
+      tipo: 'pivot', clave: null, username: cuenta?.username ?? null, categoria: cuenta?.categoria ?? null,
+      nombre: (cuenta?.nombre_derby ?? '').trim() || cuenta?.username || pivotEmail, idEvento, esPivot: true, pivotEmail,
+    };
+  }
   return { error: 'Tu sesión venció. Vuelve a iniciar sesión.' };
 }
 
@@ -147,13 +210,23 @@ async function _evento(db: any, idEvento: string): Promise<any | null> {
   return data ?? null;
 }
 
-function _encargados(cfg: any): string[] {
-  return Array.isArray(cfg?.encargados) ? cfg.encargados.map((x: unknown) => String(x)) : [];
+/// Qué ve quien pide. Lx +1 hereda de quien lx invitó (si a esa persona se le
+/// esconde la sorpresa, a su +1 también).
+function _vista(q: Quien, cfg: any): Vista {
+  if (q.tipo === 'invitado') {
+    if (!cfg) return 'completa';
+    if (!publicado(cfg)) return 'oculta';
+    return esSecretoPara(cfg, q.invitado.anfitrion) ? 'neutral' : 'completa';
+  }
+  return vistaDe(cfg, { username: q.username, esPivot: q.esPivot, categoria: q.categoria });
 }
 
-/// Pivots y encargadxs organizan (editan, sortean).
 function _organiza(q: Quien, cfg: any): boolean {
-  return q.esPivot || (q.tipo === 'miembro' && !!q.clave && _encargados(cfg).includes(q.clave));
+  return _vista(q, cfg) === 'organiza';
+}
+
+function _piezas(cfg: any): Record<string, any> {
+  return cfg?.piezas && typeof cfg.piezas === 'object' ? cfg.piezas : {};
 }
 
 /// Usernames con "Asistiré" como última respuesta.
@@ -172,10 +245,11 @@ async function _invitados(db: any, idEvento: string): Promise<any[]> {
 
 async function _personas(db: any, usernames: string[]): Promise<Map<string, { nombre: string; foto: string }>> {
   const out = new Map<string, { nombre: string; foto: string }>();
-  if (!usernames.length) return out;
-  const { data } = await db.from('equipo').select('username, nombre_derby, foto_perfil').in('username', usernames);
+  const unicos = [...new Set(usernames.filter(Boolean))];
+  if (!unicos.length) return out;
+  const { data } = await db.from('equipo').select('username, nombre_derby, foto_perfil').in('username', unicos);
   for (const r of data ?? []) out.set(r.username, { nombre: (r.nombre_derby ?? '').trim() || r.username, foto: r.foto_perfil ?? '' });
-  for (const u of usernames) if (!out.has(u)) out.set(u, { nombre: u, foto: '' });
+  for (const u of unicos) if (!out.has(u)) out.set(u, { nombre: u, foto: '' });
   return out;
 }
 
@@ -215,10 +289,25 @@ function _enlace(deps: DepsSocial, token: string): string {
   return `${deps.appUrl.replace(/\/+$/, '')}/?social=${encodeURIComponent(token)}`;
 }
 
-/// Si quien pide participa del evento (para la comida): Asistiré, o +1 de alguien que asiste.
+/// Si quien pide participa del evento: Asistiré, o +1 de alguien que asiste.
 function _asiste(q: Quien, asisten: Set<string>): boolean {
   if (q.tipo === 'invitado') return asisten.has(q.invitado.anfitrion);
   return !!q.clave && asisten.has(q.clave);
+}
+
+/// ¿Ya terminó el evento? (hora de pared de Ecuador).
+function _termino(ev: any): boolean {
+  const hoy = _hoyEc();
+  const fecha = String(ev?.fecha ?? '').substring(0, 10);
+  if (!fecha || fecha < hoy) return !!fecha;
+  if (fecha > hoy) return false;
+  const fin = String(ev?.termina ?? '').substring(0, 5);
+  return !!fin && _ahoraEc().substring(11, 16) >= fin;
+}
+
+function _estado(cfg: any): 'publicado' | 'rechazado' | 'por_aprobar' {
+  if (publicado(cfg)) return 'publicado';
+  return cfg?.rechazado_en ? 'rechazado' : 'por_aprobar';
 }
 
 // ─── socialGet ────────────────────────────────────────────────────────────
@@ -231,38 +320,57 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   if (!ev) return { exito: false, error: 'No encontramos este evento.' };
   const cfg = await _config(db, q.idEvento);
   const { data: ligaRow } = await db.from('ligas').select('nombre, moneda').eq('id', liga).maybeSingle();
+  const vista = _vista(q, cfg);
+  if (vista === 'oculta') return { exito: false, error: 'Este evento todavía no está publicado.' };
+  const neutral = vista === 'neutral', organiza = vista === 'organiza', esInv = q.tipo === 'invitado';
   const evento = {
     id: ev.id_evento, fecha: ev.fecha, lugar: ev.donde, inicia: ev.inicia, termina: ev.termina, tipo: ev.tipo_evento,
-    estado: ev.estado, info: ev.info_adicional ?? '', mapa: q.tipo === 'invitado' ? (ev.google_maps ?? '') : undefined,
+    estado: ev.estado, info: neutral ? '' : (ev.info_adicional ?? ''), mapa: esInv ? (ev.google_maps ?? '') : undefined,
     liga: ligaRow?.nombre ?? '', moneda: ligaRow?.moneda ?? '',
   };
-  if (!cfg) return { exito: true, social: null, evento, esPivot: q.esPivot };
-  const organiza = _organiza(q, cfg);
-  if (!cfg.aprobado_en && !organiza) return { exito: false, error: 'Este evento todavía no está publicado.' };
+  if (!cfg) return { exito: true, social: null, evento, esPivot: q.esPivot, organiza, vista };
 
-  const [asisten, invitados, sorteo] = await Promise.all([
+  const piezas = _piezas(cfg);
+  const hom = homenajeadxs(cfg);
+  const yoHomenajeadx = !!q.username && hom.includes(q.username);
+  const [asisten, invitados, sorteo, personas] = await Promise.all([
     _asistentes(db, q.idEvento),
     _invitados(db, q.idEvento),
     db.from('social_sorteo').select('da, recibe, revelado_en').eq('id_evento', q.idEvento).then((r: any) => r.data ?? []),
+    _personas(db, [...hom, ...noEnterarse(cfg), ...encargadxs(cfg), cfg.creador ?? '', cfg.regalo_compra ?? '']),
   ]);
+  const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
   const invitadosQueCuentan = invitados.filter((i) => asisten.has(i.anfitrion));
   const total = asisten.size + invitadosQueCuentan.length;
   const cierre = cfg.cierre ?? _restarDias(ev.fecha, DIAS_CIERRE);
-  const social = {
+  // Lo que ve la vista neutral: nada del motivo, del homenaje ni de la sorpresa.
+  const social: Record<string, any> = {
     amigoSecreto: cfg.amigo_secreto, regaloRobado: cfg.regalo_robado, comida: cfg.comida, invitados: cfg.invitados,
     topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
     cierre, inscripcionAbierta: !cfg.sorteado_en && _hoyEc() <= cierre, sorteado: !!cfg.sorteado_en,
     reglasRobado: cfg.reglas_robado ?? PLANTILLA_REGALO_ROBADO, reglasPorDefecto: !cfg.reglas_robado,
-    aprobado: !!cfg.aprobado_en,
+    titulo: tituloPara(cfg, vista, nombreDe),
+    sorpresa: esInv ? null : etiquetaSorpresa(cfg, vista, nombreDe),
+    plantilla: neutral ? null : (cfg.plantilla ?? null),
+    festividad: neutral ? null : (cfg.festividad ?? null),
+    descripcion: neutral ? '' : (cfg.descripcion ?? ''),
+    estado: _estado(cfg),
+    rechazoMotivo: organiza ? (cfg.rechazo_motivo ?? '') : '',
+    aprobado: publicado(cfg),
+    playlist: piezas.playlist ? { link: piezas.playlist.link ?? '', nota: piezas.playlist.nota ?? '' } : null,
+    dress: piezas.dress ? { texto: piezas.dress.texto ?? '' } : null,
+    traer: !!piezas.traer,
+    premios: !neutral && !esInv && piezas.premios ? (piezas.premios.lista ?? []) : null,
+    homenaje: !neutral && !esInv && !yoHomenajeadx && !!piezas.homenaje && hom.length > 0,
   };
 
-  const out: Record<string, any> = { exito: true, social, evento, esPivot: q.esPivot, tipo: q.tipo, organiza };
+  const out: Record<string, any> = { exito: true, social, evento, esPivot: q.esPivot, tipo: q.tipo, organiza, vista };
   out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null };
-  if (q.tipo === 'invitado') out.yo.anfitrion = (await _personas(db, [q.invitado.anfitrion])).get(q.invitado.anfitrion)?.nombre ?? '';
+  if (esInv) out.yo.anfitrion = (await _personas(db, [q.invitado.anfitrion])).get(q.invitado.anfitrion)?.nombre ?? '';
   // Lxs +1 no ven la lista de asistentes, solo cuántxs son (para la comida).
   out.conteo = { asistentes: asisten.size, invitados: invitadosQueCuentan.length, total };
 
-  if (q.tipo === 'miembro') {
+  if (q.tipo !== 'invitado' && q.clave) {
     out.misInvitados = invitados.filter((i) => i.anfitrion === q.clave).map((i) => ({
       id: i.id, nombre: i.nombre, contacto: i.contacto ?? '', enlace: _enlace(deps, i.token),
       enSorteo: sorteo.some((s: any) => s.da === 'inv:' + i.id),
@@ -293,23 +401,76 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
         id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
         cerrada: meta > 0 && aportado >= meta,
         // Lxs +1 solo ven lo que llevan ellxs.
-        aportes: ap.filter((a: any) => q.tipo !== 'invitado' || a.clave === q.clave).map((a: any) => ({
+        aportes: ap.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({
           id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave,
         })),
       };
     });
   }
 
-  if (organiza) {
-    const enc = _encargados(cfg);
-    const nombres = await _personas(db, enc);
-    out.encargados = enc.map((u) => ({ username: u, nombre: nombres.get(u)?.nombre ?? u }));
-    out.esEncargadx = q.tipo === 'miembro' && enc.includes(q.clave ?? '');
-    if (cfg.pendiente) {
-      out.pendiente = { ...cfg.pendiente, por: cfg.pendiente_por ?? '', en: cfg.pendiente_en };
-    }
+  // Qué traer: lo arma quien organiza; cada quien se anota.
+  if (piezas.traer) {
+    const items: any[] = Array.isArray(piezas.traer.items) ? piezas.traer.items : [];
+    const { data: anotes } = await db.from('social_traer_anotes').select('*').eq('id_evento', q.idEvento).order('created_at');
+    out.traer = items.map((it: any) => {
+      const de = (anotes ?? []).filter((a: any) => a.item === it.id);
+      const cantidad = _num(it.cantidad);
+      return {
+        id: it.id, texto: it.texto, cantidad, anotados: de.length, completo: !!cantidad && de.length >= cantidad,
+        personas: de.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({ id: a.id, nombre: a.nombre, detalle: a.detalle ?? '', mio: a.clave === q.clave })),
+      };
+    });
   }
+
+  // Homenaje (nunca para la vista neutral, lxs +1 ni lxs homenajeadxs).
+  if (social.homenaje) {
+    const h = piezas.homenaje ?? {};
+    const bloque: Record<string, any> = {
+      personas: hom.map((u) => ({ username: u, nombre: nombreDe(u), foto: personas.get(u)?.foto ?? '' })),
+      liberados: !!cfg.mensajes_liberados_en,
+      mensajes: h.mensajes !== false,
+      regalo: null,
+    };
+    if (h.mensajes !== false) {
+      const { data: ms } = await db.from('social_mensajes').select('para, clave, texto').eq('id_evento', q.idEvento);
+      const conteo: Record<string, number> = {};
+      const mios: Record<string, string> = {};
+      for (const m of ms ?? []) {
+        conteo[m.para] = (conteo[m.para] ?? 0) + 1;
+        if (m.clave === q.clave) mios[m.para] = m.texto;
+      }
+      bloque.conteo = conteo;
+      bloque.mios = mios;
+    }
+    if (h.regalo) {
+      const { data: ap } = await db.from('social_regalo_aportes').select('*').eq('id_evento', q.idEvento).order('created_at');
+      const lista = (ap ?? []).map((a: any) => ({ id: a.id, nombre: a.nombre, monto: Number(a.monto), mio: a.clave === q.clave }));
+      bloque.regalo = {
+        tope: cfg.regalo_tope == null ? null : Number(cfg.regalo_tope),
+        nota: _texto(h.regaloNota, 300),
+        compra: cfg.regalo_compra ? { username: cfg.regalo_compra, nombre: nombreDe(cfg.regalo_compra) } : null,
+        aportes: lista,
+        total: lista.reduce((s: number, a: any) => s + a.monto, 0),
+      };
+    }
+    out.homenaje = bloque;
+  }
+  // Mensajes para la persona homenajeada: después del evento o cuando se liberan.
+  if (yoHomenajeadx && piezas.homenaje && piezas.homenaje.mensajes !== false && mensajesAbiertos(cfg, _termino(ev))) {
+    const { data: ms } = await db.from('social_mensajes').select('nombre, texto, created_at').eq('id_evento', q.idEvento).eq('para', q.username).order('created_at');
+    out.paraTi = (ms ?? []).map((m: any) => ({ nombre: m.nombre, texto: m.texto }));
+  }
+
   if (organiza) {
+    out.editable = {
+      plantilla: cfg.plantilla ?? null, festividad: cfg.festividad ?? null, nombre: cfg.nombre ?? '', nombreNeutro: cfg.nombre_neutro ?? '',
+      descripcion: cfg.descripcion ?? '', para: cfg.para ?? { tipo: 'liga', valores: [] }, sorpresa: !!cfg.sorpresa,
+      homenajeados: hom, noEnterarse: noEnterarse(cfg), encargados: encargadxs(cfg), piezas,
+      regaloTope: cfg.regalo_tope == null ? null : Number(cfg.regalo_tope), regaloCompra: cfg.regalo_compra ?? null,
+      reglasRobado: cfg.reglas_robado ?? '', creador: cfg.creador ?? null, mapa: ev.google_maps ?? '',
+      nombres: Object.fromEntries([...personas].map(([u, p]) => [u, p.nombre])),
+      migracion: 'aprobado_en' in cfg,
+    };
     const ps = _participantes(asisten, invitados);
     out.admin = {
       participantes: ps.length,
@@ -321,75 +482,15 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   return out;
 }
 
-// ─── Configuración (solo Pivots) ──────────────────────────────────────────
+// ─── Datos del asistente (crear y editar) ─────────────────────────────────
 
-async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
-  const db = deps.db, liga = deps.ligaEnCurso();
-  const q = await _quien(params, deps);
-  if ('error' in q) return { exito: false, error: q.error };
-  const idEvento = q.idEvento;
-  const ev = await _evento(db, idEvento);
-  if (!ev) return { exito: false, error: 'No encontramos este evento.' };
-  if (ev.tipo_evento !== 'Social') return { exito: false, error: 'Solo los eventos de tipo Social tienen estas opciones.' };
-  const previa = await _config(db, idEvento);
-  if (!previa && !q.esPivot) return { exito: false, error: 'Solo un Pivot puede crear el evento social.' };
-  if (previa && !_organiza(q, previa)) return { exito: false, error: 'Solo Pivots y encargadxs pueden cambiar el evento.' };
-  const cambios = { config: _json(params.config) ?? {}, categorias: _json(params.categorias), evento: _json(params.evento) ?? {} };
-  if (q.esPivot) {
-    const r = await _aplicarConfig(db, liga, ev, previa, cambios, q.pivotEmail!, true);
-    if (!r.exito) return r;
-    if (params.publicar === true || params.publicar === 'true') {
-      const pub = await _publicar(db, deps, idEvento, q.pivotEmail!);
-      if (!pub.exito) return pub;
-    }
-    return r;
-  }
-  // Encargadx: queda pendiente hasta que un Pivot lo apruebe.
-  const resumen = await _resumenCambios(db, ev, previa, cambios);
-  if (!resumen.length) return { exito: true, pendiente: false, avisos: ['No hay cambios.'] };
-  const { error } = await db.from('social_eventos').update({
-    pendiente: { ...cambios, resumen }, pendiente_por: q.nombre, pendiente_en: new Date().toISOString(),
-  }).eq('id_evento', idEvento);
-  if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
-  return { exito: true, pendiente: true, avisos: ['Tus cambios quedan pendientes hasta que un Pivot los apruebe.'] };
-}
-
-/// Qué cambia una propuesta, en palabras (para quien aprueba).
-async function _resumenCambios(db: any, ev: any, cfg: any, cambios: any): Promise<string[]> {
-  const c = cambios.config ?? {}, e = cambios.evento ?? {};
-  const out: string[] = [];
-  const si = (b: boolean) => (b ? 'sí' : 'no');
-  const bool = (k: string, col: string, etiqueta: string, def: boolean) => {
-    if (c[k] === undefined) return;
-    const nuevo = def ? c[k] !== false : c[k] === true;
-    if (nuevo !== !!cfg?.[col]) out.push(`${etiqueta}: ${si(nuevo)}`);
-  };
-  bool('amigoSecreto', 'amigo_secreto', 'Amigo secreto', true);
-  bool('regaloRobado', 'regalo_robado', 'Regalo robado', false);
-  bool('comida', 'comida', 'Comida compartida', true);
-  bool('invitados', 'invitados', 'Se admiten +1', true);
-  const num = (k: string, col: string, etiqueta: string) => {
-    if (c[k] === undefined) return;
-    const a = cfg?.[col] == null ? null : Number(cfg[col]), b = _num(c[k]);
-    if (a !== b) out.push(`${etiqueta}: ${a ?? 'sin tope'} → ${b ?? 'sin tope'}`);
-  };
-  num('topeAmigo', 'tope_amigo', 'Tope del amigo secreto');
-  num('topeRobado', 'tope_robado', 'Tope del regalo robado');
-  if (c.recordatorioRobado !== undefined && (_texto(c.recordatorioRobado, 300) || null) !== (cfg?.recordatorio_robado ?? null)) out.push('Recordatorio del regalo robado');
-  if (c.reglasRobado !== undefined && _reglas(c.reglasRobado) !== (cfg?.reglas_robado ?? null)) out.push('Reglas del regalo robado');
-  if (typeof c.cierre === 'string' && c.cierre !== cfg?.cierre) out.push(`Cierre de la inscripción: ${c.cierre}`);
-  if (e.lugar !== undefined && _texto(e.lugar, 120) && _texto(e.lugar, 120) !== (ev.donde ?? '')) out.push(`Lugar: ${_texto(e.lugar, 120)}`);
-  if (e.mapa !== undefined && _texto(e.mapa, 500) !== (ev.google_maps ?? '')) out.push('Enlace del mapa');
-  const h = (x: unknown) => String(x ?? '').substring(0, 5);
-  if ((e.inicia !== undefined && _hora(e.inicia) && _hora(e.inicia) !== h(ev.inicia)) || (e.termina !== undefined && (_hora(e.termina) ?? '') !== h(ev.termina))) {
-    out.push(`Horario: ${_hora(e.inicia) ?? h(ev.inicia)}${_hora(e.termina) ? ' – ' + _hora(e.termina) : ''}`);
-  }
-  if (Array.isArray(cambios.categorias)) {
-    const { data: actuales } = await db.from('social_comida_categorias').select('id, nombre, unidad, por_persona').eq('id_evento', ev.id_evento).order('orden');
-    const firma = (xs: any[]) => JSON.stringify(xs.map((x) => [x.id ?? null, _texto(x.nombre, 60), _texto(x.unidad, 30) || 'porciones', Number(x.por_persona ?? x.porPersona ?? 1)]));
-    if (firma((actuales ?? []).map((x: any) => x)) !== firma(cambios.categorias.filter((x: any) => _texto(x?.nombre, 60)))) out.push('Categorías de comida');
-  }
-  return out;
+/// Usernames que existen en la liga (sin archivadxs).
+async function _existentes(db: any, v: unknown, max = 200): Promise<string[]> {
+  const pedidos = [...new Set((Array.isArray(v) ? v : []).map((x: unknown) => _texto(x, 80)).filter(Boolean))].slice(0, max) as string[];
+  if (!pedidos.length) return [];
+  const { data } = await db.from('equipo').select('username').in('username', pedidos).is('eliminado_en', null);
+  const ok = new Set((data ?? []).map((r: any) => r.username));
+  return pedidos.filter((u) => ok.has(u));
 }
 
 function _hora(v: unknown): string | null {
@@ -402,105 +503,375 @@ function _reglas(v: unknown): string | null {
   return t && t !== PLANTILLA_REGALO_ROBADO ? t : null;
 }
 
-/// Aplica una configuración (de un Pivot, o una propuesta aprobada).
-async function _aplicarConfig(db: any, liga: string, ev: any, previa: any, cambios: any, email: string, conEncargados: boolean): Promise<Record<string, any>> {
-  const idEvento = ev.id_evento;
-  const c = cambios.config ?? {};
-  const limite = _restarDias(ev.fecha, DIAS_CIERRE);
-  let cierre = typeof c.cierre === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.cierre) ? c.cierre : (previa?.cierre ?? limite);
-  if (cierre > limite) cierre = limite;
-  const fila: Record<string, any> = {
-    id_evento: idEvento,
-    amigo_secreto: c.amigoSecreto !== false,
-    regalo_robado: c.regaloRobado === true,
-    comida: c.comida !== false,
-    invitados: c.invitados !== false,
-    tope_amigo: _num(c.topeAmigo),
-    tope_robado: _num(c.topeRobado),
-    recordatorio_robado: _texto(c.recordatorioRobado, 300) || null,
-    reglas_robado: c.reglasRobado === undefined ? (previa?.reglas_robado ?? null) : _reglas(c.reglasRobado),
-    cierre,
-    pendiente: null, pendiente_por: null, pendiente_en: null,
-    liga_id: liga,
-  };
-  if (conEncargados && Array.isArray(c.encargados)) {
-    const pedidos = [...new Set(c.encargados.map((x: unknown) => _texto(x, 80)).filter(Boolean))].slice(0, 10) as string[];
-    const { data: existen } = pedidos.length ? await db.from('equipo').select('username').in('username', pedidos).is('eliminado_en', null) : { data: [] };
-    fila.encargados = (existen ?? []).map((r: any) => r.username);
-  }
-  if (!previa) fila.creado_por = email;
-  const { error } = await db.from('social_eventos').upsert(fila, { onConflict: 'id_evento' });
-  if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
-
-  // Lugar y horario: en el evento y en su regla (venue), porque la
-  // regeneración de la ventana copia los datos del venue al evento.
-  const e = cambios.evento ?? {};
-  const cambioEv: Record<string, any> = {};
-  const cambioVenue: Record<string, any> = {};
-  const lugar = _texto(e.lugar, 120);
-  if (e.lugar !== undefined && lugar && lugar !== ev.donde) (cambioEv.donde = lugar, cambioVenue.lugar = lugar);
-  if (e.mapa !== undefined) {
-    const mapa = _texto(e.mapa, 500) || null;
-    if (mapa !== (ev.google_maps ?? null)) (cambioEv.google_maps = mapa, cambioVenue.google_maps = mapa);
-  }
-  if (e.inicia !== undefined && _hora(e.inicia)) (cambioEv.inicia = _hora(e.inicia), cambioVenue.inicia = _hora(e.inicia));
-  if (e.termina !== undefined) (cambioEv.termina = _hora(e.termina), cambioVenue.finaliza = _hora(e.termina));
-  if (Object.keys(cambioEv).length) {
-    const { error: e1 } = await db.from('asistencias').update(cambioEv).eq('id_evento', idEvento);
-    if (e1) return { exito: false, error: 'No se pudo cambiar el lugar u horario: ' + e1.message };
-    if (ev.id_regla) await db.from('venues').update(cambioVenue).eq('id', ev.id_regla);
-  }
-
-  // Categorías de la comida: se actualizan por id; las que se quitan se
-  // borran solo si nadie se anotó todavía.
-  const cats = cambios.categorias;
-  const avisos: string[] = [];
-  if (Array.isArray(cats)) {
-    const { data: actuales } = await db.from('social_comida_categorias').select('id, nombre').eq('id_evento', idEvento);
-    const vistos = new Set<string>();
-    let orden = 0;
-    for (const x of cats.slice(0, 20)) {
-      const nombre = _texto(x?.nombre, 60);
-      if (!nombre) continue;
-      const datos = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
-      const id = typeof x?.id === 'string' && (actuales ?? []).some((a: any) => a.id === x.id) ? x.id : null;
-      if (id) {
-        vistos.add(id);
-        await db.from('social_comida_categorias').update(datos).eq('id', id);
-      } else {
-        await db.from('social_comida_categorias').insert({ ...datos, id_evento: idEvento, liga_id: liga });
-      }
-    }
-    for (const a of actuales ?? []) {
-      if (vistos.has(a.id)) continue;
-      const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', a.id);
-      if ((count ?? 0) > 0) avisos.push(`"${a.nombre}" no se quitó porque ya hay personas anotadas.`);
-      else await db.from('social_comida_categorias').delete().eq('id', a.id);
-    }
-  }
-  return { exito: true, cierre, avisos };
+function _link(v: unknown): string {
+  let l = _texto(v, 500);
+  if (l && !/^https?:\/\//i.test(l)) l = 'https://' + l;
+  return l;
 }
 
-/// Publica el evento (lo ve todo el equipo) y avisa la primera vez.
+/// Piezas nuevas (jsonb `piezas`): solo las que vienen prendidas.
+function _leerPiezas(v: any): Record<string, any> {
+  const p = v && typeof v === 'object' ? v : {};
+  const out: Record<string, any> = {};
+  if (p.playlist) out.playlist = { link: _link(p.playlist.link), nota: _texto(p.playlist.nota, 200) };
+  if (p.dress) out.dress = { texto: _textoLargo(p.dress.texto, 400) };
+  if (p.traer) {
+    const items = (Array.isArray(p.traer.items) ? p.traer.items : []).slice(0, 40).map((x: any) => ({
+      id: typeof x?.id === 'string' && /^[\w-]{1,40}$/.test(x.id) ? x.id : _idCorto(),
+      texto: _texto(x?.texto, 80),
+      cantidad: _num(x?.cantidad) ? Math.min(99, Math.floor(_num(x?.cantidad)!)) : null,
+    })).filter((x: any) => x.texto);
+    out.traer = { items };
+  }
+  if (p.premios) {
+    const lista = (Array.isArray(p.premios.lista) ? p.premios.lista : []).slice(0, 40).map((x: any) => ({
+      id: typeof x?.id === 'string' && /^[\w-]{1,40}$/.test(x.id) ? x.id : _idCorto(),
+      premio: _texto(x?.premio, 80),
+      para: _texto(x?.para, 80),
+    })).filter((x: any) => x.premio);
+    out.premios = { lista };
+  }
+  if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
+  return out;
+}
+
+/// Lee y valida los datos del asistente. `previa`: la fila actual al editar.
+async function _leerDatos(db: any, d: any, previa: any, creador: string | null, miCategoria: string | null): Promise<{ error: string } | { fila: Record<string, any>; ev: Record<string, any>; categorias: any[] | null }> {
+  const fila: Record<string, any> = {};
+  const ev: Record<string, any> = {};
+  if (d.plantilla !== undefined) fila.plantilla = PLANTILLAS.includes(String(d.plantilla)) ? String(d.plantilla) : 'personalizado';
+  if (d.festividad !== undefined) fila.festividad = _texto(d.festividad, 40) || null;
+  if (d.nombre !== undefined) fila.nombre = _texto(d.nombre, 80) || null;
+  if (d.nombreNeutro !== undefined) fila.nombre_neutro = _texto(d.nombreNeutro, 80) || null;
+  if (d.descripcion !== undefined) fila.descripcion = _textoLargo(d.descripcion, 1000) || null;
+
+  if (d.para !== undefined) {
+    let tipo = String(d.para?.tipo ?? 'liga');
+    let valores = (Array.isArray(d.para?.valores) ? d.para.valores : []).map((x: unknown) => _texto(x, 80)).filter(Boolean).slice(0, 200);
+    if (tipo === 'equipo') (tipo = 'equipos', valores = miCategoria ? [miCategoria] : []);
+    if (tipo === 'personas') valores = await _existentes(db, valores);
+    if (!['equipos', 'liga', 'personas'].includes(tipo)) tipo = 'liga';
+    if (tipo !== 'liga' && !valores.length) return { error: tipo === 'personas' ? 'Elige al menos una persona para invitar.' : 'Elige al menos un equipo.' };
+    fila.para = { tipo, valores: tipo === 'liga' ? [] : [...new Set(valores)] };
+  }
+
+  const m = d.modulos ?? {};
+  if (m.amigoSecreto !== undefined) fila.amigo_secreto = m.amigoSecreto === true;
+  if (m.regaloRobado !== undefined) fila.regalo_robado = m.regaloRobado === true;
+  if (m.comida !== undefined) fila.comida = m.comida === true;
+  if (m.invitados !== undefined) fila.invitados = m.invitados === true;
+  if (d.topeAmigo !== undefined) fila.tope_amigo = _num(d.topeAmigo);
+  if (d.topeRobado !== undefined) fila.tope_robado = _num(d.topeRobado);
+  if (d.recordatorioRobado !== undefined) fila.recordatorio_robado = _texto(d.recordatorioRobado, 300) || null;
+  if (d.reglasRobado !== undefined) fila.reglas_robado = _reglas(d.reglasRobado);
+  if (d.piezas !== undefined) fila.piezas = _leerPiezas(d.piezas);
+  if (d.regaloTope !== undefined) fila.regalo_tope = _num(d.regaloTope);
+
+  // Homenaje y sorpresa.
+  const sorpresa = d.sorpresa !== undefined ? d.sorpresa === true : !!previa?.sorpresa;
+  const hom = d.homenajeados !== undefined ? await _existentes(db, d.homenajeados, 20) : homenajeadxs(previa);
+  const nadie = d.noEnterarse !== undefined ? await _existentes(db, d.noEnterarse, 100) : noEnterarse(previa);
+  const enc = d.encargados !== undefined ? (await _existentes(db, d.encargados, 10)).filter((u) => u !== creador) : encargadxs(previa);
+  if (d.sorpresa !== undefined) fila.sorpresa = sorpresa;
+  if (d.homenajeados !== undefined) fila.homenajeados = hom;
+  if (d.noEnterarse !== undefined) fila.no_enterarse = sorpresa ? nadie.filter((u) => !hom.includes(u)) : [];
+  if (d.encargados !== undefined) fila.encargados = enc;
+  if (d.regaloCompra !== undefined) fila.regalo_compra = (await _existentes(db, [d.regaloCompra], 1))[0] ?? null;
+  const secreto = new Set([...hom, ...(sorpresa ? nadie : [])]);
+  if (sorpresa) {
+    if (!hom.length && !nadie.length) return { error: 'Para que sea sorpresa, elige a quién homenajean o quiénes no deben enterarse.' };
+    if (creador && secreto.has(creador)) return { error: 'Quien organiza una sorpresa no puede estar entre las personas homenajeadas ni entre quienes no deben enterarse.' };
+    const choca = enc.filter((u) => secreto.has(u));
+    if (choca.length) return { error: 'Unx encargadx no puede estar entre las personas homenajeadas ni entre quienes no deben enterarse.' };
+    if (fila.regalo_compra && secreto.has(fila.regalo_compra)) return { error: 'Quien compra el regalo no puede ser una persona homenajeada.' };
+    const neutro = fila.nombre_neutro !== undefined ? fila.nombre_neutro : previa?.nombre_neutro;
+    if (!neutro) return { error: 'Escribe el nombre neutro que verán quienes no deben enterarse (por ejemplo, "Reunión del equipo").' };
+  }
+
+  // Fecha, hora y lugar (van al evento del calendario y a su regla).
+  if (d.fecha !== undefined) {
+    const f = String(d.fecha ?? '').substring(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return { error: 'Elige la fecha.' };
+    if (f < _hoyEc() && f !== String(previa?.__fecha ?? '').substring(0, 10)) return { error: 'La fecha ya pasó.' };
+    ev.fecha = f;
+  }
+  if (d.inicia !== undefined) {
+    if (!_hora(d.inicia)) return { error: 'Elige la hora de inicio.' };
+    ev.inicia = _hora(d.inicia);
+  }
+  if (d.termina !== undefined) ev.termina = _hora(d.termina);
+  if (d.lugar !== undefined) {
+    const l = _texto(d.lugar, 120);
+    if (!l) return { error: 'Escribe dónde será.' };
+    ev.lugar = l;
+  }
+  if (d.mapa !== undefined) ev.mapa = _link(d.mapa) || null;
+
+  // Cierre del amigo secreto: como máximo 2 semanas antes.
+  const fechaEv = ev.fecha ?? previa?.__fecha;
+  if (fechaEv && (d.cierre !== undefined || ev.fecha)) {
+    const limite = _restarDias(fechaEv, DIAS_CIERRE);
+    let cierre = typeof d.cierre === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.cierre) ? d.cierre : (previa?.cierre ?? limite);
+    if (cierre > limite) cierre = limite;
+    fila.cierre = cierre;
+  }
+  const categorias = Array.isArray(d.categorias) ? d.categorias : null;
+  return { fila, ev, categorias };
+}
+
+/// Categorías de la comida: por id; las que se quitan se borran solo si
+/// nadie se anotó todavía.
+async function _guardarCategorias(db: any, liga: string, idEvento: string, cats: any[]): Promise<string[]> {
+  const avisos: string[] = [];
+  const { data: actuales } = await db.from('social_comida_categorias').select('id, nombre').eq('id_evento', idEvento);
+  const vistos = new Set<string>();
+  let orden = 0;
+  for (const x of cats.slice(0, 20)) {
+    const nombre = _texto(x?.nombre, 60);
+    if (!nombre) continue;
+    const datos = { nombre, unidad: _texto(x?.unidad, 30) || 'porciones', por_persona: _num(x?.porPersona) ?? 1, orden: orden++ };
+    const id = typeof x?.id === 'string' && (actuales ?? []).some((a: any) => a.id === x.id) ? x.id : null;
+    if (id) {
+      vistos.add(id);
+      await db.from('social_comida_categorias').update(datos).eq('id', id);
+    } else {
+      await db.from('social_comida_categorias').insert({ ...datos, id_evento: idEvento, liga_id: liga });
+    }
+  }
+  for (const a of actuales ?? []) {
+    if (vistos.has(a.id)) continue;
+    const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', a.id);
+    if ((count ?? 0) > 0) avisos.push(`"${a.nombre}" no se quitó porque ya hay personas anotadas.`);
+    else await db.from('social_comida_categorias').delete().eq('id', a.id);
+  }
+  return avisos;
+}
+
+const _DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+/// Cambia lugar, mapa, horario o fecha en el evento y en su regla (venue),
+/// porque la regeneración de la ventana copia los datos del venue al evento.
+async function _cambiarEvento(db: any, ev: any, e: Record<string, any>): Promise<string | null> {
+  const cambioEv: Record<string, any> = {};
+  const cambioVenue: Record<string, any> = {};
+  if (e.lugar && e.lugar !== ev.donde) (cambioEv.donde = e.lugar, cambioVenue.lugar = e.lugar);
+  if (e.mapa !== undefined && e.mapa !== (ev.google_maps ?? null)) (cambioEv.google_maps = e.mapa, cambioVenue.google_maps = e.mapa);
+  if (e.inicia && e.inicia !== String(ev.inicia ?? '').substring(0, 5)) (cambioEv.inicia = e.inicia, cambioVenue.inicia = e.inicia);
+  if (e.termina !== undefined && (e.termina ?? '') !== String(ev.termina ?? '').substring(0, 5)) (cambioEv.termina = e.termina, cambioVenue.finaliza = e.termina);
+  if (e.fecha && e.fecha !== String(ev.fecha).substring(0, 10)) {
+    const d = new Date(e.fecha + 'T12:00:00Z');
+    cambioEv.fecha = e.fecha;
+    cambioEv.mes = e.fecha.substring(0, 7);
+    cambioEv.dia = _DIAS[d.getUTCDay()];
+    cambioVenue.fecha_referencia = e.fecha;
+  }
+  if (!Object.keys(cambioEv).length) return null;
+  const { error } = await db.from('asistencias').update(cambioEv).eq('id_evento', ev.id_evento);
+  if (error) return 'No se pudo cambiar la fecha, el lugar o el horario: ' + error.message;
+  if (ev.id_regla) await db.from('venues').update(cambioVenue).eq('id', ev.id_regla);
+  return null;
+}
+
+/// Equipos invitados también en el evento (`asistencias.equipos`, alcance
+/// de los avisos). Sin esa columna (migración 20261120030000) no pasa nada.
+async function _equiposEnEvento(db: any, idEvento: string, para: any): Promise<void> {
+  const equipos = para?.tipo === 'equipos' ? (para.valores ?? []) : null;
+  try {
+    await db.from('asistencias').update({ equipos: equipos?.length ? equipos : null }).eq('id_evento', idEvento);
+  } catch { /* columna sin crear */ }
+}
+
+// ─── Crear (cualquier persona de la liga) ─────────────────────────────────
+
+async function socialCrear(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien({ ...params, idEvento: '-' }, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (q.tipo === 'invitado' || (!q.username && !q.esPivot)) return { exito: false, error: 'Inicia sesión con tu cuenta para crear un evento.' };
+  const d = _json(params.datos) ?? {};
+  for (const k of ['fecha', 'inicia', 'lugar']) if (d[k] === undefined) d[k] = '';
+  const r = await _leerDatos(db, { ...d, sorpresa: d.sorpresa === true }, null, q.username, q.categoria);
+  if ('error' in r) return { exito: false, error: r.error };
+  if (!r.fila.nombre && !r.fila.nombre_neutro) return { exito: false, error: 'Ponle un nombre al evento.' };
+
+  // Mismo mecanismo que "Nuevo evento": una regla (venue) de evento único y
+  // la ventana de asistencias se regenera (id = EV-<venue>-<AAAAMMDD>).
+  const { data: lugares } = await db.from('venues').select('lugar, google_maps').eq('lugar', r.ev.lugar).not('google_maps', 'is', null).limit(1);
+  const { data: v, error: ev1 } = await db.from('venues').insert({
+    lugar: r.ev.lugar, google_maps: r.ev.mapa ?? (lugares ?? [])[0]?.google_maps ?? null, tipo_icono: 'Social', requiere_reserva: false,
+    info_adicional: null, tipo: 'unico', fecha_referencia: r.ev.fecha, inicia: r.ev.inicia, ...(r.ev.termina ? { finaliza: r.ev.termina } : {}),
+  }).select('id').single();
+  if (ev1 || !v?.id) return { exito: false, error: 'No se pudo crear el evento: ' + (ev1?.message ?? 'sin respuesta') };
+  try {
+    await db.rpc('regenerar_ventana_asistencias');
+  } catch { /* el cron diario también la regenera */ }
+  const idEvento = `EV-${v.id}-${r.ev.fecha.replace(/-/g, '')}`;
+  const ev = await _evento(db, idEvento);
+  if (!ev) {
+    await db.from('venues').delete().eq('id', v.id);
+    return { exito: false, error: 'Ese día no se pueden crear eventos (¿está dentro de una temporada de descanso?).' };
+  }
+
+  const fila: Record<string, any> = {
+    id_evento: idEvento, liga_id: liga, creado_por: q.pivotEmail ?? q.username, creador: q.username,
+    amigo_secreto: false, regalo_robado: false, comida: false, invitados: false, piezas: {}, para: { tipo: 'liga', valores: [] },
+    ...r.fila, aprobado_en: null, actualizado_en: new Date().toISOString(),
+  };
+  if (!fila.cierre) fila.cierre = _restarDias(r.ev.fecha, DIAS_CIERRE);
+  const { error: e2 } = await db.from('social_eventos').insert(fila);
+  if (e2) {
+    await db.from('asistencias').delete().eq('id_evento', idEvento);
+    await db.from('venues').delete().eq('id', v.id);
+    return { exito: false, error: _esFaltaColumna(e2) ? FALTA_MIGRACION : 'No se pudo guardar: ' + e2.message };
+  }
+  await _equiposEnEvento(db, idEvento, fila.para);
+  const avisos = r.categorias && fila.comida ? await _guardarCategorias(db, liga, idEvento, r.categorias) : [];
+
+  // Aprobación: un Pivot que puede aprobar lo publica al crearlo; si ningún
+  // Pivot puede (todos homenajeadxs o no deben enterarse), se publica solo.
+  const pivots = deps.pivots ? await deps.pivots() : [];
+  const elegibles = aprobadores(pivots, fila);
+  let publicadoYa = false;
+  if ((q.esPivot && puedeAprobar(fila, q.username)) || !elegibles.length) {
+    const pub = await _publicar(db, deps, idEvento, q.pivotEmail ?? 'sin aprobación');
+    publicadoYa = pub.exito === true;
+  } else {
+    await _avisarPorAprobar(deps, fila, ev, elegibles.map((p) => p.username), q.nombre);
+  }
+  return {
+    exito: true, idEvento, fecha: r.ev.fecha, publicado: publicadoYa, avisos,
+    mensaje: publicadoYa ? 'Evento publicado en el calendario.' : 'Listo. Un Pivot lo revisa y, cuando lo apruebe, se publica en el calendario.',
+  };
+}
+
+async function _avisarPorAprobar(deps: DepsSocial, cfg: any, ev: any, usernames: string[], quien: string): Promise<void> {
+  if (!deps.push || !usernames.length) return;
+  try {
+    await deps.push({
+      tipo: 'avisos_admin',
+      include_external_user_ids: usernames,
+      headings: { es: 'Hay un Social o fiesta por aprobar' },
+      contents: { es: `${quien} creó "${cfg.nombre || cfg.nombre_neutro || 'Social o fiesta'}" para el ${_fechaCorta(ev.fecha)}. Revísalo en Notificaciones.` },
+      url: _url(deps, ev.id_evento),
+    });
+  } catch { /* el aviso no frena la creación */ }
+}
+
+// ─── Editar (quien creó, encargadxs y Pivots) ─────────────────────────────
+
+/// Datos de la primera versión (config + categorias + evento) al formato del asistente.
+function _datosLegacy(params: Record<string, any>): any {
+  const c = _json(params.config) ?? {}, e = _json(params.evento) ?? {};
+  const d: any = {
+    modulos: {
+      amigoSecreto: c.amigoSecreto !== false, regaloRobado: c.regaloRobado === true, comida: c.comida !== false, invitados: c.invitados !== false,
+    },
+    topeAmigo: c.topeAmigo, topeRobado: c.topeRobado, recordatorioRobado: c.recordatorioRobado, cierre: c.cierre,
+  };
+  if (c.reglasRobado !== undefined) d.reglasRobado = c.reglasRobado;
+  if (Array.isArray(c.encargados)) d.encargados = c.encargados;
+  const cats = _json(params.categorias);
+  if (Array.isArray(cats)) d.categorias = cats;
+  if (e.lugar) d.lugar = e.lugar;
+  if (e.mapa !== undefined) d.mapa = e.mapa;
+  if (e.inicia) d.inicia = e.inicia;
+  if (e.termina !== undefined) d.termina = e.termina;
+  return d;
+}
+
+async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const idEvento = q.idEvento;
+  const ev = await _evento(db, idEvento);
+  if (!ev) return { exito: false, error: 'No encontramos este evento.' };
+  if (ev.tipo_evento !== 'Social') return { exito: false, error: 'Solo los eventos de tipo Social o fiesta tienen estas opciones.' };
+  const previa = await _config(db, idEvento);
+  if (!previa && !q.esPivot) return { exito: false, error: 'Solo un Pivot puede configurar este evento.' };
+  if (previa && !_organiza(q, previa)) return { exito: false, error: 'Solo quien creó el evento, sus encargadxs y los Pivots pueden cambiarlo.' };
+  const d = params.datos !== undefined ? (_json(params.datos) ?? {}) : _datosLegacy(params);
+  const creador = previa?.creador ?? null;
+  const r = await _leerDatos(db, d, previa ? { ...previa, __fecha: ev.fecha } : { __fecha: ev.fecha }, creador ?? q.username, q.categoria);
+  if ('error' in r) return { exito: false, error: r.error };
+  const fila: Record<string, any> = { ...r.fila };
+  if (previa && 'actualizado_en' in previa) fila.actualizado_en = new Date().toISOString();
+  if (!fila.cierre && !previa?.cierre) fila.cierre = _restarDias(r.ev.fecha ?? ev.fecha, DIAS_CIERRE);
+  const reenviar = params.reenviar === true || params.reenviar === 'true';
+  if (reenviar && previa?.rechazado_en) (fila.rechazado_en = null, fila.rechazo_motivo = null);
+  if (!previa) {
+    Object.assign(fila, { id_evento: idEvento, liga_id: liga, creado_por: q.pivotEmail });
+  }
+  const { error } = previa
+    ? await db.from('social_eventos').update(fila).eq('id_evento', idEvento)
+    : await db.from('social_eventos').insert({ amigo_secreto: true, comida: true, invitados: true, ...fila });
+  if (error) return { exito: false, error: _esFaltaColumna(error) ? FALTA_MIGRACION : 'No se pudo guardar: ' + error.message };
+  const err = await _cambiarEvento(db, ev, r.ev);
+  if (err) return { exito: false, error: err };
+  if (fila.para) await _equiposEnEvento(db, idEvento, fila.para);
+  const avisos = r.categorias ? await _guardarCategorias(db, liga, idEvento, r.categorias) : [];
+
+  const cfg = await _config(db, idEvento);
+  // Primera versión: un Pivot lo crea y lo publica de una vez.
+  if (!previa && q.esPivot) await _publicar(db, deps, idEvento, q.pivotEmail!);
+  else if (cfg && !publicado(cfg)) {
+    const elegibles = aprobadores(deps.pivots ? await deps.pivots() : [], cfg);
+    if (!elegibles.length || (q.esPivot && puedeAprobar(cfg, q.username) && (params.publicar === true || params.publicar === 'true'))) {
+      await _publicar(db, deps, idEvento, q.pivotEmail ?? 'sin aprobación');
+    } else if (reenviar) {
+      await _avisarPorAprobar(deps, cfg, { ...ev, fecha: r.ev.fecha ?? ev.fecha }, elegibles.map((p) => p.username), q.nombre);
+    }
+  }
+  return { exito: true, avisos, publicado: publicado(await _config(db, idEvento)) };
+}
+
+// ─── Aprobación (Pivots) ──────────────────────────────────────────────────
+
+/// Publica el evento (lo ve quien está invitadx) y avisa una sola vez: con el
+/// nombre neutro a quienes no deben enterarse.
 async function _publicar(db: any, deps: DepsSocial, idEvento: string, email: string): Promise<Record<string, any>> {
   const cfg = await _config(db, idEvento);
   if (!cfg) return { exito: false, error: 'Primero guarda la configuración del evento.' };
   if (cfg.aprobado_en) return { exito: true };
-  const { error } = await db.from('social_eventos').update({ aprobado_en: new Date().toISOString(), aprobado_por: email }).eq('id_evento', idEvento);
+  const cambio: Record<string, any> = { aprobado_en: new Date().toISOString(), aprobado_por: email };
+  if ('rechazado_en' in cfg) (cambio.rechazado_en = null, cambio.rechazo_motivo = null);
+  const { error } = await db.from('social_eventos').update(cambio).eq('id_evento', idEvento);
   if (error) return { exito: false, error: 'No se pudo publicar: ' + error.message };
   const ev = await _evento(db, idEvento);
   if (deps.push && ev) {
     try {
-      await deps.push({
-        tipo: 'evento_creado',
-        broadcastEquipo: true,
-        headings: { es: `Nuevo evento social: ${_fechaCorta(ev.fecha)}` },
-        contents: { es: [String(ev.inicia ?? '').substring(0, 5), ev.donde].filter(Boolean).join(' · ') + '. Confirma tu asistencia.' },
-        url: `${deps.appUrl.replace(/\/+$/, '')}/?evento=${encodeURIComponent(idEvento)}`,
-      });
+      const { data: filas } = await db.from('equipo').select('username, categoria').is('eliminado_en', null);
+      const listaInv = (filas ?? []).filter((f: any) => f.username && estaInvitadx(cfg, f.username, f.categoria)).map((f: any) => String(f.username));
+      const personas = await _personas(db, homenajeadxs(cfg));
+      const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
+      const detalle = [_fechaCorta(ev.fecha), String(ev.inicia ?? '').substring(0, 5), ev.donde].filter(Boolean).join(' · ');
+      const secreto = listaInv.filter((u: string) => esSecretoPara(cfg, u));
+      const resto = listaInv.filter((u: string) => !esSecretoPara(cfg, u));
+      const sorpresa = etiquetaSorpresa(cfg, 'completa', nombreDe);
+      const envio = (us: string[], titulo: string, extra: string) => us.length ? deps.push!({
+        tipo: 'evento_creado', include_external_user_ids: us, evento: { idEvento },
+        headings: { es: `Nuevo: ${titulo}` }, contents: { es: `${detalle}. Confirma tu asistencia.${extra}` }, url: _url(deps, idEvento),
+      }) : Promise.resolve();
+      await Promise.allSettled([
+        envio(resto, tituloPara(cfg, 'completa', nombreDe), sorpresa ? ` ${sorpresa}: que no se entere.` : ''),
+        envio(secreto, tituloPara(cfg, 'neutral', nombreDe), ''),
+      ]);
+      // A quien lo creó: ya está aprobado.
+      if (cfg.creador && email !== 'sin aprobación' && !(await _esPivotUsername(deps, cfg.creador, email))) {
+        await deps.push({
+          tipo: 'social', include_external_user_ids: [cfg.creador], personal: true,
+          headings: { es: 'Tu evento ya está publicado' },
+          contents: { es: `Un Pivot aprobó "${tituloPara(cfg, 'organiza', nombreDe)}". Ya aparece en el calendario.` }, url: _url(deps, idEvento),
+        });
+      }
     } catch { /* el aviso no frena la publicación */ }
   }
   return { exito: true, publicado: true };
+}
+
+async function _esPivotUsername(deps: DepsSocial, username: string, email: string): Promise<boolean> {
+  const ps = deps.pivots ? await deps.pivots() : [];
+  return ps.some((p) => p.username === username && p.email === String(email).toLowerCase());
 }
 
 function _fechaCorta(iso: string): string {
@@ -509,42 +880,100 @@ function _fechaCorta(iso: string): string {
   return d.length === 3 ? `${Number(d[2])} de ${meses[Number(d[1]) - 1] ?? ''}` : String(iso ?? '');
 }
 
-async function socialAprobar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
-  const db = deps.db, liga = deps.ligaEnCurso();
+/// Pivot que pide aprobar o rechazar: su cuenta (para saber si está en las listas).
+async function _pivotQueAprueba(params: Record<string, any>, deps: DepsSocial): Promise<{ email: string; username: string | null } | null> {
   const email = await deps.validarAdminToken(String(params.adminToken ?? ''));
-  if (!email) return { exito: false, error: 'Solo un Pivot puede aprobar.' };
-  const idEvento = _texto(params.idEvento, 200);
-  const [ev, cfg] = await Promise.all([_evento(db, idEvento), _config(db, idEvento)]);
-  if (!ev || !cfg) return { exito: false, error: 'Este evento no tiene configuración.' };
-  let avisos: string[] = [];
-  if (cfg.pendiente) {
-    const r = await _aplicarConfig(db, liga, ev, cfg, cfg.pendiente, email, false);
-    if (!r.exito) return r;
-    avisos = r.avisos ?? [];
-  }
-  const pub = await _publicar(db, deps, idEvento, email);
-  if (!pub.exito) return pub;
-  return { exito: true, publicado: pub.publicado === true, avisos };
+  if (!email) return null;
+  const tokenUser = params.token ? await deps.validarToken(String(params.token)) : null;
+  const username = tokenUser ?? (await _cuentaDePivot(deps.db, email))?.username ?? null;
+  return { email, username };
 }
 
-async function socialDescartarPendiente(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+async function socialAprobar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
   const db = deps.db;
-  const q = await _quien(params, deps);
-  if ('error' in q) return { exito: false, error: q.error };
-  const cfg = await _config(db, q.idEvento);
-  if (!cfg || !_organiza(q, cfg)) return { exito: false, error: 'Solo Pivots y encargadxs pueden hacer esto.' };
-  await db.from('social_eventos').update({ pendiente: null, pendiente_por: null, pendiente_en: null }).eq('id_evento', q.idEvento);
+  const p = await _pivotQueAprueba(params, deps);
+  if (!p) return { exito: false, error: 'Solo un Pivot puede aprobar.' };
+  const idEvento = _texto(params.idEvento, 200);
+  const [ev, cfg] = await Promise.all([_evento(db, idEvento), _config(db, idEvento)]);
+  // Sin decir por qué: a una persona homenajeada no se le cuenta que hay algo.
+  if (!ev || !cfg || !puedeAprobar(cfg, p.username)) return { exito: false, error: 'Este evento no está disponible.' };
+  const pub = await _publicar(db, deps, idEvento, p.email);
+  if (!pub.exito) return pub;
+  return { exito: true, publicado: true };
+}
+
+async function socialRechazar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db;
+  const p = await _pivotQueAprueba(params, deps);
+  if (!p) return { exito: false, error: 'Solo un Pivot puede hacer esto.' };
+  const idEvento = _texto(params.idEvento, 200);
+  const [ev, cfg] = await Promise.all([_evento(db, idEvento), _config(db, idEvento)]);
+  if (!ev || !cfg || !puedeAprobar(cfg, p.username)) return { exito: false, error: 'Este evento no está disponible.' };
+  if (publicado(cfg)) return { exito: false, error: 'Este evento ya está publicado.' };
+  const motivo = _texto(params.motivo, 300);
+  const { error } = await db.from('social_eventos').update({ rechazado_en: new Date().toISOString(), rechazo_motivo: motivo || null }).eq('id_evento', idEvento);
+  if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
+  if (deps.push && cfg.creador) {
+    try {
+      await deps.push({
+        tipo: 'social', include_external_user_ids: [cfg.creador], personal: true,
+        headings: { es: 'Tu evento necesita cambios' },
+        contents: { es: `Un Pivot revisó "${cfg.nombre || cfg.nombre_neutro || 'Social o fiesta'}".${motivo ? ' ' + motivo : ''} Edítalo y envíalo de nuevo.` },
+        url: _url(deps, idEvento),
+      });
+    } catch { /* best-effort */ }
+  }
   return { exito: true };
 }
 
-/// Personas del equipo para elegir encargadxs (solo Pivots).
+/// Para la Bandeja de Pivots (Notificaciones del Calendario): eventos por
+/// aprobar que este Pivot puede aprobar. Sin la migración, ninguno.
+export async function socialPorAprobar(adminEmail: string, deps: DepsSocial): Promise<any[]> {
+  const db = deps.db;
+  const { data, error } = await db.from('social_eventos').select('*').is('aprobado_en', null).is('rechazado_en', null);
+  if (error || !(data ?? []).length) return [];
+  const yo = (await _cuentaDePivot(db, adminEmail))?.username ?? null;
+  const filas = (data ?? []).filter((c: any) => puedeAprobar(c, yo));
+  if (!filas.length) return [];
+  const { data: evs } = await db.from('asistencias').select('id_evento, fecha, donde, inicia, estado').in('id_evento', filas.map((c: any) => c.id_evento));
+  const porId = new Map((evs ?? []).map((e: any) => [e.id_evento, e]));
+  const personas = await _personas(db, filas.flatMap((c: any) => [c.creador ?? '', ...homenajeadxs(c)]));
+  const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
+  const hoy = _hoyEc();
+  return filas.filter((c: any) => {
+    const e: any = porId.get(c.id_evento);
+    return e && String(e.fecha) >= hoy && !/cancel|eliminado/i.test(String(e.estado ?? ''));
+  }).map((c: any) => {
+    const e: any = porId.get(c.id_evento);
+    const para = c.para?.tipo === 'personas' ? `${(c.para.valores ?? []).length} personas` : c.para?.tipo === 'equipos' ? (c.para.valores ?? []).join(', ') : 'Toda la liga';
+    return {
+      id: c.id_evento, nombre: c.creador ?? '', nombreMostrar: c.creador ? nombreDe(c.creador) : 'Un Pivot', foto: personas.get(c.creador)?.foto ?? '',
+      titulo: tituloPara(c, 'organiza', nombreDe), sorpresa: etiquetaSorpresa(c, 'organiza', nombreDe), para,
+      piezas: _resumenPiezas(c), creada: c.actualizado_en ?? c.created_at,
+      evento: { idEvento: c.id_evento, fecha: e.fecha, lugar: e.donde ?? '', hora: String(e.inicia ?? '').substring(0, 5), tipo: 'Social o fiesta' },
+    };
+  });
+}
+
+function _resumenPiezas(c: any): string[] {
+  const p = _piezas(c);
+  return [
+    c.comida && 'Comida y bebida', p.playlist && 'Playlist', c.amigo_secreto && 'Amigo secreto', c.regalo_robado && 'Regalo robado',
+    p.dress && 'Dress code', p.traer && 'Qué traer', p.homenaje && 'Homenaje', p.premios && 'Premios', c.invitados && '+1',
+  ].filter(Boolean) as string[];
+}
+
+/// Personas y equipos de la liga para elegir invitadxs, homenajeadxs y encargadxs.
 async function socialEquipo(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
-  if (!(await deps.validarAdminToken(String(params.adminToken ?? '')))) return { exito: false, error: 'Solo Pivots.' };
-  const { data } = await deps.db.from('equipo').select('username, nombre_derby').is('eliminado_en', null).order('username');
-  return {
-    exito: true,
-    personas: (data ?? []).map((r: any) => ({ username: r.username, nombre: (r.nombre_derby ?? '').trim() || r.username })),
-  };
+  const q = await _quien({ ...params, idEvento: '-' }, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (q.tipo === 'invitado') return { exito: false, error: 'Solo personas de la liga.' };
+  const { data } = await deps.db.from('equipo').select('username, nombre_derby, categoria, foto_perfil').is('eliminado_en', null).order('username');
+  const personas = (data ?? []).filter((r: any) => r.username).map((r: any) => ({
+    username: r.username, nombre: (r.nombre_derby ?? '').trim() || r.username, equipo: r.categoria ?? '', foto: r.foto_perfil ?? '',
+  }));
+  personas.sort((a: any, b: any) => a.nombre.localeCompare(b.nombre));
+  return { exito: true, personas, equipos: [...new Set(personas.map((p: any) => p.equipo).filter(Boolean))].sort(), yo: q.username, miEquipo: q.categoria };
 }
 
 // ─── Invitadxs +1 ─────────────────────────────────────────────────────────
@@ -553,9 +982,9 @@ async function socialAgregarInvitado(params: Record<string, any>, deps: DepsSoci
   const db = deps.db, liga = deps.ligaEnCurso();
   const q = await _quien(params, deps);
   if ('error' in q) return { exito: false, error: q.error };
-  if (q.tipo !== 'miembro') return { exito: false, error: 'Solo personas del equipo pueden sumar invitadxs.' };
+  if (q.tipo !== 'miembro') return { exito: false, error: 'Solo personas de la liga pueden sumar invitadxs.' };
   const cfg = await _config(db, q.idEvento);
-  if (!cfg?.invitados) return { exito: false, error: 'Este evento no admite invitadxs.' };
+  if (!cfg?.invitados || _vista(q, cfg) === 'oculta') return { exito: false, error: 'Este evento no admite invitadxs.' };
   const asisten = await _asistentes(db, q.idEvento);
   if (!asisten.has(q.clave!)) return { exito: false, error: 'Primero marca Asistiré para sumar a tu +1.' };
   const nombre = _texto(params.nombre, 60);
@@ -581,6 +1010,9 @@ async function socialQuitarInvitado(params: Record<string, any>, deps: DepsSocia
   const { data: sorteo } = await db.from('social_sorteo').select('da, recibe').eq('id_evento', inv.id_evento);
   if ((sorteo ?? []).some((s: any) => s.da === clave || s.recibe === clave)) return { exito: false, error: 'Tu invitadx ya está en el sorteo del amigo secreto. Pide a quien organiza que lo rehaga.' };
   await db.from('social_comida_aportes').delete().eq('clave', clave);
+  try {
+    await db.from('social_traer_anotes').delete().eq('clave', clave);
+  } catch { /* tabla sin crear */ }
   await db.from('social_perfiles').delete().eq('liga_id', liga).eq('clave', clave);
   await db.from('social_invitados').delete().eq('id', inv.id);
   return { exito: true };
@@ -618,8 +1050,7 @@ async function socialGuardarPerfil(params: Record<string, any>, deps: DepsSocial
   for (const x of Array.isArray(p.wishlist) ? p.wishlist : []) {
     const texto = _texto(x?.texto, 80);
     if (!texto) continue;
-    let link = _texto(x?.link, 500);
-    if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+    const link = _link(x?.link);
     const favorito = x?.favorito === true && favoritos < MAX_FAVORITOS;
     if (favorito) favoritos++;
     wishlist.push({ texto, nota: _texto(x?.nota, 200), link, favorito });
@@ -685,12 +1116,129 @@ async function socialQuitarAporte(params: Record<string, any>, deps: DepsSocial)
   const { data: cat } = await db.from('social_comida_categorias').select('id_evento').eq('id', ap.categoria_id).maybeSingle();
   const q = await _quien({ ...params, idEvento: cat?.id_evento ?? '-' }, deps);
   if ('error' in q) return { exito: false, error: q.error };
-  if (ap.clave !== q.clave && !q.esPivot) return { exito: false, error: 'Solo puedes quitar lo que anotaste tú.' };
+  if (ap.clave !== q.clave && !_organiza(q, await _config(db, cat?.id_evento ?? '-'))) return { exito: false, error: 'Solo puedes quitar lo que anotaste tú.' };
   await db.from('social_comida_aportes').delete().eq('id', ap.id);
   return { exito: true };
 }
 
-// ─── Cierre y sorteo (solo Pivots) ────────────────────────────────────────
+// ─── Qué traer ────────────────────────────────────────────────────────────
+
+async function socialAnotarTraer(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const cfg = await _config(db, q.idEvento);
+  if (!q.clave || !cfg || _vista(q, cfg) === 'oculta') return { exito: false, error: 'No encontramos este evento.' };
+  const items: any[] = _piezas(cfg).traer?.items ?? [];
+  const it = items.find((x) => x.id === String(params.item ?? ''));
+  if (!it) return { exito: false, error: 'Esa cosa ya no está en la lista.' };
+  if (!_asiste(q, await _asistentes(db, q.idEvento))) return { exito: false, error: 'Primero confirma tu asistencia para anotarte.' };
+  const { data: ya } = await db.from('social_traer_anotes').select('clave').eq('id_evento', q.idEvento).eq('item', it.id);
+  if ((ya ?? []).some((a: any) => a.clave === q.clave)) return { exito: false, error: 'Ya te anotaste con esto.' };
+  const cantidad = _num(it.cantidad);
+  if (cantidad && (ya ?? []).length >= cantidad) return { exito: false, error: `"${it.texto}" ya está cubierto.` };
+  const { error } = await db.from('social_traer_anotes').insert({
+    id_evento: q.idEvento, item: it.id, clave: q.clave, nombre: q.nombre, detalle: _texto(params.detalle, 80) || null, liga_id: liga,
+  });
+  if (error) return { exito: false, error: _esFaltaColumna(error) ? FALTA_MIGRACION : 'No se pudo guardar: ' + error.message };
+  return { exito: true };
+}
+
+async function socialQuitarTraer(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db;
+  const { data: a } = await db.from('social_traer_anotes').select('id, clave, id_evento').eq('id', String(params.id ?? '')).maybeSingle();
+  if (!a) return { exito: false, error: 'No encontramos esa anotación.' };
+  const q = await _quien({ ...params, idEvento: a.id_evento }, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (a.clave !== q.clave && !_organiza(q, await _config(db, a.id_evento))) return { exito: false, error: 'Solo puedes quitar lo que anotaste tú.' };
+  await db.from('social_traer_anotes').delete().eq('id', a.id);
+  return { exito: true };
+}
+
+// ─── Homenaje: mensajes y regalo entre todxs ──────────────────────────────
+
+/// Quien puede escribir mensajes y aportar: cuenta de la liga que ve el
+/// detalle completo y no es una persona homenajeada.
+async function _paraHomenaje(params: Record<string, any>, deps: DepsSocial): Promise<{ q: Quien; cfg: any } | { error: string }> {
+  const q = await _quien(params, deps);
+  if ('error' in q) return q;
+  const cfg = await _config(deps.db, q.idEvento);
+  const v = cfg ? _vista(q, cfg) : 'oculta';
+  if (!cfg || q.tipo === 'invitado' || !q.clave || (v !== 'completa' && v !== 'organiza') || !_piezas(cfg).homenaje || homenajeadxs(cfg).includes(q.clave)) {
+    return { error: 'No encontramos este evento.' };
+  }
+  return { q, cfg };
+}
+
+async function socialMensaje(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const r = await _paraHomenaje(params, deps);
+  if ('error' in r) return { exito: false, error: r.error };
+  const { q, cfg } = r;
+  if (_piezas(cfg).homenaje.mensajes === false) return { exito: false, error: 'Este homenaje no tiene mensajes.' };
+  const para = _texto(params.para, 80);
+  if (!homenajeadxs(cfg).includes(para)) return { exito: false, error: 'Elige a quién le escribes.' };
+  const texto = _textoLargo(params.texto, 1000);
+  if (!texto) {
+    await db.from('social_mensajes').delete().eq('id_evento', q.idEvento).eq('para', para).eq('clave', q.clave);
+    return { exito: true, borrado: true };
+  }
+  const { error } = await db.from('social_mensajes').upsert({
+    id_evento: q.idEvento, para, clave: q.clave, nombre: q.nombre, texto, updated_at: new Date().toISOString(), liga_id: liga,
+  }, { onConflict: 'id_evento,para,clave' });
+  if (error) return { exito: false, error: _esFaltaColumna(error) ? FALTA_MIGRACION : 'No se pudo guardar: ' + error.message };
+  return { exito: true };
+}
+
+/// Regalo entre todxs: solo se anota quién aporta cuánto. No pasa por
+/// Finanzas ni crea movimientos. Monto 0 o vacío quita el aporte.
+async function socialAportarRegalo(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const r = await _paraHomenaje(params, deps);
+  if ('error' in r) return { exito: false, error: r.error };
+  const { q, cfg } = r;
+  if (!_piezas(cfg).homenaje.regalo) return { exito: false, error: 'Este homenaje no tiene regalo entre todxs.' };
+  const monto = _num(params.monto);
+  if (!monto) {
+    await db.from('social_regalo_aportes').delete().eq('id_evento', q.idEvento).eq('clave', q.clave);
+    return { exito: true, borrado: true };
+  }
+  const { data: otros } = await db.from('social_regalo_aportes').select('clave, monto').eq('id_evento', q.idEvento);
+  const resto = (otros ?? []).filter((a: any) => a.clave !== q.clave).reduce((s: number, a: any) => s + Number(a.monto ?? 0), 0);
+  const tope = cfg.regalo_tope == null ? null : Number(cfg.regalo_tope);
+  if (tope != null && resto + monto > tope) {
+    const queda = Math.max(0, tope - resto);
+    return { exito: false, error: queda > 0 ? `Con tu aporte se pasa del tope. Faltan ${Math.round(queda * 100) / 100}.` : 'Ya se juntó todo el regalo.' };
+  }
+  const { error } = await db.from('social_regalo_aportes').upsert({
+    id_evento: q.idEvento, clave: q.clave, nombre: q.nombre, monto: Math.round(monto * 100) / 100, liga_id: liga,
+  }, { onConflict: 'id_evento,clave' });
+  if (error) return { exito: false, error: _esFaltaColumna(error) ? FALTA_MIGRACION : 'No se pudo guardar: ' + error.message };
+  return { exito: true };
+}
+
+async function socialLiberarMensajes(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db;
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const cfg = await _config(db, q.idEvento);
+  if (!cfg || !_organiza(q, cfg)) return { exito: false, error: 'Solo quien organiza puede liberar los mensajes.' };
+  if (cfg.mensajes_liberados_en) return { exito: true };
+  const { error } = await db.from('social_eventos').update({ mensajes_liberados_en: new Date().toISOString() }).eq('id_evento', q.idEvento);
+  if (error) return { exito: false, error: _esFaltaColumna(error) ? FALTA_MIGRACION : 'No se pudo guardar: ' + error.message };
+  const hom = homenajeadxs(cfg);
+  if (deps.push && hom.length) {
+    try {
+      await deps.push({
+        tipo: 'social', include_external_user_ids: hom, personal: true,
+        headings: { es: 'Tienes mensajes de tu liga' }, contents: { es: 'Entra al evento para leerlos.' }, url: _url(deps, q.idEvento),
+      });
+    } catch { /* best-effort */ }
+  }
+  return { exito: true };
+}
+
+// ─── Cierre y sorteo (quien organiza) ─────────────────────────────────────
 
 async function socialSortear(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
   const db = deps.db, liga = deps.ligaEnCurso();
@@ -699,9 +1247,9 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   const idEvento = q.idEvento;
   const [ev, cfg] = await Promise.all([_evento(db, idEvento), _config(db, idEvento)]);
   if (!ev || !cfg) return { exito: false, error: 'Este evento no tiene amigo secreto configurado.' };
-  if (!_organiza(q, cfg)) return { exito: false, error: 'Solo Pivots y encargadxs pueden hacer el sorteo.' };
+  if (!_organiza(q, cfg)) return { exito: false, error: 'Solo quien organiza puede hacer el sorteo.' };
   const email = q.pivotEmail ?? q.clave ?? '';
-  if (!cfg.aprobado_en) return { exito: false, error: 'Primero un Pivot tiene que aprobar y publicar el evento.' };
+  if (!publicado(cfg)) return { exito: false, error: 'Primero un Pivot tiene que aprobar el evento.' };
   if (!cfg.amigo_secreto) return { exito: false, error: 'Este evento no tiene amigo secreto.' };
   const rehacer = params.rehacer === true || params.rehacer === 'true';
   if (cfg.sorteado_en && !rehacer) return { exito: false, error: 'El sorteo ya se hizo.' };
@@ -711,7 +1259,7 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   // Historial: quién le regaló a quién el año anterior en esta liga.
   const { data: previas } = await db.from('social_sorteo').select('da, recibe').eq('liga_id', liga).eq('anio', anio - 1).neq('id_evento', idEvento);
   const r = sortearAmigoSecreto(ps, previas ?? []);
-  if (!r.ok) return { exito: false, error: r.error };
+  if (!r.ok) return { exito: false, error: (r as { error: string }).error };
   await db.from('social_sorteo').delete().eq('id_evento', idEvento);
   const { error } = await db.from('social_sorteo').insert(r.pares.map((x) => ({ id_evento: idEvento, da: x.da, recibe: x.recibe, anio, liga_id: liga })));
   if (error) return { exito: false, error: 'No se pudo guardar el sorteo: ' + error.message };
@@ -720,51 +1268,80 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
   if (deps.push && miembros.length) {
     try {
       await deps.push({
-        tipo: 'social_sorteo',
+        tipo: 'social',
         include_external_user_ids: miembros,
         headings: { es: '¡Ya hay amigo secreto!' },
         contents: { es: 'Gira tu ruleta para saber a quién le regalas.' },
-        url: `${deps.appUrl.replace(/\/+$/, '')}/?evento=${encodeURIComponent(idEvento)}`,
+        url: _url(deps, idEvento),
       });
     } catch { /* el aviso no frena el sorteo */ }
   }
   return { exito: true, participantes: ps.length, repiteAnterior: r.repiteAnterior };
 }
 
-// ─── Calendario: eventos sociales sin publicar ────────────────────────────
+// ─── Calendario ───────────────────────────────────────────────────────────
 
-/// Saca del calendario los eventos Social que ningún Pivot aprobó todavía,
-/// salvo para Pivots y sus encargadxs (que los ven marcados `socialBorrador`).
-/// Lo llama getEventosRango de index.ts.
+/// Eventos Social o fiesta en el calendario (lo llama getEventosRango de
+/// index.ts): saca los que la persona no debe ver (sin aprobar, no invitadx)
+/// y pone a cada uno el nombre que le toca (`socialTitulo`; el neutro para
+/// quien no debe enterarse), `socialSorpresa` ("Sorpresa para X", nunca para
+/// la vista neutral), `socialEstado` y `socialOrganiza`.
 export async function filtrarEventosSociales(eventos: any[], params: Record<string, any>, deps: DepsSocial): Promise<any[]> {
   const sociales = eventos.filter((e) => e?.tipoIcono === 'Social');
   if (!sociales.length) return eventos;
-  const { data } = await deps.db.from('social_eventos').select('id_evento, aprobado_en, encargados, pendiente_en').in('id_evento', sociales.map((e) => e.idEvento));
+  const { data, error } = await deps.db.from('social_eventos').select('*').in('id_evento', sociales.map((e) => e.idEvento));
+  if (error) return eventos;
   const porId = new Map((data ?? []).map((r: any) => [r.id_evento, r]));
-  let quien: string | null | undefined, pivot: boolean | undefined;
+  const pivotEmail = params.adminToken ? await deps.validarAdminToken(String(params.adminToken)) : null;
+  let username = params.token ? await deps.validarToken(String(params.token)) : null;
+  let categoria: string | null = null;
+  if (username) {
+    const { data: eq } = await deps.db.from('equipo').select('categoria').eq('username', username).maybeSingle();
+    categoria = eq?.categoria ?? null;
+  } else if (pivotEmail) {
+    const c = await _cuentaDePivot(deps.db, pivotEmail);
+    (username = c?.username ?? null, categoria = c?.categoria ?? null);
+  }
+  const personas = await _personas(deps.db, (data ?? []).flatMap((c: any) => homenajeadxs(c)));
+  const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
   const out: any[] = [];
   for (const e of eventos) {
-    if (e?.tipoIcono !== 'Social') {
+    const cfg: any = e?.tipoIcono === 'Social' ? porId.get(e.idEvento) : null;
+    if (!cfg) {
       out.push(e);
       continue;
     }
-    const cfg: any = porId.get(e.idEvento);
-    if (cfg?.aprobado_en) {
-      out.push(cfg.pendiente_en ? { ...e, socialPendiente: true } : e);
-      continue;
-    }
-    if (pivot === undefined) pivot = !!(params.adminToken && (await deps.validarAdminToken(String(params.adminToken))));
-    if (quien === undefined) quien = params.token ? await deps.validarToken(String(params.token)) : null;
-    if (pivot || (quien && _encargados(cfg).includes(quien))) out.push({ ...e, socialBorrador: true, socialPendiente: !!cfg?.pendiente_en });
+    const vista = vistaDe(cfg, { username, esPivot: !!pivotEmail, categoria });
+    if (vista === 'oculta') continue;
+    out.push({
+      ...e,
+      descripcion: vista === 'neutral' ? '' : (cfg.descripcion || e.descripcion || ''),
+      socialTitulo: tituloPara(cfg, vista, nombreDe),
+      socialSorpresa: etiquetaSorpresa(cfg, vista, nombreDe),
+      socialEstado: _estado(cfg),
+      socialOrganiza: vista === 'organiza',
+    });
   }
   return out;
 }
 
+/// Alcance de los avisos de un evento social (lo usa `_filtrarDestinatariosEvento`
+/// de index.ts): sin publicar no le llega a nadie; publicado, solo a quienes
+/// están invitadxs. null = no es un evento social (o falta la tabla).
+export async function alcanceSocial(db: any, idEvento: string): Promise<{ publicado: boolean; invitadx: (u: string, categoria?: string | null) => boolean } | null> {
+  if (!idEvento) return null;
+  const { data, error } = await db.from('social_eventos').select('*').eq('id_evento', idEvento).maybeSingle();
+  if (error || !data) return null;
+  return { publicado: publicado(data), invitadx: (u, categoria) => estaInvitadx(data, u, categoria) };
+}
+
 // ─── Aviso del día antes ──────────────────────────────────────────────────
 
-/// El día antes de un evento Social publicado, avisa a quienes marcaron
-/// Asistiré que lleven el regalo del amigo secreto y/o del regalo robado.
-/// Una sola vez por evento (`recordatorio_enviado_en`). Lo llama cronDiario.
+/// El día antes de un evento Social o fiesta publicado, avisa a quienes
+/// marcaron Asistiré que lleven el regalo del amigo secreto y/o del regalo
+/// robado. Una sola vez por evento (`recordatorio_enviado_en`; sin esa columna
+/// no se manda, para no repetirlo). Lo llama cronDiario. Quien no debe
+/// enterarse recibe el nombre neutro.
 export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number> {
   if (!deps.push) return 0;
   const db = deps.db, liga = deps.ligaEnCurso();
@@ -774,7 +1351,7 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
   for (const ev of evs ?? []) {
     if (/cancel|sin entren|no se entrena|eliminado/i.test(String(ev.estado ?? ''))) continue;
     const cfg = await _config(db, ev.id_evento);
-    if (!cfg?.aprobado_en || cfg.recordatorio_enviado_en || !(cfg.amigo_secreto || cfg.regalo_robado)) continue;
+    if (!cfg || !('recordatorio_enviado_en' in cfg) || !publicado(cfg) || cfg.recordatorio_enviado_en || !(cfg.amigo_secreto || cfg.regalo_robado)) continue;
     const asisten = [...(await _asistentes(db, ev.id_evento))];
     await db.from('social_eventos').update({ recordatorio_enviado_en: new Date().toISOString() }).eq('id_evento', ev.id_evento);
     if (!asisten.length) continue;
@@ -785,16 +1362,29 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
       cfg.regalo_robado ? `un regalo envuelto para el regalo robado${tope(cfg.tope_robado)}` : '',
     ].filter(Boolean);
     if (!partes.length) continue;
-    try {
-      await deps.push({
-        tipo: 'recordatorio_1dia',
-        include_external_user_ids: asisten,
-        headings: { es: '¡Mañana es el evento social!' },
-        contents: { es: `No olvides llevar ${partes.join(' y ')}.` },
-        url: `${deps.appUrl.replace(/\/+$/, '')}/?evento=${encodeURIComponent(ev.id_evento)}`,
-      });
-      enviados += asisten.length;
-    } catch { /* best-effort */ }
+    const personas = await _personas(db, homenajeadxs(cfg));
+    const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
+    const grupos: [string[], Vista][] = [
+      [asisten.filter((u) => !esSecretoPara(cfg, u)), 'completa'],
+      [asisten.filter((u) => esSecretoPara(cfg, u)), 'neutral'],
+    ];
+    for (const [us, vista] of grupos) {
+      if (!us.length) continue;
+      try {
+        await deps.push({
+          tipo: 'recordatorio_1dia',
+          include_external_user_ids: us,
+          headings: { es: `¡Mañana es ${tituloPara(cfg, vista, nombreDe)}!` },
+          contents: { es: `No olvides llevar ${partes.join(' y ')}.` },
+          url: _url(deps, ev.id_evento),
+          evento: { idEvento: ev.id_evento },
+        });
+        enviados += us.length;
+      } catch { /* best-effort */ }
+    }
   }
   return enviados;
 }
+
+/// Para pruebas y para index.ts: personas a las que se les esconde la sorpresa.
+export { personasEnSecreto };

@@ -1,3 +1,5 @@
+import 'tipos_evento.dart';
+
 /// Estados de respuesta (RSVP) que acepta `marcarAsistenciaUsuario`.
 enum EstadoRsvp {
   asistire('Asistiré'),
@@ -78,7 +80,20 @@ class Evento {
     required this.descripcion,
     required this.videoInstructivo,
     List<AsistenciaReal>? asistentes,
+    this.socialTitulo,
+    this.socialSorpresa,
+    this.socialEstado,
   }) : asistentes = asistentes ?? [];
+
+  /// "Social o fiesta" (Victor, 2026-11-20): nombre que le toca ver a esta
+  /// persona (el neutro si no debe enterarse de la sorpresa), "Sorpresa para X"
+  /// y 'publicado' | 'por_aprobar' | 'rechazado'. Los manda el servidor ya filtrados.
+  final String? socialTitulo;
+  final String? socialSorpresa;
+  final String? socialEstado;
+
+  /// Título de la tarjeta: el nombre del Social o fiesta, o el tipo.
+  String get titulo => (socialTitulo ?? '').trim().isNotEmpty ? socialTitulo!.trim() : etiquetaTipoEvento(tipo);
 
   final String id;
   final DateTime fecha; // solo día (hora de pared de Ecuador)
@@ -187,6 +202,9 @@ class Evento {
       descripcion: (raw['descripcion'] ?? '').toString(),
       videoInstructivo: (raw['videoInstructivo'] ?? '').toString(),
       asistentes: reales,
+      socialTitulo: raw['socialTitulo'] as String?,
+      socialSorpresa: raw['socialSorpresa'] as String?,
+      socialEstado: raw['socialEstado'] as String?,
     );
   }
 }

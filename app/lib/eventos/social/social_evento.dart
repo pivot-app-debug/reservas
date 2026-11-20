@@ -8,12 +8,15 @@ import '../../core/fechas.dart';
 import '../../core/tema.dart';
 import '../eventos_repo.dart';
 import '../modelos.dart';
-import 'social_config_screen.dart';
+import 'crear_social_screen.dart';
+import 'social_piezas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
 
-/// Secciones del evento Social en su detalle (NAVIQUINDE.md): +1, amigo
-/// secreto, regalo robado y comida. Se recarga al cambiar la asistencia.
+/// Secciones del "Social o fiesta" en su detalle (NAVIQUINDE.md): encabezado
+/// (nombre, sorpresa, aprobación), +1, amigo secreto, regalo robado, comida,
+/// playlist, dress code, qué traer, homenaje y premios. Se recarga al cambiar
+/// la asistencia. Lo que no le toca ver a cada quien no llega del servidor.
 class SocialEnEvento extends StatefulWidget {
   const SocialEnEvento({super.key, required this.repo, required this.evento});
   final EventosRepo repo;
@@ -56,10 +59,34 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
   Future<void> _configurar() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => SocialConfigScreen(repo: _social, fechaEvento: widget.evento.fecha, actual: _estado),
+        builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion, repo: _social, actual: _estado),
       ),
     );
-    if (ok == true) _cargar();
+    if (ok == true) {
+      _cargar();
+      widget.repo.cargar(forzar: true);
+    }
+  }
+
+  Future<void> _liberar() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('¿Liberar los mensajes?'),
+        content: const Text('Las personas homenajeadas podrán leerlos desde ahora y se les avisa.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Liberar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _social.liberarMensajes();
+      await _cargar();
+    } catch (e) {
+      if (mounted) avisarSocial(context, e.toString());
+    }
   }
 
   Future<void> _sortear() async {
@@ -156,7 +183,9 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
   String _mensaje(Map<String, dynamic> inv) {
     final ev = widget.evento;
-    return 'Hola, ${inv['nombre']}. Te invito a ${ev.lugar.isEmpty ? 'nuestro evento' : 'nuestro evento en ${ev.lugar}'} el ${Fechas.corta(ev.fecha)}. '
+    final titulo = _estado?.titulo ?? '';
+    final que = titulo.isEmpty ? 'nuestro evento' : '"$titulo"';
+    return 'Hola, ${inv['nombre']}. Te invito a ${ev.lugar.isEmpty ? que : '$que en ${ev.lugar}'} el ${Fechas.corta(ev.fecha)}. '
         'Entra aquí (sin crear cuenta) para tus pistas del amigo secreto y la comida: ${inv['enlace']}';
   }
 
@@ -275,9 +304,8 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final hoy = Fechas.hoy();
     final yaCerro = cierre != null && !hoy.isBefore(cierre);
     return TarjetaSocial(
-      titulo: 'Organizar',
+      titulo: 'Amigo secreto: organizar',
       icono: Icons.tune_rounded,
-      accion: TextButton(onPressed: _configurar, child: const Text('Editar')),
       children: [
         Text(
           '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} +1)'
@@ -326,7 +354,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     } else if (e == null) {
       contenido = TarjetaSocial(
         key: const ValueKey('error'),
-        titulo: 'Evento social',
+        titulo: 'Social o fiesta',
         children: [
           Text(_error!, style: TextStyle(color: p.textoSecundario)),
           TextButton(onPressed: _cargar, child: const Text('Reintentar')),
@@ -336,10 +364,10 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
       contenido = _esPivot
           ? TarjetaSocial(
               key: const ValueKey('sin-config'),
-              titulo: 'Evento social',
+              titulo: 'Social o fiesta',
               icono: Icons.celebration_outlined,
               children: [
-                Text('Activa el amigo secreto, el regalo robado, la comida compartida y lxs +1.', style: TextStyle(color: p.textoSecundario)),
+                Text('Elige las piezas: comida, playlist, amigo secreto, regalo robado, homenaje y más.', style: TextStyle(color: p.textoSecundario)),
                 const SizedBox(height: 10),
                 FilledButton(onPressed: _configurar, child: const Text('Configurar')),
               ],
@@ -349,11 +377,21 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
       contenido = Column(
         key: const ValueKey('social'),
         children: [
-          if (e.esPivot) _organizar(e),
+          EncabezadoSocial(
+            estado: e,
+            accion: e.organiza ? TextButton(onPressed: _configurar, child: const Text('Editar')) : null,
+          ),
+          if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
+          if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
+          if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
           if (e.modulo('invitados')) _invitados(e),
           if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e),
           if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+          if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
+          if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),
+          if (e.social?['traer'] == true) TraerTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+          if (e.premios != null) PremiosTarjeta(lista: e.premios!),
         ],
       );
     }

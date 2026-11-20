@@ -5,9 +5,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AsyncLocalStorage } from 'node:async_hooks';
 // Evento social (Naviquinde, 2026-11-19): acciones social* en su propio módulo.
-import { ACCIONES_SOCIAL, accionSocial, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales } from './social.ts';
+import { ACCIONES_SOCIAL, accionSocial, alcanceSocial, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales, socialPorAprobar } from './social.ts';
 function _depsSocial(): DepsSocial {
-  return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, appUrl: APP_URL };
+  return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, pivots: _administradorxs, appUrl: APP_URL };
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -3183,6 +3183,9 @@ async function adminBandeja(params: Record<string, any>): Promise<Record<string,
   const areas = await _areasDe(adminEmail);
   const areaDe: Record<string, string> = { reservas: 'finanzas', excepciones: 'finanzas', rectificaciones: 'asistencia', lesiones: 'salud', prestamos: 'inventario', tareas: 'tareas', cambiosEquipo: 'equipo', revisionesEquipo: 'equipo', coaches: 'equipo' };
   for (const k of Object.keys(items)) if (!areas.includes(areaDe[k])) (items as Record<string, any[]>)[k] = [];
+  // Social o fiesta por aprobar (Victor, 2026-11-20): para todo Pivot que
+  // pueda aprobarlo (nunca homenajeadxs ni quienes no deben enterarse).
+  try { (items as Record<string, any[]>).sociales = await socialPorAprobar(adminEmail, _depsSocial()); } catch (e) { console.error('[bandeja] sociales:', e); }
   const total = Object.values(items).reduce((n, l) => n + l.length, 0);
   return { exito: true, total, ...items, areas };
 }
@@ -10563,6 +10566,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'tarea_vence', nombre: 'Tareas por vencer', descripcion: 'Un día antes de que venza una tarea que tomaste.', categoria: 'Tareas' },
   { clave: 'tarea_revisada', nombre: 'Revisión de tus tareas', descripcion: 'Cuando admins aprueban o devuelven una tarea que enviaste.', categoria: 'Tareas' },
     { clave: 'aviso_pivots', nombre: 'Avisos de los Pivots', descripcion: 'Mensajes que los Pivots envían al equipo.', categoria: 'Equipo' },
+  { clave: 'social', nombre: 'Sociales y fiestas', descripcion: 'Amigo secreto listo, tu evento aprobado o con cambios y mensajes para ti.', categoria: 'Equipo' },
   { clave: 'avisos_admin', nombre: 'Avisos para admins', descripcion: 'Resumen antes del entrenamiento, bajas de última hora, solicitudes pendientes y cambios de reservas.', categoria: 'Administración', soloAdmin: true },
 ];
 const CATALOGO_CLAVES = new Set(CATALOGO_NOTIFICACIONES.map((c) => c.clave));
@@ -11090,6 +11094,11 @@ async function _filtrarDestinatariosEvento(evento: AlcanceEvento | null, usernam
   }
   const equipos = !evento ? [] : evento.equipos != null ? _listaEquipos(evento.equipos)
     : evento.idEvento ? ((await _equiposDeEventos([String(evento.idEvento)]))[String(evento.idEvento)] ?? []) : [];
+  // Social o fiesta (social.ts): sin aprobar no le llega a nadie; publicado,
+  // solo a quienes están invitadxs (su equipo, varios, toda la liga o personas).
+  let social: Awaited<ReturnType<typeof alcanceSocial>> = null;
+  try { social = evento?.idEvento ? await alcanceSocial(supabase, String(evento.idEvento)) : null; } catch { social = null; }
+  if (social && !social.publicado) return [];
   const coaches: Record<string, string[]> = {};
   const pivots = new Set<string>();
   if (equipos.length) {
@@ -11105,6 +11114,7 @@ async function _filtrarDestinatariosEvento(evento: AlcanceEvento | null, usernam
     if (!f) return true; // cuenta admin sin fila ('admin_'+email): Pivot de toda la liga
     if (_estaArchivado(f)) return false;
     if (!opts.soloEquipos && !_esActivx(f)) return false;
+    if (social) return social.invitadx(u, f.categoria ?? null);
     if (!equipos.length) return true;
     if (equipos.includes(String(f.categoria ?? ''))) return true;
     if (f.email && pivots.has(String(f.email).toLowerCase())) return true;

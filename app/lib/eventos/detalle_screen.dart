@@ -390,7 +390,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          etiquetaTipoEvento(ev.tipo),
+          ev.titulo,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(

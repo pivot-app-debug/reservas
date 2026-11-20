@@ -652,6 +652,26 @@ class RegaloRobadoTarjeta extends StatelessWidget {
           style: TextStyle(color: p.texto),
         ),
         if (estado.recordatorioRobado.isNotEmpty) ...[const SizedBox(height: 6), Text(estado.recordatorioRobado, style: TextStyle(color: p.textoSecundario))],
+        // Reglas del juego (plantilla o las que escribió quien organiza).
+        if (estado.reglasRobado.isNotEmpty)
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: p.tarjeta),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              title: Text(
+                'Reglas del juego',
+                style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+              ),
+              expandedAlignment: Alignment.topLeft,
+              children: [
+                Text(
+                  estado.reglasRobado.replaceAll('{tope}', estado.topeRobado != null ? montoSocial(estado.topeRobado, simbolo) : 'el tope acordado'),
+                  style: TextStyle(height: 1.4, color: p.texto),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
