@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/moneda.dart';
+import '../../core/pronombres.dart';
 import '../../core/tema.dart';
 import '../widgets_comunes.dart';
+import 'mensajeria.dart';
 import 'pistas_screen.dart';
 import 'social_repo.dart';
 
@@ -176,8 +178,11 @@ class FichaAmigoVista extends StatelessWidget {
 // ─── Amigo secreto (estado, ruleta y ficha oculta) ────────────────────────
 
 class AmigoSecretoTarjeta extends StatefulWidget {
-  const AmigoSecretoTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar, this.simbolo});
+  const AmigoSecretoTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar, this.simbolo, this.pronombres});
   final SocialRepo repo;
+
+  /// Pronombres de quien mira: los textos para la persona se adaptan (Victor, 2026-11-20).
+  final Object? pronombres;
   final EstadoSocial estado;
   final VoidCallback alCambiar;
   final String? simbolo;
@@ -236,7 +241,10 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
             !e.asiste
                 ? 'Confirma tu asistencia para entrar al amigo secreto.'
                 : e.inscripcionAbierta && cierre != null
-                ? 'Estás inscritx. El sorteo se hace al cerrar la inscripción, el ${cierre.day}/${cierre.month}. Mientras tanto, completa tus pistas.'
+                ? conPronombres(
+                    'Estás inscritx. El sorteo se hace al cerrar la inscripción, el ${cierre.day}/${cierre.month}. Mientras tanto, completa tus pistas.',
+                    widget.pronombres,
+                  )
                 : 'La inscripción cerró. Pronto se hará el sorteo.',
             style: TextStyle(color: p.textoSecundario),
           ),
@@ -713,10 +721,11 @@ class RegaloRobadoTarjeta extends StatelessWidget {
 
 /// Personas a cargo del evento con botones de contacto.
 class ACargoTarjeta extends StatelessWidget {
-  const ACargoTarjeta({super.key, required this.personas});
+  const ACargoTarjeta({super.key, required this.personas, this.redes = const []});
   final List<Map<String, dynamic>> personas;
 
-  static String _digitos(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+  /// Apps de mensajería de la liga (Comunidad en Equipo): solo esas se ofrecen.
+  final List<String> redes;
 
   @override
   Widget build(BuildContext context) {
@@ -728,27 +737,25 @@ class ACargoTarjeta extends StatelessWidget {
         for (final x in personas)
           Builder(
             builder: (context) {
-              var tel = _digitos('${x['telefono'] ?? ''}');
-              final pre = _digitos('${x['prefijo'] ?? ''}');
-              if (tel.startsWith('0')) tel = tel.substring(1);
-              final completo = tel.isEmpty ? '' : '${pre.isEmpty ? '593' : pre}$tel';
+              final completo = telefonoInternacional('${x['telefono'] ?? ''}', prefijo: '${x['prefijo'] ?? ''}');
+              final canales = canalesPara(completo, redes).where((c) => c.$1 != 'Mensaje de texto');
               final email = '${x['email'] ?? ''}';
               final yo = x['yo'] == true;
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: AvatarPersona(nombre: '${x['nombre'] ?? ''}', foto: '${x['foto'] ?? ''}', tamano: 40),
                 title: Text('${x['nombre'] ?? ''}${yo ? ' (tú)' : ''}', style: TextStyle(color: p.texto)),
-                subtitle: Text(x['organiza'] == true ? 'Organiza' : 'Encargadx'),
+                subtitle: Text(x['organiza'] == true ? 'Organiza' : conPronombres('Encargadx', x['pronombres'])),
                 trailing: yo
                     ? null
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (completo.isNotEmpty)
+                          for (final (nombre, icono, uri) in canales)
                             IconButton(
-                              tooltip: 'WhatsApp',
-                              icon: const Icon(Icons.chat_rounded),
-                              onPressed: () => launchUrl(Uri.parse('https://wa.me/$completo'), mode: LaunchMode.externalApplication),
+                              tooltip: nombre,
+                              icon: Icon(icono),
+                              onPressed: () => launchUrl(uri, mode: LaunchMode.externalApplication),
                             ),
                           if (completo.isNotEmpty)
                             IconButton(tooltip: 'Llamar', icon: const Icon(Icons.call_rounded), onPressed: () => launchUrl(Uri.parse('tel:+$completo'))),

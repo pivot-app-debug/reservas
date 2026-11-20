@@ -22,7 +22,7 @@ const _irregulares = <String, List<String>>{
 };
 const _regulares = {
   'lesionadx', 'inactivx', 'activx', 'nuevx', 'marcadx', 'inscritx', 'archivadx', 'bienvenidx', 'hermanx', 'listx', 'invitadx', 'aprobadx', //
-  'pausadx', 'anotadx', 'elegidx', 'seleccionadx', 'confirmadx', 'retiradx', 'cansadx', 'ausentadx',
+  'pausadx', 'anotadx', 'encargadx', 'elegidx', 'seleccionadx', 'confirmadx', 'retiradx', 'cansadx', 'ausentadx',
 };
 
 final _palabra = RegExp(r'[A-Za-zÁÉÍÓÚáéíóúÑñ]+x\b');

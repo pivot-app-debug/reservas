@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: íconos, mensajería y pronombres)
+- **Ícono según la festividad** en el calendario (Navidad, Año nuevo, Halloween, Pascua; cumpleaños, aniversario y despedida por plantilla) y **ícono a elección** para una festividad propia. Sin "Día de muertos" en las festividades.
+- **Mensajería según la liga:** el +1 pide "Teléfono o correo" y su enlace se manda por las apps que la liga tiene como Comunidad en Equipo (WhatsApp, Telegram, Signal) o por mensaje de texto; si la liga no usa WhatsApp, no aparece. Telegram y Signal no reciben el texto: se copia para pegarlo. Lo mismo en "¿Dudas? Pregúntales".
+- **Pronombres:** "Estás inscritx" y "Encargadx" se adaptan a los pronombres de cada persona.
+
 ## 2026-11-20 (Social o fiesta: ajustes de Victor, 11:20)
 - Sin "Plan del evento" ni "Asistencia anticipada" en un Social o fiesta (ya se arma con sus piezas; es un evento especial).
 - **Ícono en el calendario:** globos de fiesta, o un regalo si es sorpresa. Nunca para quien no debe enterarse (el servidor manda `socialFestivo` solo a quien puede saberlo y no se guarda sin señal).

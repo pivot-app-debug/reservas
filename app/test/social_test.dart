@@ -36,7 +36,7 @@ void main() {
     final s = sugerenciasDe('festividad', 'Navidad');
     expect(s.piezas, containsAll([Pieza.amigoSecreto, Pieza.regaloRobado, Pieza.comida, Pieza.invitados]));
     expect(s.comida, isNotEmpty);
-        // Día de muertos salió de las festividades (Victor, 2026-11-20).
+    // Día de muertos salió de las festividades (Victor, 2026-11-20).
     expect(kFestividades.any((f) => f.nombre == 'Día de muertos'), isFalse);
     expect(kFestividades.any((f) => f.nombre == 'Año nuevo'), isTrue);
     expect(iconoSocial('navidad'), isNot(iconoSocial('halloween')));

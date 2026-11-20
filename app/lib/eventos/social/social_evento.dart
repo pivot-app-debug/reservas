@@ -9,6 +9,7 @@ import '../../core/tema.dart';
 import '../eventos_repo.dart';
 import '../modelos.dart';
 import 'crear_social_screen.dart';
+import 'mensajeria.dart';
 import 'social_piezas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
@@ -33,6 +34,9 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
   EstadoRsvp? _rsvpVisto;
   bool _sorteando = false;
 
+  /// Apps de mensajería de la liga (Comunidad en Equipo).
+  List<String> _redes = const [];
+
   bool get _esPivot => widget.repo.sesion.esAdmin && widget.repo.sesion.adminToken != null;
 
   @override
@@ -40,6 +44,9 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     super.initState();
     _rsvpVisto = widget.evento.miEstado;
     _cargar();
+    mensajeriasDeLiga(widget.repo.sesion).then((r) {
+      if (mounted) setState(() => _redes = r);
+    }).ignore();
   }
 
   Future<void> _cargar() async {
@@ -157,7 +164,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
               controller: contacto,
               maxLength: 120,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'WhatsApp o correo', hintText: 'Para enviarle su enlace'),
+              decoration: const InputDecoration(labelText: 'Teléfono o correo', hintText: 'Para enviarle su enlace'),
             ),
             const Text('Recibe un enlace propio para entrar sin crear cuenta: sus pistas, su ruleta y la comida.'),
           ],
@@ -191,8 +198,9 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
   Future<void> _compartir(Map<String, dynamic> inv) async {
     final contacto = '${inv['contacto'] ?? ''}';
-    final tel = contacto.replaceAll(RegExp(r'[^0-9]'), '');
+    final tel = contacto.contains('@') ? '' : telefonoInternacional(contacto);
     final texto = _mensaje(inv);
+    final canales = canalesPara(tel, _redes, texto: texto);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -201,13 +209,19 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(title: Text('Enlace de ${inv['nombre']}'), subtitle: const Text('Es personal: con él entra sin cuenta.')),
-            if (tel.length >= 7 && !contacto.contains('@'))
+            // Las apps de mensajería que usa la liga (Comunidad en Equipo) y SMS.
+            for (final (nombre, icono, uri) in canales)
               ListTile(
-                leading: const Icon(Icons.chat_outlined),
-                title: const Text('Enviar por WhatsApp'),
+                leading: Icon(icono),
+                title: Text('Enviar por $nombre'),
                 onTap: () {
                   Navigator.pop(h);
-                  launchUrl(Uri.parse('https://wa.me/$tel?text=${Uri.encodeComponent(texto)}'), mode: LaunchMode.externalApplication);
+                  // Telegram y Signal no reciben el texto: se copia para pegarlo en el chat.
+                  if (nombre != 'WhatsApp' && nombre != 'Mensaje de texto') {
+                    Clipboard.setData(ClipboardData(text: texto));
+                    avisarSocial(context, 'Copiamos el mensaje con su enlace: pégalo en el chat.');
+                  }
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
               ),
             if (contacto.contains('@'))
@@ -385,7 +399,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
           if (e.modulo('invitados')) _invitados(e),
-          if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+          if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar, pronombres: widget.repo.sesion.datos['pronombres']),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e),
           if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
@@ -393,7 +407,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.social?['traer'] == true) TraerTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.premios != null) PremiosTarjeta(lista: e.premios!),
           // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
-          if (e.aCargo.isNotEmpty) ACargoTarjeta(personas: e.aCargo),
+          if (e.aCargo.isNotEmpty) ACargoTarjeta(personas: e.aCargo, redes: _redes),
         ],
       );
     }

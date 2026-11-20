@@ -485,10 +485,10 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   if (!esInv) {
     const aCargo = [...new Set([cfg.creador, ...encargadxs(cfg)].filter((u: unknown) => typeof u === 'string' && u && !String(u).includes('@')))] as string[];
     if (aCargo.length) {
-      const { data: cs } = await db.from('equipo').select('username, nombre_derby, foto_perfil, telefono, prefijo, email').in('username', aCargo);
+            const { data: cs } = await db.from('equipo').select('username, nombre_derby, foto_perfil, telefono, prefijo, email, pronombres').in('username', aCargo);
       out.aCargo = (cs ?? []).map((r: any) => ({
         username: r.username, nombre: (r.nombre_derby ?? '').trim() || r.username, foto: r.foto_perfil ?? '',
-        telefono: r.telefono ?? '', prefijo: r.prefijo ?? '', email: r.email ?? '', organiza: r.username === cfg.creador, yo: r.username === q.username,
+                telefono: r.telefono ?? '', prefijo: r.prefijo ?? '', email: r.email ?? '', pronombres: r.pronombres ?? '', organiza: r.username === cfg.creador, yo: r.username === q.username,
       })).sort((a: any, b: any) => Number(b.organiza) - Number(a.organiza));
     }
   }
