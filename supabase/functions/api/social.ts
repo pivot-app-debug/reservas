@@ -82,7 +82,10 @@ const MAX_INVITADOS = 5;
 const MAX_LISTA = 30;
 const MAX_WISHLIST = 20;
 const MAX_FAVORITOS = 2;
+// Cierre del amigo secreto (Victor, 2026-11-20): por defecto 2 semanas antes;
+// quien organiza puede elegir cualquier fecha hasta 1 día antes del evento.
 const DIAS_CIERRE = 14;
+const DIAS_CIERRE_MIN = 1;
 const FALTA_MIGRACION = 'Falta aplicar la migración del Social o fiesta (20261120100000). Avísale a un Pivot.';
 
 function _texto(v: unknown, max: number): string {
@@ -115,6 +118,12 @@ function _tokenNuevo(): string {
 
 function _idCorto(): string {
   return crypto.randomUUID().substring(0, 8);
+}
+
+/** 2 semanas antes; si eso ya pasó, el día anterior al evento. */
+function _cierreDefecto(fecha: string): string {
+  const d = _restarDias(fecha, DIAS_CIERRE);
+  return d >= _hoyEc() ? d : _restarDias(fecha, DIAS_CIERRE_MIN);
 }
 
 function _restarDias(iso: string, dias: number): string {
@@ -344,7 +353,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
   const invitadosQueCuentan = invitados.filter((i) => asisten.has(i.anfitrion));
   const total = asisten.size + invitadosQueCuentan.length;
-  const cierre = cfg.cierre ?? _restarDias(ev.fecha, DIAS_CIERRE);
+    const cierre = cfg.cierre ?? _cierreDefecto(ev.fecha);
   // Lo que ve la vista neutral: nada del motivo, del homenaje ni de la sorpresa.
   const social: Record<string, any> = {
     amigoSecreto: !!cfg.amigo_secreto && ve('amigoSecreto'), regaloRobado: !!cfg.regalo_robado && ve('regaloRobado'),
@@ -618,11 +627,11 @@ async function _leerDatos(db: any, d: any, previa: any, creador: string | null, 
   }
   if (d.mapa !== undefined) ev.mapa = _link(d.mapa) || null;
 
-  // Cierre del amigo secreto: como máximo 2 semanas antes.
+    // Cierre del amigo secreto: como máximo 1 día antes (por defecto, 2 semanas).
   const fechaEv = ev.fecha ?? previa?.__fecha;
   if (fechaEv && (d.cierre !== undefined || ev.fecha)) {
-    const limite = _restarDias(fechaEv, DIAS_CIERRE);
-    let cierre = typeof d.cierre === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.cierre) ? d.cierre : (previa?.cierre ?? limite);
+    const limite = _restarDias(fechaEv, DIAS_CIERRE_MIN);
+    let cierre = typeof d.cierre === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.cierre) ? d.cierre : (previa?.cierre ?? _cierreDefecto(fechaEv));
     if (cierre > limite) cierre = limite;
     fila.cierre = cierre;
   }
@@ -728,7 +737,7 @@ async function socialCrear(params: Record<string, any>, deps: DepsSocial): Promi
     amigo_secreto: false, regalo_robado: false, comida: false, invitados: false, piezas: {}, para: { tipo: 'liga', valores: [] },
     ...r.fila, aprobado_en: null, actualizado_en: new Date().toISOString(),
   };
-  if (!fila.cierre) fila.cierre = _restarDias(r.ev.fecha, DIAS_CIERRE);
+    if (!fila.cierre) fila.cierre = _cierreDefecto(r.ev.fecha);
   const { error: e2 } = await db.from('social_eventos').insert(fila);
   if (e2) {
     await db.from('asistencias').delete().eq('id_evento', idEvento);
@@ -809,7 +818,7 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
   const fotoAntes = previa && publicado(previa) ? await _foto(db, previa, ev) : null;
   const fila: Record<string, any> = { ...r.fila };
   if (previa && 'actualizado_en' in previa) fila.actualizado_en = new Date().toISOString();
-  if (!fila.cierre && !previa?.cierre) fila.cierre = _restarDias(r.ev.fecha ?? ev.fecha, DIAS_CIERRE);
+    if (!fila.cierre && !previa?.cierre) fila.cierre = _cierreDefecto(r.ev.fecha ?? ev.fecha);
   const reenviar = params.reenviar === true || params.reenviar === 'true';
   if (reenviar && previa?.rechazado_en) (fila.rechazado_en = null, fila.rechazo_motivo = null);
   if (!previa) {

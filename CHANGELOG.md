@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: homenaje y cierre)
+- El paso "Homenaje y sorpresa" del asistente ya no aparece si no elegiste la pieza Homenaje. El resumen sigue igual y en esa fila dice "Sin homenaje ni sorpresa" (desde ahí se puede agregar).
+- **Cierre del amigo secreto libre:** por defecto 2 semanas antes; quien organiza puede elegir cualquier fecha hasta 1 día antes del evento. Si queda a menos de 2 semanas, avisa que la gente tiene poco tiempo para comprar el regalo. Si el evento es en menos de 2 semanas, el cierre por defecto es el día anterior.
+
 ## 2026-11-20 (Social o fiesta: dónde se crea)
 - **Pivots:** Social o fiesta se crea en Nuevo evento → Único, que ahora se abre con dos opciones: "Entrenamiento, partido u otro" y "Social o fiesta". Ya no está en el +.
 - **Quien no es Pivot:** "Crear un evento" en el menú ⋯ del Calendario (junto a Buscar y Filtros), para no cargar la barra. El + queda solo con las reservas.

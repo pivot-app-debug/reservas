@@ -5,7 +5,7 @@ La Naviquinde es la fiesta de fin de año de Quindes (19/12/2026). En Pivot se c
 ## Decidido
 - Tipo de evento "Social" con módulos que se activan al crearlo: **Amigo secreto**, **Regalo robado** (tope de presupuesto y recordatorio), **Comida compartida** e **invitadxs +1**. Dos topes de presupuesto en la moneda de la liga (amigo secreto y regalo robado).
 - **Asistencia:** cada persona marca Asistiré y puede sumar uno o más +1 (nombre y WhatsApp o correo). Cada +1 recibe un enlace propio (token) para entrar **sin crear cuenta**: su mini perfil, pistas/wishlist, su ruleta y la comida.
-- **Fecha de cierre** de inscripción al amigo secreto: como máximo 2 semanas antes del evento. Quien se suma después no entra al amigo secreto (sí a la comida).
+- **Fecha de cierre** de inscripción al amigo secreto: por defecto 2 semanas antes del evento; quien organiza puede elegir cualquier fecha hasta 1 día antes (Victor, 20/11), con aviso si queda a menos de 2 semanas. Quien se suma después no entra al amigo secreto (sí a la comida).
 - **Sorteo:** al cerrar, la app arma las parejas como un ciclo (A→B→C→…→A), que funciona con cualquier cantidad, par o impar. Reglas: nadie se toca a sí mismx; una persona y su +1 nunca se tocan entre sí (en ningún sentido); a futuro, no repetir la pareja del año anterior (guardar historial por liga). Si las reglas lo hacen imposible, se avisa a quien organiza.
 - **Ruleta:** cada persona (o +1) gira su propia ruleta y le revela a quién le toca. Después queda oculto bajo "Ver mi amigo secreto" (ícono de ojo).
 - **Privacidad:** cada quien ve solo la ficha de la persona que le tocó (pistas y wishlist). Lxs +1 tampoco ven la lista de asistentes.

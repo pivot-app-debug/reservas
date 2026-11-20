@@ -259,10 +259,16 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     });
   }
 
+  /// El paso Homenaje y sorpresa solo sale si elegiste la pieza Homenaje (Victor, 2026-11-20).
+  bool _saltar(_P p) => p == _P.homenaje && !_piezas.contains(Pieza.homenaje) && _homenajeados.isEmpty && !_sorpresa;
+
   void _siguiente() {
     if (_editando) return _ir(_P.resumen);
-    final i = _orden.indexOf(_paso);
-    if (i < _orden.length - 1) _ir(_orden[i + 1]);
+    var i = _orden.indexOf(_paso) + 1;
+    while (i < _orden.length - 1 && _saltar(_orden[i])) {
+      i++;
+    }
+    if (i < _orden.length) _ir(_orden[i]);
   }
 
   void _atras() {
@@ -274,8 +280,11 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       }
       return;
     }
-    final i = _orden.indexOf(_paso);
-    if (i > 0) _ir(_orden[i - 1]);
+    var i = _orden.indexOf(_paso) - 1;
+    while (i > 0 && _saltar(_orden[i])) {
+      i--;
+    }
+    if (i >= 0) _ir(_orden[i]);
   }
 
   String? get _falta => switch (_paso) {
@@ -764,17 +773,36 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   // ─── Paso 5: configuración ──────────────────────────────────────────────
 
-  DateTime? get _limiteCierre => _fecha?.subtract(const Duration(days: 14));
+  // Cierre libre hasta 1 día antes; por defecto, 2 semanas antes (Victor, 2026-11-20).
+  DateTime? get _limiteCierre => _fecha?.subtract(const Duration(days: 1));
+
+  DateTime? get _cierrePorDefecto {
+    final f = _fecha;
+    if (f == null) return null;
+    final d = f.subtract(const Duration(days: 14));
+    return d.isBefore(Fechas.hoy()) ? _limiteCierre : d;
+  }
+
+  DateTime? get _cierreElegido {
+    final limite = _limiteCierre;
+    return _cierre == null || (limite != null && _cierre!.isAfter(limite)) ? _cierrePorDefecto : _cierre;
+  }
+
+  bool get _cierreJusto {
+    final c = _cierreElegido, f = _fecha;
+    return c != null && f != null && f.difference(c).inDays < 14;
+  }
 
   Future<void> _elegirCierre() async {
     final limite = _limiteCierre;
     if (limite == null) return;
     final hoy = Fechas.hoy();
     if (limite.isBefore(hoy)) {
-      avisarSocial(context, 'El evento es en menos de 2 semanas: cierra la inscripción y sortea cuando quieras desde el evento.');
+      avisarSocial(context, 'El evento es mañana o antes: cierra la inscripción y sortea cuando quieras desde el evento.');
       return;
     }
-    final actual = _cierre == null || _cierre!.isAfter(limite) || _cierre!.isBefore(hoy) ? limite : _cierre!;
+    final elegido = _cierreElegido;
+    final actual = elegido == null || elegido.isBefore(hoy) ? limite : elegido;
     final f = await showDatePicker(context: context, firstDate: hoy, lastDate: limite, initialDate: actual);
     if (f != null) setState(() => _cierre = f);
   }
@@ -861,8 +889,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       ]);
     }
     if (_piezas.contains(Pieza.amigoSecreto)) {
-      final limite = _limiteCierre;
-      final cierre = _cierre == null || (limite != null && _cierre!.isAfter(limite)) ? limite : _cierre;
+      final cierre = _cierreElegido;
       secciones.addAll([
         _titulo('Amigo secreto'),
         _numero(_topeAmigo, 'Tope del regalo (opcional)'),
@@ -871,7 +898,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           leading: const Icon(Icons.event_busy_outlined),
           title: const Text('Cierre de la inscripción'),
           subtitle: Text(
-            '${cierre == null ? 'Elige primero la fecha' : Fechas.corta(cierre)} · como máximo 2 semanas antes. Quien se suma después no entra al amigo secreto.',
+            '${cierre == null ? 'Elige primero la fecha' : Fechas.corta(cierre)} · hasta 1 día antes del evento. Quien se suma después no entra al amigo secreto.'
+            '${_cierreJusto ? '\nCon menos de 2 semanas, la gente tiene poco tiempo para comprar el regalo.' : ''}',
           ),
           onTap: _elegirCierre,
         ),
@@ -1257,6 +1285,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
             if (_homenajeados.isNotEmpty) 'Para ${_nombres(_homenajeados)}',
             if (_sorpresa) 'Sorpresa: ven "${_neutro.text.trim()}"',
             if (_sorpresa && _noEnterarse.isNotEmpty) 'Tampoco se enteran: ${_nombres(_noEnterarse)}',
+            // Sin homenaje no se le recuerda nada (Victor, 2026-11-20); queda la fila para agregarlo.
+            if (_homenajeados.isEmpty && !_sorpresa) 'Sin homenaje ni sorpresa',
           ].join('\n'),
         ),
         fila(_P.encargados, Icons.manage_accounts_outlined, 'Encargadxs', _nombres(_encargados)),
@@ -1270,8 +1300,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   Map<String, Object?> _datos() {
     final festividad = _plantilla == 'festividad' ? (_festividad == 'Otra' ? _festividadOtra.text.trim() : _festividad) : null;
-    final limite = _limiteCierre;
-    final cierre = _cierre == null || (limite != null && _cierre!.isAfter(limite)) ? limite : _cierre;
+    final cierre = _cierreElegido;
     final piezas = <String, Object?>{
       if (_piezas.contains(Pieza.playlist)) 'playlist': {'link': _playlist.text.trim(), 'nota': _playlistNota.text.trim()},
       if (_piezas.contains(Pieza.dress)) 'dress': {'texto': _dress.text.trim()},
