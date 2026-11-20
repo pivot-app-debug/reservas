@@ -165,6 +165,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
   final _kBandeja = GlobalKey(debugLabel: 'tour-bandeja');
   final _kFiltros = GlobalKey(debugLabel: 'tour-filtros');
+  final _kBuscar = GlobalKey(debugLabel: 'tour-buscar');
 
   String? _idTarjetaTour;
 
@@ -904,6 +905,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             },
           ),
           IconButton(
+            key: _kBuscar,
             tooltip: _consulta.trim().isEmpty ? 'Buscar' : 'Buscar ("${_consulta.trim()}")',
             icon: Badge(isLabelVisible: _consulta.trim().isNotEmpty, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.search_rounded)),
             onPressed: () {
@@ -1423,37 +1425,34 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     const verbos = {
       'Reserva por clase': 'reservar tus clases',
       'Reserva por mes': 'pagar tu mensualidad',
-      'Nuevo evento': 'crear eventos',
-      'Nueva tarea': 'crear tareas',
-      'Proponer tarea': 'proponer tareas',
       'Asistencia anticipada': 'marcar tu asistencia a varios entrenamientos de una vez',
     };
     final nombres = [for (final a in _acciones) verbos[a.texto] ?? a.texto.toLowerCase()];
     final lista = nombres.length <= 1 ? nombres.join() : '${nombres.sublist(0, nombres.length - 1).join(', ')} o ${nombres.last}';
-    final reserva = ReservasRepo(repo.sesion).opciones.isNotEmpty;
-    final tituloMas = reserva ? 'Reserva tu lugar' : 'Asistencia anticipada';
-    final textoMas = 'Toca aquí para $lista.';
+    final crea = repo.sesion.esAdmin || repo.sesion.puedeCrearSocial;
     await Tour.mostrarSiCorresponde(
       context,
-      // v2 (2026-11-15): tour nuevo para la app nueva, también para quien vio el anterior.
-      preferencia: 'tour.calendario.v2',
+      // v3 (Victor, 2026-11-20): la casita, Filtros y Buscar; los eventos se
+      // crean en la casita. Se muestra de nuevo a todxs una vez.
+      preferencia: 'tour.calendario.v3',
       pasos: [
-        if (_acciones.isNotEmpty) PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Avisos, tareas, cursos, eventos y pagos',
-          texto: _esAdmin
-              ? 'Aquí están tus avisos (pagos, reservas, rectificaciones y pedidos por revisar), las tareas, los cursos, los eventos (donde se crean) y los pagos.'
-              : 'Aquí están tus avisos y pedidos, las tareas para tomar, los cursos, los eventos de la semana y tus pagos. Si la casita tiene un punto, hay novedades.',
+          titulo: 'Tu inicio',
+          texto: crea
+              ? 'En la casita ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Ahí también creas eventos. Si tiene un punto rojo, hay novedades.'
+              : 'En la casita ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Si tiene un punto rojo, hay novedades.',
         ),
-        PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
-        // Barra nueva (Victor, 2026-11-20): Filtros y Buscar al lado de la campana.
         PasoTour(
           clave: _kFiltros,
-          titulo: 'Filtra y busca',
-          texto: 'Con estos dos íconos eliges qué ver (eventos o tareas, tipo, lugar o área) y buscas eventos, tareas, cumpleaños o lugares.',
+          titulo: 'Filtra',
+          texto: 'Elige qué ver en el calendario: eventos o tareas, el tipo de evento, el lugar o el área. Con filtros activos, el ícono muestra cuántos.',
         ),
-        PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, cambiar tu respuesta y ver cómo llegar.'),
+        PasoTour(clave: _kBuscar, titulo: 'Busca', texto: 'Encuentra eventos, tareas, cumpleaños o lugares escribiendo una palabra.'),
+        if (_acciones.isNotEmpty)
+          PasoTour(clave: _kMas, titulo: 'Reserva o paga', texto: 'Toca aquí para $lista. Tus pagos y recibos están en la casita, en Pagos y suscripciones.'),
+        PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
+        PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, responder si vas y ver cómo llegar.'),
         PasoTour(
           clave: ClavesTour.navegacion,
           ajuste: ClavesTour.primeraPestana,
@@ -1464,7 +1463,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         // no dejaría lugar para la tarjeta y el recorte no se notaría).
         PasoTour(
           clave: _kLista,
-          // Debajo de la cabecera de vidrio (antes marcaba la barra de arriba).
           ajuste: (r) => Rect.fromLTWH(r.left + 10, r.top + _altoCabecera + 8, r.width - 20, (r.height - _altoCabecera) * 0.45),
           titulo: 'Explora la línea de tiempo',
           texto: 'Desliza para ver lo pasado y lo próximo: eventos, tus tareas, cumpleaños y temporadas de descanso. Arriba eliges ver todo, solo eventos o solo tareas.',

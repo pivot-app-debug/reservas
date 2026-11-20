@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/fechas.dart';
+import '../core/tour.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../ajustes/pagos_screen.dart';
@@ -84,6 +85,36 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     super.initState();
     _tabs.addListener(_alCambiar);
     _alCambiar();
+    // Tour corto la primera vez (Victor, 2026-11-20): los pills y dónde se crean los eventos.
+    Future.delayed(const Duration(milliseconds: 900), _tour);
+  }
+
+  final _kPills = GlobalKey(debugLabel: 'tour-pills');
+  final _kCuerpo = GlobalKey(debugLabel: 'tour-cuerpo');
+
+  Future<void> _tour() async {
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+    final crea = widget.eventos.sesion.esAdmin || widget.eventos.sesion.puedeCrearSocial;
+    await Tour.mostrarSiCorresponde(
+      context,
+      preferencia: 'tour.actividad.v1',
+      pasos: [
+        PasoTour(
+          clave: _kPills,
+          titulo: 'Tus secciones',
+          texto: 'Toca un ícono para cambiar de sección (o desliza): Novedades, Tareas, Cursos y Pagos. La elegida se marca con su nombre.',
+        ),
+        PasoTour(
+          clave: _kCuerpo,
+          // Solo la parte de arriba (los próximos eventos), debajo de la barra.
+          ajuste: (r) => Rect.fromLTWH(r.left + 8, r.top + altoBarra(context) + 4, r.width - 16, r.height * 0.35),
+          titulo: 'Lo que viene',
+          texto: crea
+              ? 'Aquí ves los eventos de los próximos días, los cumpleaños y las fiestas. Debajo está el botón para crear un evento.'
+              : 'Aquí ves los eventos de los próximos días, los cumpleaños y las fiestas. Debajo, tus notificaciones.',
+        ),
+      ],
+    );
   }
 
   void _alCambiar() {
@@ -139,7 +170,9 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
 
   /// Navegación por pills (Victor, 2026-11-20): la elegida se expande con su
   /// ícono y su nombre en el color de énfasis; las demás quedan solo con ícono.
-  Widget _pills(PivotPaleta p) => AnimatedBuilder(
+  Widget _pills(PivotPaleta p) => KeyedSubtree(key: _kPills, child: _pillsBarra(p));
+
+  Widget _pillsBarra(PivotPaleta p) => AnimatedBuilder(
     animation: _tabs.animation!,
     builder: (context, _) {
       final actual = _tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
@@ -248,7 +281,10 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         ),
         bottom: PreferredSize(preferredSize: const Size.fromHeight(54), child: _pills(p)),
       ),
-      body: TabBarView(controller: _tabs, children: [for (final x in _pestanas) _cuerpo(x)]),
+      body: KeyedSubtree(
+        key: _kCuerpo,
+        child: TabBarView(controller: _tabs, children: [for (final x in _pestanas) _cuerpo(x)]),
+      ),
     );
   }
 }
