@@ -33,7 +33,11 @@ jobs:
 
       - name: Compilar
         working-directory: app
-        run: flutter build web --release --base-href / --no-wasm-dry-run
+        # WEB_BUILD: número de esta publicación; la app lo compara con
+        # web_version.json para pedir actualizar (Victor, 2026-11-20).
+        run: |
+          flutter build web --release --base-href / --no-wasm-dry-run --dart-define=WEB_BUILD=${{ github.run_number }}
+          echo "{\"build\": ${{ github.run_number }}}" > build/web/web_version.json
 
       - name: Publicar en la raíz
         run: |
@@ -46,7 +50,7 @@ jobs:
               n=$(basename "$f")
               if [ -d "$f" ] && [ -d "$n" ]; then cp -r "$f"/. "$n"/; else rm -rf "$n"; cp -r "$f" "$n"; fi
             done
-            git add -A index.html main.dart.js flutter.js flutter_bootstrap.js flutter_service_worker.js version.json manifest.json favicon.png firebase-messaging-sw.js canvaskit assets icons
+            git add -A index.html main.dart.js flutter.js flutter_bootstrap.js flutter_service_worker.js version.json web_version.json manifest.json favicon.png firebase-messaging-sw.js canvaskit assets icons
             if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
             git commit -m "Web: ${GITHUB_SHA::7} [skip ci]"
             git push origin HEAD:main && exit 0

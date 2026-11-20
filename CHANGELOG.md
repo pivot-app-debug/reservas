@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (actualización obligatoria en la web y la PWA)
+- Cada publicación de la web lleva su número (`WEB_BUILD` = corrida del CI) y se publica `web_version.json` con el último. Al abrir la app y al volver a ella, si hay uno más nuevo aparece la misma pantalla que en Android ("Hay una nueva versión de Pivot") y no se puede seguir sin actualizar.
+- "Actualizar ahora" borra la caché del navegador (sin tocar el service worker de las notificaciones), vuelve a pedir los archivos principales sin caché y recarga. No cierra la sesión.
+- Quien tiene abierta una versión anterior a esta necesita recargar una vez; desde ahí, se pide sola.
+
 ## 2026-11-20 (Social o fiesta: permisos, comida y avisos)
 - **Regla de oro:** quien crea el evento cambia todo (los Pivots también).
 - **Permisos por encargadx** (paso Encargadxs): Fecha, hora y lugar · Amigo secreto y regalo robado · Comida y qué traer · Playlist, dress code y premios · Invitadxs (+1) · Homenaje y sorpresa. Por defecto, todo menos homenaje. En el asistente cada encargadx solo abre lo suyo (el resto se ve con candado) y el servidor guarda solo eso.

@@ -10,6 +10,7 @@ import 'package:ota_update/ota_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'recargar_web.dart';
 import 'tema.dart';
 
 /// Actualización obligatoria (pedido explícito 2026-11-06): si hay una
@@ -66,10 +67,22 @@ class _ControlActualizacionState extends State<ControlActualizacion> with Widget
   }
 
   Future<void> _revisar() async {
-    if (kIsWeb) return; // la web siempre está en la última versión
     if (_revisando) return;
     _revisando = true;
     try {
+      // Web y PWA (Victor, 2026-11-20): cada publicación lleva su número
+      // (`WEB_BUILD`, el de la corrida del CI) y `web_version.json` tiene el
+      // último. Si hay uno más nuevo, se pide actualizar igual que en Android.
+      if (kIsWeb) {
+        const local = int.fromEnvironment('WEB_BUILD');
+        if (local == 0) return; // compilación local, sin número
+        final resp = await http.get(Uri.base.resolve('web_version.json?t=${DateTime.now().millisecondsSinceEpoch}')).timeout(const Duration(seconds: 15));
+        if (resp.statusCode != 200) return;
+        final j = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+        final remota = (j['build'] as num?)?.toInt() ?? 0;
+        if (mounted) setState(() => _pendiente = remota > local ? VersionRemota(codigo: remota, nombre: '', novedades: '${j['novedades'] ?? ''}') : null);
+        return;
+      }
       if (Actualizacion.esPlay) {
         final info = await InAppUpdate.checkForUpdate();
         if (info.updateAvailability == UpdateAvailability.updateAvailable && info.immediateUpdateAllowed) {
@@ -129,6 +142,12 @@ class _PantallaActualizarState extends State<PantallaActualizar> {
   }
 
   void _actualizar() {
+    if (kIsWeb) {
+      // Borra lo guardado y recarga con la versión nueva (no cierra la sesión).
+      setState(() => _progreso = 0);
+      recargarWebNueva(widget.version.codigo);
+      return;
+    }
     setState(() {
       _error = null;
       _progreso = 0;
@@ -197,7 +216,9 @@ class _PantallaActualizarState extends State<PantallaActualizar> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Para seguir usando la app, actualiza a la versión ${widget.version.nombre}.',
+                  widget.version.nombre.isEmpty
+                      ? 'Para seguir usando la app, actualiza a la última versión. Tarda unos segundos y no se cierra tu sesión.'
+                      : 'Para seguir usando la app, actualiza a la versión ${widget.version.nombre}.',
                   textAlign: TextAlign.center,
                   style: t.bodyMedium?.copyWith(color: p.textoSecundario),
                 ),
@@ -218,7 +239,7 @@ class _PantallaActualizarState extends State<PantallaActualizar> {
                           children: [
                             LinearProgressIndicator(value: _progreso == 0 ? null : _progreso, minHeight: 8, borderRadius: BorderRadius.circular(8)),
                             const SizedBox(height: 10),
-                            Text('Descargando… ${((_progreso ?? 0) * 100).round()} %', style: TextStyle(color: p.textoSecundario)),
+                            Text(kIsWeb ? 'Actualizando…' : 'Descargando… ${((_progreso ?? 0) * 100).round()} %', style: TextStyle(color: p.textoSecundario)),
                           ],
                         )
                       : FilledButton(
