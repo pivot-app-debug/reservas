@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Actividad con íconos)
+- En la barra del Calendario, la campana pasa a ser una casita, con un punto rojo cuando hay novedades.
+- Las pestañas de Actividad ahora son íconos grandes: Avisos, Tareas, Cursos y Fiestas. El título de arriba cambia según la pestaña.
+- Fiestas: explica qué tiene cada fiesta. Si no hay fiestas próximas, se ve "No hay fiestas próximas" con el botón "Crear una fiesta", igual que en Tareas y Cursos. Si hay alguna, aparece la lista y el botón flotante "Nueva fiesta".
+
 ## 2026-11-20 (regalo robado en vivo)
 - Botón "Jugar al regalo robado" en la tarjeta del regalo robado. Antes del día del evento se ve gris. El día del evento, quien dirige el juego (quien organiza o tiene el área de amigo secreto y regalo robado) lo activa.
 - Paso a paso en vivo: regalos a la pila (cada quien se marca o lo marca quien dirige), sorteo del orden, turnos con "Abrió uno" o "Robó uno", siguiente turno y turno final. Todxs ven en vivo a quién le toca, quién robó a quién, qué tiene cada quien y lo que pasó. Se puede deshacer lo último. No manda notificaciones.

@@ -32,7 +32,6 @@ import '../tareas/tareas_modelos.dart';
 import '../tareas/tareas_repo.dart';
 import '../tareas/tareas_screen.dart' hide PilaAvatares;
 import '../pivots/bandeja_repo.dart';
-import '../pivots/icono_bandeja.dart';
 import '../core/esqueleto.dart';
 import '../cursos/cursos_screen.dart';
 import '../actividad/actividad_screen.dart';
@@ -873,12 +872,19 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
           ),
           const Spacer(),
-          // Barra (Victor, 2026-11-20): solo la campana (Actividad), Filtros y
-          // Buscar. Tareas, Clases y Fiestas viven dentro de Actividad.
+          // Barra (Victor, 2026-11-20): la casita (Avisos, Tareas, Cursos y
+          // Fiestas), Filtros y Buscar. Punto rojo con novedades; a los Pivots,
+          // el número de pendientes.
           IconButton(
             key: _kBandeja,
-            tooltip: _bandeja.hayNovedades ? 'Actividad (hay novedades)' : 'Actividad',
-            icon: IconoBandeja(novedades: _bandeja.hayNovedades || _cursos.nuevos, pendientes: _bandeja.esPivot ? _bandeja.total : 0),
+            tooltip: _bandeja.hayNovedades ? 'Avisos, tareas, cursos y fiestas (hay novedades)' : 'Avisos, tareas, cursos y fiestas',
+            icon: Badge(
+              isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos,
+              smallSize: 9,
+              backgroundColor: p.marca,
+              label: _bandeja.esPivot && _bandeja.total > 0 ? Text('${_bandeja.total}') : null,
+              child: const Icon(Icons.home_outlined),
+            ),
             onPressed: () => _abrirActividad(),
           ),
           IconButton(
@@ -1430,7 +1436,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Actividad',
+          titulo: 'Avisos, tareas, cursos y fiestas',
           texto: _esAdmin
               ? 'Aquí están tus notificaciones (pagos, reservas, rectificaciones y pedidos por revisar), las tareas, las clases y las fiestas y eventos sociales.'
               : 'Aquí están tus notificaciones y pedidos, las tareas para tomar, las clases y las fiestas y eventos sociales. Si la campana tiene un punto, hay novedades.',

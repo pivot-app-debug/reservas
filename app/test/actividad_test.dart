@@ -24,12 +24,13 @@ void main() {
       ),
     );
     await t.pump(const Duration(seconds: 1));
-    expect(find.text('Actividad'), findsOneWidget);
-    expect(find.text('Notificaciones'), findsOneWidget);
-    expect(find.text('Tareas'), findsOneWidget);
-    expect(find.text('Clases'), findsOneWidget);
-    await t.tap(find.text('Fiestas'));
+    // Título según la pestaña; pestañas con íconos.
+    expect(find.text('Avisos'), findsOneWidget);
+    expect(find.byTooltip('Cursos'), findsOneWidget);
+    await t.tap(find.byIcon(Icons.celebration_rounded));
     await t.pumpAndSettle();
+    expect(find.text('Fiestas'), findsWidgets);
+    expect(find.text('No hay fiestas próximas.'), findsOneWidget);
     expect(find.textContaining('Los crea un Pivot de fiestas y eventos sociales'), findsOneWidget);
     expect(find.text('Crear evento'), findsNothing);
     expect(s.puedeCrearSocial, isFalse);
