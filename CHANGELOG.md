@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (lo que falta, más directo)
+- Qué lleva cada quien: "Faltan" pasó a decir "Todavía falta para el grupo", con la cantidad que falta en cada sección (por ejemplo, "Platos salados (6 porciones)").
+- "Tu parte" dice en una frase qué te toca: "Te toca llevar algo: con comida o bebida para 3 personas en cualquier sección cubres tu parte", "Te falta poco…" o "Ya cubriste tu parte ✓".
+
 ## 2026-11-20 (tours al día)
 - Tour del Calendario nuevo, que se muestra otra vez a todxs una vez: la casita (tu inicio, y dónde se crean los eventos), Filtros, Buscar, el "+" (solo con reservas o pagos), navegar por mes, el detalle de un evento, volver a hoy y la línea de tiempo.
 - Tour corto la primera vez que abres la casita: los pills y lo que viene.

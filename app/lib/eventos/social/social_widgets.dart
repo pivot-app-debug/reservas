@@ -979,9 +979,11 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
     final admin = e.puedeComida;
     final abiertas = e.comida.where((c) => !c.cerrada).toList()..sort((a, b) => (b.falta ? 1 : 0) - (a.falta ? 1 : 0));
     final completas = e.comida.where((c) => c.cerrada).toList();
+    // Lo que todavía le falta al grupo, con cuánto (Victor, 2026-11-20: "más directo").
     final faltan = [
       for (final c in abiertas)
-        if (c.falta || (c.meta > 0 && c.aportado < c.meta)) c.nombre,
+        if (c.falta || (c.meta > 0 && c.aportado < c.meta))
+          c.meta > 0 && c.aportado < c.meta ? '${c.nombre} (${cantidadSocial(c.meta - c.aportado)}${c.porCosa ? '' : ' ${c.unidad}'})' : c.nombre,
     ];
     final mias = [
       for (final c in e.comida)
@@ -999,7 +1001,7 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           '${e.asiste ? 'Mira lo que ya lleva cada quien para no repetir.' : 'Confirma tu asistencia para anotarte.'}',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
-        if (e.asiste && e.seccionesParte.isNotEmpty) _TuParte(valor: e.miParte),
+        if (e.asiste && e.seccionesParte.isNotEmpty) _TuParte(valor: e.miParte, secciones: e.seccionesParte.length),
         if (mias.isNotEmpty)
           Container(
             width: double.infinity,
@@ -1044,7 +1046,7 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
             TextSpan(
               children: [
                 TextSpan(
-                  text: 'Faltan: ',
+                  text: 'Todavía falta para el grupo: ',
                   style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
                 ),
                 TextSpan(
@@ -1485,8 +1487,13 @@ class _Contador extends StatelessWidget {
 
 /// Cuánto cubriste de lo que te toca llevar.
 class _TuParte extends StatelessWidget {
-  const _TuParte({required this.valor});
+  const _TuParte({required this.valor, required this.secciones});
   final double valor;
+
+  /// Secciones de comida y bebida que cuentan: tu parte es 1 persona en cada una.
+  final int secciones;
+
+  int _personas() => math.max(1, ((1 - valor) * secciones).ceil());
 
   @override
   Widget build(BuildContext context) {
@@ -1525,11 +1532,17 @@ class _TuParte extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          // En una frase, qué te toca (Victor, 2026-11-20).
           Text(
             lista
-                ? 'Ya cubriste tu parte. Si quieres, puedes llevar más.'
-                : 'Lo que llevas para todxs en comida o bebida suma. Con una sola cosa que rinda bastante puedes cubrirla.',
-            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+                ? 'Ya cubriste tu parte ✓ Si quieres, puedes llevar más.'
+                : valor <= 0
+                ? 'Te toca llevar algo: con comida o bebida para ${_personas()} personas en cualquier sección cubres tu parte.'.replaceFirst(
+                    'para 1 personas',
+                    'para 1 persona',
+                  )
+                : 'Te falta poco: con comida o bebida para ${_personas()} ${_personas() == 1 ? 'persona' : 'personas'} más cubres tu parte.',
+            style: TextStyle(fontSize: 13, fontWeight: lista ? FontWeight.w400 : FontWeight.w600, color: lista ? p.textoSecundario : p.texto),
           ),
         ],
       ),

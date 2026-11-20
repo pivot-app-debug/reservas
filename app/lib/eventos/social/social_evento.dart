@@ -380,7 +380,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           Text(
             faltan.isEmpty
                 ? 'Por ahora no falta nada. Si se necesita algo más, agrega una sección o márcala como "Hace falta".'
-                : 'Falta: ${faltan.join(', ')}. Agrega secciones, deja ideas de qué llevar y marca lo que hace falta: se avisa a quienes van.',
+                : 'Todavía falta para el grupo: ${faltan.join(', ')}. Agrega secciones, deja ideas de qué llevar y marca lo que hace falta: se avisa a quienes van.',
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
           atajo(Icons.restaurant_rounded, 'Gestionar lo que lleva cada quien', () {
