@@ -486,6 +486,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     return showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text(p.tipo == TipoPedido.social ? '¿Qué hay que cambiar?' : '¿Por qué se rechaza?'),
         content: TextField(
           controller: c,

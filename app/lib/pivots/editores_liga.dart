@@ -116,6 +116,7 @@ Future<void> precioLiga(BuildContext context, ConfigLiga c, String titulo, num? 
   final v = await showDialog<String>(
     context: context,
     builder: (d) => AlertDialog(
+      scrollable: true,
       title: Text(titulo),
       content: TextField(
         controller: ctl,

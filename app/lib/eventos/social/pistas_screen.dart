@@ -93,6 +93,7 @@ class _PistasScreenState extends State<PistasScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text(item == null ? 'Agregar a mi wishlist' : 'Editar'),
         content: SingleChildScrollView(
           child: Column(

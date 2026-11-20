@@ -538,39 +538,50 @@ class ComidaTarjeta extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => StatefulBuilder(
+        // scrollable: con el teclado abierto se desplaza entera y no se corta (Victor, 2026-11-20).
         builder: (d, set) => AlertDialog(
+          scrollable: true,
           title: Text(c.nombre),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: detalle,
-                  autofocus: sugerencia == null,
-                  maxLength: 80,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', hintText: 'Ej.: Vino tinto'),
-                ),
-                if (!c.porCosa)
-                  TextField(
-                    controller: cantidad,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: 'Cantidad', suffixText: c.unidad),
-                  ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (c.meta > 0 && !c.porCosa) ...[
+                Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.', style: TextStyle(color: d.pivot.textoSecundario)),
                 const SizedBox(height: 12),
-                const Text('¿Para quién?'),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    ChoiceChip(label: const Text('Para todxs'), selected: paraTodxs == true, onSelected: (_) => set(() => paraTodxs = true)),
-                    ChoiceChip(label: const Text('Solo para mí'), selected: paraTodxs == false, onSelected: (_) => set(() => paraTodxs = false)),
-                  ],
-                ),
-                if (c.meta > 0 && !c.porCosa) ...[const SizedBox(height: 8), Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.')],
               ],
-            ),
+              TextField(
+                controller: detalle,
+                autofocus: sugerencia == null,
+                maxLength: 80,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
+              ),
+              if (!c.porCosa) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cantidad,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: 'Cantidad', suffixText: c.unidad),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Text('¿Para quién?'),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  emptySelectionAllowed: true,
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('Para todxs')),
+                    ButtonSegment(value: false, label: Text('Solo para mí')),
+                  ],
+                  selected: {?paraTodxs},
+                  onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
@@ -607,8 +618,10 @@ class ComidaTarjeta extends StatelessWidget {
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (d, set) => AlertDialog(
+          scrollable: true,
           title: Text(c == null ? 'Agregar sección' : 'Editar ${c.nombre}'),
-          content: SingleChildScrollView(
+          content: SizedBox(
+            width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

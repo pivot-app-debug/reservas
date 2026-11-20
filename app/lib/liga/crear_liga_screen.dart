@@ -1089,6 +1089,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
     final r = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Nuevo rol'),
         content: TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.sentences),
         actions: [

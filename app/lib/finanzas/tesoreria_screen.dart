@@ -269,6 +269,7 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     final v = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text('Conciliar ${c['nombre']}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1074,6 +1075,7 @@ Future<void> detalleMovimiento(
     final motivo = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('¿Anular el movimiento?'),
         content: TextField(
           controller: ctl,

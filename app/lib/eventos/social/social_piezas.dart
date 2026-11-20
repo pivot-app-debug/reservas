@@ -125,6 +125,7 @@ class TraerTarjeta extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text('Llevo: ${it['texto']}'),
         content: TextField(
           controller: detalle,
@@ -265,6 +266,7 @@ class HomenajeTarjeta extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text('Para ${persona['nombre']}'),
         content: TextField(
           controller: c,
@@ -298,6 +300,7 @@ class HomenajeTarjeta extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('¿Cuánto aportas?'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

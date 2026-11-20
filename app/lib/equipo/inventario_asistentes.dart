@@ -387,6 +387,7 @@ class _NuevaListaAsistenteState extends State<NuevaListaAsistente> {
     final t = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Nueva talla'),
         content: TextField(
           controller: c,

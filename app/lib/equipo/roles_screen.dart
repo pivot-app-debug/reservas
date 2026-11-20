@@ -44,6 +44,7 @@ class _RolesScreenState extends State<RolesScreen> {
     return showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text(actual == null ? 'Nuevo rol' : 'Renombrar rol'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

@@ -595,6 +595,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     final n = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Nombre de la lista'),
         content: TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.sentences),
         actions: [
@@ -623,6 +624,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     final t = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: Text('Etiqueta · $titulo'),
         content: TextField(
           controller: c,
@@ -669,6 +671,7 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     final t = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Nueva talla'),
         content: TextField(
           controller: c,

@@ -90,5 +90,13 @@ void main() {
     expect(find.text('Luces navideñas'), findsNothing);
     expect(find.text('Guirnaldas'), findsOneWidget);
     expect(t.takeException(), isNull);
+    // La ventana para anotarse no se corta en un teléfono bajito.
+    t.view.physicalSize = const Size(360 * 3, 560 * 3);
+    await t.pumpAndSettle();
+    await t.tap(find.byTooltip('Me anoto').first);
+    await t.pumpAndSettle();
+    expect(find.text('¿Para quién?'), findsOneWidget);
+    expect(find.text('Faltan 2 bolsas.'), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 }

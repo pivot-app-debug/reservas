@@ -1218,6 +1218,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     final n = await showDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Nombre del equipo'),
         content: TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.words),
         actions: [

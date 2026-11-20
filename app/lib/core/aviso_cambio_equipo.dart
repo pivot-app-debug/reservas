@@ -54,6 +54,7 @@ Future<void> mostrarAvisoCambioEquipo(BuildContext context, Sesion s) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
+        scrollable: true,
         title: const Text('Pedir revisión'),
         content: TextField(
           controller: c,

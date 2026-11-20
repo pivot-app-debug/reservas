@@ -68,6 +68,7 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (d, set) => AlertDialog(
+          scrollable: true,
           title: Text('¿Eliminar a ${x['nombreDerby']}?'),
           content: Column(
             mainAxisSize: MainAxisSize.min,

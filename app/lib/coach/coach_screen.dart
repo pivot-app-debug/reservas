@@ -2033,6 +2033,7 @@ class _FeedbackEventoScreenState extends State<FeedbackEventoScreen> {
                           final t = await showDialog<String>(
                             context: context,
                             builder: (h) => AlertDialog(
+                              scrollable: true,
                               title: const Text('Agregar al plan'),
                               content: TextField(
                                 controller: c,
@@ -2489,6 +2490,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
                 final t = await showDialog<String>(
                   context: context,
                   builder: (d) => AlertDialog(
+                    scrollable: true,
                     title: const Text('Agregar al plan'),
                     content: TextField(
                       controller: ctl,
