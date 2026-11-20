@@ -12,6 +12,7 @@ import '../core/periodos_sin_cobro.dart';
 import '../sesion/sesion.dart';
 import 'anticipada.dart';
 import 'modelos.dart';
+import 'tipos_evento.dart';
 
 /// Modo de edición de un evento recurrente (mismos 3 de la web,
 /// `_evAdminEditarEvento()`): solo este, un período o desde este en adelante.
@@ -237,7 +238,9 @@ class EventosRepo extends ChangeNotifier {
     if (ev.tipo == 'Entrenamiento' && (d['necesitaPatines'] == 'Sí' || d['necesitaProtecciones'] == 'Sí')) {
       return 'Como usas equipamiento del equipo, tu lugar en los entrenamientos se confirma con la reserva.';
     }
-    if (_modo == 'mirlxs' && c != null && !c.alDia) return 'Para responder necesitas tener tu cuota al día.';
+    // Fiestas y festividades no piden la cuota al día para marcar asistencia (Victor, 2026-11-20).
+    final festivo = ev.tipo == kTipoSocial || ev.tipo == 'Evento social';
+    if (_modo == 'mirlxs' && !festivo && c != null && !c.alDia) return 'Para responder necesitas tener tu cuota al día.';
     if (c != null && c.tieneReserva(ev.id)) return 'Ya tienes una reserva para este evento.';
     return null;
   }

@@ -526,6 +526,29 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
   }
 
+  /// Aviso del cierre del amigo secreto en "Tu asistencia" (ícono y texto), o null.
+  /// Después del cierre se puede seguir marcando Asistiré: vas a la fiesta pero no al sorteo.
+  (IconData, String)? _avisoCierre(Evento ev) {
+    final c = ev.socialCierre;
+    if (ev.tipo != kTipoSocial || c == null || ev.finalizado || ev.cancelado) return null;
+    final abierto = !ev.socialSorteado && !Fechas.hoy().isAfter(c);
+    if (abierto) {
+      return ev.miEstado == EstadoRsvp.asistire
+          ? (Icons.redeem_rounded, 'Ya estás en el amigo secreto. La inscripción cierra el ${Fechas.corta(c)}.')
+          : (Icons.event_available_rounded, 'Tienes hasta el ${Fechas.corta(c)} para marcar Asistiré y entrar al amigo secreto.');
+    }
+    // Hasta que se hace el sorteo, quien marca Asistiré todavía entra.
+    if (!ev.socialSorteado) {
+      return (
+        Icons.hourglass_bottom_rounded,
+        'La inscripción al amigo secreto cerró el ${Fechas.corta(c)}. Si marcas Asistiré antes de que se haga el sorteo, todavía entras.',
+      );
+    }
+    return ev.miEstado == EstadoRsvp.asistire
+        ? (Icons.event_busy_rounded, 'La inscripción al amigo secreto cerró el ${Fechas.corta(c)} y el sorteo ya se hizo.')
+        : (Icons.event_busy_rounded, 'El sorteo del amigo secreto ya se hizo. Si marcas Asistiré, vienes a la fiesta pero no participas en el amigo secreto.');
+  }
+
   Widget _tuAsistencia(BuildContext context, Evento ev) {
     final p = context.pivot;
     final motivo = repo.motivoSinRespuesta(ev);
@@ -542,6 +565,27 @@ class _DetalleScreenState extends State<DetalleScreen> {
             'Tu asistencia',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
           ),
+          // Social o fiesta con amigo secreto: hasta cuándo inscribirse (Victor, 2026-11-20).
+          if (_avisoCierre(ev) case final aviso?) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+              child: Row(
+                children: [
+                  Icon(aviso.$1, size: 20, color: p.marcaTexto),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      aviso.$2,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.sobreSuave),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -569,11 +613,14 @@ class _DetalleScreenState extends State<DetalleScreen> {
                     },
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            motivo ?? repo.motivoSinAsistire(ev) ?? 'Puedes cambiarla hasta 10 minutos antes de que empiece.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
+          // Con el aviso del amigo secreto arriba, abajo solo va un motivo si lo hay.
+          if ((motivo ?? repo.motivoSinAsistire(ev)) != null || _avisoCierre(ev) == null) ...[
+            const SizedBox(height: 10),
+            Text(
+              motivo ?? repo.motivoSinAsistire(ev) ?? 'Puedes cambiarla hasta 10 minutos antes de que empiece.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+          ],
           // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
           // Sin asistencia anticipada en un Social o fiesta: es un evento especial (2026-11-20).
           if (repo.anticipada.disponible && ev.tipo != kTipoSocial) ...[const SizedBox(height: 12), _botonAnticipada(context)],

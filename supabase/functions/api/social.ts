@@ -1435,8 +1435,12 @@ export async function filtrarEventosSociales(eventos: any[], params: Record<stri
       socialSorpresa: etiquetaSorpresa(cfg, vista, nombreDe),
       socialEstado: _estado(cfg),
             socialOrganiza: vista === 'organiza',
-      // Ícono de fiesta en el calendario, nunca para quien no debe enterarse.
+            // Ícono de fiesta en el calendario, nunca para quien no debe enterarse.
       socialFestivo: vista !== 'neutral',
+      // Cierre del amigo secreto para el aviso en "Tu asistencia" (Victor, 2026-11-20).
+      ...(cfg.amigo_secreto && piezaVisible(cfg, 'amigoSecreto', vista) && e.fecha
+        ? { socialCierre: cfg.cierre ?? _cierreDefecto(String(e.fecha).substring(0, 10)), socialSorteado: !!cfg.sorteado_en }
+        : {}),
     });
   }
   return out;

@@ -242,8 +242,28 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
           ),
         );
       case 'fuera':
+        // Fuera del sorteo: se dice por qué y no se piden pistas (Victor, 2026-11-20).
         contenido.add(
-          Text('Te sumaste después del cierre: esta vez no estás en el amigo secreto, pero sí en la comida.', style: TextStyle(color: p.textoSecundario)),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 20, color: p.marcaTexto),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    e.asiste
+                        ? 'No participas en el amigo secreto: marcaste Asistiré después de que se hizo el sorteo. Igual vienes a la fiesta.'
+                        : 'El sorteo del amigo secreto ya se hizo. Si marcas Asistiré, vienes a la fiesta pero no participas en el amigo secreto.',
+                    style: TextStyle(color: p.sobreSuave),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       case 'por_revelar':
         contenido.add(Text('¡Ya se hizo el sorteo! Gira tu ruleta para saber a quién le regalas.', style: TextStyle(color: p.texto)));
@@ -283,21 +303,26 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
         );
     }
     contenido.add(const SizedBox(height: 12));
+    final fuera = estado == 'fuera';
     contenido.add(
       ListTile(
+        // Fuera del sorteo, las pistas y la wishlist quedan deshabilitadas.
+        enabled: !fuera,
         contentPadding: EdgeInsets.zero,
-        leading: Icon(Icons.lightbulb_outline_rounded, color: p.marcaTexto),
+        leading: Icon(Icons.lightbulb_outline_rounded, color: fuera ? p.textoSecundario : p.marcaTexto),
         title: Text(
           'Mis pistas y wishlist',
           style: TextStyle(color: p.texto, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          pf.vacio
+          fuera
+              ? 'No hace falta: esta vez no participas'
+              : pf.vacio
               ? 'Cuéntale a tu amigo secreto qué te gusta'
               : '${pf.gustos.length + pf.sobreMi.length + pf.noRegalar.length} pistas · ${pf.wishlist.length} en tu wishlist',
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: _pistas,
+        onTap: fuera ? null : _pistas,
       ),
     );
     return TarjetaSocial(titulo: 'Amigo secreto', icono: Icons.redeem_rounded, children: contenido);

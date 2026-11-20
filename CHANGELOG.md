@@ -9,6 +9,9 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **"¿Dudas? Pregúntales":** quien organiza y lxs encargadxs con botones de WhatsApp y llamar (o correo si no hay teléfono). Solo para gente de la liga; lxs +1 no ven teléfonos.
 - Reglas del regalo robado: la plantilla ya no menciona el monto (el tope se muestra aparte).
 - Wishlist sin favoritos con estrella.
+- **Aviso del cierre en "Tu asistencia"** (en lugar del texto de abajo): "Tienes hasta el X para marcar Asistiré y entrar al amigo secreto"; cerrada sin sorteo, todavía entras si marcas antes del sorteo; con el sorteo hecho, vienes a la fiesta pero no participas. Asistiré sigue habilitado (solo se cierra el amigo secreto).
+- **Fuera del sorteo:** la tarjeta del amigo secreto dice por qué no participas y "Mis pistas y wishlist" queda deshabilitado.
+- **Sin cobro para fiestas:** un Social o fiesta ya no pide la cuota al día para marcar asistencia (la regla de Mirlxs seguía aplicando a todos los tipos).
 
 ## 2026-11-20 (Social o fiesta: homenaje y cierre)
 - El paso "Homenaje y sorpresa" del asistente ya no aparece si no elegiste la pieza Homenaje. El resumen sigue igual y en esa fila dice "Sin homenaje ni sorpresa" (desde ahí se puede agregar).
