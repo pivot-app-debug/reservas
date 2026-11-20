@@ -5339,7 +5339,8 @@ async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<
       if (!username || !(await _puedeVer(c, username))) continue;
       const nota = it?.nota == null || it.nota === '' ? null : Math.max(1, Math.min(10, Math.round(Number(it.nota))));
       const comentario = String(it?.comentario ?? '').trim().slice(0, 2000) || null;
-      if (nota == null && !comentario) continue;
+            // "Lo que trabajó" solo, sin nota ni comentario, también se guarda (Victor, 2026-11-20).
+      if (nota == null && !comentario && it?.trabajo !== true) continue;
       filas.push({ id_evento: idEvento, fecha, username, tema: String(it?.tema ?? 'General').trim().slice(0, 80) || 'General', nota, comentario, por_voz: it?.porVoz === true, visible, coach: c.user });
     }
     if (!filas.length) return { exito: false, error: 'No hay nada para guardar.' };

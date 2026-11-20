@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../coach/coach_screen.dart';
+import '../core/actualizacion.dart';
 import '../core/datos_pendientes.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -167,6 +168,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                   ),
                 ],
               ),
+              const VersionApp(),
             ],
           );
         },

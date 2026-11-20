@@ -282,3 +282,97 @@ class _PantallaActualizarState extends State<PantallaActualizar> {
     );
   }
 }
+
+/// Versión instalada y "Buscar actualización" (Victor, 2026-11-20: para saber
+/// si estás en la última y forzarla si no). Va al final de Ajustes.
+class VersionApp extends StatefulWidget {
+  const VersionApp({super.key});
+
+  @override
+  State<VersionApp> createState() => _VersionAppState();
+}
+
+class _VersionAppState extends State<VersionApp> {
+  String _texto = '';
+  bool _buscando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _leer();
+  }
+
+  Future<void> _leer() async {
+    if (kIsWeb) {
+      const n = int.fromEnvironment('WEB_BUILD');
+      setState(() => _texto = n == 0 ? 'Versión de prueba' : 'Versión web $n');
+      return;
+    }
+    try {
+      final i = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _texto = 'Versión ${i.version}');
+    } catch (_) {}
+  }
+
+  Future<void> _buscar() async {
+    setState(() => _buscando = true);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final t = DateTime.now().millisecondsSinceEpoch;
+      if (kIsWeb) {
+        const local = int.fromEnvironment('WEB_BUILD');
+        final r = await http.get(Uri.base.resolve('web_version.json?t=$t')).timeout(const Duration(seconds: 15));
+        final remota = ((jsonDecode(utf8.decode(r.bodyBytes)) as Map)['build'] as num?)?.toInt() ?? 0;
+        if (remota > local) {
+          m.showSnackBar(const SnackBar(content: Text('Hay una versión nueva: actualizando…')));
+          await recargarWebNueva(remota);
+          return;
+        }
+      } else if (Actualizacion.esPlay) {
+        final info = await InAppUpdate.checkForUpdate();
+        if (info.updateAvailability == UpdateAvailability.updateAvailable) {
+          await InAppUpdate.performImmediateUpdate();
+          return;
+        }
+      } else {
+        final instalada = int.tryParse((await PackageInfo.fromPlatform()).buildNumber) ?? 0;
+        final r = await http.get(Uri.parse('${Actualizacion.urlVersion}?t=$t')).timeout(const Duration(seconds: 15));
+        final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+        final codigo = (j['versionCode'] as num?)?.toInt() ?? 0;
+        if (codigo > instalada && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PantallaActualizar(
+                version: VersionRemota(codigo: codigo, nombre: '${j['versionName'] ?? ''}', novedades: '${j['novedades'] ?? ''}'),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      m.showSnackBar(const SnackBar(content: Text('Tienes la última versión.')));
+    } catch (_) {
+      m.showSnackBar(const SnackBar(content: Text('No se pudo revisar. Revisa tu conexión.')));
+    } finally {
+      if (mounted) setState(() => _buscando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: [
+          Text(_texto, style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+          TextButton.icon(
+            onPressed: _buscando ? null : _buscar,
+            icon: _buscando ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.system_update_rounded),
+            label: const Text('Buscar actualización'),
+          ),
+        ],
+      ),
+    );
+  }
+}
