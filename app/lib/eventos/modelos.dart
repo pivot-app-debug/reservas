@@ -85,6 +85,7 @@ class Evento {
     this.socialEstado,
     this.socialFestivo = false,
     this.socialIcono,
+    this.socialOrganiza = false,
 
     this.socialCierre,
     this.socialSorteado = false,
@@ -103,6 +104,9 @@ class Evento {
 
   /// Clave del ícono de la fiesta (`kIconosSocial`).
   final String? socialIcono;
+
+  /// Quien mira organiza o es encargadx: puede editarlo desde el botón del evento.
+  final bool socialOrganiza;
 
   /// Cierre de la inscripción al amigo secreto (solo si el evento tiene uno
   /// y la persona puede verlo) y si ya se hizo el sorteo.
@@ -224,6 +228,7 @@ class Evento {
       socialEstado: raw['socialEstado'] as String?,
       socialFestivo: raw['socialFestivo'] == true,
       socialIcono: raw['socialIcono'] as String?,
+      socialOrganiza: raw['socialOrganiza'] == true,
       socialCierre: DateTime.tryParse('${raw['socialCierre'] ?? ''}'),
       socialSorteado: raw['socialSorteado'] == true,
     );

@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Social o fiesta: editar desde el botón del evento)
+- Sin la tarjeta con el nombre y el botón "Editar" en el detalle: solo quedan los avisos de sorpresa y de aprobación, si los hay. Se edita desde el botón del evento, que ahora también ven quienes organizan (no solo Pivots) como "Editar evento".
+- El asistente abre al toque con los datos ya cargados; si todavía no hay datos, muestra que está cargando en vez de trabarse.
+
 ## 2026-11-20 (temporadas de descanso y fiestas)
 - **Las temporadas de descanso ya no eliminan fiestas ni festividades** (Social o fiesta). Se devolvió la Naviquinde del 19/12, que había quitado la temporada del 15/12 al 10/01.
 - **Antes de crear o editar una temporada** se muestra la lista de eventos con casillas para elegir cuáles se cancelan: entrenamientos marcados por defecto; partidos, reuniones y otros sin marcar. Los que se dejan quedan guardados en la temporada (`reglas.conservar`) y no se tocan al editarla. También se listan los cursos que se mueven.

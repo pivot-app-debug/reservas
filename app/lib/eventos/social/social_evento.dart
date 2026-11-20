@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -52,6 +54,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
   Future<void> _cargar() async {
     try {
       final e = await _social.cargar();
+      _estadosSociales[widget.evento.id] = e;
       if (mounted) {
         setState(() {
           _estado = e;
@@ -391,10 +394,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
       contenido = Column(
         key: const ValueKey('social'),
         children: [
-          EncabezadoSocial(
-            estado: e,
-            accion: e.organiza ? TextButton(onPressed: _configurar, child: const Text('Editar')) : null,
-          ),
+          EncabezadoSocial(estado: e),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
@@ -425,11 +425,30 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
 /// Editar un Social o fiesta con su asistente desde el menú del evento
 /// (Victor, 2026-11-20). Devuelve true si se guardaron cambios.
+/// Último estado cargado de cada Social o fiesta (solo en memoria): así el
+/// asistente abre al toque desde el botón del evento.
+final _estadosSociales = <String, EstadoSocial>{};
+
 Future<bool?> editarSocial(BuildContext context, EventosRepo repo, Evento ev) async {
   final s = repo.sesion;
   final social = SocialRepo.miembro(s.api, idEvento: ev.id, adminToken: s.adminToken);
   try {
-    final estado = await social.cargar();
+    var estado = _estadosSociales[ev.id];
+    if (estado == null) {
+      // Sin datos todavía: se muestra que está cargando en vez de quedarse trabado.
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        ),
+      );
+      try {
+        estado = await social.cargar();
+      } finally {
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
     if (!context.mounted) return null;
     return await Navigator.of(context).push<bool>(
       MaterialPageRoute(

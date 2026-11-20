@@ -15,10 +15,12 @@ import 'social_widgets.dart';
 
 /// Nombre, "Sorpresa para X", descripción y estado de la aprobación.
 class EncabezadoSocial extends StatelessWidget {
-  const EncabezadoSocial({super.key, required this.estado, this.accion});
+  const EncabezadoSocial({super.key, required this.estado});
   final EstadoSocial estado;
-  final Widget? accion;
 
+  /// Sin tarjeta ni botón de editar (Victor, 2026-11-20: se edita desde el
+  /// botón del evento): solo avisos de sorpresa y de aprobación, si los hay.
+  /// La descripción ya está en el detalle del evento.
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -28,29 +30,33 @@ class EncabezadoSocial extends StatelessWidget {
       'rechazado' => 'Un Pivot pidió cambios${e.rechazoMotivo.isEmpty ? '' : ': ${e.rechazoMotivo}'}. Edítalo y envíalo de nuevo.',
       _ => null,
     };
-    return TarjetaSocial(
-      titulo: e.titulo.isEmpty ? 'Social o fiesta' : e.titulo,
-      icono: Icons.celebration_outlined,
-      accion: accion,
-      children: [
-        if (e.sorpresa != null) ...[Etiqueta(texto: e.sorpresa!, icono: Icons.visibility_off_outlined), const SizedBox(height: 8)],
-        if (aprobacion != null)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-            child: Text(aprobacion, style: TextStyle(color: p.sobreSuave)),
-          ),
-        if (e.descripcion.isNotEmpty) Text(e.descripcion, style: TextStyle(color: p.texto)),
-        if (e.sorpresa != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Las personas homenajeadas y quienes no deben enterarse lo ven con otro nombre. No le cuentes.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
+    if (e.sorpresa == null && aprobacion == null) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (aprobacion != null) Text(aprobacion, style: TextStyle(color: p.sobreSuave)),
+          if (aprobacion != null && e.sorpresa != null) const SizedBox(height: 8),
+          if (e.sorpresa != null)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.visibility_off_outlined, size: 20, color: p.marcaTexto),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${e.sorpresa}. Las personas homenajeadas y quienes no deben enterarse lo ven con otro nombre. No le cuentes.',
+                    style: TextStyle(color: p.sobreSuave),
+                  ),
+                ),
+              ],
+            ),
         ],
-      ],
+      ),
     );
   }
 }

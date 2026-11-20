@@ -343,6 +343,20 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   onPressed: () => _menuAdmin(ev),
                   child: const Icon(Icons.edit_calendar_outlined),
                 )
+              // Quien organiza un Social o fiesta lo edita desde aquí (Victor, 2026-11-20).
+              : ev.tipo == kTipoSocial && ev.socialOrganiza && !ev.cancelado
+              ? FloatingActionButton.extended(
+                  tooltip: 'Editar evento',
+                  onPressed: () async {
+                    final ok = await editarSocial(context, repo, ev);
+                    if (ok == true && mounted) {
+                      setState(() => _versionSocial++);
+                      _avisar('Cambios guardados.');
+                    }
+                  },
+                  icon: const Icon(Icons.edit_calendar_outlined),
+                  label: const Text('Editar evento'),
+                )
               : null,
           body: ListView(
             padding: EdgeInsets.fromLTRB(0, 20 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom), // barra de 68
