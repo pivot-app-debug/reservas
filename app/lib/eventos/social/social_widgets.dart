@@ -10,6 +10,7 @@ import '../widgets_comunes.dart';
 import 'mensajeria.dart';
 import 'pistas_screen.dart';
 import 'que_lleva_calculo.dart';
+import 'social_juego_screen.dart';
 import 'social_repo.dart';
 
 /// Piezas del evento Social que comparten la cuenta del equipo (detalle del
@@ -1250,9 +1251,82 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
 
 /// Regalo robado: tope y recordatorio.
 class RegaloRobadoTarjeta extends StatelessWidget {
-  const RegaloRobadoTarjeta({super.key, required this.estado, this.simbolo});
+  const RegaloRobadoTarjeta({super.key, required this.estado, this.simbolo, this.repo, this.alCambiar});
   final EstadoSocial estado;
   final String? simbolo;
+
+  /// Para el juego en vivo (sin repo, solo la información).
+  final SocialRepo? repo;
+  final VoidCallback? alCambiar;
+
+  /// "Jugar al regalo robado" (Victor, 2026-11-20): quien dirige lo activa el
+  /// día del evento; si ya empezó, todxs entran a verlo en vivo.
+  Future<void> _jugar(BuildContext context) async {
+    final r = repo;
+    if (r == null) return;
+    final j = estado.juegoRobado;
+    if (j['fase'] == null) {
+      final si = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('¿Empezamos el regalo robado?'),
+          content: const Text(
+            'Todas las personas que van verán el juego en vivo en la app. Te guiamos paso a paso: '
+            'regalos a la pila, sorteo del orden y turnos.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Todavía no')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Empezar')),
+          ],
+        ),
+      );
+      if (si != true || !context.mounted) return;
+      try {
+        await r.juego('iniciar');
+      } catch (e) {
+        if (context.mounted) avisarSocial(context, e.toString());
+        return;
+      }
+    }
+    if (!context.mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => RegaloRobadoJuegoScreen(repo: r)));
+    alCambiar?.call();
+  }
+
+  Widget _boton(BuildContext context, PivotPaleta p) {
+    final j = estado.juegoRobado;
+    final fase = j['fase'];
+    final dirige = j['dirige'] == true, hoy = j['hoy'] == true;
+    final activo = repo != null && (fase != null || (dirige && hoy));
+    final nota = fase == 'terminado'
+        ? 'El juego terminó: mira quién se llevó qué.'
+        : fase != null
+        ? 'El juego está en vivo: entra para ver los turnos.'
+        : !hoy
+        ? 'Se activa el día del evento.'
+        : dirige
+        ? 'Tú diriges el juego: actívalo cuando estén listxs.'
+        : 'Quien dirige el juego todavía no lo activa.';
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            onPressed: activo ? () => _jugar(context) : null,
+            icon: const Icon(Icons.casino_rounded),
+            label: const Text('Jugar al regalo robado'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            nota,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1288,9 +1362,19 @@ class RegaloRobadoTarjeta extends StatelessWidget {
               ],
             ),
           ),
+        _boton(context, p),
       ],
     );
   }
+}
+
+String _aCargoDe(Map<String, dynamic> x) {
+  if (x['organiza'] == true) return 'Organiza todo el evento';
+  final de = [for (final a in (x['aCargoDe'] as List? ?? const [])) '$a'];
+  final quien = conPronombres('Encargadx', x['pronombres']);
+  if (de.isEmpty) return quien;
+  final lista = de.length == 1 ? de.first : '${de.sublist(0, de.length - 1).join(', ')} y ${de.last}';
+  return '$quien de $lista';
 }
 
 /// Personas a cargo del evento con botones de contacto.
@@ -1319,7 +1403,8 @@ class ACargoTarjeta extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: AvatarPersona(nombre: '${x['nombre'] ?? ''}', foto: '${x['foto'] ?? ''}', tamano: 40),
                 title: Text('${x['nombre'] ?? ''}${yo ? ' (tú)' : ''}', style: TextStyle(color: p.texto)),
-                subtitle: Text(x['organiza'] == true ? 'Organiza' : conPronombres('Encargadx', x['pronombres'])),
+                // De qué está a cargo cada quien, para saber a quién preguntar (Victor, 2026-11-20).
+                subtitle: Text(_aCargoDe(x)),
                 trailing: yo
                     ? null
                     : Row(

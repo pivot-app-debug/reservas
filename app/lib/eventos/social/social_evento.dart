@@ -382,7 +382,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
           if (e.modulo('invitados')) _invitados(e),
           if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar, pronombres: widget.repo.sesion.datos['pronombres']),
-          if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e),
+          if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
           if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
           if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
           if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),

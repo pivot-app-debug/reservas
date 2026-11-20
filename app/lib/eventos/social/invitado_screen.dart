@@ -144,7 +144,7 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
           children: [
             _encabezado(e),
             if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _repo, estado: e, alCambiar: _cargar, simbolo: simbolo),
-            if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, simbolo: simbolo),
+            if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, simbolo: simbolo, repo: _repo, alCambiar: _cargar),
             if (e.modulo('comida')) ComidaTarjeta(repo: _repo, estado: e, alCambiar: _cargar),
             if (e.playlist != null) PlaylistTarjeta(datos: e.playlist!),
             if (e.dress != null) DressTarjeta(texto: '${e.dress!['texto'] ?? ''}'),

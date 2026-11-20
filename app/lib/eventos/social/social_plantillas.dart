@@ -207,14 +207,26 @@ const kSugerenciasNeutras = ['Reunión del equipo', 'Junta de la liga', 'Entrena
 
 /// Reglas de siempre del regalo robado (igual que `PLANTILLA_REGALO_ROBADO`
 /// del servidor): sirven de punto de partida para editarlas.
-const kReglasRegaloRobado = '''1. Cada persona trae un regalo envuelto y sin nombre. Solo juega quien trajo regalo.
-2. Todos los regalos se ponen juntos en una pila.
-3. Se sortea el orden de los turnos.
-4. En tu turno eliges: abres un regalo de la pila o robas uno que ya esté abierto.
-5. Si te roban, vuelves a elegir: abres uno de la pila o robas otro, pero no el que te acaban de quitar.
-6. Un mismo regalo se puede robar como máximo 3 veces. Al tercer robo se queda con esa persona.
-7. El juego termina cuando se abre el último regalo de la pila. Quien tuvo el primer turno puede, al final, cambiar su regalo por otro que todavía se pueda robar.
-8. Lo importante es pasarla bien juntxs: nada de enojos por un regalo.''';
+/// Reglas escritas del regalo robado según las opciones del juego (Victor,
+/// 2026-11-20). Igual que `plantillaReglasRobado` en social_juego.ts.
+String reglasRegaloRobado({int robosMax = 3, bool devolver = false, bool turnoFinal = true}) => [
+  '1. Cada persona trae un regalo envuelto y sin nombre. Solo juega quien trajo regalo.',
+  '2. Todos los regalos se ponen juntos en una pila.',
+  '3. Se sortea el orden de los turnos.',
+  '4. En tu turno eliges: abres un regalo de la pila o robas uno que ya esté abierto.',
+  devolver
+      ? '5. Si te roban, vuelves a elegir: abres uno de la pila o robas otro (también puedes recuperar el que te quitaron).'
+      : '5. Si te roban, vuelves a elegir: abres uno de la pila o robas otro, pero no el que te acaban de quitar.',
+  robosMax > 0
+      ? '6. Un mismo regalo se puede robar como máximo $robosMax ${robosMax == 1 ? 'vez' : 'veces'}. Al llegar a ese número se queda con esa persona.'
+      : '6. Un regalo se puede robar todas las veces que se quiera.',
+  turnoFinal
+      ? '7. El juego termina cuando se abre el último regalo de la pila. Quien tuvo el primer turno puede, al final, cambiar su regalo por otro que todavía se pueda robar.'
+      : '7. El juego termina cuando se abre el último regalo de la pila.',
+  '8. Lo importante es pasarla bien juntxs: nada de enojos por un regalo.',
+].join('\n');
+
+final kReglasRegaloRobado = reglasRegaloRobado();
 
 /// Íconos del Social o fiesta en el calendario (Victor, 2026-11-20). La clave
 /// la manda el servidor (`socialIcono`): la que eligió quien organiza para una

@@ -27,6 +27,7 @@
 // primera versión); solo `socialCrear` y las piezas nuevas fallan con aviso.
 
 import { type ParticipanteSorteo, sortearAmigoSecreto } from './social_sorteo.ts';
+import { aplicar, type EstadoJuego, nuevoJuego, plantillaReglasRobado, reglasJuego, vistaJuego } from './social_juego.ts';
 import {
   aprobadores, cambiosPara, diferencias, encargadxs, estaInvitadx, esSecretoPara, etiquetaSorpresa, type Foto, homenajeadxs, listaEs, mensajesAbiertos, soloImportantes,
   noEnterarse, PIEZAS_ELEGIBLES, personasEnSecreto, piezaVisible, publicado, puedeAprobar, tituloPara, type Vista, vistaDe,
@@ -49,7 +50,8 @@ export const ACCIONES_SOCIAL = new Set([
   'socialGet', 'socialCrear', 'socialGuardarConfig', 'socialAgregarInvitado', 'socialQuitarInvitado', 'socialGuardarPerfil',
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
-    'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
+        'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
+  'socialJuego',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -179,7 +181,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
       case 'socialAnotarTraer': return await socialAnotarTraer(params, deps);
       case 'socialQuitarTraer': return await socialQuitarTraer(params, deps);
       case 'socialMensaje': return await socialMensaje(params, deps);
-      case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
+            case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
+      case 'socialJuego': return await socialJuego(params, deps);
       case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
@@ -277,7 +280,7 @@ export function _filtrarPorPermisos(d: any, areas: string[], previa: any): any {
   if (d.piezas !== undefined) {
     const antes = _piezas(previa);
     const nuevas = d.piezas && typeof d.piezas === 'object' ? d.piezas : {};
-    const porArea: Record<string, string[]> = { amigo: ['noTocar'], comida: ['traer'], extras: ['playlist', 'dress', 'premios'], homenaje: ['homenaje', 'ocultas'] };
+        const porArea: Record<string, string[]> = { amigo: ['noTocar', 'juegoRobado'], comida: ['traer'], extras: ['playlist', 'dress', 'premios'], homenaje: ['homenaje', 'ocultas'] };
     const piezas: any = { ...antes };
     for (const [area, claves] of Object.entries(porArea)) {
       if (!puede(area)) continue;
@@ -421,7 +424,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     comida: !!cfg.comida && ve('comida'), invitados: !!cfg.invitados && ve('invitados'),
     topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
     cierre, inscripcionAbierta: !cfg.sorteado_en && _hoyEc() <= cierre, sorteado: !!cfg.sorteado_en,
-    reglasRobado: cfg.reglas_robado ?? PLANTILLA_REGALO_ROBADO, reglasPorDefecto: !cfg.reglas_robado,
+        // Sin reglas propias, la plantilla sigue las opciones del juego (Victor, 2026-11-20).
+    reglasRobado: cfg.reglas_robado ?? plantillaReglasRobado(reglasJuego(_piezas(cfg).juegoRobado)), reglasPorDefecto: !cfg.reglas_robado,
     titulo: tituloPara(cfg, vista, nombreDe),
     sorpresa: esInv ? null : etiquetaSorpresa(cfg, vista, nombreDe),
     plantilla: neutral ? null : (cfg.plantilla ?? null),
@@ -459,6 +463,12 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     else if (!mio) out.amigo = { estado: 'fuera' };
     else if (!mio.revelado_en) out.amigo = { estado: 'por_revelar' };
     else out.amigo = { estado: 'revelado', ficha: await _ficha(db, liga, mio.recibe) };
+  }
+
+    // Regalo robado en vivo: si ya empezó, quién dirige y si es el día.
+  if (social.regaloRobado) {
+    const { data: jr } = await db.from('social_regalo_juego').select('estado').eq('id_evento', q.idEvento).maybeSingle();
+    out.juegoRobado = { fase: jr?.estado?.fase ?? null, dirige: _dirigeJuego(q, cfg), hoy: ev.fecha === _hoyEc() };
   }
 
   if (social.comida) {
@@ -546,7 +556,25 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     const aCargo = [...new Set([cfg.creador, ...encargadxs(cfg)].filter((u: unknown) => typeof u === 'string' && u && !String(u).includes('@')))] as string[];
     if (aCargo.length) {
             const { data: cs } = await db.from('equipo').select('username, nombre_derby, foto_perfil, telefono, prefijo, email, pronombres').in('username', aCargo);
+            // De qué está a cargo cada quien (Victor, 2026-11-20), solo con lo que el evento tiene
+      // y sin delatar el homenaje a quien no debe saberlo.
+      const etiquetas = (u: string): string[] => {
+        if (u === cfg.creador) return [];
+        const p = cfg.permisos && typeof cfg.permisos === 'object' ? cfg.permisos[u] : null;
+        const areas: string[] = Array.isArray(p) ? p : AREAS_POR_DEFECTO;
+        const amigo = [cfg.amigo_secreto && 'el amigo secreto', cfg.regalo_robado && 'el regalo robado'].filter(Boolean).join(' y ');
+        const extras = [piezas.playlist && 'la playlist', piezas.dress && 'el dress code', piezas.premios && 'los premios'].filter(Boolean) as string[];
+        const out: string[] = [];
+        if (areas.includes('fecha')) out.push('la fecha, hora y lugar');
+        if (areas.includes('amigo') && amigo) out.push(amigo);
+        if (areas.includes('comida') && cfg.comida) out.push('lo que lleva cada quien');
+        if (areas.includes('extras') && extras.length) out.push(extras.join(', '));
+        if (areas.includes('invitados') && cfg.invitados) out.push('lxs invitadxs +1');
+        if (areas.includes('homenaje') && piezas.homenaje && !neutral && !yoHomenajeadx) out.push('el homenaje');
+        return out;
+      };
       out.aCargo = (cs ?? []).map((r: any) => ({
+        aCargoDe: etiquetas(r.username),
         username: r.username, nombre: (r.nombre_derby ?? '').trim() || r.username, foto: r.foto_perfil ?? '',
                 telefono: r.telefono ?? '', prefijo: r.prefijo ?? '', email: r.email ?? '', pronombres: r.pronombres ?? '', organiza: r.username === cfg.creador, yo: r.username === q.username,
       })).sort((a: any, b: any) => Number(b.organiza) - Number(a.organiza));
@@ -598,7 +626,14 @@ function _hora(v: unknown): string | null {
 
 function _reglas(v: unknown): string | null {
   const t = String(v ?? '').replace(/\r/g, '').trim().slice(0, 3000);
-  return t && t !== PLANTILLA_REGALO_ROBADO ? t : null;
+    if (!t || t === PLANTILLA_REGALO_ROBADO) return null;
+  // Una plantilla sin cambios (de cualquier combinación de opciones) no se guarda: sigue a las opciones.
+  for (let n = 0; n <= 10; n++) {
+    for (const devolver of [false, true]) {
+      for (const turnoFinal of [false, true]) if (t === plantillaReglasRobado({ robosMax: n, devolver, turnoFinal, describir: true })) return null;
+    }
+  }
+  return t;
 }
 
 function _link(v: unknown): string {
@@ -1484,6 +1519,78 @@ async function socialQuitarTraer(params: Record<string, any>, deps: DepsSocial):
   if (a.clave !== q.clave && !_organiza(q, await _config(db, a.id_evento))) return { exito: false, error: 'Solo puedes quitar lo que anotaste tú.' };
   await db.from('social_traer_anotes').delete().eq('id', a.id);
   return { exito: true };
+}
+
+// ─── Regalo robado en vivo (Victor, 2026-11-20) ────────────────────────────
+// Ver social_juego.ts. Lo dirige quien organiza o tiene el área "amigo";
+// se activa el día del evento; todxs lo ven en vivo (sin notificaciones).
+
+function _dirigeJuego(q: Quien, cfg: any): boolean {
+  if (!_organiza(q, cfg)) return false;
+  const a = _misPermisos(q, cfg);
+  return a === null || a.includes('amigo');
+}
+
+async function socialJuego(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  const cfg = await _config(db, q.idEvento);
+  if (!cfg || !cfg.regalo_robado || !piezaVisible(cfg, 'regaloRobado', _vista(q, cfg))) return { exito: false, error: 'Este evento no tiene regalo robado.' };
+  const ev = await _evento(db, q.idEvento);
+  if (!ev) return { exito: false, error: 'Evento inválido.' };
+  const reglas = reglasJuego(_piezas(cfg).juegoRobado);
+  const dirige = _dirigeJuego(q, cfg);
+  const hoy = ev.fecha === _hoyEc();
+  const { data: fila } = await db.from('social_regalo_juego').select('estado').eq('id_evento', q.idEvento).maybeSingle();
+  let estado: EstadoJuego | null = fila?.estado?.fase ? fila.estado : null;
+  const accion = String(params.accion ?? 'ver');
+  const responder = () => ({ exito: true, dirige, hoy, reglas, juego: estado ? vistaJuego(estado, q.clave, reglas) : null });
+  if (accion === 'ver') return responder();
+
+  const guardar = async (e: EstadoJuego | null) => {
+    if (e) {
+      const { error } = await db.from('social_regalo_juego').upsert({ id_evento: q.idEvento, liga_id: liga, estado: e, updated_at: new Date().toISOString() });
+      if (error) throw new Error('No se pudo guardar el juego.');
+    } else {
+      await db.from('social_regalo_juego').delete().eq('id_evento', q.idEvento);
+    }
+    estado = e;
+  };
+
+  // Cada quien puede marcar que dejó su regalo en la pila.
+  if (accion === 'mio') {
+    if (!estado || estado.fase !== 'pila') return { exito: false, error: 'Los regalos ya están en la pila.' };
+    if (!estado.participantes.some((x) => x.clave === q.clave)) return { exito: false, error: 'No estás en la lista del juego.' };
+    const r = aplicar(estado, 'dejo', { clave: q.clave, valor: params.valor }, reglas, _ahoraEc());
+    if ('error' in r) return { exito: false, error: r.error };
+    await guardar(r);
+    return responder();
+  }
+
+  if (!dirige) return { exito: false, error: 'Solo quien dirige el regalo robado puede hacer esto.' };
+  if (accion === 'iniciar') {
+    if (!hoy) return { exito: false, error: 'El juego se activa el día del evento.' };
+    if (estado && estado.fase !== 'terminado') return responder();
+    const [asisten, invitados] = await Promise.all([_asistentes(db, q.idEvento), _invitados(db, q.idEvento)]);
+    const ps = _participantes(asisten, invitados);
+    const nombres = await _personas(db, ps.filter((x) => !x.clave.startsWith('inv:')).map((x) => x.clave));
+    const inv = new Map(invitados.map((i: any) => [`inv:${i.id}`, String(i.nombre ?? '')]));
+    const lista = ps.map((x) => ({ clave: x.clave, nombre: (x.clave.startsWith('inv:') ? inv.get(x.clave) : nombres.get(x.clave)?.nombre) || 'Alguien' }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    if (lista.length < 2) return { exito: false, error: 'Para jugar hacen falta al menos 2 personas con "Asistiré".' };
+    await guardar(nuevoJuego(lista));
+    return responder();
+  }
+  if (accion === 'reiniciar') {
+    await guardar(null);
+    return responder();
+  }
+  if (!estado) return { exito: false, error: 'El juego todavía no empezó.' };
+  const r = aplicar(estado, accion, params, reglas, _ahoraEc());
+  if ('error' in r) return { exito: false, error: r.error };
+  await guardar(r);
+  return responder();
 }
 
 // ─── Homenaje: mensajes y regalo entre todxs ──────────────────────────────

@@ -30,6 +30,10 @@ class SocialRepo {
   Future<Map<String, dynamic>> guardarConfig(Map<String, Object?> config, List<Map<String, Object?>> categorias) =>
       _post('socialGuardarConfig', {'config': jsonEncode(config), 'categorias': jsonEncode(categorias)});
 
+  /// Regalo robado en vivo (Victor, 2026-11-20): 'ver', 'iniciar', 'mio', 'dejo',
+  /// 'sortear', 'empezar', 'abrir', 'robar', 'siguiente', 'final', 'deshacer', 'reiniciar'.
+  Future<Map<String, dynamic>> juego(String accion, [Map<String, Object?> extra = const {}]) => _post('socialJuego', {'accion': accion, ...extra});
+
   /// El +1 escribe su nombre al abrir su enlace.
   Future<void> nombrarme(String nombre) => _post('socialInvitadoNombre', {'nombre': nombre});
 
@@ -201,6 +205,9 @@ class EstadoSocial {
   DateTime? get cierre => DateTime.tryParse('${social?['cierre'] ?? ''}');
   num? get topeAmigo => social?['topeAmigo'] as num?;
   num? get topeRobado => social?['topeRobado'] as num?;
+
+  /// Regalo robado en vivo: fase (null = no empezó), si dirijo el juego y si es el día.
+  Map<String, dynamic> get juegoRobado => Map<String, dynamic>.from((raw['juegoRobado'] as Map?) ?? const {});
   String get recordatorioRobado => '${social?['recordatorioRobado'] ?? ''}';
 
   List<Map<String, dynamic>> get misInvitados => [for (final x in (raw['misInvitados'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];

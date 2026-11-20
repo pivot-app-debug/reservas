@@ -119,6 +119,10 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   /// Amigo secreto: parejas que no se pueden tocar entre sí (Victor, 2026-11-20).
   final List<(String, String)> _noTocar = [];
+
+  // Regalo robado en vivo (Victor, 2026-11-20): opciones del juego.
+  int _robosMax = 3;
+  bool _devolver = false, _turnoFinal = true, _describir = true;
   final _dress = TextEditingController();
   final List<_Item> _traer = [];
   final List<_Premio> _premios = [];
@@ -199,6 +203,11 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       _cats.add(_Cat(id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: c.porPersona, modo: c.modo, total: c.total, ideas: c.sugerencias));
     }
     if (_cats.isEmpty) _cats.addAll(_catsSugeridas());
+    final jr = (piezas['juegoRobado'] as Map?) ?? const {};
+    _robosMax = (jr['robosMax'] as num?)?.toInt() ?? 3;
+    _devolver = jr['devolver'] == true;
+    _turnoFinal = jr['turnoFinal'] != false;
+    _describir = jr['describir'] != false;
     final pl = (piezas['playlist'] as Map?) ?? const {};
     _playlist.text = '${pl['link'] ?? ''}';
     _playlistNota.text = '${pl['nota'] ?? ''}';
@@ -1090,6 +1099,39 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
       secciones.addAll([
         _titulo('Regalo robado'),
         _numero(_topeRobado, 'Tope del regalo (opcional)'),
+        // El juego en vivo sigue estas opciones; las reglas escritas también, si no escribes otras.
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _robosMax,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: '¿Cuántas veces se puede robar un regalo?'),
+          items: [
+            for (final n in [1, 2, 3, 4, 5]) DropdownMenuItem(value: n, child: Text(n == 1 ? '1 vez' : '$n veces')),
+            const DropdownMenuItem(value: 0, child: Text('Sin límite')),
+          ],
+          onChanged: _puedePieza(Pieza.regaloRobado) ? (v) => setState(() => _robosMax = v ?? 3) : null,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Se puede robar de vuelta enseguida'),
+          subtitle: const Text('Si te roban, puedes recuperar ese mismo regalo en tu turno.'),
+          value: _devolver,
+          onChanged: (v) => setState(() => _devolver = v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Turno final para la primera persona'),
+          subtitle: const Text('Al final puede cambiar su regalo por otro.'),
+          value: _turnoFinal,
+          onChanged: (v) => setState(() => _turnoFinal = v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Escribir qué era cada regalo'),
+          subtitle: const Text('Al abrirlo, quien dirige anota qué era para que todxs lo vean.'),
+          value: _describir,
+          onChanged: (v) => setState(() => _describir = v),
+        ),
         TextField(
           controller: _recordatorio,
           maxLength: 300,
@@ -1106,7 +1148,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
-            onPressed: () => setState(() => _reglas.text = kReglasRegaloRobado),
+            onPressed: () => setState(() => _reglas.text = reglasRegaloRobado(robosMax: _robosMax, devolver: _devolver, turnoFinal: _turnoFinal)),
             icon: const Icon(Icons.restore_rounded),
             label: const Text('Usar la plantilla de reglas para editarla'),
           ),
@@ -1557,6 +1599,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
           ],
         },
       if (_piezas.contains(Pieza.homenaje)) 'homenaje': {'mensajes': _mensajes, 'regalo': _regalo, 'regaloNota': _regaloNota.text.trim()},
+      if (_piezas.contains(Pieza.regaloRobado))
+        'juegoRobado': {'robosMax': _robosMax, 'devolver': _devolver, 'turnoFinal': _turnoFinal, 'describir': _describir},
       if (_piezas.contains(Pieza.amigoSecreto) && _noTocar.isNotEmpty)
         'noTocar': [
           for (final (a, b) in _noTocar) [a, b],
