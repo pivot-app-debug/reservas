@@ -30,6 +30,9 @@ class SocialRepo {
   Future<Map<String, dynamic>> guardarConfig(Map<String, Object?> config, List<Map<String, Object?>> categorias) =>
       _post('socialGuardarConfig', {'config': jsonEncode(config), 'categorias': jsonEncode(categorias)});
 
+  /// El +1 escribe su nombre al abrir su enlace.
+  Future<void> nombrarme(String nombre) => _post('socialInvitadoNombre', {'nombre': nombre});
+
   Future<Map<String, dynamic>> agregarInvitado(String nombre, String contacto) async {
     final r = await _post('socialAgregarInvitado', {'nombre': nombre, 'contacto': contacto});
     return Map<String, dynamic>.from(r['invitado'] as Map);
@@ -184,6 +187,9 @@ class EstadoSocial {
   /// Configuración completa para editar (solo quien organiza).
   Map<String, dynamic>? get editable => raw['editable'] is Map ? Map<String, dynamic>.from(raw['editable'] as Map) : null;
   bool get asiste => yo['asiste'] == true;
+
+  /// +1 que todavía no escribió su nombre.
+  bool get necesitaNombre => yo['necesitaNombre'] == true;
 
   bool modulo(String k) => social?[k] == true;
   bool get sorteado => social?['sorteado'] == true;

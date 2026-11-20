@@ -122,6 +122,16 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
           ),
         ),
       );
+    } else if (e.necesitaNombre) {
+      // Primera vez con el enlace: escribe su nombre (Victor, 2026-11-20).
+      cuerpo = _PedirNombre(
+        key: const ValueKey('nombre'),
+        estado: e,
+        alGuardar: (n) async {
+          await _repo.nombrarme(n);
+          await _cargar();
+        },
+      );
     } else {
       // La liga guarda el código (USD); se muestra su símbolo.
       final codigo = '${e.evento['moneda'] ?? ''}';
@@ -148,6 +158,86 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Tu invitación')),
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: cuerpo),
+    );
+  }
+}
+
+class _PedirNombre extends StatefulWidget {
+  const _PedirNombre({super.key, required this.estado, required this.alGuardar});
+  final EstadoSocial estado;
+  final Future<void> Function(String) alGuardar;
+
+  @override
+  State<_PedirNombre> createState() => _PedirNombreState();
+}
+
+class _PedirNombreState extends State<_PedirNombre> {
+  final _nombre = TextEditingController();
+  bool _guardando = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final n = _nombre.text.trim();
+    if (n.isEmpty) return setState(() => _error = 'Escribe tu nombre.');
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
+    try {
+      await widget.alGuardar(n);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _guardando = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final e = widget.estado;
+    final anfitrion = '${e.yo['anfitrion'] ?? ''}';
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Icon(Icons.celebration_rounded, size: 56, color: p.marcaTexto),
+        const SizedBox(height: 16),
+        Text(
+          '${anfitrion.isEmpty ? 'Te invitaron' : '$anfitrion te invitó'} a ${e.titulo.isEmpty ? 'un evento' : '"${e.titulo}"'}',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: p.texto),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Escribe tu nombre para entrar. No hace falta crear una cuenta.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: p.textoSecundario),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _nombre,
+          autofocus: true,
+          maxLength: 60,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(labelText: 'Tu nombre', errorText: _error),
+          onSubmitted: (_) => _guardar(),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          onPressed: _guardando ? null : _guardar,
+          child: Text(_guardando ? 'Entrando…' : 'Entrar'),
+        ),
+      ],
     );
   }
 }

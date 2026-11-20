@@ -47,7 +47,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialGet', 'socialCrear', 'socialGuardarConfig', 'socialAgregarInvitado', 'socialQuitarInvitado', 'socialGuardarPerfil',
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
-    'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar',
+    'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -162,7 +162,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
       case 'socialGet': return await socialGet(params, deps);
       case 'socialCrear': return await socialCrear(params, deps);
             case 'socialGuardarConfig': return await socialGuardarConfig(params, deps);
-      case 'socialComidaEditar': return await socialComidaEditar(params, deps);
+            case 'socialComidaEditar': return await socialComidaEditar(params, deps);
+      case 'socialInvitadoNombre': return await socialInvitadoNombre(params, deps);
       case 'socialAgregarInvitado': return await socialAgregarInvitado(params, deps);
       case 'socialQuitarInvitado': return await socialQuitarInvitado(params, deps);
       case 'socialGuardarPerfil': return await socialGuardarPerfil(params, deps);
@@ -347,7 +348,7 @@ async function _ficha(db: any, liga: string, clave: string): Promise<Record<stri
 function _participantes(asisten: Set<string>, invitados: any[]): ParticipanteSorteo[] {
   return [
     ...[...asisten].map((u) => ({ clave: u, grupo: u })),
-    ...invitados.filter((i) => asisten.has(i.anfitrion)).map((i) => ({ clave: 'inv:' + i.id, grupo: i.anfitrion })),
+        ...invitados.filter((i) => asisten.has(i.anfitrion) && !!i.nombre).map((i) => ({ clave: 'inv:' + i.id, grupo: i.anfitrion })),
   ];
 }
 
@@ -408,7 +409,8 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     _personas(db, [...hom, ...noEnterarse(cfg), ...encargadxs(cfg), cfg.creador ?? '', cfg.regalo_compra ?? '']),
   ]);
   const nombreDe = (u: string) => personas.get(u)?.nombre ?? u;
-  const invitadosQueCuentan = invitados.filter((i) => asisten.has(i.anfitrion));
+    // Un +1 cuenta desde que abre su enlace y escribe su nombre.
+  const invitadosQueCuentan = invitados.filter((i) => asisten.has(i.anfitrion) && !!i.nombre);
   const total = asisten.size + invitadosQueCuentan.length;
     const cierre = cfg.cierre ?? _cierreDefecto(ev.fecha);
   // Lo que ve la vista neutral: nada del motivo, del homenaje ni de la sorpresa.
@@ -435,14 +437,14 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   };
 
   const out: Record<string, any> = { exito: true, social, evento, esPivot: q.esPivot, tipo: q.tipo, organiza, vista };
-  out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null };
+    out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null, necesitaNombre: esInv && !q.nombre };
   if (esInv) out.yo.anfitrion = (await _personas(db, [q.invitado.anfitrion])).get(q.invitado.anfitrion)?.nombre ?? '';
   // Lxs +1 no ven la lista de asistentes, solo cuántxs son (para la comida).
   out.conteo = { asistentes: asisten.size, invitados: invitadosQueCuentan.length, total };
 
   if (q.tipo !== 'invitado' && q.clave) {
     out.misInvitados = invitados.filter((i) => i.anfitrion === q.clave).map((i) => ({
-      id: i.id, nombre: i.nombre, contacto: i.contacto ?? '', enlace: _enlace(deps, i.token),
+            id: i.id, nombre: i.nombre, contacto: i.contacto ?? '', enlace: _enlace(deps, i.token), entro: !!i.nombre,
       enSorteo: sorteo.some((s: any) => s.da === 'inv:' + i.id),
     }));
   }
@@ -1188,16 +1190,32 @@ async function socialAgregarInvitado(params: Record<string, any>, deps: DepsSoci
   if (!cfg?.invitados || vInv === 'oculta' || !piezaVisible(cfg, 'invitados', vInv)) return { exito: false, error: 'Este evento no admite invitadxs.' };
   const asisten = await _asistentes(db, q.idEvento);
   if (!asisten.has(q.clave!)) return { exito: false, error: 'Primero marca Asistiré para sumar a tu +1.' };
+    // +1 por enlace (Victor, 2026-11-20): el nombre es opcional; si no viene,
+  // lo escribe el +1 al abrir su enlace.
   const nombre = _texto(params.nombre, 60);
-  if (!nombre) return { exito: false, error: 'Escribe el nombre de tu invitadx.' };
   const contacto = _texto(params.contacto, 120);
   const { count } = await db.from('social_invitados').select('id', { count: 'exact', head: true }).eq('id_evento', q.idEvento).eq('anfitrion', q.clave);
   if ((count ?? 0) >= MAX_INVITADOS) return { exito: false, error: `Puedes sumar hasta ${MAX_INVITADOS} invitadxs.` };
   const token = _tokenNuevo();
   const { data, error } = await db.from('social_invitados')
-    .insert({ id_evento: q.idEvento, anfitrion: q.clave, nombre, contacto: contacto || null, token, liga_id: liga }).select('id').single();
+        .insert({ id_evento: q.idEvento, anfitrion: q.clave, nombre, contacto: contacto || null, token, liga_id: liga, ...(nombre ? { entro_en: new Date().toISOString() } : {}) })
+    .select('id').single();
   if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
-  return { exito: true, invitado: { id: data.id, nombre, contacto, enlace: _enlace(deps, token), enSorteo: false } };
+  return { exito: true, invitado: { id: data.id, nombre, contacto, enlace: _enlace(deps, token), enSorteo: false, entro: !!nombre } };
+}
+
+/// El +1 escribe su nombre al abrir su enlace (y puede corregirlo).
+async function socialInvitadoNombre(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  if (!params.invitadoToken) return { exito: false, error: 'Este enlace no es válido.' };
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (q.tipo !== 'invitado') return { exito: false, error: 'Este enlace no es válido.' };
+  const nombre = _texto(params.nombre, 60);
+  if (!nombre) return { exito: false, error: 'Escribe tu nombre.' };
+  const { error } = await deps.db.from('social_invitados')
+    .update({ nombre, ...(q.invitado.entro_en ? {} : { entro_en: new Date().toISOString() }) }).eq('id', q.invitado.id);
+  if (error) return { exito: false, error: 'No se pudo guardar: ' + error.message };
+  return { exito: true };
 }
 
 async function socialQuitarInvitado(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {

@@ -147,43 +147,11 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
   // ─── +1 ─────────────────────────────────────────────────────────────────
 
+  /// +1 por enlace (Victor, 2026-11-20): se crea su enlace y se abre para
+  /// mandarlo. El +1 escribe su nombre al abrirlo.
   Future<void> _agregarInvitado() async {
-    final nombre = TextEditingController(), contacto = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('Sumar a tu +1'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nombre,
-              autofocus: true,
-              maxLength: 60,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Nombre'),
-            ),
-            TextField(
-              controller: contacto,
-              maxLength: 120,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Teléfono o correo', hintText: 'Para enviarle su enlace'),
-            ),
-            const Text('Recibe un enlace propio para entrar sin crear cuenta: sus pistas, su amigo secreto y la comida.'),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Sumar')),
-        ],
-      ),
-    );
-    final n = nombre.text.trim(), c = contacto.text.trim();
-    nombre.dispose();
-    contacto.dispose();
-    if (ok != true || n.isEmpty || !mounted) return;
     try {
-      final inv = await _social.agregarInvitado(n, c);
+      final inv = await _social.agregarInvitado('', '');
       await _cargar();
       if (mounted) await _compartir(inv);
     } catch (e) {
@@ -195,7 +163,8 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final ev = widget.evento;
     final titulo = _estado?.titulo ?? '';
     final que = titulo.isEmpty ? 'nuestro evento' : '"$titulo"';
-    return 'Hola, ${inv['nombre']}. Te invito a ${ev.lugar.isEmpty ? que : '$que en ${ev.lugar}'} el ${Fechas.corta(ev.fecha)}. '
+    final n = '${inv['nombre'] ?? ''}'.trim();
+    return '${n.isEmpty ? 'Hola' : 'Hola, $n'}. Te invito a ${ev.lugar.isEmpty ? que : '$que en ${ev.lugar}'} el ${Fechas.corta(ev.fecha)}. '
         'Entra aquí (sin crear cuenta) para tus pistas del amigo secreto y la comida: ${inv['enlace']}';
   }
 
@@ -211,7 +180,10 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(title: Text('Enlace de ${inv['nombre']}'), subtitle: const Text('Es personal: con él entra sin cuenta.')),
+            ListTile(
+              title: Text('${inv['nombre'] ?? ''}'.isEmpty ? 'Enlace para tu +1' : 'Enlace de ${inv['nombre']}'),
+              subtitle: const Text('Es para una sola persona: con él entra sin crear cuenta y escribe su nombre.'),
+            ),
             // Las apps de mensajería que usa la liga (Comunidad en Equipo) y SMS.
             for (final (nombre, icono, uri) in canales)
               ListTile(
@@ -290,13 +262,23 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         if (!e.asiste)
           Text('Marca Asistiré para sumar a tu +1.', style: TextStyle(color: p.textoSecundario))
         else ...[
-          if (lista.isEmpty) Text('Puedes sumar a una o más personas. Cada una recibe su propio enlace.', style: TextStyle(color: p.textoSecundario)),
+          if (lista.isEmpty)
+            Text(
+              'Mándale un enlace a tu +1: entra sin crear cuenta, escribe su nombre y ve el evento. Cada enlace es para una persona.',
+              style: TextStyle(color: p.textoSecundario),
+            ),
           for (final inv in lista)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.person_outline_rounded),
-              title: Text('${inv['nombre']}'),
-              subtitle: Text([if ('${inv['contacto']}'.isNotEmpty) '${inv['contacto']}', if (inv['enSorteo'] == true) 'En el amigo secreto'].join(' · ')),
+              leading: Icon(inv['entro'] == false ? Icons.schedule_send_outlined : Icons.person_outline_rounded),
+              title: Text(inv['entro'] == false ? 'Enlace enviado' : '${inv['nombre']}'),
+              subtitle: Text(
+                [
+                  if (inv['entro'] == false) 'Todavía no entra',
+                  if ('${inv['contacto'] ?? ''}'.isNotEmpty) '${inv['contacto']}',
+                  if (inv['enSorteo'] == true) 'En el amigo secreto',
+                ].join(' · '),
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -307,7 +289,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: _agregarInvitado, icon: const Icon(Icons.add_rounded), label: const Text('Sumar +1')),
+            child: TextButton.icon(onPressed: _agregarInvitado, icon: const Icon(Icons.add_rounded), label: const Text('Invitar a mi +1')),
           ),
         ],
       ],

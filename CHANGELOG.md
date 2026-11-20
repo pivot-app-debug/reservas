@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (+1 por enlace)
+- "Invitar a mi +1" ya no pide nombre ni contacto: crea un enlace y abre las opciones para mandarlo (compartir o copiar). El +1 abre el enlace, escribe su nombre una vez y entra sin crear cuenta: ve el evento, "Qué lleva cada quien", sus pistas y su amigo secreto.
+- En "Tus invitadxs +1" se ve "Enlace enviado · Todavía no entra" hasta que la persona entra; se puede reenviar o quitar.
+- Un +1 cuenta para la comida y entra al sorteo recién cuando escribió su nombre.
+
 ## 2026-11-20 ("Qué lleva cada quien" rediseñado)
 - Cada sección es una fila compacta (nombre, qué se pide, barra fina y un solo indicador: "3 de 10", "Hace falta", "Te falta 1" o un check) con un **+** para anotarse; se despliega al tocarla.
 - Abiertas solo las que hacen falta y las que te faltan; las completas van al final en "Completadas (N)", cerradas.
