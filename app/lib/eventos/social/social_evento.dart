@@ -109,8 +109,8 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         title: Text(rehacer ? '¿Rehacer el sorteo?' : '¿Cerrar la inscripción y sortear?'),
         content: Text(
           rehacer
-              ? 'Se arma un sorteo nuevo con quienes confirmaron hoy ($n). ${e.admin?['revelados'] ?? 0} personas ya vieron su amigo secreto y tendrán que volver a girar la ruleta.'
-              : 'Entran $n personas (quienes marcaron Asistiré y sus +1). Quien se sume después no entra al amigo secreto. Se avisa al equipo para que gire su ruleta.',
+              ? 'Se arma un sorteo nuevo con quienes confirmaron hoy ($n). ${e.admin?['revelados'] ?? 0} personas ya vieron a quién le regalan y tendrán que volver a descubrirlo con el sorteo nuevo.'
+              : 'Entran $n personas (quienes marcaron Asistiré y sus +1). Se sortea a quién le regala cada persona y se les avisa para que lo descubran en el evento. Quien se sume después no entra al amigo secreto.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
@@ -127,7 +127,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         context,
         r['repiteAnterior'] == true
             ? 'Sorteo listo. No hubo forma de evitar todas las parejas del año anterior.'
-            : 'Sorteo listo: ${r['participantes']} personas ya pueden girar su ruleta.',
+            : 'Sorteo listo: ${r['participantes']} personas ya pueden descubrir a quién le regalan.',
       );
       await _cargar();
     } catch (e) {
@@ -169,7 +169,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(labelText: 'Teléfono o correo', hintText: 'Para enviarle su enlace'),
             ),
-            const Text('Recibe un enlace propio para entrar sin crear cuenta: sus pistas, su ruleta y la comida.'),
+            const Text('Recibe un enlace propio para entrar sin crear cuenta: sus pistas, su amigo secreto y la comida.'),
           ],
         ),
         actions: [
@@ -326,7 +326,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
       children: [
         Text(
           '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} +1)'
-          '${e.sorteado ? ' · ${a['revelados'] ?? 0} de ${a['sorteados'] ?? 0} ya giraron su ruleta' : ''}.',
+          '${e.sorteado ? ' · ${a['revelados'] ?? 0} de ${a['sorteados'] ?? 0} ya vieron a quién le regalan' : ''}.',
           style: TextStyle(color: p.texto),
         ),
         if (e.modulo('amigoSecreto')) ...[

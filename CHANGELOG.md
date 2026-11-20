@@ -10,6 +10,7 @@ Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.
 - **"Lo que llevas"** arriba en el evento, y el recordatorio del día anterior ahora dice "Mañana llevas: …".
 - Los ítems de "Qué traer" de la Naviquinde (Adornos, Vasos y platos) pasaron a secciones libres, con lo que ya había anotado cada persona.
 - Encargadxs: permisos con un toggle por cosa.
+- Textos del sorteo para quien organiza y del asistente sin "girar la ruleta": "Se sortea a quién le regala cada persona y se les avisa para que lo descubran". El aviso a quienes participan: "Ya se hizo el sorteo. Entra al evento para descubrir a quién le regalas."
 
 ## 2026-11-20 (actualización obligatoria en la web y la PWA)
 - Cada publicación de la web lleva su número (`WEB_BUILD` = corrida del CI) y se publica `web_version.json` con el último. Al abrir la app y al volver a ella, si hay uno más nuevo aparece la misma pantalla que en Android ("Hay una nueva versión de Pivot") y no se puede seguir sin actualizar.

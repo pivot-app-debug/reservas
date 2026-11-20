@@ -1546,7 +1546,7 @@ async function socialSortear(params: Record<string, any>, deps: DepsSocial): Pro
         tipo: 'social',
         include_external_user_ids: miembros,
         headings: { es: '¡Ya hay amigo secreto!' },
-        contents: { es: 'Gira tu ruleta para saber a quién le regalas.' },
+        contents: { es: 'Ya se hizo el sorteo. Entra al evento para descubrir a quién le regalas.' },
         url: _url(deps, idEvento),
       });
     } catch { /* el aviso no frena el sorteo */ }

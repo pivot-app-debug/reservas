@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 enum Pieza {
   comida('¿Qué llevamos?', 'Comida, bebida y cosas para la fiesta: cada quien se anota con lo que lleva y todxs ven qué falta', Icons.restaurant_rounded),
   playlist('Playlist colaborativa', 'Un enlace de Spotify u otra app para que todxs sumen canciones', Icons.queue_music_rounded),
-  amigoSecreto('Amigo secreto', 'Sorteo con ruleta, pistas y wishlist', Icons.redeem_rounded),
+  amigoSecreto('Amigo secreto', 'Se sortea a quién le regala cada persona; cada quien deja pistas y su wishlist', Icons.redeem_rounded),
   regaloRobado('Regalo robado', 'Tope, recordatorio y reglas del juego', Icons.card_giftcard_rounded),
   dress('Dress code o disfraces', 'Cómo venir vestidxs', Icons.checkroom_rounded),
   // Ya no se elige: pasó a ser secciones de "¿Qué llevamos?" (Victor, 2026-11-20).
