@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../core/banner_ayuda.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -20,7 +19,7 @@ import '../tareas/tareas_repo.dart';
 import '../tareas/tareas_screen.dart' show TareasScreen;
 
 /// Pestañas de Actividad.
-enum PestanaActividad { notificaciones, tareas, clases, eventos, pagos }
+enum PestanaActividad { notificaciones, tareas, clases, pagos }
 
 /// Actividad (Victor, 2026-11-20): lo que se abre con la campana del
 /// Calendario. Junta en pestañas Notificaciones, Tareas, Clases (cursos y
@@ -33,6 +32,7 @@ class ActividadScreen extends StatefulWidget {
     required this.bandeja,
     required this.tareas,
     required this.verClases,
+    this.verPagos = true,
     this.cursosNuevos = false,
     this.inicial = PestanaActividad.notificaciones,
     this.alCrearSocial,
@@ -46,6 +46,9 @@ class ActividadScreen extends StatefulWidget {
 
   /// Pivots, coaches o quien tiene cursos para tomar.
   final bool verClases;
+
+  /// Quien paga cuota o tiene pagos con el equipo.
+  final bool verPagos;
   final bool cursosNuevos;
   final PestanaActividad inicial;
 
@@ -67,8 +70,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones,
     PestanaActividad.tareas,
     if (widget.verClases) PestanaActividad.clases,
-    PestanaActividad.eventos,
-    PestanaActividad.pagos,
+    if (widget.verPagos) PestanaActividad.pagos,
   ];
   late final TabController _tabs = TabController(
     length: _pestanas.length,
@@ -98,10 +100,9 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   }
 
   static String nombre(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => 'Notificaciones',
+    PestanaActividad.notificaciones => 'Novedades',
     PestanaActividad.tareas => 'Tareas',
     PestanaActividad.clases => 'Cursos',
-    PestanaActividad.eventos => 'Eventos',
     PestanaActividad.pagos => 'Pagos y suscripciones',
   };
 
@@ -110,10 +111,9 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
 
   // Material Symbols (Victor, 2026-11-20): los mismos íconos de Google Fonts.
   static IconData _icono(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => Symbols.notifications,
+    PestanaActividad.notificaciones => Symbols.newspaper,
     PestanaActividad.tareas => Symbols.checklist,
     PestanaActividad.clases => Symbols.school,
-    PestanaActividad.eventos => Symbols.event,
     PestanaActividad.pagos => Symbols.payments,
   };
 
@@ -133,7 +133,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         ),
       ),
       PestanaActividad.clases => punto(_cursosNuevos),
-      PestanaActividad.eventos || PestanaActividad.pagos => icono,
+      PestanaActividad.pagos => icono,
     };
   }
 
@@ -202,10 +202,14 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   Widget _cuerpo(PestanaActividad x) {
     final s = widget.eventos.sesion;
     return switch (x) {
-      PestanaActividad.notificaciones => BandejaPivotsScreen(repo: widget.bandeja, embebida: true),
+      // Novedades (Victor, 2026-11-20): primero los próximos eventos, después las notificaciones.
+      PestanaActividad.notificaciones => BandejaPivotsScreen(
+        repo: widget.bandeja,
+        embebida: true,
+        encabezado: _SeccionEventos(eventos: widget.eventos, alCrearSocial: widget.alCrearSocial, alCrearEvento: widget.alCrearEvento),
+      ),
       PestanaActividad.tareas => TareasScreen(repo: widget.tareas, embebida: true),
       PestanaActividad.clases => s.esAdmin ? CursosScreen(sesion: s, embebida: true) : CursosAbiertosScreen(sesion: s, embebida: true),
-      PestanaActividad.eventos => _PanelEventos(eventos: widget.eventos, alCrearSocial: widget.alCrearSocial, alCrearEvento: widget.alCrearEvento),
       PestanaActividad.pagos => PagosScreen(repo: widget.eventos, embebida: true),
     };
   }
@@ -249,13 +253,13 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   }
 }
 
-/// Eventos (Victor, 2026-11-20): esta semana, cumpleaños del mes y próximas
-/// fiestas. Crear: un Pivot con todas las herramientas usa Nuevo evento (que
-/// incluye Social o fiesta); un Pivot solo de fiestas, el asistente de fiestas;
-/// sin ser Pivot no se crea. Sin ningún evento próximo, el botón va en la
-/// lista en vez de flotar.
-class _PanelEventos extends StatelessWidget {
-  const _PanelEventos({required this.eventos, this.alCrearSocial, this.alCrearEvento});
+/// Próximos eventos arriba de Novedades (Victor, 2026-11-20): los de la
+/// próxima semana, los cumpleaños de los próximos 10 días y las fiestas. Para
+/// quien puede crear eventos, un botón fijo (sin botón flotante): un Pivot usa
+/// Nuevo evento (que incluye Social o fiesta); un Pivot solo de fiestas, el
+/// asistente de fiestas.
+class _SeccionEventos extends StatelessWidget {
+  const _SeccionEventos({required this.eventos, this.alCrearSocial, this.alCrearEvento});
   final EventosRepo eventos;
   final void Function(Map r)? alCrearSocial;
   final void Function(Object r)? alCrearEvento;
@@ -285,99 +289,53 @@ class _PanelEventos extends StatelessWidget {
       listenable: eventos,
       builder: (context, _) {
         final hoy = Fechas.hoy();
-        final finSemana = hoy.add(const Duration(days: 7));
+        final finSemana = hoy.add(const Duration(days: 8));
         final proximos = eventos.eventos.where((e) => !e.fecha.isBefore(hoy)).toList()..sort((a, b) => a.fecha.compareTo(b.fecha));
         final semana = proximos.where((e) => e.fecha.isBefore(finSemana)).toList();
         final fiestas = proximos.where((e) => e.tipo == kTipoSocial && !e.fecha.isBefore(finSemana)).toList();
-        final cumples = eventos.cumples.where((c) => c.fecha.month == hoy.month).toList()..sort((a, b) => a.fecha.day.compareTo(b.fecha.day));
-        final puede = _puede;
+        final cumples = eventos.cumples.where((c) => !c.fecha.isBefore(hoy) && c.fecha.difference(hoy).inDays <= 10).toList()
+          ..sort((a, b) => a.fecha.compareTo(b.fecha));
         Widget titulo(String t) => Padding(
-          padding: const EdgeInsets.fromLTRB(4, 18, 4, 2),
+          padding: const EdgeInsets.fromLTRB(4, 14, 4, 2),
           child: Text(
             t,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
           ),
         );
-        Widget vacio(String t) => Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-          child: Text(t, style: TextStyle(color: p.textoSecundario)),
-        );
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          // Con eventos próximos, el "+" flota; sin ninguno, el botón va en la lista (como Cursos).
-          floatingActionButton: AnimatedScale(
-            scale: puede && proximos.isNotEmpty ? 1 : 0,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutBack,
-            child: FloatingActionButton.extended(
-              onPressed: () => _crear(context),
-              icon: const Icon(Icons.add_rounded),
-              label: Text(eventos.sesion.esAdmin ? 'Nuevo evento' : 'Nueva fiesta'),
-            ),
-          ),
-          body: ListView(
-            padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
-            children: [
-              BannerAyuda(
-                titulo: '¿Qué hay en Eventos?',
-                texto: 'Lo que viene en la liga: los eventos de esta semana, los cumpleaños del mes y las próximas fiestas.',
-                pasos: [
-                  (Icons.touch_app_outlined, 'Toca un evento para ver quiénes van y responder si vas.'),
-                  if (eventos.sesion.esAdmin)
-                    (Icons.add_circle_outline_rounded, 'Crea entrenamientos, partidos, reuniones o fiestas: aparecen en el calendario de quienes invites.')
-                  else if (puede)
-                    (Icons.celebration_outlined, 'Crea fiestas y eventos sociales: invitación, qué lleva cada quien, amigo secreto, regalo robado y más.'),
-                ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            titulo('PRÓXIMOS 7 DÍAS'),
+            if (semana.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+                child: Text('No hay eventos en los próximos 7 días.', style: TextStyle(color: p.textoSecundario)),
               ),
-              if (proximos.isEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'No hay eventos próximos.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  puede ? 'Crea el primero: aparece en el calendario de quienes invites.' : 'Cuando haya uno, lo verás aquí y en el calendario.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: p.textoSecundario),
-                ),
-                if (puede) ...[
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                    ),
-                    onPressed: () => _crear(context),
-                    icon: const Icon(Icons.add_rounded),
-                    label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
-                  ),
-                ],
-              ] else ...[
-                titulo('ESTA SEMANA'),
-                if (semana.isEmpty) vacio('No hay eventos esta semana.'),
-                for (final e in semana) _fila(context, p, e),
-              ],
-              titulo('CUMPLEAÑOS ESTE MES'),
-              if (cumples.isEmpty) vacio('Nadie cumple años este mes.'),
+            for (final e in semana) _fila(context, p, e),
+            if (cumples.isNotEmpty) ...[
+              titulo('CUMPLEAÑOS PRÓXIMOS'),
               for (final c in cumples)
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                   leading: Icon(c.esAniversario ? Icons.workspace_premium_outlined : Icons.cake_outlined, color: p.marcaTexto),
                   title: Text(c.nombre),
                   subtitle: Text(
-                    '${c.fecha.day} de ${Fechas.mes(c.fecha)}'
+                    '${c.fecha == hoy ? 'Hoy' : '${Fechas.dia(c.fecha)} ${c.fecha.day} de ${Fechas.mes(c.fecha)}'}'
                     '${c.esAniversario ? ' · ${c.aniosEquipo} ${c.aniosEquipo == 1 ? 'año' : 'años'} en el equipo' : (c.edad != null ? ' · cumple ${c.edad}' : '')}',
                   ),
                 ),
-              if (proximos.isNotEmpty) ...[
-                titulo('PRÓXIMAS FIESTAS Y EVENTOS SOCIALES'),
-                if (fiestas.isEmpty) vacio('No hay más fiestas próximas.'),
-                for (final e in fiestas) _fila(context, p, e),
-              ],
             ],
-          ),
+            if (fiestas.isNotEmpty) ...[titulo('PRÓXIMAS FIESTAS Y EVENTOS SOCIALES'), for (final e in fiestas) _fila(context, p, e)],
+            if (_puede) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: () => _crear(context),
+                icon: const Icon(Icons.add_rounded),
+                label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
+              ),
+            ],
+          ],
         );
       },
     );

@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Novedades y actualización de la web)
+- La primera sección de Actividad ahora se llama Novedades (ícono de noticias). Arriba muestra los eventos de los próximos 7 días, los cumpleaños de los próximos 10 días y las próximas fiestas; debajo, las notificaciones. Quien puede crear eventos tiene ahí el botón fijo "Crear un evento" (o "Crear una fiesta").
+- Ya no hay pill de Eventos.
+- Pagos y suscripciones se oculta si no pagas cuota ni tienes pagos con el equipo. Sin cuota mensual ya no dice "Pagas por clase", salvo que de verdad pagues clases.
+- Web: cada publicación pide sus archivos con un número de versión, así el navegador no se queda con la versión vieja. Con la app abierta, también revisa cada 5 minutos si hay una versión nueva.
+
 ## 2026-11-20 (Actividad con pills)
 - En vez de pestañas, Actividad tiene una barra de pills: la sección elegida se expande con su ícono y su nombre en el color de énfasis, y el título también cambia.
 - Íconos de Google Material Symbols (los de Google Fonts): la casita de la barra y los de cada sección. Esto arregla el ícono de Cursos, que se veía como un cuadro negro.

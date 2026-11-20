@@ -33,7 +33,10 @@ import '../core/esqueleto.dart';
 /// animación; si falla, vuelve y se avisa. Nada de esto se guarda en el
 /// teléfono.
 class BandejaPivotsScreen extends StatefulWidget {
-  const BandejaPivotsScreen({super.key, required this.repo, this.embebida = false});
+  const BandejaPivotsScreen({super.key, required this.repo, this.embebida = false, this.encabezado});
+
+  /// Arriba de todo (Novedades: los próximos eventos).
+  final Widget? encabezado;
 
   /// Dentro de una pestaña de Actividad: sin barra propia.
   final bool embebida;
@@ -656,15 +659,29 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                       key: const ValueKey('vacia'),
                       padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
                       children: [
-                        const SizedBox(height: 120),
-                        Icon(Icons.inbox_rounded, size: 56, color: p.textoSecundario),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No hay nada pendiente',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: p.texto),
-                        ),
-
+                        if (widget.encabezado != null) ...[
+                          widget.encabezado!,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 18, 4, 4),
+                            child: Text(
+                              'NOTIFICACIONES',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text('No hay nada pendiente.', style: TextStyle(color: p.textoSecundario)),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 120),
+                          Icon(Icons.inbox_rounded, size: 56, color: p.textoSecundario),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No hay nada pendiente',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: p.texto),
+                          ),
+                        ],
                         if (hijos.isNotEmpty) const SizedBox(height: 24),
                         ...hijos,
                       ],
@@ -672,7 +689,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                   : ListView(
                       key: const ValueKey('lista'),
                       padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
-                      children: hijos,
+                      children: [if (widget.encabezado != null) widget.encabezado!, ...hijos],
                     ),
             ),
           );

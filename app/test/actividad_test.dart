@@ -25,13 +25,11 @@ void main() {
     );
     await t.pump(const Duration(seconds: 1));
     // Título según la pestaña; pestañas con íconos.
-    expect(find.text('Notificaciones'), findsWidgets);
+    // Novedades: primero los próximos eventos, después las notificaciones.
+    expect(find.text('Novedades'), findsWidgets);
     expect(find.byTooltip('Cursos'), findsOneWidget);
-    await t.tap(find.byTooltip('Eventos'));
-    await t.pumpAndSettle();
-    expect(find.text('Eventos'), findsWidgets);
-    expect(find.text('No hay eventos próximos.'), findsOneWidget);
-    expect(find.text('CUMPLEAÑOS ESTE MES'), findsOneWidget);
+    expect(find.text('PRÓXIMOS 7 DÍAS'), findsOneWidget);
+    expect(find.text('No hay eventos en los próximos 7 días.'), findsOneWidget);
     expect(find.text('Crear un evento'), findsNothing);
     expect(find.byTooltip('Pagos y suscripciones'), findsOneWidget);
     expect(s.puedeCrearSocial, isFalse);

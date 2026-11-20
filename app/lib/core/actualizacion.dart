@@ -48,15 +48,20 @@ class _ControlActualizacionState extends State<ControlActualizacion> with Widget
   VersionRemota? _pendiente;
   bool _revisando = false;
 
+  /// Con la app abierta mucho rato también se revisa (cada 5 minutos).
+  Timer? _reloj;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _revisar();
+    _reloj = Timer.periodic(const Duration(minutes: 5), (_) => _revisar());
   }
 
   @override
   void dispose() {
+    _reloj?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

@@ -36,6 +36,7 @@ import '../pivots/bandeja_repo.dart';
 import '../core/esqueleto.dart';
 import '../cursos/cursos_screen.dart';
 import '../actividad/actividad_screen.dart';
+import '../ajustes/pagos_screen.dart';
 import '../push/avisos_obligatorios.dart';
 import 'tipos_evento.dart';
 
@@ -1300,6 +1301,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         bandeja: _bandeja,
         tareas: _tareas,
         verClases: _esAdmin || repo.sesion.esCoach || _cursos.hay,
+        // Pagos solo si paga cuota o tiene pagos con el equipo (Victor, 2026-11-20).
+        verPagos: PagosScreen.tieneAlgo(repo.cuota),
         cursosNuevos: _cursos.nuevos,
         inicial: inicial,
         alCrearSocial: _alCrearSocial,

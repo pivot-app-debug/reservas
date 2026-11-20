@@ -37,7 +37,12 @@ jobs:
         # web_version.json para pedir actualizar (Victor, 2026-11-20).
         run: |
           flutter build web --release --base-href / --no-wasm-dry-run --dart-define=WEB_BUILD=${{ github.run_number }}
-          echo "{\"build\": ${{ github.run_number }}}" > build/web/web_version.json
+                    echo "{\"build\": ${{ github.run_number }}}" > build/web/web_version.json
+          # Cada publicación pide sus archivos con ?v=<número> (Victor, 2026-11-20:
+          # la web seguía mostrando la versión vieja por la caché del navegador).
+          sed -i 's/"mainJsPath":"main.dart.js"/"mainJsPath":"main.dart.js?v=${{ github.run_number }}"/' build/web/flutter_bootstrap.js
+          sed -i 's/src="flutter_bootstrap.js"/src="flutter_bootstrap.js?v=${{ github.run_number }}"/' build/web/index.html
+          grep -q 'main.dart.js?v=' build/web/flutter_bootstrap.js && grep -q 'flutter_bootstrap.js?v=' build/web/index.html
 
       - name: Publicar en la raíz
         run: |

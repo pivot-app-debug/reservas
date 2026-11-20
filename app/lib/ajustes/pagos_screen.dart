@@ -243,8 +243,10 @@ class _Estado extends StatelessWidget {
     const sobre = PivotPaleta.sobreSeccion;
     final hoy = Fechas.hoy();
     final debe = cuota.pagaCuotaMensual && !cuota.alDia;
+    // Sin cuota mensual: "por clase" solo si de verdad paga clases (Victor, 2026-11-20).
+    final porClase = cuota.reservas.any((r) => r['tipo'] != 'mensual');
     final (String titulo, String texto) = !cuota.pagaCuotaMensual
-        ? ('Pagas por clase', 'Aquí ves tus reservas y recibos.')
+        ? (porClase ? ('Pagas por clase', 'Aquí ves tus reservas y recibos.') : ('No pagas cuota mensual', 'Aquí ves tus pagos y recibos con el equipo.'))
         : debe
         ? ('Debes la cuota de ${Fechas.mesNombre(hoy).toLowerCase()}', 'Págala para seguir marcando asistencia sin límites.')
         : ('Tu cuota está al día', 'Gracias por sostener al equipo.');
