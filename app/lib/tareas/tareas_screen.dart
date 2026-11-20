@@ -25,7 +25,10 @@ export 'tareas_widgets.dart' show HeroOpcional, PillPuntos, PilaAvatares, Iconos
 /// en rojo) → Sugeridas para ti (si faltan puntos para la meta) →
 /// Disponibles (con filtro por área) → Sin cupos → Baúl.
 class TareasScreen extends StatefulWidget {
-  const TareasScreen({super.key, required this.repo});
+  const TareasScreen({super.key, required this.repo, this.embebida = false});
+
+  /// Dentro de una pestaña de Actividad: sin barra propia.
+  final bool embebida;
   final TareasRepo repo;
 
   @override
@@ -72,13 +75,15 @@ class _TareasScreenState extends State<TareasScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       // Archivadas: ahora en un carrusel dentro de la lista (Victor, 2026-11-17).
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text('Tareas', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              flexibleSpace: const Vidrio(child: SizedBox.expand()),
+              title: Text('Tareas', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+            ),
       // Solo con tareas disponibles; si no hay, el botón está en la lista (Victor, 2026-11-16).
       floatingActionButton: ListenableBuilder(
         listenable: repo,

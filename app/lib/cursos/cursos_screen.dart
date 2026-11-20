@@ -253,7 +253,10 @@ Future<void> marcarCursosVistos(Iterable<String> ids) async {
 }
 
 class CursosAbiertosScreen extends StatefulWidget {
-  const CursosAbiertosScreen({super.key, required this.sesion, this.destacado});
+  const CursosAbiertosScreen({super.key, required this.sesion, this.destacado, this.embebida = false});
+
+  /// Dentro de una pestaña de Actividad: sin barra propia.
+  final bool embebida;
   final Sesion sesion;
 
   /// Curso del enlace de invitación: va primero.
@@ -355,7 +358,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
     final l = _cursos;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra('Cursos'),
+      appBar: widget.embebida ? null : _barra('Cursos'),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: l == null
@@ -434,7 +437,10 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
 // ─── Pivots: crear y seguir cursos ─────────────────────────────────────────
 
 class CursosScreen extends StatefulWidget {
-  const CursosScreen({super.key, required this.sesion});
+  const CursosScreen({super.key, required this.sesion, this.embebida = false});
+
+  /// Dentro de una pestaña de Actividad: sin barra propia.
+  final bool embebida;
   final Sesion sesion;
   @override
   State<CursosScreen> createState() => _CursosScreenState();
@@ -520,7 +526,7 @@ class _CursosScreenState extends State<CursosScreen> {
     final l = _cursos;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: _barra('Cursos'),
+      appBar: widget.embebida ? null : _barra('Cursos'),
       // Solo con al menos un curso; si no hay, el botón está en la lista (Victor, 2026-11-18).
       floatingActionButton: AnimatedScale(
         scale: l != null && l.isNotEmpty ? 1 : 0,

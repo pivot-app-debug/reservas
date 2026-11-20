@@ -7,7 +7,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // Evento social (Naviquinde, 2026-11-19): acciones social* en su propio módulo.
 import { ACCIONES_SOCIAL, accionSocial, alcanceSocial, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales, socialPorAprobar } from './social.ts';
 function _depsSocial(): DepsSocial {
-  return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, pivots: _administradorxs, appUrl: APP_URL };
+    return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, pivots: _administradorxs, appUrl: APP_URL, areasDe: _areasDe };
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -307,7 +307,9 @@ const ACCIONES_SOLO_PIVOTS = new Set([
 
 // ─── Pivots y permisos por área (Victor, 2026-11-13) ────────────────────────
 // admins.areas null = todas. El Pivot principal siempre tiene todas.
-const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 'tareas', 'liga'];
+// 'sociales' (Victor, 2026-11-20): crear fiestas y eventos sociales. Un Pivot
+// con solo esa área no usa ninguna otra herramienta de Pivot (`_soloSociales`).
+const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 'tareas', 'liga', 'sociales'];
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
@@ -334,6 +336,11 @@ async function _areasDe(email: string): Promise<string[]> {
   const { data } = await supabase.from('admins').select('areas').ilike('email', e).maybeSingle();
   if (!data) return [];
   return Array.isArray(data.areas) ? data.areas.filter((a: string) => AREAS_PIVOT.includes(a)) : AREAS_PIVOT;
+}
+
+/** Pivot que solo tiene el área de fiestas y eventos sociales. */
+function _soloSociales(areas: string[]): boolean {
+  return areas.length === 1 && areas[0] === 'sociales';
 }
 
 async function _esAdmin(email: string): Promise<boolean> {
@@ -12932,6 +12939,16 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       const em = await _validarAdminToken(String(params.adminToken));
       if (em && !(await _areasDe(em)).includes(areaAccion)) {
         return json({ exito: false, error: 'No tienes permiso para esta área. Otro Pivot te la puede dar en Mi Liga → Pivots y permisos.' });
+      }
+    }
+
+        // Pivot solo de fiestas y eventos sociales: ninguna otra herramienta de Pivot
+    // (Victor, 2026-11-20). Puede leer sus propias áreas.
+    const esHerramientaPivot = String(action).startsWith('admin') || ACCIONES_SOLO_PIVOTS.has(String(action)) || !!areaAccion;
+    if (esHerramientaPivot && params.adminToken && !(action === 'adminPivots' && params.accion === 'misAreas')) {
+      const em = await _validarAdminToken(String(params.adminToken));
+      if (em && _soloSociales(await _areasDe(em))) {
+        return json({ exito: false, error: 'Tu rol de Pivot es de fiestas y eventos sociales; esta herramienta es de otras áreas.' });
       }
     }
 

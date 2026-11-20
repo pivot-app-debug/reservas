@@ -90,6 +90,13 @@ class _VidrioState extends State<Vidrio> {
 // Desde dentro del cuerpo se usa el alto real de la barra del Scaffold
 // (cuenta pestañas, barras de progreso y barras más altas).
 double altoBarra(BuildContext context) {
-  final real = Scaffold.maybeOf(context)?.appBarMaxHeight;
-  return real ?? MediaQueryData.fromView(View.of(context)).viewPadding.top + kToolbarHeight;
+  // Una pantalla metida en una pestaña (sin barra propia) usa la barra de la
+  // pantalla que la contiene.
+  var s = Scaffold.maybeOf(context);
+  while (s != null) {
+    final real = s.appBarMaxHeight;
+    if (real != null) return real;
+    s = Scaffold.maybeOf(s.context);
+  }
+  return MediaQueryData.fromView(View.of(context)).viewPadding.top + kToolbarHeight;
 }

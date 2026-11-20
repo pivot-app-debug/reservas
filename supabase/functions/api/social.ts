@@ -40,7 +40,9 @@ export interface DepsSocial {
   push?: (p: any) => Promise<unknown>;
   /// Pivots de la liga con su cuenta (`_administradorxs` de index.ts).
   pivots?: () => Promise<{ username: string; email: string; nombre?: string }[]>;
-  appUrl: string;
+    appUrl: string;
+  /// Áreas de un Pivot por email (`_areasDe` de index.ts).
+  areasDe?: (email: string) => Promise<string[]>;
 }
 
 export const ACCIONES_SOCIAL = new Set([
@@ -831,7 +833,10 @@ async function socialCrear(params: Record<string, any>, deps: DepsSocial): Promi
   const db = deps.db, liga = deps.ligaEnCurso();
   const q = await _quien({ ...params, idEvento: '-' }, deps);
   if ('error' in q) return { exito: false, error: q.error };
-  if (q.tipo === 'invitado' || (!q.username && !q.esPivot)) return { exito: false, error: 'Inicia sesión con tu cuenta para crear un evento.' };
+    if (q.tipo === 'invitado' || (!q.username && !q.esPivot)) return { exito: false, error: 'Inicia sesión con tu cuenta para crear un evento.' };
+  // Solo Pivots con el área de fiestas y eventos sociales (Victor, 2026-11-20).
+  const areas = q.pivotEmail && deps.areasDe ? await deps.areasDe(q.pivotEmail) : [];
+  if (!areas.includes('sociales')) return { exito: false, error: 'Solo los Pivots de fiestas y eventos sociales pueden crear estos eventos.' };
   const d = _json(params.datos) ?? {};
   for (const k of ['fecha', 'inicia', 'lugar']) if (d[k] === undefined) d[k] = '';
   const r = await _leerDatos(db, { ...d, sorpresa: d.sorpresa === true }, null, q.username, q.categoria);

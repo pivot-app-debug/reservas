@@ -598,18 +598,20 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
                         alTocar: () => elegir(false),
                       ),
                       // Social o fiesta: su propio asistente por piezas (Victor, 2026-11-20).
-                      _tarjetaOpcion(
-                        context,
-                        icono: Icons.celebration_outlined,
-                        titulo: 'Social o fiesta',
-                        texto: 'Fiesta, festividad, cumpleaños, aniversario o despedida',
-                        activa: false,
-                        alTocar: () async {
-                          final nav = Navigator.of(context);
-                          final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion)));
-                          if (r is Map && mounted) nav.pop(r);
-                        },
-                      ),
+                      // Solo Pivots con el área de fiestas y eventos sociales.
+                      if (widget.repo.sesion.puedeCrearSocial)
+                        _tarjetaOpcion(
+                          context,
+                          icono: Icons.celebration_outlined,
+                          titulo: 'Social o fiesta',
+                          texto: 'Fiesta, festividad, cumpleaños, aniversario o despedida',
+                          activa: false,
+                          alTocar: () async {
+                            final nav = Navigator.of(context);
+                            final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: widget.repo.sesion)));
+                            if (r is Map && mounted) nav.pop(r);
+                          },
+                        ),
                     ],
                   ),
                 ),

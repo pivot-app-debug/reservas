@@ -33,7 +33,10 @@ import '../core/esqueleto.dart';
 /// animación; si falla, vuelve y se avisa. Nada de esto se guarda en el
 /// teléfono.
 class BandejaPivotsScreen extends StatefulWidget {
-  const BandejaPivotsScreen({super.key, required this.repo});
+  const BandejaPivotsScreen({super.key, required this.repo, this.embebida = false});
+
+  /// Dentro de una pestaña de Actividad: sin barra propia.
+  final bool embebida;
   final BandejaRepo repo;
 
   @override
@@ -509,13 +512,15 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     final p = context.pivot;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              flexibleSpace: const Vidrio(child: SizedBox.expand()),
+              title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {

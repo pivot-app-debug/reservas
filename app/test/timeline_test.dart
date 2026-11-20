@@ -42,11 +42,12 @@ void main() {
     expect(find.byType(PanelCalendario), findsNothing);
     // El filtro guardado se cargó: la lupa tiene el punto.
     expect(find.byType(Badge), findsWidgets);
-    // Atrás con el buscador abierto lo cierra (no sale de la app). Buscar
-    // está en el menú ⋯ (2026-11-17).
-    await t.tap(find.byIcon(Icons.more_vert_rounded));
-    await t.pumpAndSettle();
-    await t.tap(find.text('Buscar'));
+    // Barra nueva (2026-11-20): campana, Filtros y Buscar; sin Tareas, Cursos ni ⋯.
+    expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+    expect(find.byIcon(Icons.checklist_rounded), findsNothing);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+    // Atrás con el buscador abierto lo cierra (no sale de la app).
+    await t.tap(find.byIcon(Icons.search_rounded));
     await t.pumpAndSettle();
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     await t.binding.handlePopRoute();

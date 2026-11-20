@@ -19,7 +19,6 @@ import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
-import 'social/crear_social_screen.dart';
 import 'social/social_plantillas.dart';
 import 'detalle_screen.dart';
 import 'eventos_repo.dart';
@@ -33,10 +32,10 @@ import '../tareas/tareas_modelos.dart';
 import '../tareas/tareas_repo.dart';
 import '../tareas/tareas_screen.dart' hide PilaAvatares;
 import '../pivots/bandeja_repo.dart';
-import '../pivots/bandeja_screen.dart';
 import '../pivots/icono_bandeja.dart';
 import '../core/esqueleto.dart';
 import '../cursos/cursos_screen.dart';
+import '../actividad/actividad_screen.dart';
 import '../push/avisos_obligatorios.dart';
 import 'tipos_evento.dart';
 
@@ -160,7 +159,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   // Tour guiado de primera vez (como el de la web, `_EV_TOUR_PASOS_*`).
   final _kMes = GlobalKey(debugLabel: 'tour-mes');
-  final _kTareas = GlobalKey(debugLabel: 'tour-tareas');
   final _kMas = GlobalKey(debugLabel: 'tour-mas');
   final _kTarjeta = GlobalKey(debugLabel: 'tour-tarjeta');
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
@@ -875,90 +873,36 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
             ),
           ),
           const Spacer(),
-          // Barra (Victor, 2026-11-17): la campana primero, Tareas, Cursos y en ⋯
-          // Buscar y Filtros (estaba muy apretada).
+          // Barra (Victor, 2026-11-20): solo la campana (Actividad), Filtros y
+          // Buscar. Tareas, Clases y Fiestas viven dentro de Actividad.
           IconButton(
             key: _kBandeja,
-            tooltip: _bandeja.hayNovedades
-                ? 'Notificaciones (hay novedades)'
-                : (_bandeja.total > 0 ? 'Notificaciones (${_bandeja.total} por revisar)' : 'Notificaciones'),
-            icon: IconoBandeja(novedades: _bandeja.hayNovedades, pendientes: _bandeja.esPivot ? _bandeja.total : 0),
+            tooltip: _bandeja.hayNovedades ? 'Actividad (hay novedades)' : 'Actividad',
+            icon: IconoBandeja(novedades: _bandeja.hayNovedades || _cursos.nuevos, pendientes: _bandeja.esPivot ? _bandeja.total : 0),
+            onPressed: () => _abrirActividad(),
+          ),
+          IconButton(
+            key: _kFiltros,
+            tooltip: _cantidadFiltros > 0 ? 'Filtros (${_cantidadFiltros == 1 ? '1 activo' : '$_cantidadFiltros activos'})' : 'Filtros',
+            icon: Badge(
+              isLabelVisible: _cantidadFiltros > 0,
+              backgroundColor: p.marca,
+              label: Text('$_cantidadFiltros'),
+              child: const Icon(Icons.tune_rounded),
+            ),
             onPressed: () {
               _cerrarCalendario();
-              SubAjustes.abrir(context, BandejaPivotsScreen(repo: _bandeja));
+              _abrirFiltros();
             },
           ),
-          // Tablero de tareas, con el número de tareas para tomar.
           IconButton(
-            key: _kTareas,
-            tooltip: 'Tareas',
-            icon: Badge(
-              isLabelVisible: _tareas.disponibles.isNotEmpty,
-              backgroundColor: p.marca,
-              label: Text('${_tareas.disponibles.length}'),
-              child: const Icon(Icons.checklist_rounded),
-            ),
-            onPressed: _abrirTablero,
-          ),
-          // Cursos al lado de Tareas (Victor, 2026-11-17): siempre para Pivots
-          // y coaches; para el resto, solo si hay cursos que puede tomar. Punto
-          // rojo con un curso nuevo hasta que se entra a Cursos.
-          if (_esAdmin || repo.sesion.esCoach || _cursos.hay)
-            IconButton(
-              tooltip: 'Cursos y clínicas',
-              icon: Badge(isLabelVisible: _cursos.nuevos, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.school_outlined)),
-              onPressed: _abrirCursos,
-            ),
-          PopupMenuButton<String>(
-            key: _kFiltros,
-            tooltip: 'Más opciones',
-            // Mismo color que los otros íconos y el menú se abre debajo.
-            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            position: PopupMenuPosition.under,
-            icon: Badge(
-              isLabelVisible: _cantidadFiltros > 0 || _consulta.trim().isNotEmpty,
-              smallSize: 9,
-              backgroundColor: p.marca,
-              child: const Icon(Icons.more_vert_rounded),
-            ),
-            onOpened: _cerrarCalendario,
-            onSelected: (v) {
-              switch (v) {
-                case 'buscar':
-                  setState(() => _buscando = true);
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
-                case 'filtros':
-                  _abrirFiltros();
-                case 'social':
-                  _nuevoSocial();
-              }
+            tooltip: _consulta.trim().isEmpty ? 'Buscar' : 'Buscar ("${_consulta.trim()}")',
+            icon: Badge(isLabelVisible: _consulta.trim().isNotEmpty, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.search_rounded)),
+            onPressed: () {
+              _cerrarCalendario();
+              setState(() => _buscando = true);
+              WidgetsBinding.instance.addPostFrameCallback((_) => _focoBusqueda.requestFocus());
             },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'buscar',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.search_rounded),
-                  title: const Text('Buscar'),
-                  subtitle: _consulta.trim().isEmpty ? null : Text('"${_consulta.trim()}"'),
-                ),
-              ),
-              PopupMenuItem(
-                value: 'filtros',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.tune_rounded),
-                  title: const Text('Filtros'),
-                  subtitle: _cantidadFiltros > 0 ? Text(_cantidadFiltros == 1 ? '1 activo' : '$_cantidadFiltros activos') : null,
-                ),
-              ),
-              // Social o fiesta para quien no es Pivot (Victor, 2026-11-20).
-              if (!_esAdmin && repo.sesion.activa)
-                const PopupMenuItem(
-                  value: 'social',
-                  child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.celebration_outlined), title: Text('Crear un evento')),
-                ),
-            ],
           ),
           const SizedBox(width: 4),
         ],
@@ -1337,10 +1281,28 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   void _abrirTarea(Tarea t, {MiTarea? mia}) => SubAjustes.abrir(context, TareaScreen(repo: _tareas, tarea: t, mia: mia));
 
-  void _abrirTablero() {
+  void _abrirTablero() => _abrirActividad(PestanaActividad.tareas);
+
+  /// La campana abre Actividad: notificaciones, tareas, clases y fiestas.
+  Future<void> _abrirActividad([PestanaActividad inicial = PestanaActividad.notificaciones]) async {
     _cerrarCalendario();
-    // Se abre deslizando, como una subsección (Victor, 2026-11-17).
-    SubAjustes.abrir(context, TareasScreen(repo: _tareas));
+    await SubAjustes.abrir(
+      context,
+      ActividadScreen(
+        eventos: repo,
+        bandeja: _bandeja,
+        tareas: _tareas,
+        verClases: _esAdmin || repo.sesion.esCoach || _cursos.hay,
+        cursosNuevos: _cursos.nuevos,
+        inicial: inicial,
+        alCrearSocial: _alCrearSocial,
+        alVerCursos: () {
+          unawaited(marcarCursosVistos(_cursos.ids));
+          setState(() => _cursos = EstadoCursos(_cursos.ids, false));
+        },
+      ),
+    );
+    if (mounted) unawaited(_cargarCursos());
   }
 
   /// Bajo la barra: las tareas atrasadas (fijas, en rojo) y el acceso a las
@@ -1468,24 +1430,17 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(clave: _kMas, titulo: tituloMas, texto: textoMas),
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Notificaciones',
+          titulo: 'Actividad',
           texto: _esAdmin
-              ? 'Aquí llega lo que hay que revisar: pagos, reservas, rectificaciones y pedidos. También ves tus propios pedidos y cómo quedaron.'
-              : 'Aquí ves tus pedidos (reservas, pagos, rectificaciones) y cómo quedaron. Si la campana se mueve, hay novedades.',
+              ? 'Aquí están tus notificaciones (pagos, reservas, rectificaciones y pedidos por revisar), las tareas, las clases y las fiestas y eventos sociales.'
+              : 'Aquí están tus notificaciones y pedidos, las tareas para tomar, las clases y las fiestas y eventos sociales. Si la campana tiene un punto, hay novedades.',
         ),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
-        PasoTour(
-          clave: _kTareas,
-          titulo: 'Tareas del equipo',
-          texto: 'Aquí ves las tareas para tomar. Las tuyas aparecen en el calendario el día que vencen, y las atrasadas, arriba en rojo.',
-        ),
-        // Buscar y filtros en ⋯ (Victor, 2026-11-17).
+        // Barra nueva (Victor, 2026-11-20): Filtros y Buscar al lado de la campana.
         PasoTour(
           clave: _kFiltros,
-          titulo: 'Busca y filtra',
-          texto: _esAdmin
-              ? 'En este menú buscas eventos, tareas, cumpleaños o lugares y eliges qué ver: eventos o tareas, tipo, lugar o área.'
-              : 'En este menú buscas eventos, tareas, cumpleaños o lugares, eliges qué ver y creas un evento social o una fiesta para la liga.',
+          titulo: 'Filtra y busca',
+          texto: 'Con estos dos íconos eliges qué ver (eventos o tareas, tipo, lugar o área) y buscas eventos, tareas, cumpleaños o lugares.',
         ),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, cambiar tu respuesta y ver cómo llegar.'),
         PasoTour(
@@ -1515,18 +1470,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   Future<void> _cargarCursos() async {
     final e = await estadoCursos(repo.sesion);
     if (mounted) setState(() => _cursos = e);
-  }
-
-  Future<void> _abrirCursos() async {
-    _cerrarCalendario();
-    unawaited(marcarCursosVistos(_cursos.ids));
-    setState(() => _cursos = EstadoCursos(_cursos.ids, false));
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _esAdmin ? CursosScreen(sesion: repo.sesion) : CursosAbiertosScreen(sesion: repo.sesion),
-      ),
-    );
-    unawaited(_cargarCursos());
   }
 
   List<_Accion> get _acciones => [
@@ -1590,12 +1533,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   }
 
   /// Social o fiesta: lo crea cualquiera; queda por aprobar hasta que un Pivot lo apruebe.
-  Future<void> _nuevoSocial() async {
-    _cerrarCalendario();
-    final r = await Navigator.of(context).push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: repo.sesion)));
-    if (r is! Map || !mounted) return;
-    await _alCrearSocial(r);
-  }
 
   Future<void> _alCrearSocial(Map r) async {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${r['mensaje'] ?? 'Evento creado.'}')));

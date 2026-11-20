@@ -27,6 +27,12 @@ const areasPivot = {
   'inventario': ('Inventario', 'Listas, préstamos, botiquín y reglas de préstamo.', Icons.inventory_2_outlined),
   'tareas': ('Tareas', 'Crear, validar y repartir tareas.', Icons.task_alt_outlined),
   'liga': ('Liga y Pivots', 'Ajustes de la liga, comunidad, avisos a todo el equipo y quién es Pivot.', Icons.shield_outlined),
+  // Victor, 2026-11-20. Con solo esta área no ve las demás herramientas de Pivot.
+  'sociales': (
+    'Fiestas y eventos sociales',
+    'Crear y organizar fiestas y eventos sociales. Con solo esta área, no ve las demás herramientas de Pivot.',
+    Icons.celebration_outlined,
+  ),
 };
 
 /// Avisos de Pivot de cada área (Notificaciones → Avisos de Pivot). La clave

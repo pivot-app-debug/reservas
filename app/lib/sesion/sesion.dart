@@ -37,7 +37,20 @@ class Sesion extends ChangeNotifier {
     api.adminToken = v;
   }
 
-  bool esAdmin = false;
+  bool _esAdmin = false;
+
+  /// Pivot con solo el área de fiestas y eventos sociales (Victor, 2026-11-20):
+  /// para la app es una persona más, con la opción de crear esos eventos. Se
+  /// recuerda en el teléfono para que no aparezcan las herramientas de Pivot
+  /// un momento al abrir la app.
+  bool soloSociales = false;
+
+  /// Pivot con herramientas de Pivot (no cuenta a quien es solo de fiestas).
+  bool get esAdmin => _esAdmin && !soloSociales;
+  set esAdmin(bool v) => _esAdmin = v;
+
+  /// Puede crear fiestas y eventos sociales: Pivots con esa área.
+  bool get puedeCrearSocial => _esAdmin && adminToken != null && (areasPivot.isEmpty || areasPivot.contains('sociales'));
 
   /// Áreas de este Pivot (Mi Liga → Pivots y permisos). Vacío = aún no se
   /// cargaron: se asume todas para no esconder nada por un fallo de red; el
@@ -46,12 +59,22 @@ class Sesion extends ChangeNotifier {
   bool tieneArea(String a) => esAdmin && adminToken != null && (areasPivot.isEmpty || areasPivot.contains(a));
 
   Future<void> cargarAreas() async {
-    if (!esAdmin || adminToken == null) return;
+    if (!_esAdmin || adminToken == null) return;
+    try {
+      if (await _almacen.read(key: 'pivot.soloSociales.$nombre') == '1' && !soloSociales) {
+        soloSociales = true;
+        notifyListeners();
+      }
+    } catch (_) {}
     try {
       final r = await api.get('adminPivots', {'adminToken': adminToken, 'accion': 'misAreas'});
       if (r['exito'] != false) {
         areasPivot = [for (final a in (r['misAreas'] as List? ?? const [])) '$a'];
+        soloSociales = areasPivot.length == 1 && areasPivot.first == 'sociales';
         notifyListeners();
+        try {
+          await _almacen.write(key: 'pivot.soloSociales.$nombre', value: soloSociales ? '1' : '');
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -313,6 +336,7 @@ class Sesion extends ChangeNotifier {
     nombre = null;
     adminToken = null;
     esAdmin = false;
+    soloSociales = false;
     coachEstado = null;
     coachEquipos = const [];
     areasPivot = const [];
