@@ -11876,7 +11876,18 @@ async function pushOffseasonCreado(params: Record<string, any>): Promise<Record<
 // (`eliminado_por_descanso`) + su estado previo, para devolverlos tal cual si
 // la temporada se borra o se acorta. Mientras exista, la regeneración tampoco
 // crea eventos nuevos en esas fechas (ya lo hacía, ver 20260828).
-const _COLS_DESCANSO = 'id_evento, estado, es_excepcion';
+const _COLS_DESCANSO = 'id_evento, estado, es_excepcion, tipo_evento, fecha, inicia, donde';
+// Un descanso nunca toca fiestas ni festividades (Victor, 2026-11-20).
+const _TIPOS_FUERA_DE_DESCANSO = new Set(['Social', 'Evento social']);
+
+/** Eventos que un descanso eliminaría (desde hoy, sin fiestas). */
+async function _eventosParaDescanso(desde: string, hasta: string): Promise<any[]> {
+  const inicio = desde > _hoyEcuadorISO() ? desde : _hoyEcuadorISO();
+  if (inicio > hasta) return [];
+  const { data } = await supabase.from('asistencias').select(_COLS_DESCANSO)
+    .gte('fecha', inicio).lte('fecha', hasta).neq('estado', 'Eliminado').order('fecha').order('inicia');
+  return ((data ?? []) as any[]).filter((r) => !_TIPOS_FUERA_DE_DESCANSO.has(String(r.tipo_evento ?? '')));
+}
 
 async function _restaurarEventosDescanso(idTemporada: string, soloFuera?: { desde: string; hasta: string }): Promise<number> {
   const { data } = await supabase.from('asistencias')
@@ -11898,12 +11909,8 @@ async function _restaurarEventosDescanso(idTemporada: string, soloFuera?: { desd
 }
 
 async function _eliminarEventosDescanso(idTemporada: string, desde: string, hasta: string): Promise<number> {
-  const inicio = desde > _hoyEcuadorISO() ? desde : _hoyEcuadorISO();
-  if (inicio > hasta) return 0;
-  const { data } = await supabase.from('asistencias').select(_COLS_DESCANSO)
-    .gte('fecha', inicio).lte('fecha', hasta).neq('estado', 'Eliminado');
   let n = 0;
-  for (const r of (data ?? []) as any[]) {
+  for (const r of await _eventosParaDescanso(desde, hasta)) {
     const { error } = await supabase.from('asistencias').update({
       estado: 'Eliminado',
       es_excepcion: true,
@@ -11925,8 +11932,13 @@ async function adminGuardarTemporadaDescanso(params: Record<string, any>): Promi
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || hasta < desde) {
     return { exito: false, error: 'Fechas inválidas.' };
   }
-    let id = params.id ? String(params.id) : '';
+        let id = params.id ? String(params.id) : '';
   const si = (v: unknown) => v === true || v === 'true';
+  // Antes de crear o editar: qué eventos se eliminarían (Victor, 2026-11-20).
+  if (si(params.soloContar)) {
+    const evs = await _eventosParaDescanso(desde, hasta);
+    return { exito: true, eventos: evs.map((r) => ({ id: r.id_evento, fecha: r.fecha, tipo: r.tipo_evento ?? '', inicia: r.inicia ?? '', lugar: r.donde ?? '' })) };
+  }
   const reglas: Record<string, any> = { congela: si(params.congela), sinCuota: si(params.sinCuota) };
   // "Cuota durante el descanso" (Victor, 2026-11-19): solo descansos nuevos (o
   // que ya la tenían). Los de antes siguen con `sinCuota` tal cual.

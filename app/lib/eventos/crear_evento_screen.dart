@@ -242,31 +242,53 @@ class _CrearEventoScreenState extends State<CrearEventoScreen> {
   }
 
   Future<void> _guardarDescanso() async {
-    // Antes de crear: qué cursos o clínicas se moverían.
+    // Antes de crear: qué eventos se eliminan y qué cursos o clínicas se mueven
+    // (Victor, 2026-11-20). Las fiestas y festividades nunca se tocan.
+    var eventos = <Map<String, dynamic>>[];
+    var afectados = <String>[];
     try {
-      final afectados = await _cursosAfectados(_descDesde!, _descHasta!);
-      if (afectados.isNotEmpty && mounted) {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (d) => AlertDialog(
-            title: Text(afectados.length == 1 ? 'Un curso tiene clases en el descanso' : '${afectados.length} cursos tienen clases en el descanso'),
-            content: Text(
+      eventos = await widget.repo.eventosParaDescanso(_descDesde!, _descHasta!);
+    } catch (_) {}
+    try {
+      afectados = await _cursosAfectados(_descDesde!, _descHasta!);
+    } catch (_) {}
+    if ((eventos.isNotEmpty || afectados.isNotEmpty) && mounted) {
+      String fila(Map<String, dynamic> e) {
+        final f = DateTime.tryParse('${e['fecha']}');
+        final h = '${e['inicia'] ?? ''}';
+        return '• ${f == null ? '' : Fechas.corta(f)}${h.length >= 5 ? ' · ${h.substring(0, 5)}' : ''} · ${etiquetaTipoEvento('${e['tipo']}')}'
+            '${'${e['lugar'] ?? ''}'.isEmpty ? '' : ' · ${e['lugar']}'}';
+      }
+
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text(widget.temporada != null ? '¿Guardar los cambios?' : '¿Crear la temporada de descanso?'),
+          content: SingleChildScrollView(
+            child: Text(
               [
-                ...afectados.map((x) => '• $x'),
-                '',
-                'Se pausan y siguen después del descanso, el mismo día de la semana. Se avisa a quienes están inscritxs.',
+                if (eventos.isNotEmpty) ...[
+                  eventos.length == 1 ? 'Se elimina 1 evento:' : 'Se eliminan ${eventos.length} eventos:',
+                  ...eventos.take(15).map(fila),
+                  if (eventos.length > 15) '…y ${eventos.length - 15} más.',
+                  'Vuelven si borras la temporada. Las fiestas y festividades no se tocan.',
+                ],
+                if (afectados.isNotEmpty) ...[
+                  if (eventos.isNotEmpty) '',
+                  afectados.length == 1 ? 'Un curso tiene clases en el descanso:' : '${afectados.length} cursos tienen clases en el descanso:',
+                  ...afectados.map((x) => '• $x'),
+                  'Se pausan y siguen después del descanso, el mismo día de la semana. Se avisa a quienes están inscritxs.',
+                ],
               ].join('\n'),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
-              FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Crear igual')),
-            ],
           ),
-        );
-        if (ok != true || !mounted) return;
-      }
-    } catch (_) {
-      // Sin poder revisar (sin señal o sin permiso de cursos): sigue igual.
+          actions: [
+            TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+            FilledButton(onPressed: () => Navigator.of(d).pop(true), child: Text(widget.temporada != null ? 'Guardar' : 'Crear')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
     }
     if (!mounted) return;
     setState(() => _guardando = true);

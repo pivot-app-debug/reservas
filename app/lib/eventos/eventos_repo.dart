@@ -687,6 +687,19 @@ class EventosRepo extends ChangeNotifier {
     return (res['eliminados'] as num?)?.toInt() ?? 0;
   }
 
+  /// Eventos que una temporada de descanso eliminaría (sin fiestas), para
+  /// mostrarlos antes de crearla (Victor, 2026-11-20).
+  Future<List<Map<String, dynamic>>> eventosParaDescanso(DateTime desde, DateTime hasta) async {
+    final res = await _api.post('adminGuardarTemporadaDescanso', {
+      'adminToken': _adminToken,
+      'desde': Fechas.iso(desde),
+      'hasta': Fechas.iso(hasta),
+      'soloContar': true,
+    });
+    if (res['exito'] != true) throw ApiException((res['error'] ?? 'No se pudo revisar.').toString());
+    return [for (final e in (res['eventos'] as List? ?? const [])) Map<String, dynamic>.from(e as Map)];
+  }
+
   /// Borra una temporada: los eventos que había eliminado vuelven.
   Future<void> eliminarDescanso(Temporada t) async {
     final res = await _api.post('adminEliminarTemporadaDescanso', {'adminToken': _adminToken, 'id': t.id});
