@@ -1047,7 +1047,27 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
       await _avisarPorAprobar(deps, cfg, { ...ev, fecha: r.ev.fecha ?? ev.fecha }, elegibles.map((p) => p.username), q.nombre);
     }
   }
-  const final = await _config(db, idEvento);
+    const final = await _config(db, idEvento);
+  // Aviso a quien dejaron a cargo (Victor, 2026-11-20): de qué y que lo puede gestionar.
+  if (final && publicado(final) && deps.push) {
+    const antes = new Set(previa ? encargadxs(previa) : []);
+    const nuevos = encargadxs(final).filter((u: string) => !antes.has(u) && u !== q.username && !u.includes('@'));
+    const nombres: Record<string, string> = {
+      fecha: 'la fecha y el lugar', amigo: 'el amigo secreto y el regalo robado', comida: 'lo que lleva cada quien',
+      extras: 'la playlist, el dress code y los premios', invitados: 'lxs invitadxs', homenaje: 'el homenaje',
+    };
+    for (const u of nuevos) {
+      const p = final.permisos && typeof final.permisos === 'object' ? final.permisos[u] : null;
+      const areas: string[] = Array.isArray(p) ? p : AREAS_POR_DEFECTO;
+      const lista = areas.map((a) => nombres[a]).filter(Boolean);
+      const texto = lista.length > 1 ? `${lista.slice(0, -1).join(', ')} y ${lista[lista.length - 1]}` : (lista[0] ?? 'el evento');
+      deps.push({
+        tipo: 'evento_editado', include_external_user_ids: [u], evento: { idEvento },
+        headings: { es: `Estás a cargo en ${final.nombre || 'una fiesta'}` },
+        contents: { es: `Te dejaron a cargo de ${texto}. Ábrelo para verlo y gestionarlo.` }, url: _url(deps, idEvento),
+      }).catch(() => {});
+    }
+  }
   if (fotoAntes && final && publicado(final)) {
     const evNuevo = (await _evento(db, idEvento)) ?? ev;
         await _avisarCambios(deps, final, evNuevo, soloImportantes(diferencias(fotoAntes, await _foto(db, final, evNuevo))), q.username);

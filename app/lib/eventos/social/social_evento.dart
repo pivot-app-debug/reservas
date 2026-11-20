@@ -321,6 +321,91 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     );
   }
 
+  // ─── Estás a cargo (Victor, 2026-11-20) ─────────────────────────────────
+  // A quien nombraron encargadx le decimos de qué está a cargo, qué se espera
+  // y le damos atajos para gestionarlo (comida, amigo secreto, playlist…).
+
+  final _kComida = GlobalKey();
+
+  /// Áreas de las que está a cargo quien mira (solo encargadxs, no quien creó el evento).
+  List<String> _aCargoDe(EstadoSocial e) {
+    final m = e.editable?['misPermisos'];
+    if (!e.organiza || m is! List) return const [];
+    return [
+      for (final a in m)
+        if (switch ('$a') {
+          'comida' => e.modulo('comida'),
+          'amigo' => e.modulo('amigoSecreto') || e.modulo('regaloRobado'),
+          'extras' => e.playlist != null || e.dress != null,
+          'invitados' => e.modulo('invitados'),
+          'fecha' => true,
+          _ => false,
+        })
+          '$a',
+    ];
+  }
+
+  Widget _estasACargo(EstadoSocial e) {
+    final p = context.pivot;
+    final areas = _aCargoDe(e);
+    final editar = EditarTarjetas(context, _social, e, _cargar);
+    Widget atajo(IconData i, String t, VoidCallback f) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44), alignment: Alignment.centerLeft),
+        onPressed: f,
+        icon: Icon(i),
+        label: Text(t),
+      ),
+    );
+    final faltan = [
+      for (final c in e.comida)
+        if (c.falta || (c.meta > 0 && c.aportado < c.meta)) c.nombre,
+    ];
+    return TarjetaSocial(
+      titulo: 'Estás a cargo',
+      icono: Icons.assignment_ind_outlined,
+      children: [
+        Text(
+          'Quien organiza te dejó a cargo de esto. Puedes cambiarlo cuando quieras y quienes van verán los cambios.',
+          style: TextStyle(color: p.textoSecundario),
+        ),
+        if (areas.contains('comida')) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Lo que lleva cada quien',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            faltan.isEmpty
+                ? 'Por ahora no falta nada. Si se necesita algo más, agrega una sección o márcala como "Hace falta".'
+                : 'Falta: ${faltan.join(', ')}. Agrega secciones, deja ideas de qué llevar y marca lo que hace falta: se avisa a quienes van.',
+            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+          ),
+          atajo(Icons.restaurant_rounded, 'Gestionar lo que lleva cada quien', () {
+            final c = _kComida.currentContext;
+            if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+          }),
+        ],
+        if (areas.contains('amigo')) ...[
+          if (e.modulo('amigoSecreto')) atajo(Icons.redeem_rounded, 'Editar el amigo secreto (tope y cierre)', editar.amigo),
+          if (e.modulo('regaloRobado')) atajo(Icons.card_giftcard_rounded, 'Editar el regalo robado', editar.robado),
+        ],
+        if (areas.contains('extras')) ...[
+          if (e.playlist != null) atajo(Icons.queue_music_rounded, 'Editar la playlist', editar.playlist),
+          if (e.dress != null) atajo(Icons.checkroom_rounded, 'Editar el dress code', editar.dress),
+        ],
+        if (areas.contains('invitados')) atajo(Icons.person_add_alt_1_outlined, 'Editar lxs invitadxs (+1)', editar.invitados),
+        if (areas.contains('fecha'))
+          atajo(Icons.event_outlined, 'Cambiar fecha, hora o lugar', () async {
+            await editarSocial(context, widget.repo, widget.evento);
+            if (mounted) unawaited(_cargar());
+          }),
+      ],
+    );
+  }
+
   Widget _organizar(EstadoSocial e) {
     final p = context.pivot;
     final a = e.admin ?? const {};
@@ -402,13 +487,18 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         key: const ValueKey('social'),
         children: [
           EncabezadoSocial(estado: e),
+          if (_aCargoDe(e).isNotEmpty) _estasACargo(e),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
           if (e.modulo('invitados')) _invitados(e),
           if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar, pronombres: widget.repo.sesion.datos['pronombres']),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
-          if (e.modulo('comida')) ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+          if (e.modulo('comida'))
+            KeyedSubtree(
+              key: _kComida,
+              child: ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+            ),
           if (e.playlist != null)
             PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
           if (e.dress != null)

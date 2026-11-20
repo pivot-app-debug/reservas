@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Estás a cargo)
+- Quien está a cargo de algo en una fiesta ve arriba la tarjeta "Estás a cargo", que dice de qué está a cargo y qué se espera. Tiene atajos para gestionarlo: lo que lleva cada quien (con lo que falta), amigo secreto, regalo robado, playlist, dress code, +1, y fecha y lugar.
+- Al dejar a alguien a cargo, le llega una notificación que dice de qué está a cargo.
+
 ## 2026-11-20 (evaluar más claro y versión en Ajustes)
 - Evaluar: una sola pantalla para cualquier evento (antes los que no eran entrenamientos tenían "Dar feedback").
   - El título ya no se corta.
