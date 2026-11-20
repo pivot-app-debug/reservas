@@ -66,9 +66,13 @@ class SocialRepo {
     List<String>? sugerencias,
     String? modo,
     num? total,
+    String? cupoTipo,
+    num? cupo,
     bool borrar = false,
   }) => _post('socialComidaEditar', {
     'modo': ?modo,
+    'cupoTipo': ?cupoTipo,
+    'cupo': ?cupo,
     'total': ?total,
     'categoriaId': ?categoriaId,
     'nombre': ?nombre,
@@ -225,6 +229,14 @@ class CategoriaComida {
   /// Lo mío: cosas anotadas (cada/libre) o cantidad (meta/total).
   num get mias => (raw['mias'] as num?) ?? 0;
   bool get porCosa => modo == 'cada' || modo == 'libre';
+
+  /// Cupo de las cosas (Victor, 2026-11-20): 'fijo' (máximo de cosas),
+  /// 'persona' (1 cosa por cada [cupo] personas) o '' sin límite. [limite] lo
+  /// calcula el servidor; 0 = sin límite. Comida y bebida no tienen cupo.
+  String get cupoTipo => '${raw['cupoTipo'] ?? ''}';
+  num? get cupo => raw['cupo'] as num?;
+  num get limite => (raw['limite'] as num?) ?? 0;
+  bool get llena => limite > 0 && aportado >= limite;
 
   /// Comida que se mide en porciones: se pregunta para cuántas personas alcanza.
   bool get enPorciones => !porCosa && unidad.toLowerCase().contains('porci');

@@ -65,6 +65,54 @@ String montoSocial(num? n, [String? simbolo]) {
 
 String cantidadSocial(num n) => n == n.roundToDouble() ? '${n.toInt()}' : n.toStringAsFixed(1);
 
+/// Formulario en un panel que sube desde abajo (Victor, 2026-11-20): se pone
+/// encima del teclado, usa todo el alto libre y los botones siempre se ven.
+Future<bool?> hojaFormulario(
+  BuildContext context, {
+  required String titulo,
+  required String accion,
+  required Widget Function(BuildContext context, StateSetter set) contenido,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (h) => StatefulBuilder(
+      builder: (h, set) {
+        final teclado = MediaQuery.viewInsetsOf(h).bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: teclado),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              Flexible(
+                child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(24, 8, 24, 8), child: contenido(h, set)),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(24, 8, 24, 12 + (teclado > 0 ? 0 : MediaQuery.paddingOf(h).bottom)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => Navigator.pop(h, false), child: const Text('Cancelar')),
+                    const SizedBox(width: 8),
+                    FilledButton(onPressed: () => Navigator.pop(h, true), child: Text(accion)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 void avisarSocial(BuildContext context, String texto) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 }
@@ -548,125 +596,121 @@ class ComidaTarjeta extends StatelessWidget {
     bool? paraTodxs;
     var tocado = false;
     final yaParte = e.miParte;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => StatefulBuilder(
-        builder: (d, set) {
-          final p = d.pivot;
-          final n = num.tryParse(valor.text.replaceAll(',', '.')) ?? 0;
-          final cantidad = porPersonas ? n * ref : n;
-          final r = rendimientoDe(detalle.text);
-          final sug = sugeridoDe(r);
-          final parte = paraTodxs == false || !e.asiste ? 0.0 : e.parteDe(c, cantidad);
-          final secundario = TextStyle(fontSize: 13, color: p.textoSecundario);
-          return AlertDialog(
-            // scrollable: con el teclado abierto se desplaza entera y no se corta.
-            scrollable: true,
-            title: Text(c.nombre),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (c.cerrada)
-                  Text('Esta sección ya está completa, pero igual puedes llevar más.', style: secundario)
-                else if (c.meta > 0 && !c.porCosa)
-                  Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.', style: secundario),
-                if (c.cerrada || (c.meta > 0 && !c.porCosa)) const SizedBox(height: 12),
-                TextField(
-                  controller: detalle,
-                  autofocus: sugerencia == null,
-                  maxLength: 80,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
-                  onChanged: (v) => set(() {
-                    final s = sugeridoDe(rendimientoDe(v));
-                    if (!tocado && s != null) valor.text = _num(s);
-                  }),
-                ),
-                if (!c.porCosa) ...[
-                  const SizedBox(height: 16),
-                  Text(porPersonas ? '¿Para cuántas personas alcanza?' : (enLitros ? '¿Cuántos litros llevas?' : '¿Cuánto llevas?')),
-                  const SizedBox(height: 6),
-                  _Contador(
-                    controller: valor,
-                    paso: porPersonas ? 1 : (enLitros ? 0.5 : 1),
-                    sufijo: porPersonas ? (n == 1 ? 'persona' : 'personas') : c.unidad,
-                    alCambiar: () => set(() => tocado = true),
-                  ),
-                  const SizedBox(height: 6),
-                  if (porPersonas) Text('Una persona come unas ${_num(ref)} ${c.unidad}. Son ${_num(cantidad)} ${c.unidad}.', style: secundario),
-                  if (enLitros && ref > 0)
-                    Text(
-                      'Una persona toma unos ${_num(ref)} litros. '
-                      '${n / ref < 1 ? 'Alcanza para menos de 1 persona.' : 'Alcanza para unas ${(n / ref).round()} personas.'}',
-                      style: secundario,
-                    ),
-                  // Ayuda para no equivocarse: un pollo no rinde 1 porción.
-                  if (r != null && sug != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-                      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.sobreSuave),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              porPersonas
-                                  ? '${r.texto} suele alcanzar para unas ${_num(sug)} personas.'
-                                  : (r.texto.startsWith('Escribiste') ? '${r.texto}.' : '${r.texto} tiene unos ${_num(sug)} litros.'),
-                              style: TextStyle(fontSize: 13, color: p.sobreSuave),
-                            ),
-                          ),
-                          if (n != sug)
-                            TextButton(
-                              onPressed: () => set(() {
-                                valor.text = _num(sug);
-                                tocado = true;
-                              }),
-                              child: const Text('Ajustar'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-                const SizedBox(height: 16),
-                const Text('¿Para quién?'),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<bool>(
-                    emptySelectionAllowed: true,
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: true, label: Text('Para todxs')),
-                      ButtonSegment(value: false, label: Text('Solo para mí')),
-                    ],
-                    selected: {?paraTodxs},
-                    onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
-                  ),
-                ),
-                if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    yaParte >= 1
-                        ? 'Ya cubriste tu parte. Esto suma de más, ¡gracias!'
-                        : (yaParte + parte >= 1 ? 'Con esto cubres tu parte ✓' : 'Con esto llegas al ${((yaParte + parte) * 100).round()} % de tu parte.'),
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
-                  ),
-                ],
-              ],
+    final ok = await hojaFormulario(
+      context,
+      titulo: c.nombre,
+      accion: 'Me anoto',
+      contenido: (d, set) {
+        final p = d.pivot;
+        final n = num.tryParse(valor.text.replaceAll(',', '.')) ?? 0;
+        final cantidad = porPersonas ? n * ref : n;
+        final r = rendimientoDe(detalle.text);
+        final sug = sugeridoDe(r);
+        final parte = paraTodxs == false || !e.asiste ? 0.0 : e.parteDe(c, cantidad);
+        final secundario = TextStyle(fontSize: 13, color: p.textoSecundario);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (c.cerrada || c.limite > 0)
+              Text(
+                c.limite > 0
+                    ? 'Quedan ${cantidadSocial(math.max(0, c.limite - c.aportado))} de ${cantidadSocial(c.limite)}.'
+                    : 'Esta sección ya está completa, pero igual puedes llevar más.',
+                style: secundario,
+              )
+            else if (c.meta > 0 && !c.porCosa)
+              Text('Faltan ${cantidadSocial(math.max(0, c.meta - c.aportado))} ${c.unidad}.', style: secundario),
+            if (c.cerrada || c.limite > 0 || (c.meta > 0 && !c.porCosa)) const SizedBox(height: 12),
+            TextField(
+              controller: detalle,
+              autofocus: sugerencia == null,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: c.porCosa ? '¿Qué llevas?' : '¿Qué llevas? (opcional)', counterText: ''),
+              onChanged: (v) => set(() {
+                final s = sugeridoDe(rendimientoDe(v));
+                if (!tocado && s != null) valor.text = _num(s);
+              }),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-              FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Me anoto')),
+            if (!c.porCosa) ...[
+              const SizedBox(height: 16),
+              Text(porPersonas ? '¿Para cuántas personas alcanza?' : (enLitros ? '¿Cuántos litros llevas?' : '¿Cuánto llevas?')),
+              const SizedBox(height: 6),
+              _Contador(
+                controller: valor,
+                paso: porPersonas ? 1 : (enLitros ? 0.5 : 1),
+                sufijo: porPersonas ? (n == 1 ? 'persona' : 'personas') : c.unidad,
+                alCambiar: () => set(() => tocado = true),
+              ),
+              const SizedBox(height: 6),
+              if (porPersonas) Text('Una persona come unas ${_num(ref)} ${c.unidad}. Son ${_num(cantidad)} ${c.unidad}.', style: secundario),
+              if (enLitros && ref > 0)
+                Text(
+                  'Una persona toma unos ${_num(ref)} litros. '
+                  '${n / ref < 1 ? 'Alcanza para menos de 1 persona.' : 'Alcanza para unas ${(n / ref).round()} personas.'}',
+                  style: secundario,
+                ),
+              // Ayuda para no equivocarse: un pollo no rinde 1 porción.
+              if (r != null && sug != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                  decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.sobreSuave),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          porPersonas
+                              ? '${r.texto} suele alcanzar para unas ${_num(sug)} personas.'
+                              : (r.texto.startsWith('Escribiste') ? '${r.texto}.' : '${r.texto} tiene unos ${_num(sug)} litros.'),
+                          style: TextStyle(fontSize: 13, color: p.sobreSuave),
+                        ),
+                      ),
+                      if (n != sug)
+                        TextButton(
+                          onPressed: () => set(() {
+                            valor.text = _num(sug);
+                            tocado = true;
+                          }),
+                          child: const Text('Ajustar'),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          );
-        },
-      ),
+            const SizedBox(height: 16),
+            const Text('¿Para quién?'),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                emptySelectionAllowed: true,
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: true, label: Text('Para todxs')),
+                  ButtonSegment(value: false, label: Text('Solo para mí')),
+                ],
+                selected: {?paraTodxs},
+                onSelectionChanged: (s) => set(() => paraTodxs = s.isEmpty ? null : s.first),
+              ),
+            ),
+            if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false) ...[
+              const SizedBox(height: 10),
+              Text(
+                yaParte >= 1
+                    ? 'Ya cubriste tu parte. Esto suma de más, ¡gracias!'
+                    : (yaParte + parte >= 1 ? 'Con esto cubres tu parte ✓' : 'Con esto llegas al ${((yaParte + parte) * 100).round()} % de tu parte.'),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
+              ),
+            ],
+          ],
+        );
+      },
     );
     final v = c.porCosa ? 1 : num.tryParse(valor.text.replaceAll(',', '.'));
     final n = v == null ? null : (porPersonas ? v * ref : v);
@@ -698,82 +742,139 @@ class ComidaTarjeta extends StatelessWidget {
     final porPersona = TextEditingController(text: c == null ? '1' : cantidadSocial(c.porPersona));
     final total = TextEditingController(text: c?.total == null ? '' : cantidadSocial(c!.total!));
     final ideas = TextEditingController(text: (c?.sugerencias ?? const []).join(', '));
+    final cupo = TextEditingController(text: c?.cupo == null ? '' : cantidadSocial(c!.cupo!));
     var modo = c?.modo ?? 'libre';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => StatefulBuilder(
-        builder: (d, set) => AlertDialog(
-          scrollable: true,
-          title: Text(c == null ? 'Agregar sección' : 'Editar ${c.nombre}'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nombre,
-                  autofocus: c == null,
-                  maxLength: 60,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Sección', hintText: 'Ej.: Plato salado, Hielo, Decoración'),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: modo,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: '¿Cuánto se pide?'),
-                  items: const [
-                    DropdownMenuItem(value: 'libre', child: Text('Libre, sin cantidad')),
-                    DropdownMenuItem(value: 'cada', child: Text('Cada persona lleva un número de cosas')),
-                    DropdownMenuItem(value: 'total', child: Text('Un total fijo')),
-                    DropdownMenuItem(value: 'meta', child: Text('Según cuántxs van (por persona)')),
+    var cupoTipo = c?.cupoTipo ?? '';
+    const espacio = SizedBox(height: 16);
+    final ok = await hojaFormulario(
+      context,
+      titulo: c == null ? 'Agregar sección' : 'Editar ${c.nombre}',
+      accion: 'Guardar',
+      contenido: (d, set) {
+        final p = d.pivot;
+        final secundario = TextStyle(fontSize: 12, color: p.textoSecundario);
+        // Comida y bebida no tienen cupo: siempre se puede llevar de más.
+        final u = unidad.text.toLowerCase();
+        final esComida = (modo == 'meta' || modo == 'total') && (u.contains('porci') || RegExp(r'^(litros?|l|lts?)$').hasMatch(u.trim()));
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: nombre,
+              autofocus: c == null,
+              maxLength: 60,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Nombre de la sección', counterText: ''),
+            ),
+            espacio,
+            DropdownButtonFormField<String>(
+              initialValue: modo,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: '¿Cuánto se pide?'),
+              items: const [
+                DropdownMenuItem(value: 'libre', child: Text('Libre, sin cantidad')),
+                DropdownMenuItem(value: 'cada', child: Text('Cada persona lleva algo')),
+                DropdownMenuItem(value: 'total', child: Text('Un total fijo')),
+                DropdownMenuItem(value: 'meta', child: Text('Según cuántas personas van')),
+              ],
+              onChanged: (v) => set(() => modo = v ?? 'libre'),
+            ),
+            const SizedBox(height: 6),
+            Text(switch (modo) {
+              'cada' => 'Cada persona que va lleva la cantidad de cosas que elijas.',
+              'total' => 'Se pide una cantidad total, sin importar cuántas personas van.',
+              'meta' => 'La cantidad crece con las personas que van. Para comida, una persona come unas 2 porciones; para bebida, 1 litro.',
+              _ => 'Cada quien lleva lo que quiera, sin cantidad.',
+            }, style: secundario),
+            if (modo == 'meta' || modo == 'cada') ...[
+              espacio,
+              TextField(
+                controller: porPersona,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: modo == 'cada' ? 'Cosas por persona' : 'Cantidad por persona'),
+              ),
+            ],
+            if (modo == 'total') ...[
+              espacio,
+              TextField(
+                controller: total,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Total'),
+              ),
+            ],
+            if (modo == 'meta' || modo == 'total') ...[
+              espacio,
+              TextField(
+                controller: unidad,
+                maxLength: 30,
+                onChanged: (_) => set(() {}),
+                decoration: const InputDecoration(labelText: 'Unidad (porciones, litros, bolsas…)', counterText: ''),
+              ),
+            ],
+            // Cupo (Victor, 2026-11-20): para que no lleguen 20 adornos.
+            if (!esComida) ...[
+              espacio,
+              const Text('Cupo', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: '', label: Text('Sin límite')),
+                    ButtonSegment(value: 'fijo', label: Text('Fijo')),
+                    ButtonSegment(value: 'persona', label: Text('Por personas')),
                   ],
-                  onChanged: (v) => set(() => modo = v ?? 'libre'),
+                  selected: {cupoTipo},
+                  onSelectionChanged: (x) => set(() => cupoTipo = x.first),
                 ),
-                if (modo == 'meta' || modo == 'cada')
-                  TextField(
-                    controller: porPersona,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: modo == 'cada' ? 'Cuántas cosas lleva cada persona' : 'Cuánto por persona'),
-                  ),
-                if (modo == 'total')
-                  TextField(
-                    controller: total,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Total'),
-                  ),
-                if (modo == 'meta' || modo == 'total')
-                  TextField(
-                    controller: unidad,
-                    maxLength: 30,
-                    decoration: const InputDecoration(labelText: 'Unidad', hintText: 'Ej.: bolsas, litros, porciones'),
-                  ),
+              ),
+              const SizedBox(height: 6),
+              Text(switch (cupoTipo) {
+                'fijo' => 'Cuando se anotan esas cosas, la sección se completa y nadie más se anota.',
+                'persona' => 'El cupo crece con las personas que van: 1 cosa por cada cierta cantidad de personas.',
+                _ => 'Se pueden anotar todas las personas que quieran.',
+              }, style: secundario),
+              if (cupoTipo.isNotEmpty) ...[
+                const SizedBox(height: 12),
                 TextField(
-                  controller: ideas,
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Ideas de qué traer (opcional)', hintText: 'Separadas por coma: luces, guirnaldas'),
+                  controller: cupo,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: cupoTipo == 'fijo' ? 'Máximo de cosas' : '1 cosa por cada… personas',
+                    suffixText: cupoTipo == 'fijo' ? 'cosas' : 'personas',
+                  ),
                 ),
               ],
+            ],
+            espacio,
+            TextField(
+              controller: ideas,
+              maxLines: null,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Ideas de qué llevar (opcional)'),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Guardar')),
+            const SizedBox(height: 6),
+            Text('Sepáralas con comas.', style: secundario),
           ],
-        ),
-      ),
+        );
+      },
     );
     final n = nombre.text.trim(), u = unidad.text.trim();
     final pp = num.tryParse(porPersona.text.replaceAll(',', '.')), tt = num.tryParse(total.text.replaceAll(',', '.'));
+    final cp = num.tryParse(cupo.text.replaceAll(',', '.'));
     final sug = [
       for (final x in ideas.text.split(','))
         if (x.trim().isNotEmpty) x.trim(),
     ];
-    for (final t in [nombre, unidad, porPersona, total, ideas]) {
-      t.dispose();
-    }
+    Future.delayed(const Duration(milliseconds: 400), () {
+      for (final t in [nombre, unidad, porPersona, total, ideas, cupo]) {
+        t.dispose();
+      }
+    });
     if (ok != true || !context.mounted) return;
     if (n.isEmpty) return avisarSocial(context, 'Escribe el nombre de la sección.');
+    if (cupoTipo.isNotEmpty && (cp == null || cp <= 0)) return avisarSocial(context, 'Indica el cupo.');
     try {
       await repo.editarComida(
         categoriaId: c?.id,
@@ -783,6 +884,8 @@ class ComidaTarjeta extends StatelessWidget {
         modo: modo,
         total: tt,
         sugerencias: sug,
+        cupoTipo: cupoTipo,
+        cupo: cupoTipo.isEmpty ? 0 : cp,
       );
       alCambiar();
     } catch (e) {
@@ -995,7 +1098,8 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
       'total' => '${cantidadSocial(c.meta)} ${c.unidad} en total',
       'libre' => 'Libre',
       _ => '${cantidadSocial(c.porPersona)} ${c.unidad} por persona',
-    };
+    }; // Cupo de las cosas: "· Cupo: 5".
+    final pideConCupo = c.limite > 0 ? '$pide · Cupo: ${cantidadSocial(c.limite)}' : pide;
     // Un solo indicador a la derecha.
     final Widget indicador = c.cerrada
         ? Icon(Icons.check_circle_rounded, size: 22, color: p.marcaTexto)
@@ -1007,7 +1111,11 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.marcaTexto),
           )
         : Text(
-            c.meta > 0 ? '${cantidadSocial(c.aportado)} de ${cantidadSocial(c.meta)}' : (c.aportes.isEmpty ? 'Nadie aún' : '${c.aportes.length}'),
+            c.limite > 0
+                ? '${cantidadSocial(c.aportado)} de ${cantidadSocial(c.limite)}'
+                : c.meta > 0
+                ? '${cantidadSocial(c.aportado)} de ${cantidadSocial(c.meta)}'
+                : (c.aportes.isEmpty ? 'Nadie aún' : '${c.aportes.length}'),
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           );
     final tomadas = {for (final a in c.aportes) '${a['detalle'] ?? ''}'.trim().toLowerCase()};
@@ -1039,17 +1147,18 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
                           c.nombre,
                           style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
                         ),
-                        Text(pide, style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+                        Text(pideConCupo, style: TextStyle(fontSize: 12, color: p.textoSecundario)),
                       ],
                     ),
                   ),
                   indicador,
-                  // Siempre se puede llevar de más (Victor, 2026-11-20).
-                  IconButton(
-                    tooltip: c.cerrada ? 'Llevar más' : 'Me anoto',
-                    icon: Icon(Icons.add_circle_outline_rounded, color: _e.asiste ? p.marcaTexto : p.textoSecundario),
-                    onPressed: _e.asiste ? () => t._anotar(context, c) : null,
-                  ),
+                  // Siempre se puede llevar de más, salvo las cosas con el cupo lleno (Victor, 2026-11-20).
+                  if (!c.llena)
+                    IconButton(
+                      tooltip: c.cerrada ? 'Llevar más' : 'Me anoto',
+                      icon: Icon(Icons.add_circle_outline_rounded, color: _e.asiste ? p.marcaTexto : p.textoSecundario),
+                      onPressed: _e.asiste ? () => t._anotar(context, c) : null,
+                    ),
                   if (admin)
                     PopupMenuButton<String>(
                       tooltip: 'Opciones',

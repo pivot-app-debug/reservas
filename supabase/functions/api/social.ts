@@ -472,14 +472,16 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     out.comida = (cats ?? []).map((c: any) => {
       const ap = (aportes ?? []).filter((a: any) => a.categoria_id === c.id);
       const aportado = ap.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
-            const meta = _metaSeccion(c, total);
+                        const meta = _metaSeccion(c, total);
+      const limite = _limiteSeccion(c, total);
       const mias = ap.filter((a: any) => a.clave === q.clave);
       return {
         id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
         modo: c.modo ?? 'meta', total: c.total == null ? null : Number(c.total),
         mias: c.modo === 'cada' || c.modo === 'libre' ? mias.length : mias.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0),
         falta: c.falta === true, sugerencias: Array.isArray(c.sugerencias) ? c.sugerencias : [],
-        cerrada: meta > 0 && aportado >= meta,
+                cupoTipo: c.cupo_tipo ?? '', cupo: c.cupo == null ? null : Number(c.cupo), limite,
+        cerrada: (meta > 0 && aportado >= meta) || (limite > 0 && aportado >= limite),
         // Lxs +1 solo ven lo que llevan ellxs.
         aportes: ap.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({
                     id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave, paraTodxs: a.para_todxs ?? null,
@@ -748,6 +750,22 @@ async function _leerDatos(db: any, d: any, previa: any, creador: string | null, 
 
 const MODOS_SECCION = ['meta', 'cada', 'total', 'libre'];
 
+/// Comida o bebida (porciones o litros): sin cupo, siempre se puede llevar de más.
+function _esComida(c: any): boolean {
+  if (c.modo === 'cada' || c.modo === 'libre') return false;
+  const u = String(c.unidad ?? '').trim().toLowerCase();
+  return u.includes('porci') || /^(litros?|l|lts?)$/.test(u);
+}
+
+/// Cupo de las cosas (Victor, 2026-11-20): 0 = sin límite.
+function _limiteSeccion(c: any, asistentes: number): number {
+  const n = Number(c.cupo ?? 0);
+  if (_esComida(c) || !(n > 0)) return 0;
+  if (c.cupo_tipo === 'fijo') return n;
+  if (c.cupo_tipo === 'persona') return Math.max(1, Math.ceil(asistentes / n));
+  return 0;
+}
+
 /// Meta de una sección de "¿Qué llevamos?" según su modo.
 function _metaSeccion(c: any, asistentes: number): number {
   const pp = Number(c.por_persona ?? 0);
@@ -774,7 +792,11 @@ async function _guardarCategorias(db: any, liga: string, idEvento: string, cats:
     if (x?.modo !== undefined) datos.modo = MODOS_SECCION.includes(String(x.modo)) ? String(x.modo) : 'meta';
     if (x?.total !== undefined) datos.total = _num(x.total);
     if (x?.falta !== undefined) datos.falta = x.falta === true;
-    if (x?.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(x.sugerencias);
+        if (x?.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(x.sugerencias);
+    if (x?.cupoTipo !== undefined) {
+      datos.cupo_tipo = x.cupoTipo === 'fijo' || x.cupoTipo === 'persona' ? x.cupoTipo : null;
+      datos.cupo = datos.cupo_tipo ? _num(x.cupo) : null;
+    }
     const id = typeof x?.id === 'string' && (actuales ?? []).some((a: any) => a.id === x.id) ? x.id : null;
     if (id) {
       vistos.add(id);
@@ -1348,8 +1370,13 @@ async function socialComidaEditar(params: Record<string, any>, deps: DepsSocial)
   };
     if (params.falta !== undefined) datos.falta = params.falta === true || params.falta === 'true';
   if (params.modo !== undefined) datos.modo = MODOS_SECCION.includes(String(params.modo)) ? String(params.modo) : 'meta';
-  if (params.total !== undefined) datos.total = _num(params.total);
+    if (params.total !== undefined) datos.total = _num(params.total);
   if (params.sugerencias !== undefined) datos.sugerencias = _sugerenciasComida(_json(params.sugerencias) ?? params.sugerencias);
+  if (params.cupoTipo !== undefined) {
+    const t = String(params.cupoTipo);
+    datos.cupo_tipo = t === 'fijo' || t === 'persona' ? t : null;
+    datos.cupo = datos.cupo_tipo ? _num(params.cupo) : null;
+  }
   if (actual) {
     await db.from('social_comida_categorias').update(datos).eq('id', id);
     // Avisa a lxs asistentes cuando algo pasa a "hace falta".
@@ -1386,9 +1413,22 @@ async function socialAnotarComida(params: Record<string, any>, deps: DepsSocial)
   const cantidad = porCosa ? 1 : _num(params.cantidad);
   if (!cantidad || cantidad <= 0) return { exito: false, error: 'Indica cuánto llevas.' };
   if (porCosa && !_texto(params.detalle, 80)) return { exito: false, error: 'Escribe qué llevas.' };
-  const asisten = await _asistentes(db, cat.id_evento);
+    const asisten = await _asistentes(db, cat.id_evento);
   if (!_asiste(q, asisten)) return { exito: false, error: 'Primero confirma tu asistencia para anotarte.' };
-  // Siempre se puede llevar de más, aunque la sección ya esté completa (Victor, 2026-11-20).
+  // Comida y bebida: siempre se puede llevar de más. Las cosas con cupo, hasta llenarlo (Victor, 2026-11-20).
+  if (cat.cupo_tipo && !_esComida(cat)) {
+    const [invitados, { data: aps }] = await Promise.all([
+      _invitados(db, cat.id_evento),
+      db.from('social_comida_aportes').select('cantidad').eq('categoria_id', cat.id),
+    ]);
+    const total = asisten.size + invitados.filter((i: any) => asisten.has(i.anfitrion) && i.nombre).length;
+    const limite = _limiteSeccion(cat, total);
+    const aportado = (aps ?? []).reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0);
+    if (limite > 0 && aportado + cantidad > limite) {
+      return { exito: false, error: aportado >= limite ? `${cat.nombre} ya llegó a su cupo. Elige otra sección.` : `En ${cat.nombre} quedan ${limite - aportado}.` };
+    }
+  }
+
 
   const pt = params.paraTodxs;
   const { error } = await db.from('social_comida_aportes').insert({

@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (cupo y paneles desde abajo)
+- Anotarse y Editar sección en "Qué lleva cada quien" ahora se abren en un panel desde abajo. El panel sube con el teclado, se puede desplazar y los botones siempre se ven.
+- Editar sección: más espacio entre campos, sin contador ni ejemplos y con una explicación debajo de cada opción.
+- Cupo para las cosas (adornos, vasos y platos, hielo…): sin límite, fijo (por ejemplo, máximo 5) o por personas (1 cosa por cada N personas). Cuando se llena, la sección se completa y nadie más se anota. Comida y bebida no tienen cupo.
+- Playlist colaborativa: el botón dice "Agrega canciones a la playlist" y abajo explica que la playlist debe ser pública y colaborativa.
+
 ## 2026-11-20 (Actividad y Pivots de fiestas)
 - Nueva área de Pivot "Fiestas y eventos sociales" (Mi Liga → Pivots y permisos). Solo quien la tiene puede crear fiestas y eventos sociales. Un Pivot con solo esa área no ve las demás herramientas de Pivot.
 - Quien no es Pivot ya no crea fiestas desde el Calendario.

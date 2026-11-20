@@ -116,4 +116,38 @@ void main() {
     expect(find.text('Una persona come unas 2 porciones. Son 8 porciones.'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
+
+  testWidgets('Cupo: una sección de cosas llena no deja anotarse', (t) async {
+    t.view.physicalSize = const Size(360 * 3, 640 * 3);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final estado = EstadoSocial({
+      'yo': {'asiste': true},
+      'conteo': {'total': 10},
+      'comida': [
+        {..._sec('Adornos', 'cosas', 1, 0, [], modo: 'libre'), 'aportado': 5, 'cupoTipo': 'fijo', 'cupo': 5, 'limite': 5, 'cerrada': true, 'sugerencias': []},
+      ],
+    });
+    await t.pumpWidget(
+      MaterialApp(
+        theme: construirTema(Brightness.light),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ComidaTarjeta(
+              repo: SocialRepo.miembro(Api(), idEvento: 'e'),
+              estado: estado,
+              alCambiar: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('Completadas (1)'));
+    await t.pumpAndSettle();
+    expect(find.text('Libre · Cupo: 5'), findsOneWidget);
+    expect(find.byTooltip('Llevar más'), findsNothing);
+    expect(find.byTooltip('Me anoto'), findsNothing);
+    expect(t.takeException(), isNull);
+  });
 }

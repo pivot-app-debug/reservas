@@ -84,15 +84,23 @@ class PlaylistTarjeta extends StatelessWidget {
         if (nota.isNotEmpty) Text(nota, style: TextStyle(color: p.texto)),
         if (link.isEmpty)
           Text('Quien organiza todavía no compartió el enlace.', style: TextStyle(color: p.textoSecundario))
-        else
+        else ...[
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: FilledButton.tonalIcon(
+            child: FilledButton.icon(
               onPressed: () => _abrir(context, link),
-              icon: const Icon(Icons.open_in_new_rounded),
-              label: const Text('Abrir la playlist'),
+              icon: const Icon(Icons.playlist_add_rounded),
+              label: const Text('Agrega canciones a la playlist'),
             ),
           ),
+          // Victor, 2026-11-20.
+          const SizedBox(height: 8),
+          Text(
+            'La playlist debe ser pública y colaborativa para que puedas agregar las canciones que quieras. '
+            'Si no está configurada así o no puedes agregar canciones, avísale a quien organiza el evento.',
+            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+          ),
+        ],
       ],
     );
   }
