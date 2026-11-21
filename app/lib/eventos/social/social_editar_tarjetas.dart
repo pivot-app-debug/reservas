@@ -132,7 +132,8 @@ class EditarTarjetas {
     var devolver = o['devolver'] == true, turnoFinal = o['turnoFinal'] != false, describir = o['describir'] != false;
     final puedeJugar = estado.asiste && estado.inscripcionAbierta;
     var juego = estado.participaRobado;
-    final ok = await hojaFormulario(
+    // Muchos campos: subsección, no hoja (Victor, 2026-11-20).
+    final ok = await pantallaFormulario(
       context,
       titulo: 'Regalo robado',
       accion: 'Guardar',

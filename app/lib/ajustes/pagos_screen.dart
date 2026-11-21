@@ -86,6 +86,7 @@ class _PagosScreenState extends State<PagosScreen> {
       children: [
         // Cómo funcionan los pagos (Victor, 2026-11-20).
         BannerAyuda(
+          clave: 'ayuda.pagos',
           titulo: '¿Cómo funcionan los pagos?',
           texto: 'Aquí ves tu cuota, tus reservas y suscripciones, y el recibo de cada pago.',
           pasos: const [

@@ -81,6 +81,9 @@ class CrearSocialScreen extends StatefulWidget {
 class _CrearSocialScreenState extends State<CrearSocialScreen> {
   late final bool _editando = widget.actual != null && widget.repo != null;
   late _P _paso = _editando ? (widget.abrirEncargados ? _P.encargados : _P.resumen) : _P.plantilla;
+
+  /// Solo responsables: una subsección propia, sin el resto del asistente.
+  bool get _soloEncargados => _editando && widget.abrirEncargados;
   bool _adelante = true, _guardando = false;
 
   EquipoSocial? _equipo;
@@ -454,6 +457,24 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsables desde "¿Dudas? Pregúntales" (Victor, 2026-11-20): subsección
+    // con solo ese paso y Guardar, en vez de todo el asistente.
+    if (_soloEncargados) {
+      return Asistente(
+        titulo: 'Responsables',
+        indice: 0,
+        total: 1,
+        tituloPaso: _titulos[_P.encargados]!,
+        ayuda: 'Quiénes organizan contigo y de qué está a cargo cada persona. Se les avisa al guardar.',
+        clavePaso: _P.encargados,
+        adelante: true,
+        alAtras: () => Navigator.of(context).maybePop(),
+        cuerpo: _pasoEncargados(context),
+        textoBoton: 'Guardar',
+        alContinuar: _enviar,
+        ocupado: _guardando,
+      );
+    }
     final idx = _orden.indexOf(_paso);
     final falta = _falta;
     final ultimo = _paso == _P.resumen;

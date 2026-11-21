@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (ayudas colapsables y ediciones en subsección)
+- Las explicaciones de Cursos ("¿Qué es un curso?"), Tareas y Pagos se colapsan tocando el título, y el teléfono recuerda cómo las dejaste.
+- Regla nueva: lo que tiene muchos campos se edita en una subsección (pantalla propia) y lo corto en un panel desde abajo.
+  - Regalo robado y Editar sección de "Qué lleva cada quien" pasaron a subsección.
+  - Cambiar responsables abre una subsección solo con Encargadxs y Guardar, en vez de todo el asistente.
+
 ## 2026-11-20 (Novedades ordenada y pills arriba)
 - Los pills van en el lugar del título, al lado de la flecha de volver.
 - Novedades:

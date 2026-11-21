@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'tema.dart';
 
-/// Banner de explicación arriba de cada sección de Actividad (Victor,
-/// 2026-11-20): qué es, cómo funciona y, si hace falta, un botón para empezar.
-/// Mismo estilo que "¿Qué es un curso?".
-class BannerAyuda extends StatelessWidget {
-  const BannerAyuda({super.key, required this.titulo, required this.texto, this.pasos = const [], this.boton});
+/// Banner de explicación arriba de cada sección (Victor, 2026-11-20): qué es,
+/// cómo funciona y, si hace falta, un botón para empezar. Se puede colapsar
+/// tocando el título; si tiene [clave], el teléfono recuerda cómo lo dejaste.
+class BannerAyuda extends StatefulWidget {
+  const BannerAyuda({super.key, required this.titulo, required this.texto, this.pasos = const [], this.boton, this.clave});
   final String titulo;
   final String texto;
   final List<(IconData, String)> pasos;
@@ -14,37 +15,98 @@ class BannerAyuda extends StatelessWidget {
   /// Botón opcional al final (ej. "Pagar o reservar").
   final Widget? boton;
 
+  /// Para recordar si quedó colapsado (ej. 'ayuda.tareas').
+  final String? clave;
+
+  @override
+  State<BannerAyuda> createState() => _BannerAyudaState();
+}
+
+class _BannerAyudaState extends State<BannerAyuda> {
+  bool _abierto = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final k = widget.clave;
+    if (k != null) {
+      SharedPreferences.getInstance().then((p) {
+        final v = p.getBool(k);
+        if (v != null && mounted) setState(() => _abierto = v);
+      });
+    }
+  }
+
+  void _alternar() {
+    setState(() => _abierto = !_abierto);
+    final k = widget.clave;
+    if (k != null) SharedPreferences.getInstance().then((p) => p.setBool(k, _abierto));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            titulo,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
-          ),
-          const SizedBox(height: 4),
-          Text(texto, style: TextStyle(height: 1.35, color: p.sobreSuave)),
-          for (final (i, t) in pasos)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            onTap: _alternar,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(i, size: 18, color: p.sobreSuave),
+                  Icon(Icons.info_outline_rounded, size: 20, color: p.sobreSuave),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(t, style: TextStyle(height: 1.35, color: p.sobreSuave)),
+                    child: Text(
+                      widget.titulo,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _abierto ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more_rounded, color: p.sobreSuave),
                   ),
                 ],
               ),
             ),
-          if (boton != null) ...[const SizedBox(height: 14), SizedBox(width: double.infinity, child: boton)],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: !_abierto
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.texto, style: TextStyle(height: 1.35, color: p.sobreSuave)),
+                        for (final (i, t) in widget.pasos)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(i, size: 18, color: p.sobreSuave),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(t, style: TextStyle(height: 1.35, color: p.sobreSuave)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (widget.boton != null) ...[const SizedBox(height: 14), SizedBox(width: double.infinity, child: widget.boton)],
+                      ],
+                    ),
+                  ),
+          ),
         ],
       ),
     );

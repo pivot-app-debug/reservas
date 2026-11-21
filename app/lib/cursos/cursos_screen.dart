@@ -4,6 +4,9 @@ import 'dart:convert';
 import '../core/selector_hora.dart';
 
 import 'package:flutter/material.dart';
+
+import '../core/banner_ayuda.dart';
+
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -99,55 +102,29 @@ class Curso {
 class _QueEsUnCurso extends StatelessWidget {
   const _QueEsUnCurso({this.persona = false});
   final bool persona;
+  // Colapsable y recordado (Victor, 2026-11-20).
   @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    Widget paso(IconData i, String t) => Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(i, size: 18, color: p.sobreSuave),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(t, style: TextStyle(height: 1.35, color: p.sobreSuave)),
-          ),
-        ],
-      ),
-    );
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '¿Qué es un curso?',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            persona
-                ? 'Un grupo de clases para aprender o mejorar tus habilidades, con su propio precio. Algunos están abiertos a toda la liga y otros solo para ciertos equipos o personas.'
-                : 'Un grupo de clases con inscripción, para quienes empiezan o para practicar algo más avanzado. Cada clase tiene sus temas y, al final, puede haber una evaluación.',
-            style: TextStyle(height: 1.35, color: p.sobreSuave),
-          ),
-          if (persona) ...[
-            paso(Icons.how_to_reg_outlined, 'Te inscribes aquí y, si tiene precio, pagas con los medios de la liga.'),
-            paso(Icons.event_outlined, 'Sus clases aparecen en tu calendario con su día, hora y lugar.'),
-            paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ves tu resultado aquí y las habilidades aprobadas quedan en tu ficha deportiva.'),
-          ] else ...[
-            paso(Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
-            paso(
+  Widget build(BuildContext context) => BannerAyuda(
+    clave: persona ? 'ayuda.cursos.persona' : 'ayuda.cursos',
+    titulo: '¿Qué es un curso?',
+    texto: persona
+        ? 'Un grupo de clases para aprender o mejorar tus habilidades, con su propio precio. Algunos están abiertos a toda la liga y otros solo para ciertos equipos o personas.'
+        : 'Un grupo de clases con inscripción, para quienes empiezan o para practicar algo más avanzado. Cada clase tiene sus temas y, al final, puede haber una evaluación.',
+    pasos: persona
+        ? const [
+            (Icons.how_to_reg_outlined, 'Te inscribes aquí y, si tiene precio, pagas con los medios de la liga.'),
+            (Icons.event_outlined, 'Sus clases aparecen en tu calendario con su día, hora y lugar.'),
+            (Icons.emoji_events_outlined, 'Si tiene evaluación, ves tu resultado aquí y las habilidades aprobadas quedan en tu ficha deportiva.'),
+          ]
+        : const [
+            (Icons.event_outlined, 'Eliges las clases: cada una aparece en el calendario con su día, hora y lugar.'),
+            (
               Icons.payments_outlined,
               'Le pones precio y, si quieres, un cupo. Las personas se inscriben desde el "+" del calendario y pagan con los medios de la liga.',
             ),
-            paso(Icons.emoji_events_outlined, 'Si tiene evaluación, ese día evalúas a cada persona en los temas de las clases.'),
+            (Icons.emoji_events_outlined, 'Si tiene evaluación, ese día evalúas a cada persona en los temas de las clases.'),
           ],
-        ],
-      ),
-    );
-  }
+  );
 }
 
 String _precio(double v) => v == 0 ? 'Gratis' : ReservasRepo.dinero(v);

@@ -226,6 +226,7 @@ class _TareasScreenState extends State<TareasScreen> {
       children: [
         // Cómo funcionan las tareas (Victor, 2026-11-20).
         BannerAyuda(
+          clave: 'ayuda.tareas',
           titulo: '¿Cómo funcionan las tareas?',
           texto: 'Son cosas que el equipo necesita y que suman puntos a quien las hace.',
           pasos: [

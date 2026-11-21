@@ -173,6 +173,44 @@ Future<void> preguntarParticipacion(BuildContext context, SocialRepo repo, Estad
   } catch (_) {}
 }
 
+/// Formulario grande en su propia pantalla (Victor, 2026-11-20): lo que tiene
+/// muchos campos va en una subsección; lo corto, en [hojaFormulario].
+Future<bool?> pantallaFormulario(
+  BuildContext context, {
+  required String titulo,
+  required String accion,
+  required Widget Function(BuildContext context, StateSetter set) contenido,
+}) {
+  return Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      builder: (_) => StatefulBuilder(
+        builder: (h, set) => Scaffold(
+          appBar: AppBar(
+            title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 16), child: contenido(h, set)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                    onPressed: () => Navigator.pop(h, true),
+                    child: Text(accion),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 void avisarSocial(BuildContext context, String texto) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 }
@@ -781,7 +819,7 @@ class ComidaTarjeta extends StatelessWidget {
     var modo = c?.modo ?? 'libre';
     var cupoTipo = c?.cupoTipo ?? '';
     const espacio = SizedBox(height: 16);
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: c == null ? 'Agregar sección' : 'Editar ${c.nombre}',
       accion: 'Guardar',
