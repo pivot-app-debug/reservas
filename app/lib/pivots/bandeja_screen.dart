@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/encabezado_seccion.dart';
+
 import '../coach/coach_screen.dart';
 import '../coach/por_evaluar.dart';
 import '../core/sincroniza.dart';
@@ -635,7 +637,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
           }
           final vacia = hijos.isEmpty && delEquipo.isEmpty;
           // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
-          final arriba = <Widget>[TarjetasPorEvaluar(sesion: repo.sesion), ...delEquipo];
+          final arriba = <Widget>[...delEquipo, TarjetasPorEvaluar(sesion: repo.sesion)];
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));
             hijos.add(
@@ -662,19 +664,9 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                       padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
                       children: [
                         ...arriba,
+                        // En Novedades, sin notificaciones no se muestra nada de más (Victor, 2026-11-20).
                         if (widget.encabezado != null) ...[
                           widget.encabezado!,
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 18, 4, 4),
-                            child: Text(
-                              'NOTIFICACIONES',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text('No hay nada pendiente.', style: TextStyle(color: p.textoSecundario)),
-                          ),
                         ] else ...[
                           const SizedBox(height: 120),
                           Icon(Icons.inbox_rounded, size: 56, color: p.textoSecundario),
@@ -709,28 +701,7 @@ class _Encabezado extends StatelessWidget {
   final int cantidad;
 
   @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-      child: Row(
-        children: [
-          Icon(icono, size: 20, color: p.marcaTexto),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              titulo,
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: p.texto),
-            ),
-          ),
-          Text(
-            '$cantidad',
-            style: TextStyle(fontWeight: FontWeight.w700, color: p.textoSecundario),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => EncabezadoSeccion(titulo: titulo, icono: icono, cantidad: cantidad);
 }
 
 /// "Se aplicarán automáticamente el 1 de diciembre · faltan 3 días".

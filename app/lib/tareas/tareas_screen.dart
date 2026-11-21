@@ -123,6 +123,9 @@ class _TareasScreenState extends State<TareasScreen> {
   }
 
   /// Las últimas 3 archivadas, deslizables, y al final "Ver todas".
+  /// Archivadas colapsable, cerrada al entrar (Victor, 2026-11-20).
+  bool _archivadasAbiertas = false;
+
   Widget _carruselArchivadas(BuildContext context) {
     final p = context.pivot;
     final l = _archivadas.take(3).toList();
@@ -145,71 +148,87 @@ class _TareasScreenState extends State<TareasScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: Text(
-              'ARCHIVADAS',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-            ),
-          ),
-          SizedBox(
-            height: 124,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              children: [
-                for (final x in l)
-                  tarjeta(
-                    alTocar: verTodas,
-                    child: Builder(
-                      builder: (context) {
-                        final personas = [
-                          for (final y in (x['personas'] as List? ?? const []))
-                            if (y is Map) PersonaTarea(Map<String, dynamic>.from(y)),
-                        ];
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                IconosAreas(areas: AreaTarea.separar('${x['area'] ?? ''}'), tamano: 22),
-                                const Spacer(),
-                                PillPuntos(puntos: (x['puntos'] as num?)?.toInt() ?? 0, completo: true),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            TextoDeslizante(
-                              texto: '${x['titulo']}',
-                              alineacion: TextAlign.start,
-                              estilo: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                            ),
-                            const Spacer(),
-                            if (personas.isEmpty)
-                              Text('Sin personas', style: TextStyle(fontSize: 13, color: p.textoSecundario))
-                            else
-                              PilaAvatares(personas: personas, tamano: 22),
-                          ],
-                        );
-                      },
+          InkWell(
+            borderRadius: BorderRadius.circular(PivotRadios.chip),
+            onTap: () => setState(() => _archivadasAbiertas = !_archivadasAbiertas),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ARCHIVADAS',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
                     ),
                   ),
-                tarjeta(
-                  alTocar: verTodas,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.inventory_2_outlined, color: p.marcaTexto),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Ver todas',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                      ),
-                    ],
+                  AnimatedRotation(
+                    turns: _archivadasAbiertas ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          if (_archivadasAbiertas)
+            SizedBox(
+              height: 124,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                children: [
+                  for (final x in l)
+                    tarjeta(
+                      alTocar: verTodas,
+                      child: Builder(
+                        builder: (context) {
+                          final personas = [
+                            for (final y in (x['personas'] as List? ?? const []))
+                              if (y is Map) PersonaTarea(Map<String, dynamic>.from(y)),
+                          ];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  IconosAreas(areas: AreaTarea.separar('${x['area'] ?? ''}'), tamano: 22),
+                                  const Spacer(),
+                                  PillPuntos(puntos: (x['puntos'] as num?)?.toInt() ?? 0, completo: true),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              TextoDeslizante(
+                                texto: '${x['titulo']}',
+                                alineacion: TextAlign.start,
+                                estilo: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                              ),
+                              const Spacer(),
+                              if (personas.isEmpty)
+                                Text('Sin personas', style: TextStyle(fontSize: 13, color: p.textoSecundario))
+                              else
+                                PilaAvatares(personas: personas, tamano: 22),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  tarjeta(
+                    alTocar: verTodas,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inventory_2_outlined, color: p.marcaTexto),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ver todas',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -240,29 +259,7 @@ class _TareasScreenState extends State<TareasScreen> {
             ),
           ],
         ),
-        // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
-
-        // Sin tareas propias, la sección no aparece (Victor, 2026-11-16).
-        if (repo.mias.isNotEmpty)
-          GrupoAjustes(
-            titulo: 'MIS TAREAS',
-            filas: [
-              for (final m in repo.mias)
-                FilaTarea(
-                  tarea: m.tarea,
-                  mia: m,
-                  alTocar: () => _abrir(m.tarea, mia: m),
-                ),
-            ],
-          ),
-        if (repo.esAdmin) RecurrentesScreen(repo: repo, inicial: _recurrentes),
-        if (repo.esAdmin && _archivadas.isNotEmpty) _carruselArchivadas(context),
-        if (sugeridas.isNotEmpty)
-          GrupoAjustes(
-            titulo: 'SUGERIDAS PARA TI',
-            pie: 'Te faltan ${textoPuntos(repo.faltan)} este mes para ${repo.meta!.nombre}.',
-            filas: [for (final x in sugeridas) FilaTarea(tarea: x, hero: false, alTocar: () => _abrir(x))],
-          ),
+        // Disponibles primero, con su botón (Victor, 2026-11-20).
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: Text(
@@ -302,6 +299,27 @@ class _TareasScreenState extends State<TareasScreen> {
           GrupoAjustes(
             filas: [for (final x in disponibles) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
           ),
+        // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
+
+        // Sin tareas propias, la sección no aparece (Victor, 2026-11-16).
+        if (repo.mias.isNotEmpty)
+          GrupoAjustes(
+            titulo: 'MIS TAREAS',
+            filas: [
+              for (final m in repo.mias)
+                FilaTarea(
+                  tarea: m.tarea,
+                  mia: m,
+                  alTocar: () => _abrir(m.tarea, mia: m),
+                ),
+            ],
+          ),
+        if (sugeridas.isNotEmpty)
+          GrupoAjustes(
+            titulo: 'SUGERIDAS PARA TI',
+            pie: 'Te faltan ${textoPuntos(repo.faltan)} este mes para ${repo.meta!.nombre}.',
+            filas: [for (final x in sugeridas) FilaTarea(tarea: x, hero: false, alTocar: () => _abrir(x))],
+          ),
         if (repo.completas.isNotEmpty)
           GrupoAjustes(
             titulo: 'SIN CUPOS',
@@ -313,6 +331,9 @@ class _TareasScreenState extends State<TareasScreen> {
             pie: 'Tareas que vencieron sin terminarse. Al rescatar una tienes el mismo plazo que tenía, contado desde hoy.',
             filas: [for (final x in repo.baul) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
           ),
+        const SizedBox(height: 8),
+        if (repo.esAdmin) RecurrentesScreen(repo: repo, inicial: _recurrentes),
+        if (repo.esAdmin && _archivadas.isNotEmpty) _carruselArchivadas(context),
       ],
     );
   }

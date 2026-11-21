@@ -30,6 +30,9 @@ class SocialRepo {
   Future<Map<String, dynamic>> guardarConfig(Map<String, Object?> config, List<Map<String, Object?>> categorias) =>
       _post('socialGuardarConfig', {'config': jsonEncode(config), 'categorias': jsonEncode(categorias)});
 
+  /// Cuánto come y toma cada persona en promedio (cambia las secciones de comida y bebida).
+  Future<void> editarConsumo({num? porciones, num? litros}) => _post('socialComidaEditar', {'accion': 'consumo', 'porciones': ?porciones, 'litros': ?litros});
+
   /// ¿Participa del amigo secreto y del regalo robado? (Victor, 2026-11-20).
   Future<void> participar({bool? amigo, bool? robado}) => _post('socialParticipar', {'amigo': ?amigo, 'robado': ?robado});
 
@@ -179,6 +182,10 @@ class EstadoSocial {
     final m = editable?['misPermisos'];
     return m is! List || m.contains(area);
   }
+
+  /// Lo que come y toma cada persona en promedio.
+  num get consumoPorciones => ((social?['consumo'] as Map?)?['porciones'] as num?) ?? 2;
+  num get consumoLitros => ((social?['consumo'] as Map?)?['litros'] as num?) ?? 1;
 
   /// Cuántxs +1 puede sumar cada persona (lo elige quien organiza).
   int get maxInvitados => (social?['maxInvitados'] as num?)?.toInt() ?? 1;

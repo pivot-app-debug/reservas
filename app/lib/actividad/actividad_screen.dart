@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../core/encabezado_seccion.dart';
 import '../core/fechas.dart';
 import '../core/tour.dart';
 import '../core/tema.dart';
@@ -313,17 +314,10 @@ class _SeccionEventos extends StatelessWidget {
         final fiestas = proximos.where((e) => e.tipo == kTipoSocial && !e.fecha.isBefore(finSemana)).toList();
         final cumples = eventos.cumples.where((c) => !c.fecha.isBefore(hoy) && c.fecha.difference(hoy).inDays <= 10).toList()
           ..sort((a, b) => a.fecha.compareTo(b.fecha));
-        Widget titulo(String t) => Padding(
-          padding: const EdgeInsets.fromLTRB(4, 14, 4, 2),
-          child: Text(
-            t,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-          ),
-        );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            titulo('PRÓXIMOS 7 DÍAS'),
+            EncabezadoSeccion(titulo: 'Próximos 7 días', icono: Icons.event_outlined, cantidad: semana.isEmpty ? null : semana.length),
             if (semana.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
@@ -341,19 +335,24 @@ class _SeccionEventos extends StatelessWidget {
               ),
             ],
             if (cumples.isNotEmpty) ...[
-              titulo('CUMPLEAÑOS PRÓXIMOS'),
+              EncabezadoSeccion(titulo: 'Cumpleaños', icono: Icons.cake_outlined, cantidad: cumples.length),
               for (final c in cumples)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  leading: Icon(c.esAniversario ? Icons.workspace_premium_outlined : Icons.cake_outlined, color: p.marcaTexto),
-                  title: Text(c.nombre),
-                  subtitle: Text(
-                    '${c.fecha == hoy ? 'Hoy' : '${Fechas.dia(c.fecha)} ${c.fecha.day} de ${Fechas.mes(c.fecha)}'}'
-                    '${c.esAniversario ? ' · ${c.aniosEquipo} ${c.aniosEquipo == 1 ? 'año' : 'años'} en el equipo' : (c.edad != null ? ' · cumple ${c.edad}' : '')}',
+                Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: ListTile(
+                    leading: Icon(c.esAniversario ? Icons.workspace_premium_outlined : Icons.cake_outlined, color: p.marcaTexto),
+                    title: Text(c.nombre),
+                    subtitle: Text(
+                      '${c.fecha == hoy ? 'Hoy' : '${Fechas.dia(c.fecha)} ${c.fecha.day} de ${Fechas.mes(c.fecha)}'}'
+                      '${c.esAniversario ? ' · ${c.aniosEquipo} ${c.aniosEquipo == 1 ? 'año' : 'años'} en el equipo' : (c.edad != null ? ' · cumple ${c.edad}' : '')}',
+                    ),
                   ),
                 ),
             ],
-            if (fiestas.isNotEmpty) ...[titulo('PRÓXIMAS FIESTAS Y EVENTOS SOCIALES'), for (final e in fiestas) _fila(context, p, e)],
+            if (fiestas.isNotEmpty) ...[
+              EncabezadoSeccion(titulo: 'Fiestas y eventos sociales', icono: Icons.celebration_outlined, cantidad: fiestas.length),
+              for (final e in fiestas) _fila(context, p, e),
+            ],
             const SizedBox(height: 16),
           ],
         );

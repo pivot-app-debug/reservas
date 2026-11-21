@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (diseño coherente en Novedades, Tareas y Qué lleva)
+- Las explicaciones (Cursos, Tareas, Pagos) siempre empiezan cerradas.
+- Novedades: títulos de sección iguales en todo (ícono + título); lo del equipo va primero, luego Por evaluar (más discreto) y después los eventos. Ya no dice "No hay nada pendiente" debajo.
+- Tareas: Disponibles va arriba de todo; Recurrentes y Archivadas se pueden abrir y cerrar (cerradas al entrar).
+- Qué lleva: "Asisten N personas" y "Falta aún para el evento: ...".
+- Lápiz junto al "+" para elegir cuántas porciones come y cuánto toma cada persona en promedio; lo que se pide se ajusta solo si se suma gente.
+- El "+" sugiere secciones que faltan (Postres, Alcohol, Hielo, Vasos y platos, etc.). Al editar se elige si es Comida, Bebida o Cosas; las cosas pueden ser sin límite, hasta N o 1 por cada X personas. "Ideas" pasó a "Ejemplos para quien se anota".
+
 ## 2026-11-20 (ayudas colapsables y ediciones en subsección)
 - Las explicaciones de Cursos ("¿Qué es un curso?"), Tareas y Pagos se colapsan tocando el título, y el teléfono recuerda cómo las dejaste.
 - Regla nueva: lo que tiene muchos campos se edita en una subsección (pantalla propia) y lo corto en un panel desde abajo.

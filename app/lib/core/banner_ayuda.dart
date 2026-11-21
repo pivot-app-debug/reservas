@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'tema.dart';
 
 /// Banner de explicación arriba de cada sección (Victor, 2026-11-20): qué es,
 /// cómo funciona y, si hace falta, un botón para empezar. Se puede colapsar
-/// tocando el título; si tiene [clave], el teléfono recuerda cómo lo dejaste.
+/// tocando el título y siempre empieza cerrado.
 class BannerAyuda extends StatefulWidget {
   const BannerAyuda({super.key, required this.titulo, required this.texto, this.pasos = const [], this.boton, this.clave});
   final String titulo;
@@ -15,7 +14,7 @@ class BannerAyuda extends StatefulWidget {
   /// Botón opcional al final (ej. "Pagar o reservar").
   final Widget? boton;
 
-  /// Para recordar si quedó colapsado (ej. 'ayuda.tareas').
+  /// Identificador del banner (ya no se recuerda si quedó abierto).
   final String? clave;
 
   @override
@@ -23,25 +22,10 @@ class BannerAyuda extends StatefulWidget {
 }
 
 class _BannerAyudaState extends State<BannerAyuda> {
-  bool _abierto = true;
+  // Siempre empieza cerrado (Victor, 2026-11-20), aunque antes lo hayas abierto.
+  bool _abierto = false;
 
-  @override
-  void initState() {
-    super.initState();
-    final k = widget.clave;
-    if (k != null) {
-      SharedPreferences.getInstance().then((p) {
-        final v = p.getBool(k);
-        if (v != null && mounted) setState(() => _abierto = v);
-      });
-    }
-  }
-
-  void _alternar() {
-    setState(() => _abierto = !_abierto);
-    final k = widget.clave;
-    if (k != null) SharedPreferences.getInstance().then((p) => p.setBool(k, _abierto));
-  }
+  void _alternar() => setState(() => _abierto = !_abierto);
 
   @override
   Widget build(BuildContext context) {

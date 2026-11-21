@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/encabezado_seccion.dart';
+
 import '../ajustes/herramientas_liga.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
@@ -63,43 +65,24 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
         duration: const Duration(milliseconds: 240),
         child: l.isEmpty
             ? const SizedBox(key: ValueKey('vacio'), width: double.infinity)
-            : Padding(
+            // Discreta, como el resto de Novedades (Victor, 2026-11-20).
+            : Column(
                 key: ValueKey(l.length),
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            tituloPendiente(l.first),
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.sobreSuave),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _frase(l.first),
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.25, color: p.sobreSuave),
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(onPressed: () => _evaluar(l.first), icon: const Icon(Icons.rate_review_rounded), label: const Text('Evaluar')),
-                        ],
-                      ),
-                    ),
-                    for (final y in l.skip(1))
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        leading: const Icon(Icons.history_rounded),
-                        title: Text(tituloPendiente(y)),
-                        subtitle: Text('${(y['total'] as num).toInt() - (y['evaluados'] as num? ?? 0).toInt()} sin evaluar'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  EncabezadoSeccion(titulo: 'Por evaluar', icono: Icons.rate_review_outlined, cantidad: l.length),
+                  for (final y in l)
+                    Card(
+                      margin: const EdgeInsets.only(top: 8),
+                      child: ListTile(
+                        leading: Icon(Icons.groups_outlined, color: p.marcaTexto),
+                        title: Text(tituloPendiente(y), style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(_frase(y)),
+                        trailing: TextButton(onPressed: () => _evaluar(y), child: const Text('Evaluar')),
                         onTap: () => _evaluar(y),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
       ),
     );
@@ -108,6 +91,6 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
   static String _frase(Map<String, dynamic> x) {
     final total = (x['total'] as num).toInt();
     final faltan = total - (x['evaluados'] as num? ?? 0).toInt();
-    return '${total == 1 ? 'Vino 1 persona' : 'Vinieron $total personas'} de tus equipos. ${faltan == total ? (total == 1 ? '¿La evaluamos?' : '¿Las evaluamos?') : 'Faltan $faltan por evaluar.'}';
+    return '${total == 1 ? 'Vino 1 persona' : 'Vinieron $total personas'} de tus equipos${faltan == total ? '' : ' · faltan $faltan'}';
   }
 }

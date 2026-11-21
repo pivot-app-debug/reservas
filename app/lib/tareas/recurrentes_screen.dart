@@ -128,6 +128,8 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
     );
   }
 
+  bool _abierta = false;
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -139,24 +141,47 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Text(
-                'RECURRENTES',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
+            // Colapsable, cerrada al entrar (Victor, 2026-11-20).
+            InkWell(
+              borderRadius: BorderRadius.circular(PivotRadios.chip),
+              onTap: () => setState(() => _abierta = !_abierta),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'RECURRENTES (${l.length})',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _abierta ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                    ),
+                  ],
+                ),
               ),
             ),
-            SizedBox(
-              height: 124,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                itemCount: l.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => _tarjeta(l[i]),
-              ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: !_abierta
+                  ? const SizedBox(width: double.infinity)
+                  : SizedBox(
+                      height: 124,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        clipBehavior: Clip.none,
+                        itemCount: l.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (_, i) => _tarjeta(l[i]),
+                      ),
+                    ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
           ],
         );
       },

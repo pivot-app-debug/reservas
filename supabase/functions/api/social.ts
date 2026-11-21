@@ -386,6 +386,13 @@ async function _dietasYAlergias(db: any, liga: string, idEvento: string, cfg: an
   return [...alergias.values()];
 }
 
+/// Lo que come y toma cada persona en promedio (por defecto 2 porciones y 1 litro).
+function _consumo(cfg: any): { porciones: number; litros: number } {
+  const c = _piezas(cfg).consumo ?? {};
+  const n = (v: unknown, d: number) => (Number(v) > 0 ? Number(v) : d);
+  return { porciones: n(c.porciones, 2), litros: n(c.litros, 1) };
+}
+
 /// Quiénes dijeron que NO participan del amigo secreto o del regalo robado
 /// (Victor, 2026-11-20). Sin fila = participa.
 async function _participacion(db: any, idEvento: string): Promise<Map<string, { amigo: boolean; robado: boolean }>> {
@@ -510,7 +517,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     comida: !!cfg.comida && ve('comida'), invitados: !!cfg.invitados && ve('invitados'),
         topeAmigo: cfg.tope_amigo, topeRobado: cfg.tope_robado, recordatorioRobado: cfg.recordatorio_robado ?? '',
     // Para editar desde las tarjetas (Victor, 2026-11-20).
-    maxInvitados: _maxInvitados(_piezas(cfg).maxInvitados), juegoOpciones: reglasJuego(_piezas(cfg).juegoRobado), reglasPropias: cfg.reglas_robado ?? '',
+        maxInvitados: _maxInvitados(_piezas(cfg).maxInvitados), consumo: _consumo(cfg), juegoOpciones: reglasJuego(_piezas(cfg).juegoRobado), reglasPropias: cfg.reglas_robado ?? '',
     cierre, inscripcionAbierta: !cfg.sorteado_en && _hoyEc() <= cierre, sorteado: !!cfg.sorteado_en,
         // Sin reglas propias, la plantilla sigue las opciones del juego (Victor, 2026-11-20).
     reglasRobado: cfg.reglas_robado ?? plantillaReglasRobado(reglasJuego(_piezas(cfg).juegoRobado)), reglasPorDefecto: !cfg.reglas_robado,
@@ -774,7 +781,8 @@ function _leerPiezas(v: any): Record<string, any> {
   }
   if (p.homenaje) out.homenaje = { mensajes: p.homenaje.mensajes !== false, regalo: p.homenaje.regalo === true, regaloNota: _texto(p.homenaje.regaloNota, 300) };
         // Opciones del regalo robado en vivo y límite de +1 (Victor, 2026-11-20).
-  if (p.juegoRobado) out.juegoRobado = reglasJuego(p.juegoRobado);
+      if (p.juegoRobado) out.juegoRobado = reglasJuego(p.juegoRobado);
+  if (p.consumo && typeof p.consumo === 'object') out.consumo = { porciones: Number(p.consumo.porciones) || 2, litros: Number(p.consumo.litros) || 1 };
   if (p.maxInvitados !== undefined && p.maxInvitados !== null) out.maxInvitados = _maxInvitados(p.maxInvitados);
       // Ícono elegido para una festividad propia (Victor, 2026-11-20).
   if (typeof p.icono === 'string' && /^[a-z_]{1,20}$/.test(p.icono)) out.icono = p.icono;
@@ -1122,7 +1130,10 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
     const fila: Record<string, any> = { ...r.fila };
   // Las dietas que quien organiza quitó no se pierden al guardar con el asistente.
   const quitadasAntes = previa ? _piezas(previa).dietasQuitadas : null;
-  if (fila.piezas && Array.isArray(quitadasAntes) && !fila.piezas.dietasQuitadas) fila.piezas = { ...fila.piezas, dietasQuitadas: quitadasAntes };
+    if (fila.piezas && Array.isArray(quitadasAntes) && !fila.piezas.dietasQuitadas) fila.piezas = { ...fila.piezas, dietasQuitadas: quitadasAntes };
+  // Lo mismo con el consumo promedio (se cambia desde la tarjeta de comida).
+  const consumoAntes = previa ? _piezas(previa).consumo : null;
+  if (fila.piezas && consumoAntes && !fila.piezas.consumo) fila.piezas = { ...fila.piezas, consumo: consumoAntes };
   if (previa && 'actualizado_en' in previa) fila.actualizado_en = new Date().toISOString();
     if (!fila.cierre && !previa?.cierre) fila.cierre = _cierreDefecto(r.ev.fecha ?? ev.fecha);
   const reenviar = params.reenviar === true || params.reenviar === 'true';
@@ -1529,7 +1540,23 @@ async function socialComidaEditar(params: Record<string, any>, deps: DepsSocial)
   const id = String(params.categoriaId ?? '');
   const { data: actual } = id ? await db.from('social_comida_categorias').select('*').eq('id', id).eq('id_evento', q.idEvento).maybeSingle() : { data: null };
   if (id && !actual) return { exito: false, error: 'No encontramos esa categoría.' };
-    if (params.accion === 'borrar') {
+      // Cuánto come y toma cada persona en promedio (Victor, 2026-11-20): cambia
+  // todas las secciones de comida (porciones) y bebida (litros) según personas.
+  if (params.accion === 'consumo') {
+    const porciones = _num(params.porciones), litros = _num(params.litros);
+    const p = _piezas(cfg);
+    const consumo = { porciones: porciones && porciones > 0 ? porciones : _consumo(cfg).porciones, litros: litros && litros > 0 ? litros : _consumo(cfg).litros };
+    await db.from('social_eventos').update({ piezas: { ...p, consumo } }).eq('id_evento', q.idEvento);
+    const { data: cats } = await db.from('social_comida_categorias').select('id, unidad, modo').eq('id_evento', q.idEvento);
+    for (const c of cats ?? []) {
+      if (c.modo !== 'meta' && c.modo != null) continue;
+      const u = String(c.unidad ?? '').trim().toLowerCase();
+      if (u.includes('porci')) await db.from('social_comida_categorias').update({ por_persona: consumo.porciones }).eq('id', c.id);
+      else if (/^(litros?|l|lts?)$/.test(u)) await db.from('social_comida_categorias').update({ por_persona: consumo.litros }).eq('id', c.id);
+    }
+    return { exito: true, consumo };
+  }
+  if (params.accion === 'borrar') {
     const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', id);
     if ((count ?? 0) > 0) return { exito: false, error: 'Alguien ya se anotó en esta categoría: no se puede quitar.' };
     await db.from('social_comida_categorias').delete().eq('id', id);

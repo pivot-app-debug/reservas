@@ -28,7 +28,7 @@ void main() {
     // Novedades: primero los próximos eventos, después las notificaciones.
     expect(find.text('Novedades'), findsWidgets);
     expect(find.byTooltip('Cursos'), findsOneWidget);
-    expect(find.text('PRÓXIMOS 7 DÍAS'), findsOneWidget);
+    expect(find.text('Próximos 7 días'), findsOneWidget);
     expect(find.text('No hay eventos en los próximos 7 días.'), findsOneWidget);
     expect(find.text('Crear un evento'), findsNothing);
     expect(find.byTooltip('Pagos y suscripciones'), findsOneWidget);
