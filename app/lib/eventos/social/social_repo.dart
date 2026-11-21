@@ -170,6 +170,9 @@ class EstadoSocial {
   /// Puede administrar la comida: organiza y (crea el evento, es Pivot o está a cargo de la comida).
   bool get puedeComida => puedeArea('comida');
 
+  /// Alergias e intolerancias de quienes van, sin nombres (para la comida).
+  List<String> get comidaAlergias => [for (final x in (raw['comidaAlergias'] as List? ?? const [])) '$x'];
+
   /// Organiza y está a cargo de esa área ('amigo', 'comida', 'extras', 'invitados'…).
   bool puedeArea(String area) {
     if (!organiza) return false;
@@ -261,6 +264,9 @@ class CategoriaComida {
   /// Lo mío: cosas anotadas (cada/libre) o cantidad (meta/total).
   num get mias => (raw['mias'] as num?) ?? 0;
   bool get porCosa => modo == 'cada' || modo == 'libre';
+
+  /// Sección creada sola por la dieta de quienes van (vegetariana, vegana…).
+  bool get dieta => raw['dieta'] == true;
 
   /// Cupo de las cosas (Victor, 2026-11-20): 'fijo' (máximo de cosas),
   /// 'persona' (1 cosa por cada [cupo] personas) o '' sin límite. [limite] lo

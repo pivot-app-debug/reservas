@@ -32,7 +32,7 @@ class SaludEmergenciaScreen extends StatelessWidget {
     'Problemas osteomusculares crónicos',
   ];
   static const _antecedentes = ['Cirugías previas', 'Hospitalización en el último año', 'Lesiones deportivas previas'];
-  static const _dietas = ['Vegetariano', 'Vegano'];
+  static const _dietas = ['Vegetariano', 'Vegano', 'Pescetariano', 'Sin gluten'];
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +56,8 @@ class SaludEmergenciaScreen extends StatelessWidget {
           // ficha de arriba; aquí solo lo que no está en ella.
           _titulo(context, 'Otros datos de salud'),
           GrupoAjustes(
+            // Se usa sin nombres en la comida de las fiestas (Victor, 2026-11-20).
+            pie: 'Tu dieta y tus alergias se usan, sin tu nombre, para la comida de las fiestas a las que vas: se arma una sección para tu dieta y se avisa de las alergias.',
             filas: [
               if (privado) ...[
                 FilaAjuste(

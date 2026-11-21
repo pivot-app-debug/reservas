@@ -57,6 +57,7 @@ class Sugerencias {
 const _comidaBase = [
   CategoriaSugerida('Bebidas', 'litros', 1),
   CategoriaSugerida('Salado', 'porciones', 2),
+  CategoriaSugerida('Acompañantes', 'porciones', 2),
   CategoriaSugerida('Snacks', 'porciones', 2),
   CategoriaSugerida('Postres', 'porciones', 2),
 ];
@@ -135,6 +136,7 @@ const kFestividades = [
       comida: [
         CategoriaSugerida('Bebidas', 'litros', 1),
         CategoriaSugerida('Platos salados', 'porciones', 2),
+        CategoriaSugerida('Acompañantes', 'porciones', 2),
         CategoriaSugerida('Postres navideños', 'porciones', 2),
         CategoriaSugerida('Snacks', 'porciones', 2),
       ],

@@ -317,6 +317,67 @@ async function _asistentes(db: any, idEvento: string): Promise<Set<string>> {
   return new Set([...ultimo].filter(([, e]) => e === 'Asistiré').map(([u]) => u));
 }
 
+// ─── Dietas y alergias (Victor, 2026-11-20) ────────────────────────────────
+// De los datos de salud de quienes marcaron Asistiré, sin nombres. Cada dieta
+// (vegetariana, vegana o la que escribieron) crea sola su sección con 2
+// porciones por persona; si quien organiza la quita, no vuelve. Las alergias
+// se devuelven como lista para un aviso en la comida.
+
+const SIN_DIETA = new Set(['', 'ninguna', 'ninguno', 'no', 'sin restricciones', 'normal']);
+
+function _nombreDieta(d: string): { clave: string; nombre: string } | null {
+  const t = d.trim();
+  const k = t.toLowerCase();
+  if (SIN_DIETA.has(k)) return null;
+  const conocidas: Record<string, string> = { vegetariano: 'vegetariana', vegetariana: 'vegetariana', vegano: 'vegana', vegana: 'vegana', pescetariano: 'pescetariana', pescetariana: 'pescetariana' };
+  const adj = conocidas[k];
+  const nombre = adj ? `Comida ${adj}` : (k.startsWith('comida') ? t : `Comida ${k}`);
+  return { clave: (adj ?? k).slice(0, 40), nombre: nombre.slice(0, 60) };
+}
+
+async function _dietasYAlergias(db: any, liga: string, idEvento: string, cfg: any, asisten: Set<string>): Promise<string[]> {
+  const usuarios = [...asisten];
+  const { data: filas } = usuarios.length
+    ? await db.from('equipo').select('dieta, alergias, alergias_desc').in('username', usuarios)
+    : { data: [] };
+  const cuenta = new Map<string, { nombre: string; n: number }>();
+  const alergias = new Map<string, string>();
+  for (const f of filas ?? []) {
+    const d = _nombreDieta(String(f.dieta ?? ''));
+    if (d) cuenta.set(d.clave, { nombre: d.nombre, n: (cuenta.get(d.clave)?.n ?? 0) + 1 });
+    const a = String(f.alergias ?? '').trim().toLowerCase();
+    if (a === 'sí' || a === 'si') {
+      const desc = String(f.alergias_desc ?? '').trim();
+      for (const parte of (desc ? desc.split(/[,;\n]+/) : ['una alergia (sin detalle)'])) {
+        const x = parte.trim();
+        if (x) alergias.set(x.toLowerCase(), x);
+      }
+    }
+  }
+  // Secciones de dieta: se crean, se ajustan o se quitan solas.
+  const quitadas = new Set<string>(Array.isArray(_piezas(cfg).dietasQuitadas) ? _piezas(cfg).dietasQuitadas : []);
+  const { data: actuales } = await db.from('social_comida_categorias').select('id, origen_item, total').eq('id_evento', idEvento).like('origen_item', 'dieta:%');
+  const porClave = new Map((actuales ?? []).map((c: any) => [String(c.origen_item).slice(6), c]));
+  for (const [clave, { nombre, n }] of cuenta) {
+    if (quitadas.has(clave)) continue;
+    const total = n * 2;
+    const ya: any = porClave.get(clave);
+    if (!ya) {
+      await db.from('social_comida_categorias').insert({
+        id_evento: idEvento, liga_id: liga, nombre, unidad: 'porciones', por_persona: 2, modo: 'total', total, origen_item: `dieta:${clave}`, orden: 900,
+      });
+    } else if (Number(ya.total) !== total) {
+      await db.from('social_comida_categorias').update({ total }).eq('id', ya.id);
+    }
+  }
+  for (const [clave, c] of porClave as Map<string, any>) {
+    if (cuenta.has(clave)) continue;
+    const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', c.id);
+    if (!count) await db.from('social_comida_categorias').delete().eq('id', c.id);
+  }
+  return [...alergias.values()];
+}
+
 /// Quiénes dijeron que NO participan del amigo secreto o del regalo robado
 /// (Victor, 2026-11-20). Sin fila = participa.
 async function _participacion(db: any, idEvento: string): Promise<Map<string, { amigo: boolean; robado: boolean }>> {
@@ -495,7 +556,9 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     out.juegoRobado = { fase: jr?.estado?.fase ?? null, dirige: _dirigeJuego(q, cfg), hoy: ev.fecha === _hoyEc() };
   }
 
-  if (social.comida) {
+    if (social.comida) {
+    // Dietas y alergias de quienes van, sin nombres (Victor, 2026-11-20).
+    out.comidaAlergias = await _dietasYAlergias(db, liga, q.idEvento, cfg, asisten);
     const { data: cats } = await db.from('social_comida_categorias').select('*').eq('id_evento', q.idEvento).order('orden');
     const ids = (cats ?? []).map((c: any) => c.id);
     const { data: aportes } = ids.length
@@ -511,7 +574,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
       const mias = ap.filter((a: any) => a.clave === q.clave);
       return {
         id: c.id, nombre: c.nombre, unidad: c.unidad, porPersona: Number(c.por_persona ?? 0), meta, aportado,
-        modo: c.modo ?? 'meta', total: c.total == null ? null : Number(c.total),
+                modo: c.modo ?? 'meta', total: c.total == null ? null : Number(c.total), dieta: String(c.origen_item ?? '').startsWith('dieta:'),
         mias: c.modo === 'cada' || c.modo === 'libre' ? mias.length : mias.reduce((s: number, a: any) => s + Number(a.cantidad ?? 0), 0),
         falta: c.falta === true, sugerencias: Array.isArray(c.sugerencias) ? c.sugerencias : [],
                 cupoTipo: c.cupo_tipo ?? '', cupo: c.cupo == null ? null : Number(c.cupo), limite,
@@ -1033,7 +1096,10 @@ async function socialGuardarConfig(params: Record<string, any>, deps: DepsSocial
   if ('error' in r) return { exito: false, error: r.error };
   // Foto de antes para avisar los cambios de un evento ya publicado.
   const fotoAntes = previa && publicado(previa) ? await _foto(db, previa, ev) : null;
-  const fila: Record<string, any> = { ...r.fila };
+    const fila: Record<string, any> = { ...r.fila };
+  // Las dietas que quien organiza quitó no se pierden al guardar con el asistente.
+  const quitadasAntes = previa ? _piezas(previa).dietasQuitadas : null;
+  if (fila.piezas && Array.isArray(quitadasAntes) && !fila.piezas.dietasQuitadas) fila.piezas = { ...fila.piezas, dietasQuitadas: quitadasAntes };
   if (previa && 'actualizado_en' in previa) fila.actualizado_en = new Date().toISOString();
     if (!fila.cierre && !previa?.cierre) fila.cierre = _cierreDefecto(r.ev.fecha ?? ev.fecha);
   const reenviar = params.reenviar === true || params.reenviar === 'true';
@@ -1440,10 +1506,18 @@ async function socialComidaEditar(params: Record<string, any>, deps: DepsSocial)
   const id = String(params.categoriaId ?? '');
   const { data: actual } = id ? await db.from('social_comida_categorias').select('*').eq('id', id).eq('id_evento', q.idEvento).maybeSingle() : { data: null };
   if (id && !actual) return { exito: false, error: 'No encontramos esa categoría.' };
-  if (params.accion === 'borrar') {
+    if (params.accion === 'borrar') {
     const { count } = await db.from('social_comida_aportes').select('id', { count: 'exact', head: true }).eq('categoria_id', id);
     if ((count ?? 0) > 0) return { exito: false, error: 'Alguien ya se anotó en esta categoría: no se puede quitar.' };
     await db.from('social_comida_categorias').delete().eq('id', id);
+    // Una sección de dieta que quien organiza quita no vuelve a crearse sola.
+    const origen = String(actual?.origen_item ?? '');
+    if (origen.startsWith('dieta:')) {
+      const p = _piezas(cfg);
+      const quitadas = new Set<string>(Array.isArray(p.dietasQuitadas) ? p.dietasQuitadas : []);
+      quitadas.add(origen.slice(6));
+      await db.from('social_eventos').update({ piezas: { ...p, dietasQuitadas: [...quitadas] } }).eq('id_evento', q.idEvento);
+    }
     return { exito: true };
   }
   const nombre = _texto(params.nombre ?? actual?.nombre, 60);

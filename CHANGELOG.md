@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (dietas, alergias y acompañantes)
+- Qué lleva cada quien:
+  - Si alguien con una dieta (vegetariana, vegana, pescetariana o la que escribió en "Otro") marca Asistiré, se crea sola la sección "Comida vegetariana" (o la que corresponda), con 2 porciones por persona. Se ajusta si se suman o bajan personas. Si quien organiza la quita, no vuelve.
+  - Las alergias e intolerancias de quienes van se muestran en un aviso, sin nombres.
+- Nueva sección "Acompañantes" en las plantillas de fiesta y en la Naviquinde, con ideas como "Arroz navideño".
+- Salud: la dieta tiene también "Pescetariano" y "Sin gluten", y la pantalla explica que la dieta y las alergias se usan sin tu nombre en la comida de las fiestas.
+
 ## 2026-11-20 (¿participas? una sola vez)
 - Arreglado: "¿Participas?" se preguntaba cada vez que abrías el evento. Las tablas nuevas de la fiesta no tenían la regla de acceso por liga, así que la respuesta no se guardaba. Esto también afectaba al regalo robado en vivo. Ahora se pregunta una sola vez.
 - Para cambiarlo después, cada tarjeta (Amigo secreto y Regalo robado) tiene su lápiz. Quien no organiza ve ahí solo "Participo"/"Juego". Quien organiza lo ve arriba de las demás opciones de la tarjeta.

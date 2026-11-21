@@ -1024,6 +1024,28 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           '${e.asiste ? 'Mira lo que ya lleva cada quien para no repetir.' : 'Confirma tu asistencia para anotarte.'}',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
+        // Alergias e intolerancias de quienes van, sin nombres (Victor, 2026-11-20).
+        if (e.comidaAlergias.isNotEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 20, color: p.sobreSuave),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ten en cuenta: entre quienes van hay alergias o intolerancias a ${e.comidaAlergias.join(', ')}. '
+                    'Si lo que llevas lo tiene, avísalo en lo que escribes.',
+                    style: TextStyle(color: p.sobreSuave),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (e.asiste && e.seccionesParte.isNotEmpty) _TuParte(valor: e.miParte, secciones: e.seccionesParte.length),
         if (mias.isNotEmpty)
           Container(
@@ -1135,8 +1157,8 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
       'total' => '${cantidadSocial(c.meta)} ${c.unidad} en total',
       'libre' => 'Libre',
       _ => '${cantidadSocial(c.porPersona)} ${c.unidad} por persona',
-    }; // Cupo de las cosas: "· Cupo: 5".
-    final pideConCupo = c.limite > 0 ? '$pide · Cupo: ${cantidadSocial(c.limite)}' : pide;
+    }; // Cupo de las cosas: "· Cupo: 5". Las de dieta dicen de dónde salen.
+    final pideConCupo = c.dieta ? '$pide · por la dieta de quienes van' : (c.limite > 0 ? '$pide · Cupo: ${cantidadSocial(c.limite)}' : pide);
     // Un solo indicador a la derecha.
     final Widget indicador = c.cerrada
         ? Icon(Icons.check_circle_rounded, size: 22, color: p.marcaTexto)
