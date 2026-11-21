@@ -577,12 +577,14 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
           }
           // Del equipo: asistencia de hoy y mañana, cumpleaños y comunicados
           // (Victor, 2026-11-17). Se van solos cuando dejan de tener sentido.
+          // Del equipo va siempre arriba de todo (Victor, 2026-11-20).
+          final delEquipo = <Widget>[];
           if (repo.novedades.isNotEmpty) {
-            hijos.add(_Encabezado(titulo: 'Del equipo', icono: Icons.campaign_outlined, cantidad: repo.novedades.length));
+            delEquipo.add(_Encabezado(titulo: 'Del equipo', icono: Icons.campaign_outlined, cantidad: repo.novedades.length));
             for (final n in repo.novedades.take(30)) {
               final c = BandejaRepo.claveNovedad(n);
               final sale = _novSaliendo.contains(c);
-              hijos.add(
+              delEquipo.add(
                 AnimatedSize(
                   key: ValueKey('nov-$c'),
                   duration: const Duration(milliseconds: 240),
@@ -631,9 +633,9 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               hijos.add(_TarjetaRecomendacion(r: r, alTocar: () => _abrirRecomendacion(r)));
             }
           }
-          final vacia = hijos.isEmpty;
+          final vacia = hijos.isEmpty && delEquipo.isEmpty;
           // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
-          hijos.insert(0, TarjetasPorEvaluar(sesion: repo.sesion));
+          final arriba = <Widget>[TarjetasPorEvaluar(sesion: repo.sesion), ...delEquipo];
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));
             hijos.add(
@@ -659,6 +661,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                       key: const ValueKey('vacia'),
                       padding: EdgeInsets.fromLTRB(16, 0 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
                       children: [
+                        ...arriba,
                         if (widget.encabezado != null) ...[
                           widget.encabezado!,
                           Padding(
@@ -689,7 +692,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                   : ListView(
                       key: const ValueKey('lista'),
                       padding: EdgeInsets.fromLTRB(16, 4 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
-                      children: [if (widget.encabezado != null) widget.encabezado!, ...hijos],
+                      children: [...arriba, if (widget.encabezado != null) widget.encabezado!, ...hijos],
                     ),
             ),
           );

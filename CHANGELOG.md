@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (Novedades ordenada y pills arriba)
+- Los pills van en el lugar del título, al lado de la flecha de volver.
+- Novedades:
+  - "Del equipo" y "¿Las evaluamos?" van arriba de todo.
+  - Después vienen los próximos 7 días, con "Crear un evento" justo debajo, los cumpleaños y las fiestas.
+  - Hay espacio antes de lo que sigue.
+- "Amigo secreto: organizar" tiene lápiz para cambiar la fecha límite y el tope.
+
 ## 2026-11-20 (dietas con permiso y cupos que se ajustan)
 - Salud → "Comida en eventos": un interruptor por la dieta y uno por cada alergia, todos apagados. Solo lo que la persona prende se usa, sin su nombre, en la comida de fiestas y reuniones. Quien tiene datos sin prender ve una sugerencia en "Qué lleva cada quien".
 - "¿Participas?" del amigo secreto y del regalo robado se cambia solo hasta el cierre de la inscripción. Después, el lápiz ya no lo ofrece.

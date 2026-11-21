@@ -177,7 +177,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     builder: (context, _) {
       final actual = _tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
       return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        padding: const EdgeInsets.only(right: 12),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(
@@ -257,29 +257,11 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        // El título dice en qué pestaña estás (Victor, 2026-11-20).
-        title: AnimatedBuilder(
-          animation: _tabs.animation!,
-          builder: (_, _) {
-            final i = _tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
-            return AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (h, a) => FadeTransition(
-                opacity: a,
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.3), end: Offset.zero).animate(a),
-                  child: h,
-                ),
-              ),
-              child: Text(
-                nombre(_pestanas[i]),
-                key: ValueKey(i),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            );
-          },
-        ),
-        bottom: PreferredSize(preferredSize: const Size.fromHeight(54), child: _pills(p)),
+        // Los pills van en el lugar del título (Victor, 2026-11-20): la elegida
+        // muestra su nombre, así que no hace falta otro título.
+        titleSpacing: 0,
+        toolbarHeight: 64,
+        title: Align(alignment: Alignment.centerLeft, child: _pills(p)),
       ),
       body: KeyedSubtree(
         key: _kCuerpo,
@@ -348,6 +330,16 @@ class _SeccionEventos extends StatelessWidget {
                 child: Text('No hay eventos en los próximos 7 días.', style: TextStyle(color: p.textoSecundario)),
               ),
             for (final e in semana) _fila(context, p, e),
+            // Crear, justo debajo de lo de esta semana (Victor, 2026-11-20).
+            if (_puede) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: () => _crear(context),
+                icon: const Icon(Icons.add_rounded),
+                label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
+              ),
+            ],
             if (cumples.isNotEmpty) ...[
               titulo('CUMPLEAÑOS PRÓXIMOS'),
               for (final c in cumples)
@@ -362,15 +354,7 @@ class _SeccionEventos extends StatelessWidget {
                 ),
             ],
             if (fiestas.isNotEmpty) ...[titulo('PRÓXIMAS FIESTAS Y EVENTOS SOCIALES'), for (final e in fiestas) _fila(context, p, e)],
-            if (_puede) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                onPressed: () => _crear(context),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
-              ),
-            ],
+            const SizedBox(height: 16),
           ],
         );
       },

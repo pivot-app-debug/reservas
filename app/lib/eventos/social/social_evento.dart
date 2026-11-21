@@ -431,6 +431,8 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     return TarjetaSocial(
       titulo: 'Amigo secreto: organizar',
       icono: Icons.tune_rounded,
+      // Fecha límite y tope desde aquí (Victor, 2026-11-20).
+      accion: e.puedeArea('amigo') ? EditarTarjetas.boton(() => EditarTarjetas(context, _social, e, _cargar).amigo()) : null,
       children: [
         Text(
           '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} +1)'
