@@ -285,8 +285,10 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final lista = e.misInvitados;
     final max = e.maxInvitados;
     return TarjetaSocial(
-      titulo: 'Tus invitadxs +$max',
+      titulo: max == 1 ? 'Tu +1' : 'Tus +$max',
       icono: Icons.person_add_alt_1_outlined,
+      estado: e.asiste ? '${lista.length} de $max' : null,
+      estadoActivo: lista.length < max,
       accion: e.puedeArea('invitados') ? EditarTarjetas.boton(() => EditarTarjetas(context, _social, e, _cargar).invitados()) : null,
       children: [
         if (!e.asiste)
@@ -512,7 +514,12 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (_aCargoDe(e).isNotEmpty) _estasACargo(e),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
-          if (e.modulo('invitados')) _invitados(e),
+          // Orden (Victor, 2026-11-20): lo que te toca primero, los detalles al final.
+          if (e.modulo('comida'))
+            KeyedSubtree(
+              key: _kComida,
+              child: ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+            ),
           if (e.modulo('amigoSecreto'))
             AmigoSecretoTarjeta(
               repo: _social,
@@ -522,27 +529,44 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
               organizar: e.organiza && e.estadoAprobacion == 'publicado' ? _organizar(e) : null,
             ),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
-          if (e.modulo('comida'))
-            KeyedSubtree(
-              key: _kComida,
-              child: ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
-            ),
-          if (e.playlist != null)
-            PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
-          if (e.dress != null)
-            DressTarjeta(
-              texto: '${e.dress!['texto'] ?? ''}',
-              alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).dress() : null,
-            ),
-          // "Qué traer" ya está dentro de "Qué lleva cada quien" (Victor, 2026-11-20).
-          if (e.premios != null) PremiosTarjeta(lista: e.premios!),
-          // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
-          if (e.aCargo.isNotEmpty)
-            ACargoTarjeta(
-              personas: e.aCargo,
-              redes: _redes,
-              // Solo quien creó el evento (o un Pivot): responsables y responsabilidades (Victor, 2026-11-20).
-              alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null,
+          if (e.modulo('invitados')) _invitados(e),
+          // Detalles en filas: dress code, playlist, premios y dudas.
+          if (e.dress != null || e.playlist != null || e.premios != null || e.aCargo.isNotEmpty)
+            DetallesSocial(
+              filas: [
+                if (e.dress != null)
+                  (
+                    Icons.checkroom_rounded,
+                    'Dress code',
+                    '${e.dress!['texto'] ?? ''}'.trim().isEmpty ? 'Ven como quieras' : '${e.dress!['texto']}'.trim(),
+                    DressTarjeta(
+                      texto: '${e.dress!['texto'] ?? ''}',
+                      alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).dress() : null,
+                    ),
+                  ),
+                if (e.playlist != null)
+                  (
+                    Icons.queue_music_rounded,
+                    'Playlist',
+                    '${e.playlist!['link'] ?? ''}'.isEmpty ? 'Sin enlace todavía' : 'Agrega canciones',
+                    PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
+                  ),
+                if (e.premios != null)
+                  (Icons.emoji_events_outlined, 'Premios', e.premios!.isEmpty ? 'Por definir' : '${e.premios!.length}', PremiosTarjeta(lista: e.premios!)),
+                // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
+                if (e.aCargo.isNotEmpty)
+                  (
+                    Icons.help_outline_rounded,
+                    'Dudas y preguntas',
+                    '${e.aCargo.length} a cargo',
+                    ACargoTarjeta(
+                      personas: e.aCargo,
+                      redes: _redes,
+                      // Solo quien creó el evento (o un Pivot): responsables y responsabilidades (Victor, 2026-11-20).
+                      alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null,
+                    ),
+                  ),
+              ],
             ),
         ],
       );

@@ -18,18 +18,35 @@ import 'social_repo.dart';
 /// evento) y lx invitadx +1 sin cuenta (InvitadoSocialScreen).
 
 class TarjetaSocial extends StatelessWidget {
-  const TarjetaSocial({super.key, required this.titulo, this.icono, required this.children, this.accion});
+  const TarjetaSocial({super.key, required this.titulo, this.icono, required this.children, this.accion, this.estado, this.estadoActivo = true});
   final String titulo;
   final IconData? icono;
   final List<Widget> children;
   final Widget? accion;
 
+  /// Pastilla de estado a la derecha del título ("Participas", "50 %"), para
+  /// saber qué te toca sin leer la tarjeta (Victor, 2026-11-20).
+  final String? estado;
+
+  /// Rosada si te toca o ya estás; gris si es solo un dato.
+  final bool estadoActivo;
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
+    // Dentro de "Detalles" va sin marco ni título: lo pone la fila.
+    if (SinMarcoSocial.de(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (accion != null) Align(alignment: Alignment.centerRight, child: accion),
+          ...children,
+        ],
+      );
+    }
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 250),
@@ -40,13 +57,19 @@ class TarjetaSocial extends StatelessWidget {
           children: [
             Row(
               children: [
-                if (icono != null) ...[Icon(icono, size: 20, color: p.marcaTexto), const SizedBox(width: 8)],
+                if (icono != null) ...[IconoTarjetaSocial(icono: icono!), const SizedBox(width: 10)],
                 Expanded(
                   child: Text(
                     titulo,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
                   ),
                 ),
+                if (estado != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Etiqueta(texto: estado!, apagada: !estadoActivo),
+                  ),
+                ],
                 ?accion,
               ],
             ),
@@ -54,6 +77,115 @@ class TarjetaSocial extends StatelessWidget {
             ...children,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Ícono de tarjeta en un cuadrito de color (mismo formato en toda la fiesta).
+class IconoTarjetaSocial extends StatelessWidget {
+  const IconoTarjetaSocial({super.key, required this.icono});
+  final IconData icono;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+      child: Icon(icono, size: 18, color: p.marcaTexto),
+    );
+  }
+}
+
+/// Marca que una tarjeta va dentro de otra (filas de "Detalles").
+class SinMarcoSocial extends InheritedWidget {
+  const SinMarcoSocial({super.key, required super.child});
+  static bool de(BuildContext context) => context.dependOnInheritedWidgetOfExactType<SinMarcoSocial>() != null;
+  @override
+  bool updateShouldNotify(SinMarcoSocial oldWidget) => false;
+}
+
+/// Detalles de la fiesta en filas (Victor, 2026-11-20): dress code, playlist,
+/// premios y dudas. Cada fila muestra una línea y se abre al tocarla.
+class DetallesSocial extends StatefulWidget {
+  const DetallesSocial({super.key, required this.filas});
+
+  /// (ícono, título, resumen, contenido)
+  final List<(IconData, String, String, Widget)> filas;
+
+  @override
+  State<DetallesSocial> createState() => _DetallesSocialState();
+}
+
+class _DetallesSocialState extends State<DetallesSocial> {
+  final _abiertas = <String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Text(
+              'Detalles',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.textoSecundario),
+            ),
+          ),
+          for (final (i, (icono, titulo, resumen, contenido)) in widget.filas.indexed) ...[
+            if (i > 0) Divider(height: 1, indent: 16, endIndent: 16, color: p.tarjetaBorde),
+            InkWell(
+              onTap: () => setState(() => _abiertas.contains(titulo) ? _abiertas.remove(titulo) : _abiertas.add(titulo)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(icono, size: 20, color: p.marcaTexto),
+                    const SizedBox(width: 12),
+                    Text(
+                      titulo,
+                      style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _abiertas.contains(titulo) ? '' : resumen,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _abiertas.contains(titulo) ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: _abiertas.contains(titulo)
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: SinMarcoSocial(child: contenido),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
@@ -497,6 +629,8 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     return TarjetaSocial(
       titulo: 'Amigo secreto',
       icono: Icons.redeem_rounded,
+      estado: e.asiste ? (e.participaAmigo ? 'Participas' : 'No participas') : null,
+      estadoActivo: e.participaAmigo,
       // Lápiz (Victor, 2026-11-20): quien organiza edita la tarjeta (y su participación);
       // el resto, solo si participa, hasta el cierre.
       accion: e.puedeArea('amigo')
@@ -1183,6 +1317,8 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
     return TarjetaSocial(
       titulo: 'Qué lleva cada quien',
       icono: Icons.restaurant_rounded,
+      estado: e.asiste && e.seccionesParte.isNotEmpty ? (e.miParte >= 1 ? 'Tu parte ✓' : 'Tu parte ${(e.miParte * 100).round()} %') : null,
+      estadoActivo: e.miParte < 1,
       // Lápiz: cuánto come y toma cada persona; "+": agregar con sugerencias (Victor, 2026-11-20).
       accion: admin
           ? Row(
@@ -1604,6 +1740,8 @@ class RegaloRobadoTarjeta extends StatelessWidget {
     return TarjetaSocial(
       titulo: 'Regalo robado',
       icono: Icons.card_giftcard_rounded,
+      estado: estado.asiste ? (estado.participaRobado ? 'Participas' : 'No participas') : null,
+      estadoActivo: estado.participaRobado,
       accion: repo != null && estado.puedeArea('amigo')
           ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).robado())
           : repo != null && estado.asiste && estado.inscripcionAbierta

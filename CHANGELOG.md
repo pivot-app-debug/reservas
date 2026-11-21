@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (vista de fiesta rediseñada)
+- Cada tarjeta tiene el mismo formato: ícono en un cuadrito, título y una pastilla con tu estado (Tu parte 50 %, Participas, 1 de 2).
+- Nuevo orden: lo que te toca primero (Qué lleva, Amigo secreto, Regalo robado, +1) y al final una tarjeta "Detalles" con Dress code, Playlist, Premios y Dudas y preguntas, que se abren al tocarlas.
+- Arriba dice cuánto falta para la fiesta; Tu asistencia muestra tu respuesta y las caritas de quienes van.
+
 ## 2026-11-20 (fiesta más ordenada)
 - Qué lleva: "Tu parte" es una tarjeta que se pliega; el termómetro siempre se ve y lo que llevas queda dentro.
 - "Falta aún para el evento", "Abiertas" y "Completadas" tienen el mismo formato; solo lo que falta va en rojo.

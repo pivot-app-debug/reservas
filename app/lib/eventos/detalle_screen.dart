@@ -450,8 +450,20 @@ class _DetalleScreenState extends State<DetalleScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Fiesta: cuánto falta, arriba de todo (Victor, 2026-11-20).
+          if (ev.tipo == kTipoSocial && !ev.yaEmpezo) ...[
+            Etiqueta(
+              icono: Icons.celebration_outlined,
+              texto: switch (DateUtils.dateOnly(ev.fecha).difference(Fechas.hoy()).inDays) {
+                <= 0 => 'Es hoy',
+                1 => 'Es mañana',
+                final n => 'Faltan $n días',
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               Expanded(child: _dato(p, Icons.schedule_rounded, ev.rangoHorario, duracion)),
@@ -575,9 +587,25 @@ class _DetalleScreenState extends State<DetalleScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Tu asistencia',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Tu asistencia',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+                ),
+              ),
+              // Fiesta: tu respuesta en una pastilla (Victor, 2026-11-20).
+              if (ev.tipo == kTipoSocial)
+                Etiqueta(
+                  texto: switch (ev.miEstado) {
+                    EstadoRsvp.asistire => 'Asistirás',
+                    EstadoRsvp.noAsistire => 'No asistirás',
+                    _ => 'Sin responder',
+                  },
+                  apagada: ev.miEstado != EstadoRsvp.asistire,
+                ),
+            ],
           ),
           // Social o fiesta con amigo secreto: hasta cuándo inscribirse (Victor, 2026-11-20).
           if (_avisoCierre(ev) case final aviso?) ...[
@@ -986,6 +1014,57 @@ class _DetalleScreenState extends State<DetalleScreen> {
   /// con Sin respuesta para todxs y la lista cerrada hasta tocar un número.
   bool _listaAbierta = false;
 
+  /// Fiesta: caritas de quienes van y el resumen en una línea; al tocar se
+  /// abren los números y la lista (Victor, 2026-11-20).
+  Widget _resumenQuienesVan(BuildContext context, List<(_Grupo, String, List<Persona>?)> grupos) {
+    final p = context.pivot;
+    final van = grupos.first.$3 ?? const <Persona>[];
+    final caras = van.take(3).toList();
+    final partes = [
+      for (final g in grupos)
+        if (g.$3 != null) '${g.$3!.length} ${g.$2.toLowerCase()}',
+    ];
+    return InkWell(
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      onTap: () => setState(() => _listaAbierta = !_listaAbierta),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            if (caras.isNotEmpty) ...[
+              SizedBox(
+                width: 28.0 + 18 * (caras.length - 1),
+                height: 32,
+                child: Stack(
+                  children: [
+                    for (final (i, per) in caras.indexed)
+                      Positioned(
+                        left: 18.0 * i,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(color: p.tarjeta, shape: BoxShape.circle),
+                          child: AvatarPersona(nombre: per.nombreMostrar, foto: per.fotoPerfil, tamano: 26),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Text(partes.join(' · '), style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+            ),
+            AnimatedRotation(
+              turns: _listaAbierta ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _equipo(BuildContext context, Evento ev, {bool embebido = false}) {
     final p = context.pivot;
     final grupos = <(_Grupo, String, List<Persona>?)>[
@@ -1004,34 +1083,35 @@ class _DetalleScreenState extends State<DetalleScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: embebido ? 0 : 8),
-            child: Text(
-              embebido ? 'Quiénes van' : 'Asistencia del equipo',
-              style: TextStyle(fontSize: embebido ? 14 : 16, fontWeight: FontWeight.w700, color: embebido ? p.textoSecundario : p.texto),
+          if (embebido)
+            _resumenQuienesVan(context, grupos)
+          else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Asistencia del equipo',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+              ),
             ),
-          ),
-          SizedBox(height: embebido ? 8 : 12),
-          Row(
-            children: [
-              for (final (i, g) in grupos.indexed) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: _Contador(
-                    cantidad: g.$3?.length,
-                    etiqueta: g.$2,
-                    elegido: verLista && g.$1 == elegido.$1,
-                    cargando: g.$1 == _Grupo.sinRespuesta && _cargandoSinRespuesta,
-                    alTocar: () => setState(() {
-                      // En una fiesta, tocar el mismo número cierra la lista.
-                      if (embebido) _listaAbierta = !(_listaAbierta && _grupo == g.$1);
-                      _grupo = g.$1;
-                    }),
+            const SizedBox(height: 12),
+          ],
+          if (verLista)
+            Row(
+              children: [
+                for (final (i, g) in grupos.indexed) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(
+                    child: _Contador(
+                      cantidad: g.$3?.length,
+                      etiqueta: g.$2,
+                      elegido: g.$1 == elegido.$1,
+                      cargando: g.$1 == _Grupo.sinRespuesta && _cargandoSinRespuesta,
+                      alTocar: () => setState(() => _grupo = g.$1),
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
+            ),
           SizedBox(height: verLista ? 12 : 0),
           // Cambio de grupo: "fundido cruzado" de Material (sale la lista
           // anterior, entra la nueva, sin encimarse) y la altura se acomoda
