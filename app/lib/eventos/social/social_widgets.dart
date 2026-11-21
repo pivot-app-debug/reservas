@@ -321,15 +321,6 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     if (ficha != null) widget.alCambiar();
   }
 
-  Future<void> _participar(bool si) async {
-    try {
-      await widget.repo.participar(amigo: si);
-      widget.alCambiar();
-    } catch (e) {
-      if (mounted) avisarSocial(context, e.toString());
-    }
-  }
-
   Future<void> _pistas() async {
     final cambio = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -355,15 +346,12 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     switch (estado) {
       case 'sin_sorteo' when e.asiste && !e.participaAmigo:
         // Eligió no participar (Victor, 2026-11-20).
-        contenido.add(Text('Elegiste no participar del amigo secreto. Igual vienes a la fiesta.', style: TextStyle(color: p.textoSecundario)));
-        if (e.inscripcionAbierta) {
-          contenido.add(
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(onPressed: () => _participar(true), child: const Text('Quiero participar')),
-            ),
-          );
-        }
+        contenido.add(
+          Text(
+            'Elegiste no participar del amigo secreto. Igual vienes a la fiesta.${e.inscripcionAbierta ? ' Para cambiarlo, toca el lápiz.' : ''}',
+            style: TextStyle(color: p.textoSecundario),
+          ),
+        );
       case 'sin_sorteo':
         contenido.add(
           Text(
@@ -378,14 +366,7 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
             style: TextStyle(color: p.textoSecundario),
           ),
         );
-        if (e.asiste && e.inscripcionAbierta) {
-          contenido.add(
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(onPressed: () => _participar(false), child: const Text('No voy a participar')),
-            ),
-          );
-        }
+
       case 'fuera':
         // Fuera del sorteo: se dice por qué y no se piden pistas (Victor, 2026-11-20).
         contenido.add(
@@ -475,7 +456,13 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     return TarjetaSocial(
       titulo: 'Amigo secreto',
       icono: Icons.redeem_rounded,
-      accion: e.puedeArea('amigo') ? EditarTarjetas.boton(() => EditarTarjetas(context, widget.repo, e, widget.alCambiar).amigo()) : null,
+      // Lápiz (Victor, 2026-11-20): quien organiza edita la tarjeta (y su participación);
+      // el resto, solo si participa, hasta el cierre.
+      accion: e.puedeArea('amigo')
+          ? EditarTarjetas.boton(() => EditarTarjetas(context, widget.repo, e, widget.alCambiar).amigo())
+          : e.asiste && e.inscripcionAbierta && !e.sorteado
+          ? EditarTarjetas.boton(() => EditarTarjetas(context, widget.repo, e, widget.alCambiar).participacion(amigo: true))
+          : null,
       children: contenido,
     );
   }
@@ -1361,29 +1348,8 @@ class RegaloRobadoTarjeta extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ¿Juega? (Victor, 2026-11-20): se cambia hasta que el juego pasa de la pila.
-          if (repo != null && estado.asiste && (fase == null || fase == 'pila')) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    estado.participaRobado ? 'Juegas al regalo robado.' : 'Elegiste no jugar al regalo robado.',
-                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    try {
-                      await repo!.participar(robado: !estado.participaRobado);
-                      alCambiar?.call();
-                    } catch (e) {
-                      if (context.mounted) avisarSocial(context, e.toString());
-                    }
-                  },
-                  child: Text(estado.participaRobado ? 'No voy a jugar' : 'Quiero jugar'),
-                ),
-              ],
-            ),
+          if (repo != null && estado.asiste && !estado.participaRobado) ...[
+            Text('Elegiste no jugar al regalo robado. Para cambiarlo, toca el lápiz.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
             const SizedBox(height: 6),
           ],
           FilledButton.icon(
@@ -1410,6 +1376,8 @@ class RegaloRobadoTarjeta extends StatelessWidget {
       icono: Icons.card_giftcard_rounded,
       accion: repo != null && estado.puedeArea('amigo')
           ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).robado())
+          : repo != null && estado.asiste && (estado.juegoRobado['fase'] == null || estado.juegoRobado['fase'] == 'pila')
+          ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).participacion(amigo: false))
           : null,
       children: [
         Text(

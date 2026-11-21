@@ -37,9 +37,41 @@ class EditarTarjetas {
     }
   });
 
+  /// Solo "¿Participas?" (quien no organiza): amigo secreto o regalo robado.
+  Future<void> participacion({required bool amigo}) async {
+    var si = amigo ? estado.participaAmigo : estado.participaRobado;
+    final ok = await hojaFormulario(
+      context,
+      titulo: amigo ? 'Amigo secreto' : 'Regalo robado',
+      accion: 'Guardar',
+      contenido: (d, set) => SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(amigo ? 'Participo del amigo secreto' : 'Juego al regalo robado'),
+        subtitle: Text(amigo ? 'Se puede cambiar hasta el cierre de la inscripción.' : 'Se puede cambiar hasta que empiece el juego.'),
+        value: si,
+        onChanged: (v) => set(() => si = v),
+      ),
+    );
+    if (ok != true) return;
+    await _participar(amigo: amigo, si: si);
+  }
+
+  Future<void> _participar({required bool amigo, required bool si}) async {
+    if (si == (amigo ? estado.participaAmigo : estado.participaRobado)) return;
+    try {
+      await repo.participar(amigo: amigo ? si : null, robado: amigo ? null : si);
+      alCambiar();
+      if (context.mounted) avisarSocial(context, 'Cambios guardados.');
+    } catch (e) {
+      if (context.mounted) avisarSocial(context, e.toString());
+    }
+  }
+
   Future<void> amigo() async {
     final tope = TextEditingController(text: _n(estado.topeAmigo));
     DateTime? cierre = estado.cierre;
+    final puedeParticipar = estado.asiste && estado.inscripcionAbierta && !estado.sorteado;
+    var participo = estado.participaAmigo;
     final evento = DateTime.tryParse('${estado.evento['fecha'] ?? ''}');
     final ok = await hojaFormulario(
       context,
@@ -48,6 +80,13 @@ class EditarTarjetas {
       contenido: (d, set) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (puedeParticipar)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Participo del amigo secreto'),
+              value: participo,
+              onChanged: (v) => set(() => participo = v),
+            ),
           TextField(
             controller: tope,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -81,6 +120,7 @@ class EditarTarjetas {
     _tarde([tope]);
     if (ok != true) return;
     await _guardar('amigo', {'tope': t, if (cierre != null && !estado.sorteado) 'cierre': Fechas.iso(cierre!)});
+    if (puedeParticipar) await _participar(amigo: true, si: participo);
   }
 
   Future<void> robado() async {
@@ -90,6 +130,9 @@ class EditarTarjetas {
     final reglas = TextEditingController(text: estado.reglasPropias);
     var robosMax = (o['robosMax'] as num?)?.toInt() ?? 3;
     var devolver = o['devolver'] == true, turnoFinal = o['turnoFinal'] != false, describir = o['describir'] != false;
+    final fase = estado.juegoRobado['fase'];
+    final puedeJugar = estado.asiste && (fase == null || fase == 'pila');
+    var juego = estado.participaRobado;
     final ok = await hojaFormulario(
       context,
       titulo: 'Regalo robado',
@@ -97,6 +140,8 @@ class EditarTarjetas {
       contenido: (d, set) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (puedeJugar)
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Juego al regalo robado'), value: juego, onChanged: (v) => set(() => juego = v)),
           TextField(
             controller: tope,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -172,6 +217,7 @@ class EditarTarjetas {
     _tarde([tope, recordatorio, reglas]);
     if (ok != true) return;
     await _guardar('robado', datos);
+    if (puedeJugar) await _participar(amigo: false, si: juego);
   }
 
   Future<void> playlist() async {
