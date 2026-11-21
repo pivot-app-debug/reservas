@@ -428,12 +428,16 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final cierre = e.cierre;
     final hoy = Fechas.hoy();
     final yaCerro = cierre != null && !hoy.isBefore(cierre);
-    return TarjetaSocial(
-      titulo: 'Amigo secreto: organizar',
-      icono: Icons.tune_rounded,
-      // Fecha límite y tope desde aquí (Victor, 2026-11-20).
-      accion: e.puedeArea('amigo') ? EditarTarjetas.boton(() => EditarTarjetas(context, _social, e, _cargar).amigo()) : null,
+    // Va al final de la tarjeta Amigo secreto (Victor, 2026-11-20: una sola tarjeta).
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Divider(height: 28),
+        Text(
+          'Organizar',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.textoSecundario),
+        ),
+        const SizedBox(height: 6),
         Text(
           '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} +1)'
           '${e.sorteado ? ' · ${a['revelados'] ?? 0} de ${a['sorteados'] ?? 0} ya vieron a quién le regalan' : ''}.',
@@ -507,10 +511,16 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           EncabezadoSocial(estado: e),
           if (_aCargoDe(e).isNotEmpty) _estasACargo(e),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
-          if (e.organiza && e.modulo('amigoSecreto') && e.estadoAprobacion == 'publicado') _organizar(e),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
           if (e.modulo('invitados')) _invitados(e),
-          if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _social, estado: e, alCambiar: _cargar, pronombres: widget.repo.sesion.datos['pronombres']),
+          if (e.modulo('amigoSecreto'))
+            AmigoSecretoTarjeta(
+              repo: _social,
+              estado: e,
+              alCambiar: _cargar,
+              pronombres: widget.repo.sesion.datos['pronombres'],
+              organizar: e.organiza && e.estadoAprobacion == 'publicado' ? _organizar(e) : null,
+            ),
           if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
           if (e.modulo('comida'))
             KeyedSubtree(

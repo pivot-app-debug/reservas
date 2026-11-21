@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-20 (fiesta más ordenada)
+- Qué lleva: "Tu parte" es una tarjeta que se pliega; el termómetro siempre se ve y lo que llevas queda dentro.
+- "Falta aún para el evento", "Abiertas" y "Completadas" tienen el mismo formato; solo lo que falta va en rojo.
+- Amigo secreto: una sola tarjeta; quien organiza ve abajo la parte de Organizar (inscritxs, cierre y sorteo).
+- En fiestas ya no existe "No jugador". Tu asistencia incluye quiénes van, quiénes no y quiénes no respondieron (visible para todo el equipo solo en fiestas).
+
 ## 2026-11-20 (diseño coherente en Novedades, Tareas y Qué lleva)
 - Las explicaciones (Cursos, Tareas, Pagos) siempre empiezan cerradas.
 - Novedades: títulos de sección iguales en todo (ícono + título); lo del equipo va primero, luego Por evaluar (más discreto) y después los eventos. Ya no dice "No hay nada pendiente" debajo.

@@ -85,7 +85,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
 
   Future<void> _cargarSinRespuesta() async {
     final ev = repo.porId(widget.eventoId);
-    if (!_esAdmin || ev == null || ev.yaEmpezo) return;
+    if (ev == null || ev.yaEmpezo || !(_esAdmin || ev.tipo == kTipoSocial)) return;
     setState(() => _cargandoSinRespuesta = true);
     try {
       final lista = await repo.sinRespuesta(ev);
@@ -393,7 +393,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
                 _ibanAIr(context, ev)
               else if (ev.finalizado)
                 _quienesFueron(context, ev)
-              else
+              else if (ev.tipo != kTipoSocial)
                 KeyedSubtree(key: _kEquipo, child: _equipo(context, ev)),
             ],
           ),
@@ -609,7 +609,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
               segments: [
                 const ButtonSegment(value: EstadoRsvp.asistire, label: Text('Asistiré')),
                 if (!sinNo) const ButtonSegment(value: EstadoRsvp.noAsistire, label: Text('No asistiré')),
-                const ButtonSegment(value: EstadoRsvp.noJugador, label: Text('No jugador')),
+                // En una fiesta no hay "No jugador" (Victor, 2026-11-20).
+                if (ev.tipo != kTipoSocial) const ButtonSegment(value: EstadoRsvp.noJugador, label: Text('No jugador')),
               ],
               selected: {?ev.miEstado},
               onSelectionChanged: bloqueado
@@ -638,6 +639,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
           // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
           // Sin asistencia anticipada en un Social o fiesta: es un evento especial (2026-11-20).
           if (repo.anticipada.disponible && ev.tipo != kTipoSocial) ...[const SizedBox(height: 12), _botonAnticipada(context)],
+          // Fiesta: quiénes van, no van y no respondieron, en la misma tarjeta (Victor, 2026-11-20).
+          if (ev.tipo == kTipoSocial) ...[const SizedBox(height: 16), KeyedSubtree(key: _kEquipo, child: _equipo(context, ev, embebido: true))],
         ],
       ),
     );
@@ -979,31 +982,36 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
   }
 
-  Widget _equipo(BuildContext context, Evento ev) {
+  /// En una fiesta (`embebido`) va dentro de Tu asistencia: sin No jugador,
+  /// con Sin respuesta para todxs y la lista cerrada hasta tocar un número.
+  bool _listaAbierta = false;
+
+  Widget _equipo(BuildContext context, Evento ev, {bool embebido = false}) {
     final p = context.pivot;
     final grupos = <(_Grupo, String, List<Persona>?)>[
       (_Grupo.asisten, 'Asisten', ev.con(EstadoRsvp.asistire).map((r) => r.persona).toList()),
       (_Grupo.noAsisten, 'No asisten', ev.con(EstadoRsvp.noAsistire).map((r) => r.persona).toList()),
-      (_Grupo.noJugador, 'No jugador', ev.con(EstadoRsvp.noJugador).map((r) => r.persona).toList()),
-      if (_esAdmin && !ev.yaEmpezo) (_Grupo.sinRespuesta, 'Sin respuesta', _sinRespuesta),
+      if (!embebido) (_Grupo.noJugador, 'No jugador', ev.con(EstadoRsvp.noJugador).map((r) => r.persona).toList()),
+      if ((_esAdmin || embebido) && !ev.yaEmpezo) (_Grupo.sinRespuesta, 'Sin respuesta', _sinRespuesta),
     ];
+    final verLista = !embebido || _listaAbierta;
     final elegido = grupos.firstWhere((g) => g.$1 == _grupo, orElse: () => grupos.first);
     final personas = elegido.$3;
     // Admins: Emergencia junto a quien fue marcadx A tiempo o Tarde en este evento.
     final marcadxs = {for (final a in ev.asistentes) a.persona.username.trim().toLowerCase()};
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      padding: embebido ? EdgeInsets.zero : const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: EdgeInsets.symmetric(horizontal: embebido ? 0 : 8),
             child: Text(
-              'Asistencia del equipo',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+              embebido ? 'Quiénes van' : 'Asistencia del equipo',
+              style: TextStyle(fontSize: embebido ? 14 : 16, fontWeight: FontWeight.w700, color: embebido ? p.textoSecundario : p.texto),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: embebido ? 8 : 12),
           Row(
             children: [
               for (final (i, g) in grupos.indexed) ...[
@@ -1012,15 +1020,19 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   child: _Contador(
                     cantidad: g.$3?.length,
                     etiqueta: g.$2,
-                    elegido: g.$1 == elegido.$1,
+                    elegido: verLista && g.$1 == elegido.$1,
                     cargando: g.$1 == _Grupo.sinRespuesta && _cargandoSinRespuesta,
-                    alTocar: () => setState(() => _grupo = g.$1),
+                    alTocar: () => setState(() {
+                      // En una fiesta, tocar el mismo número cierra la lista.
+                      if (embebido) _listaAbierta = !(_listaAbierta && _grupo == g.$1);
+                      _grupo = g.$1;
+                    }),
                   ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: verLista ? 12 : 0),
           // Cambio de grupo: "fundido cruzado" de Material (sale la lista
           // anterior, entra la nueva, sin encimarse) y la altura se acomoda
           // suave (antes las dos listas se superponían y saltaba el alto).
@@ -1034,8 +1046,10 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   FadeThroughTransition(animation: primaria, secondaryAnimation: secundaria, fillColor: Colors.transparent, child: hijo),
               layoutBuilder: (hijos) => Stack(alignment: Alignment.topCenter, children: hijos),
               child: KeyedSubtree(
-                key: ValueKey('${elegido.$1}-${personas?.length}'),
-                child: personas == null
+                key: ValueKey('${elegido.$1}-${personas?.length}-$verLista'),
+                child: !verLista
+                    ? const SizedBox(width: double.infinity)
+                    : personas == null
                     ? const Padding(padding: EdgeInsets.all(16), child: EsqueletoFilas())
                     : personas.isEmpty
                     ? Padding(

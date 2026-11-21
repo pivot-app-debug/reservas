@@ -453,7 +453,10 @@ class EventosRepo extends ChangeNotifier {
   /// Miembros activos sin respuesta (mismo filtro que la web: ni 'Ausente'
   /// ni 30+ días sin una asistencia real).
   Future<List<Persona>> sinRespuesta(Evento ev) async {
-    final res = await _api.get('adminBuscarPersonasParaEvento', {'adminToken': _adminToken, 'idEvento': ev.id});
+    // En una fiesta lo ve todo el equipo (Victor, 2026-11-20); el resto, solo admins.
+    final res = ev.tipo == kTipoSocial
+        ? await _api.get('socialSinRespuesta', {'idEvento': ev.id, 'adminToken': ?sesion.adminToken})
+        : await _api.get('adminBuscarPersonasParaEvento', {'adminToken': _adminToken, 'idEvento': ev.id});
     final respondieron = ev.rsvps.map((r) => r.persona.username.trim().toUpperCase()).toSet();
     final hoy = DateTime.now();
     final out = <Persona>[];

@@ -51,7 +51,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
         'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
-      'socialJuego', 'socialEditarPieza', 'socialParticipar',
+            'socialJuego', 'socialEditarPieza', 'socialParticipar', 'socialSinRespuesta',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -190,7 +190,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
             case 'socialAportarRegalo': return await socialAportarRegalo(params, deps);
             case 'socialJuego': return await socialJuego(params, deps);
             case 'socialEditarPieza': return await socialEditarPieza(params, deps);
-      case 'socialParticipar': return await socialParticipar(params, deps);
+            case 'socialParticipar': return await socialParticipar(params, deps);
+      case 'socialSinRespuesta': return await socialSinRespuesta(params, deps);
       case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
@@ -1698,6 +1699,27 @@ async function socialQuitarTraer(params: Record<string, any>, deps: DepsSocial):
 // Al marcar Asistiré, cada quien (también lxs +1) dice si participa del amigo
 // secreto y del regalo robado. El amigo se cambia hasta el cierre o el sorteo;
 // el regalo robado, hasta que el juego pase de la pila.
+
+/// En una fiesta todxs ven quiénes no respondieron (Victor, 2026-11-20); en
+/// entrenos y partidos sigue siendo solo de admins (adminBuscarPersonasParaEvento).
+/// Mismos datos públicos que Equipo: usuario, nombre derby, foto y estado; la app
+/// filtra a quien ya respondió y a quien lleva tiempo sin venir.
+async function socialSinRespuesta(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db;
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (q.tipo === 'invitado') return { exito: false, error: 'Solo para el equipo.' };
+  const ev = await _evento(db, q.idEvento);
+  if (!ev || ev.tipo_evento !== 'Social') return { exito: false, error: 'Solo en eventos Social o fiesta.' };
+  const { data: equipo } = await db.from('equipo').select('username, estado_miembro, nombre_derby, foto_perfil').is('eliminado_en', null).order('username');
+  const { data: ultimas } = await db.rpc('fn_ultima_asistencia_real_por_usuario');
+  const mapa = (ultimas ?? {}) as Record<string, string>;
+  const personas = (equipo ?? []).map((r: any) => {
+    const u = mapa[String(r.username ?? '').trim().toUpperCase()] ?? null;
+    return { nombre: r.username, nombreDerby: r.nombre_derby ?? '', fotoPerfil: r.foto_perfil ?? '', estadoMiembro: r.estado_miembro ?? 'Activx', ultimaAsistencia: u ? u.slice(0, 10) : null };
+  });
+  return { exito: true, personas };
+}
 
 async function socialParticipar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
   const db = deps.db, liga = deps.ligaEnCurso();

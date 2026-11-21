@@ -325,8 +325,11 @@ class FichaAmigoVista extends StatelessWidget {
 // ─── Amigo secreto (estado, ruleta y ficha oculta) ────────────────────────
 
 class AmigoSecretoTarjeta extends StatefulWidget {
-  const AmigoSecretoTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar, this.simbolo, this.pronombres});
+  const AmigoSecretoTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar, this.simbolo, this.pronombres, this.organizar});
   final SocialRepo repo;
+
+  /// Para quien organiza: inscritxs, cierre y sorteo, en la misma tarjeta (Victor, 2026-11-20).
+  final Widget? organizar;
 
   /// Pronombres de quien mira: los textos para la persona se adaptan (Victor, 2026-11-20).
   final Object? pronombres;
@@ -501,7 +504,7 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
           : e.asiste && e.inscripcionAbierta && !e.sorteado
           ? EditarTarjetas.boton(() => EditarTarjetas(context, widget.repo, e, widget.alCambiar).participacion(amigo: true))
           : null,
-      children: contenido,
+      children: [...contenido, ?widget.organizar],
     );
   }
 }
@@ -1163,9 +1166,14 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
     final abiertas = e.comida.where((c) => !c.cerrada).toList()..sort((a, b) => (b.falta ? 1 : 0) - (a.falta ? 1 : 0));
     final completas = e.comida.where((c) => c.cerrada).toList();
     // Lo que todavía le falta al grupo, con cuánto (Victor, 2026-11-20: "más directo").
+    bool falta(CategoriaComida c) => c.falta || (c.meta > 0 && c.aportado < c.meta);
     final faltan = [
       for (final c in abiertas)
-        if (c.falta || (c.meta > 0 && c.aportado < c.meta)) c.nombre,
+        if (falta(c)) c,
+    ];
+    final resto = [
+      for (final c in abiertas)
+        if (!falta(c)) c,
     ];
     final mias = [
       for (final c in e.comida)
@@ -1223,62 +1231,38 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
               ],
             ),
           ),
-        if (e.asiste && e.seccionesParte.isNotEmpty) _TuParte(valor: e.miParte, secciones: e.seccionesParte.length),
-        if (mias.isNotEmpty)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 8),
-            decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tú llevas',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
-                ),
-                for (final (c, a) in mias)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          [
-                            '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
-                            if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
-                            if (ComidaTarjeta._para(a['paraTodxs']).isNotEmpty) ComidaTarjeta._para(a['paraTodxs']),
-                          ].join(' · '),
-                          style: TextStyle(color: p.sobreSuave),
-                        ),
+        // Tu parte (Victor, 2026-11-20): el termómetro siempre a la vista;
+        // la frase y lo que llevas, plegados.
+        if ((e.asiste && e.seccionesParte.isNotEmpty) || mias.isNotEmpty)
+          _TuParte(
+            valor: e.asiste && e.seccionesParte.isNotEmpty ? e.miParte : null,
+            secciones: e.seccionesParte.length,
+            abierta: _tuParteAbierta,
+            alTocar: () => setState(() => _tuParteAbierta = !_tuParteAbierta),
+            lleva: [
+              for (final (c, a) in mias)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        [
+                          '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
+                          if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
+                          if (ComidaTarjeta._para(a['paraTodxs']).isNotEmpty) ComidaTarjeta._para(a['paraTodxs']),
+                        ].join(' · '),
+                        style: TextStyle(color: p.sobreSuave),
                       ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: 'Quitar',
-                        icon: Icon(Icons.close_rounded, size: 18, color: p.sobreSuave),
-                        onPressed: () => t._quitar(context, '${a['id']}'),
-                      ),
-                    ],
-                  ),
-                Text('Te lo recordamos el día anterior.', style: TextStyle(fontSize: 12, color: p.sobreSuave)),
-              ],
-            ),
-          ),
-        if (faltan.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Falta aún para el evento: ',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Quitar',
+                      icon: Icon(Icons.close_rounded, size: 18, color: p.sobreSuave),
+                      onPressed: () => t._quitar(context, '${a['id']}'),
+                    ),
+                  ],
                 ),
-                TextSpan(
-                  text: faltan.join(', '),
-                  style: TextStyle(color: p.texto),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
         if (e.comida.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -1287,43 +1271,87 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
               style: TextStyle(color: p.textoSecundario),
             ),
           ),
-        const SizedBox(height: 8),
-        for (final c in abiertas) _seccion(context, p, c, admin),
-        if (completas.isNotEmpty) ...[
-          InkWell(
-            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-            onTap: () => setState(() => _verCompletadas = !_verCompletadas),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, size: 20, color: p.textoSecundario),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Completadas (${completas.length})',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: p.textoSecundario),
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: _verCompletadas ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
-                  ),
-                ],
-              ),
-            ),
+        const SizedBox(height: 4),
+        // Mismo formato en los tres grupos (Victor, 2026-11-20); solo "Falta aún" en rojo.
+        if (faltan.isNotEmpty)
+          _grupo(
+            p,
+            icono: Icons.error_outline_rounded,
+            titulo: 'Falta aún para el evento (${faltan.length})',
+            color: p.marcaTexto,
+            abierto: _verFaltan,
+            alTocar: () => setState(() => _verFaltan = !_verFaltan),
+            hijos: [for (final c in faltan) _seccion(context, p, c, admin)],
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: _verCompletadas ? Column(children: [for (final c in completas) _seccion(context, p, c, admin)]) : const SizedBox(width: double.infinity),
+        if (resto.isNotEmpty)
+          _grupo(
+            p,
+            icono: Icons.add_circle_outline_rounded,
+            titulo: 'Abiertas (${resto.length})',
+            color: p.textoSecundario,
+            abierto: _verResto,
+            alTocar: () => setState(() => _verResto = !_verResto),
+            hijos: [for (final c in resto) _seccion(context, p, c, admin)],
           ),
-        ],
+        if (completas.isNotEmpty)
+          _grupo(
+            p,
+            icono: Icons.check_circle_rounded,
+            titulo: 'Completadas (${completas.length})',
+            color: p.textoSecundario,
+            abierto: _verCompletadas,
+            alTocar: () => setState(() => _verCompletadas = !_verCompletadas),
+            hijos: [for (final c in completas) _seccion(context, p, c, admin)],
+          ),
       ],
     );
   }
+
+  bool _tuParteAbierta = false, _verFaltan = true, _verResto = true;
+
+  Widget _grupo(
+    PivotPaleta p, {
+    required IconData icono,
+    required String titulo,
+    required Color color,
+    required bool abierto,
+    required VoidCallback alTocar,
+    required List<Widget> hijos,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      InkWell(
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        onTap: alTocar,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Icon(icono, size: 20, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: TextStyle(fontWeight: FontWeight.w600, color: color),
+                ),
+              ),
+              AnimatedRotation(
+                turns: abierto ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(Icons.expand_more_rounded, color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: abierto ? Column(children: hijos) : const SizedBox(width: double.infinity),
+      ),
+    ],
+  );
 
   Widget _seccion(BuildContext context, PivotPaleta p, CategoriaComida c, bool admin) {
     final t = widget.t;
@@ -1722,62 +1750,113 @@ class _Contador extends StatelessWidget {
 
 /// Cuánto cubriste de lo que te toca llevar.
 class _TuParte extends StatelessWidget {
-  const _TuParte({required this.valor, required this.secciones});
-  final double valor;
+  const _TuParte({required this.valor, required this.secciones, required this.abierta, required this.alTocar, required this.lleva});
+
+  /// Cuánto cubriste (0 a 1); null si no cuenta (sin secciones de comida o bebida).
+  final double? valor;
 
   /// Secciones de comida y bebida que cuentan: tu parte es 1 persona en cada una.
   final int secciones;
+  final bool abierta;
+  final VoidCallback alTocar;
 
-  int _personas() => math.max(1, ((1 - valor) * secciones).ceil());
+  /// Lo que llevas (filas con "Quitar").
+  final List<Widget> lleva;
+
+  int _personas(double v) => math.max(1, ((1 - v) * secciones).ceil());
 
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final lista = valor >= 1;
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
+    final v = valor;
+    final lista = v != null && v >= 1;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 10),
+      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Tu parte',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                ),
+          InkWell(
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            onTap: alTocar,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Tu parte',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                    ),
+                  ),
+                  if (lista)
+                    Icon(Icons.check_circle_rounded, size: 20, color: p.marcaTexto)
+                  else if (v != null)
+                    Text(
+                      '${(v * 100).round()} %',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                    ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: abierta ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more_rounded, color: p.sobreSuave),
+                  ),
+                ],
               ),
-              if (lista)
-                Icon(Icons.check_circle_rounded, size: 20, color: p.marcaTexto)
-              else
-                Text(
-                  '${(valor * 100).round()} %',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(PivotRadios.chip),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: valor.clamp(0, 1).toDouble()),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOutCubic,
-              builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 6, backgroundColor: p.suave, color: p.marca),
             ),
           ),
-          const SizedBox(height: 4),
-          // En una frase, qué te toca (Victor, 2026-11-20).
-          Text(
-            lista
-                ? 'Ya cubriste tu parte ✓ Si quieres, puedes llevar más.'
-                : valor <= 0
-                ? 'Te toca llevar algo: con comida o bebida para ${_personas()} personas en cualquier sección cubres tu parte.'.replaceFirst(
-                    'para 1 personas',
-                    'para 1 persona',
-                  )
-                : 'Te falta poco: con comida o bebida para ${_personas()} ${_personas() == 1 ? 'persona' : 'personas'} más cubres tu parte.',
-            style: TextStyle(fontSize: 13, fontWeight: lista ? FontWeight.w400 : FontWeight.w600, color: lista ? p.textoSecundario : p.texto),
+          if (v != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(PivotRadios.chip),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: v.clamp(0, 1).toDouble()),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, x, _) => LinearProgressIndicator(value: x, minHeight: 6, backgroundColor: p.tarjeta, color: p.marca),
+                ),
+              ),
+            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: !abierta
+                ? const SizedBox(width: double.infinity)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (v != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 8, 8, 4),
+                          // En una frase, qué te toca (Victor, 2026-11-20).
+                          child: Text(
+                            lista
+                                ? 'Ya cubriste tu parte ✓ Si quieres, puedes llevar más.'
+                                : v <= 0
+                                ? 'Te toca llevar algo: con comida o bebida para ${_personas(v)} ${_personas(v) == 1 ? 'persona' : 'personas'} en cualquier sección cubres tu parte.'
+                                : 'Te falta poco: con comida o bebida para ${_personas(v)} ${_personas(v) == 1 ? 'persona' : 'personas'} más cubres tu parte.',
+                            style: TextStyle(fontSize: 13, color: p.sobreSuave),
+                          ),
+                        ),
+                      if (lleva.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Tú llevas',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                          ),
+                        ),
+                        ...lleva,
+                        Text('Te lo recordamos el día anterior.', style: TextStyle(fontSize: 12, color: p.sobreSuave)),
+                      ] else
+                        Text('Todavía no te anotaste en ninguna sección.', style: TextStyle(fontSize: 12, color: p.sobreSuave)),
+                    ],
+                  ),
           ),
         ],
       ),

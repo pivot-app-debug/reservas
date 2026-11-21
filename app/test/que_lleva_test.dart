@@ -82,6 +82,11 @@ void main() {
     );
     await t.pumpAndSettle();
     expect(find.text('Qué lleva cada quien'), findsOneWidget);
+    // Tu parte empieza plegada: al tocarla aparece lo que llevas.
+    expect(find.text('Tu parte'), findsOneWidget);
+    expect(find.text('Tú llevas'), findsNothing);
+    await t.tap(find.text('Tu parte'));
+    await t.pumpAndSettle();
     expect(find.text('Tú llevas'), findsOneWidget);
     expect(find.text('Hace falta'), findsOneWidget);
     expect(find.text('Te falta 1'), findsOneWidget);
