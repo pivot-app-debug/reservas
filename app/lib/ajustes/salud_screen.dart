@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -56,8 +58,6 @@ class SaludEmergenciaScreen extends StatelessWidget {
           // ficha de arriba; aquí solo lo que no está en ella.
           _titulo(context, 'Otros datos de salud'),
           GrupoAjustes(
-            // Se usa sin nombres en la comida de las fiestas (Victor, 2026-11-20).
-            pie: 'Tu dieta y tus alergias se usan, sin tu nombre, para la comida de las fiestas a las que vas: se arma una sección para tu dieta y se avisa de las alergias.',
             filas: [
               if (privado) ...[
                 FilaAjuste(
@@ -87,6 +87,10 @@ class SaludEmergenciaScreen extends StatelessWidget {
               ),
             ],
           ),
+          // Comida en eventos (Victor, 2026-11-20): apagado; cada dato se prende aparte.
+          const SizedBox(height: 22),
+          _titulo(context, 'Comida en eventos'),
+          _ComidaEventos(sesion: s),
         ];
       },
     );
@@ -353,4 +357,85 @@ class _TarjetaContacto extends StatelessWidget {
 
 extension on String {
   String ifEmpty(String otro) => isEmpty ? otro : this;
+}
+
+/// Qué datos de salud se usan, sin tu nombre, en la comida de fiestas y
+/// reuniones (Victor, 2026-11-20). Todo empieza apagado: cada dieta y cada
+/// alergia se prende aparte.
+class _ComidaEventos extends StatelessWidget {
+  const _ComidaEventos({required this.sesion});
+  final Sesion sesion;
+
+  static const _sinDieta = {'', 'ninguna', 'ninguno', 'no', 'sin restricciones', 'normal'};
+
+  Map<String, dynamic> _actual() {
+    try {
+      final j = jsonDecode(valorDe(sesion, 'comidaEventos').isEmpty ? '{}' : valorDe(sesion, 'comidaEventos'));
+      return j is Map<String, dynamic> ? j : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _guardar(BuildContext context, Map<String, dynamic> j) => guardarCampos(context, sesion, {'comidaEventos': jsonEncode(j)});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final dieta = valorDe(sesion, 'dieta');
+    final hayDieta = !_sinDieta.contains(dieta.toLowerCase());
+    final alergias = ['sí', 'si'].contains(valorDe(sesion, 'alergias').toLowerCase())
+        ? [
+            for (final x in valorDe(sesion, 'alergiasDesc').split(RegExp(r'[,;\n]+')))
+              if (x.trim().isNotEmpty) x.trim(),
+          ]
+        : <String>[];
+    final j = _actual();
+    final usadas = {for (final x in (j['alergias'] as List? ?? const [])) '$x'.toLowerCase()};
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              'Si quieres que tu dieta o tus alergias se tomen en cuenta en la comida de fiestas y reuniones del equipo, prende cada una. '
+              'Se usan sin tu nombre: tu dieta suma una sección de comida para ti y tus alergias salen en un aviso.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+          ),
+          if (!hayDieta && alergias.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text('No tienes una dieta ni alergias registradas.', style: TextStyle(color: p.textoSecundario)),
+            ),
+          if (hayDieta)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Dieta: $dieta'),
+              subtitle: const Text('Usar en la comida de eventos'),
+              value: j['dieta'] == true,
+              onChanged: (v) => _guardar(context, {...j, 'dieta': v}),
+            ),
+          for (final a in alergias)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Alergia: $a'),
+              subtitle: const Text('Avisar en la comida de eventos'),
+              value: usadas.contains(a.toLowerCase()),
+              onChanged: (v) {
+                final l = [
+                  for (final x in (j['alergias'] as List? ?? const []))
+                    if ('$x'.toLowerCase() != a.toLowerCase()) '$x',
+                  if (v) a,
+                ];
+                _guardar(context, {...j, 'alergias': l});
+              },
+            ),
+        ],
+      ),
+    );
+  }
 }

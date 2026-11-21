@@ -47,7 +47,7 @@ class EditarTarjetas {
       contenido: (d, set) => SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(amigo ? 'Participo del amigo secreto' : 'Juego al regalo robado'),
-        subtitle: Text(amigo ? 'Se puede cambiar hasta el cierre de la inscripción.' : 'Se puede cambiar hasta que empiece el juego.'),
+        subtitle: const Text('Se puede cambiar hasta el cierre de la inscripción.'),
         value: si,
         onChanged: (v) => set(() => si = v),
       ),
@@ -130,8 +130,7 @@ class EditarTarjetas {
     final reglas = TextEditingController(text: estado.reglasPropias);
     var robosMax = (o['robosMax'] as num?)?.toInt() ?? 3;
     var devolver = o['devolver'] == true, turnoFinal = o['turnoFinal'] != false, describir = o['describir'] != false;
-    final fase = estado.juegoRobado['fase'];
-    final puedeJugar = estado.asiste && (fase == null || fase == 'pila');
+    final puedeJugar = estado.asiste && estado.inscripcionAbierta;
     var juego = estado.participaRobado;
     final ok = await hojaFormulario(
       context,

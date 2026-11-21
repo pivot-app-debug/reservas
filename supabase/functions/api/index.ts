@@ -213,7 +213,8 @@ function getDatosCompletos(row: Record<string, any> | null): Record<string, any>
     enfermedad:           row.enfermedad            ?? '',
     alergias:             row.alergias              ?? '',
     dieta:                row.dieta                 ?? '',
-    alergiasDesc:         row.alergias_desc         ?? '',
+        alergiasDesc:         row.alergias_desc         ?? '',
+    comidaEventos:        row.comida_eventos        ?? '',
     antecedentes:         row.antecedentes          ?? '',
     medicamentos:         row.medicamentos          ?? '',
     medicamentosDesc:     row.medicamentos_desc     ?? '',
@@ -870,8 +871,8 @@ async function actualizarDatosPersona(params: Record<string, any>): Promise<Reco
     emerg2Nombre: 'emerg2_nombre', emerg2Relacion: 'emerg2_relacion', emerg2Prefijo: 'emerg2_prefijo', emerg2Telefono: 'emerg2_telefono',
     enfermedad: 'enfermedad', alergias: 'alergias', alergiasDesc: 'alergias_desc',
     antecedentes: 'antecedentes', medicamentos: 'medicamentos', medicamentosDesc: 'medicamentos_desc',
-        atencionMedica: 'atencion_medica', seguro: 'seguro', seguroContacto: 'seguro_contacto',
-    roles: 'roles',
+                atencionMedica: 'atencion_medica', seguro: 'seguro', seguroContacto: 'seguro_contacto',
+    roles: 'roles', comidaEventos: 'comida_eventos',
   };
   const update: Record<string, any> = {};
   for (const camel of Object.keys(datos ?? {})) { if (CAMPO_MAP[camel]) update[CAMPO_MAP[camel]] = datos[camel]; }

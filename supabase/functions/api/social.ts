@@ -323,6 +323,13 @@ async function _asistentes(db: any, idEvento: string): Promise<Set<string>> {
 // porciones por persona; si quien organiza la quita, no vuelve. Las alergias
 // se devuelven como lista para un aviso en la comida.
 
+/// `equipo.comida_eventos`: {"dieta": bool, "alergias": [texto]}; vacío = nada.
+function _comidaEventos(v: unknown): { dieta: boolean; alergias: Set<string> } {
+  let j: any = {};
+  try { j = JSON.parse(String(v ?? '') || '{}'); } catch { j = {}; }
+  return { dieta: j?.dieta === true, alergias: new Set((Array.isArray(j?.alergias) ? j.alergias : []).map((x: unknown) => String(x).trim().toLowerCase())) };
+}
+
 const SIN_DIETA = new Set(['', 'ninguna', 'ninguno', 'no', 'sin restricciones', 'normal']);
 
 function _nombreDieta(d: string): { clave: string; nombre: string } | null {
@@ -338,19 +345,20 @@ function _nombreDieta(d: string): { clave: string; nombre: string } | null {
 async function _dietasYAlergias(db: any, liga: string, idEvento: string, cfg: any, asisten: Set<string>): Promise<string[]> {
   const usuarios = [...asisten];
   const { data: filas } = usuarios.length
-    ? await db.from('equipo').select('dieta, alergias, alergias_desc').in('username', usuarios)
+        ? await db.from('equipo').select('dieta, alergias, alergias_desc, comida_eventos').in('username', usuarios)
     : { data: [] };
   const cuenta = new Map<string, { nombre: string; n: number }>();
   const alergias = new Map<string, string>();
-  for (const f of filas ?? []) {
-    const d = _nombreDieta(String(f.dieta ?? ''));
+    for (const f of filas ?? []) {
+    // Solo lo que cada persona prendió en Salud (Victor, 2026-11-20).
+    const usar = _comidaEventos(f.comida_eventos);
+    const d = usar.dieta ? _nombreDieta(String(f.dieta ?? '')) : null;
     if (d) cuenta.set(d.clave, { nombre: d.nombre, n: (cuenta.get(d.clave)?.n ?? 0) + 1 });
     const a = String(f.alergias ?? '').trim().toLowerCase();
     if (a === 'sí' || a === 'si') {
-      const desc = String(f.alergias_desc ?? '').trim();
-      for (const parte of (desc ? desc.split(/[,;\n]+/) : ['una alergia (sin detalle)'])) {
+      for (const parte of String(f.alergias_desc ?? '').split(/[,;\n]+/)) {
         const x = parte.trim();
-        if (x) alergias.set(x.toLowerCase(), x);
+        if (x && usar.alergias.has(x.toLowerCase())) alergias.set(x.toLowerCase(), x);
       }
     }
   }
@@ -528,6 +536,17 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
   if (q.clave) {
     const { data: pa } = await db.from('social_participacion').select('amigo, robado').eq('id_evento', q.idEvento).eq('clave', q.clave).maybeSingle();
     out.yo.participa = { amigo: pa ? pa.amigo !== false : true, robado: pa ? pa.robado !== false : true, respondio: !!pa };
+  }
+    // Tiene dieta o alergias en Salud que no prendió para los eventos: se le sugiere (solo a esa persona).
+  if (q.username && social.comida) {
+    const { data: yoSalud } = await db.from('equipo').select('dieta, alergias, alergias_desc, comida_eventos').eq('username', q.username).maybeSingle();
+    if (yoSalud) {
+      const usar = _comidaEventos(yoSalud.comida_eventos);
+      const dieta = !!_nombreDieta(String(yoSalud.dieta ?? '')) && !usar.dieta;
+      const tieneAlergia = ['sí', 'si'].includes(String(yoSalud.alergias ?? '').trim().toLowerCase());
+      const alergiasSinUsar = tieneAlergia && String(yoSalud.alergias_desc ?? '').split(/[,;\n]+/).some((x) => x.trim() && !usar.alergias.has(x.trim().toLowerCase()));
+      out.yo.comidaSinUsar = dieta || alergiasSinUsar;
+    }
   }
   if (esInv) out.yo.anfitrion = (await _personas(db, [q.invitado.anfitrion])).get(q.invitado.anfitrion)?.nombre ?? '';
   // Lxs +1 no ven la lista de asistentes, solo cuántxs son (para la comida).
@@ -885,8 +904,12 @@ function _esComida(c: any): boolean {
 
 /// Cupo de las cosas (Victor, 2026-11-20): 0 = sin límite.
 function _limiteSeccion(c: any, asistentes: number): number {
+  if (_esComida(c)) return 0;
+  // Cosas "según cuántas personas van" o "un total fijo": esa cantidad es
+  // también el máximo, y se ajusta sola con quienes van (Victor, 2026-11-20).
+  if (c.modo === 'meta' || c.modo === 'total') return _metaSeccion(c, asistentes);
   const n = Number(c.cupo ?? 0);
-  if (_esComida(c) || !(n > 0)) return 0;
+  if (!(n > 0)) return 0;
   if (c.cupo_tipo === 'fijo') return n;
   if (c.cupo_tipo === 'persona') return Math.max(1, Math.ceil(asistentes / n));
   return 0;
@@ -1666,10 +1689,10 @@ async function socialParticipar(params: Record<string, any>, deps: DepsSocial): 
     if (cfg.sorteado_en || (cierre && _hoyEc() > cierre)) return { exito: false, error: 'La inscripción del amigo secreto ya cerró.' };
     fila.amigo = si(params.amigo);
   }
+    // Las dos se cambian hasta el cierre de la inscripción (Victor, 2026-11-20).
   if (params.robado !== undefined && si(params.robado) !== fila.robado) {
-    const { data: jr } = await db.from('social_regalo_juego').select('estado').eq('id_evento', q.idEvento).maybeSingle();
-    const fase = jr?.estado?.fase;
-    if (fase && fase !== 'pila' && fase !== 'terminado') return { exito: false, error: 'El regalo robado ya empezó.' };
+    const cierre = cfg.cierre ?? null;
+    if (cierre && _hoyEc() > cierre) return { exito: false, error: 'La inscripción ya cerró.' };
     fila.robado = si(params.robado);
   }
   const { error } = await db.from('social_participacion').upsert(fila, { onConflict: 'id_evento,clave' });

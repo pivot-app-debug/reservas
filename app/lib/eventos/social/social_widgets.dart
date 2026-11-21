@@ -121,7 +121,7 @@ Future<bool?> hojaFormulario(
 Future<void> preguntarParticipacion(BuildContext context, SocialRepo repo, EstadoSocial e, VoidCallback alCambiar) async {
   final fase = e.juegoRobado['fase'];
   final amigo = e.modulo('amigoSecreto') && e.inscripcionAbierta && !e.sorteado;
-  final robado = e.modulo('regaloRobado') && (fase == null || fase == 'pila');
+  final robado = e.modulo('regaloRobado') && e.inscripcionAbierta && (fase == null || fase == 'pila');
   if (!e.asiste || e.respondioParticipa || (!amigo && !robado)) return;
   var siAmigo = e.participaAmigo, siRobado = e.participaRobado;
   await showModalBottomSheet<void>(
@@ -847,7 +847,13 @@ class ComidaTarjeta extends StatelessWidget {
               ),
             ],
             // Cupo (Victor, 2026-11-20): para que no lleguen 20 adornos.
-            if (!esComida) ...[
+            // Cupo solo en Libre o Cada persona: con "según cuántas personas van" o
+            // "un total fijo", esa cantidad ya es el máximo y se ajusta sola (Victor, 2026-11-20).
+            if (!esComida && (modo == 'meta' || modo == 'total')) ...[
+              const SizedBox(height: 8),
+              Text('Para cosas, esta cantidad es también el máximo: cuando se completa, nadie más se anota.', style: secundario),
+            ],
+            if (!esComida && (modo == 'libre' || modo == 'cada')) ...[
               espacio,
               const Text('Cupo', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
@@ -909,7 +915,7 @@ class ComidaTarjeta extends StatelessWidget {
     });
     if (ok != true || !context.mounted) return;
     if (n.isEmpty) return avisarSocial(context, 'Escribe el nombre de la sección.');
-    if (cupoTipo.isNotEmpty && (cp == null || cp <= 0)) return avisarSocial(context, 'Indica el cupo.');
+    if ((modo == 'libre' || modo == 'cada') && cupoTipo.isNotEmpty && (cp == null || cp <= 0)) return avisarSocial(context, 'Indica el cupo.');
     try {
       await repo.editarComida(
         categoriaId: c?.id,
@@ -919,8 +925,8 @@ class ComidaTarjeta extends StatelessWidget {
         modo: modo,
         total: tt,
         sugerencias: sug,
-        cupoTipo: cupoTipo,
-        cupo: cupoTipo.isEmpty ? 0 : cp,
+        cupoTipo: modo == 'libre' || modo == 'cada' ? cupoTipo : '',
+        cupo: cupoTipo.isEmpty || !(modo == 'libre' || modo == 'cada') ? 0 : cp,
       );
       alCambiar();
     } catch (e) {
@@ -1024,6 +1030,16 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           '${e.asiste ? 'Mira lo que ya lleva cada quien para no repetir.' : 'Confirma tu asistencia para anotarte.'}',
           style: TextStyle(fontSize: 13, color: p.textoSecundario),
         ),
+        // Tiene dieta o alergias en Salud sin prender para eventos (solo lo ve esa persona).
+        if (e.yo['comidaSinUsar'] == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              'Tienes una dieta o alergias en Salud que no se están tomando en cuenta. Si quieres que se usen (sin tu nombre), '
+              'préndelas en Ajustes → Salud y emergencia → Comida en eventos.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
+          ),
         // Alergias e intolerancias de quienes van, sin nombres (Victor, 2026-11-20).
         if (e.comidaAlergias.isNotEmpty)
           Container(
@@ -1371,7 +1387,10 @@ class RegaloRobadoTarjeta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (repo != null && estado.asiste && !estado.participaRobado) ...[
-            Text('Elegiste no jugar al regalo robado. Para cambiarlo, toca el lápiz.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+            Text(
+              estado.inscripcionAbierta ? 'Elegiste no jugar al regalo robado. Para cambiarlo, toca el lápiz.' : 'Elegiste no jugar al regalo robado.',
+              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+            ),
             const SizedBox(height: 6),
           ],
           FilledButton.icon(
@@ -1398,7 +1417,7 @@ class RegaloRobadoTarjeta extends StatelessWidget {
       icono: Icons.card_giftcard_rounded,
       accion: repo != null && estado.puedeArea('amigo')
           ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).robado())
-          : repo != null && estado.asiste && (estado.juegoRobado['fase'] == null || estado.juegoRobado['fase'] == 'pila')
+          : repo != null && estado.asiste && estado.inscripcionAbierta
           ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).participacion(amigo: false))
           : null,
       children: [
