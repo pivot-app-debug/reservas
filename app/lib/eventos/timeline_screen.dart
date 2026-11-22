@@ -58,9 +58,14 @@ class SenalHoy extends ChangeNotifier {
   /// ícono del Calendario de la barra de abajo pasa a una flecha hacia hoy.
   final lejos = ValueNotifier<int>(0);
 
+  /// Día que se ve arriba en el timeline (Victor, 2026-11-22: el ícono muestra
+  /// su número en vez de una flecha).
+  final dia = ValueNotifier<DateTime?>(null);
+
   @override
   void dispose() {
     lejos.dispose();
+    dia.dispose();
     super.dispose();
   }
 }
@@ -315,6 +320,12 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     final d = _filas[i].dia;
     if (_scrollDelUsuario || _diaArriba == null) _diaArriba = d;
     _avisarLejosDeHoy(pos);
+    final senal = widget.irAHoy;
+    if (senal != null && senal.dia.value != d) {
+      Future.microtask(() {
+        if (mounted) senal.dia.value = d;
+      });
+    }
     if (d.month != _mesVisible.month || d.year != _mesVisible.year) {
       _mesVisible = d;
       if (!_calAbierto) _tituloMes.value = d;

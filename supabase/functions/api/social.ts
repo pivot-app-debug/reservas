@@ -692,7 +692,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
         if (areas.includes('amigo') && amigo) out.push(amigo);
         if (areas.includes('comida') && cfg.comida) out.push('lo que lleva cada quien');
         if (areas.includes('extras') && extras.length) out.push(extras.join(', '));
-        if (areas.includes('invitados') && cfg.invitados) out.push('lxs invitadxs +1');
+        if (areas.includes('invitados') && cfg.invitados) out.push('lxs invitadxs');
         if (areas.includes('homenaje') && piezas.homenaje && !neutral && !yoHomenajeadx) out.push('el homenaje');
         return out;
       };

@@ -2004,8 +2004,11 @@ String _aCargoDe(Map<String, dynamic> x) {
 
 /// Personas a cargo del evento con botones de contacto.
 class ACargoTarjeta extends StatelessWidget {
-  const ACargoTarjeta({super.key, required this.personas, this.redes = const [], this.alEditar});
+  const ACargoTarjeta({super.key, required this.personas, this.redes = const [], this.alEditar, this.alTocarPersona});
   final List<Map<String, dynamic>> personas;
+
+  /// Quien organiza toca a unx encargadx para cambiar de qué está a cargo (Victor, 2026-11-22).
+  final void Function(String usuario)? alTocarPersona;
 
   /// Quien creó el evento (o un Pivot) cambia responsables y responsabilidades.
   final VoidCallback? alEditar;
@@ -2028,8 +2031,10 @@ class ACargoTarjeta extends StatelessWidget {
               final canales = canalesPara(completo, redes).where((c) => c.$1 != 'Mensaje de texto');
               final email = '${x['email'] ?? ''}';
               final yo = x['yo'] == true;
+              final tocar = alTocarPersona != null && x['organiza'] != true ? () => alTocarPersona!('${x['username']}') : null;
               return ListTile(
                 contentPadding: EdgeInsets.zero,
+                onTap: tocar,
                 leading: AvatarPersona(nombre: '${x['nombre'] ?? ''}', foto: '${x['foto'] ?? ''}', tamano: 40),
                 title: Text('${x['nombre'] ?? ''}${yo ? ' (tú)' : ''}', style: TextStyle(color: p.texto)),
                 // De qué está a cargo cada quien, para saber a quién preguntar (Victor, 2026-11-20).

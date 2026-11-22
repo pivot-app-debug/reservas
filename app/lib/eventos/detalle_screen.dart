@@ -6,6 +6,7 @@ import '../coach/coach_screen.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/moneda.dart';
+import '../core/navegacion.dart';
 import '../core/reloj.dart';
 import '../core/tema.dart';
 import '../reservas/gestionar_reserva.dart';
@@ -73,9 +74,30 @@ class _DetalleScreenState extends State<DetalleScreen> {
 
   bool get _esAdmin => repo.sesion.esAdmin && repo.sesion.adminToken != null;
 
+  /// Fecha del evento en el ícono del Calendario mientras se ve (Victor,
+  /// 2026-11-22); al salir vuelve la que había.
+  DateTime? _diaAntes;
+
+  DateTime? get _diaDelEvento {
+    final ev = repo.porId(widget.eventoId);
+    if (ev != null) return ev.fecha;
+    final m = RegExp(r'^ev_(\d{4})(\d{2})(\d{2})').firstMatch(widget.eventoId);
+    return m == null ? null : DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+  }
+
+  @override
+  void dispose() {
+    final antes = _diaAntes;
+    WidgetsBinding.instance.addPostFrameCallback((_) => Navegacion.diaEvento.value = antes);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _diaAntes = Navegacion.diaEvento.value;
+    final dia = _diaDelEvento;
+    if (dia != null) WidgetsBinding.instance.addPostFrameCallback((_) => Navegacion.diaEvento.value = dia);
     if (repo.porId(widget.eventoId) == null) repo.cargar(forzar: true);
     _cargarSinRespuesta();
     // Qué llevar (Pivots): pill con lo que reservó cada persona.

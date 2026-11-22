@@ -14,4 +14,8 @@ class Navegacion {
   /// 2026-11-22): 'novedades' | 'tareas' | 'cursos' | 'pagos'. Lo aplica el
   /// Calendario y vuelve a null.
   static final actividad = ValueNotifier<String?>(null);
+
+  /// Fecha del evento abierto (Victor, 2026-11-22): el ícono del Calendario
+  /// muestra ese día mientras se ve el detalle.
+  static final diaEvento = ValueNotifier<DateTime?>(null);
 }

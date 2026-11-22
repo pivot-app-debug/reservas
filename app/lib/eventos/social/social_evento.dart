@@ -391,13 +391,87 @@ class SocialEnEventoState extends State<SocialEnEvento> {
   );
 
   /// Dudas y preguntas: las personas a cargo, desde la barra del evento.
+  /// Quien creó el evento toca a alguien para elegir de qué está a cargo, y
+  /// con el lápiz suma o quita encargadxs (Victor, 2026-11-22).
   Future<void> abrirDudas() => abrirSubseccionSocial(
     context,
     idEvento: _id,
     titulo: 'Dudas y preguntas',
-    contenido: (e) =>
-        ACargoTarjeta(personas: e.aCargo, redes: _redes, alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null),
+    contenido: (e) {
+      final edita = e.organiza && e.editable?['misPermisos'] is! List;
+      return ACargoTarjeta(personas: e.aCargo, redes: _redes, alTocarPersona: edita ? (u) => _rolDe(e, u) : null, alEditar: edita ? _editarResponsables : null);
+    },
   );
+
+  static const _areasACargo = [
+    ('fecha', 'Fecha, hora y lugar', Icons.event_outlined),
+    ('amigo', 'Amigo secreto y regalo robado', Icons.redeem_rounded),
+    ('comida', 'Qué llevar', Icons.restaurant_rounded),
+    ('extras', 'Playlist, dress code y premios', Icons.music_note_rounded),
+    ('invitados', 'Invitadxs', Icons.person_add_alt_rounded),
+    ('homenaje', 'Homenaje y sorpresa', Icons.favorite_border_rounded),
+  ];
+
+  /// De qué está a cargo unx encargadx (panel corto desde abajo).
+  Future<void> _rolDe(EstadoSocial e, String usuario) async {
+    final ed = e.editable ?? const {};
+    final encargados = [for (final x in (ed['encargados'] as List? ?? const [])) '$x'];
+    final permisos = <String, Set<String>>{
+      for (final u in encargados)
+        u: {
+          for (final a in ((ed['permisos'] as Map?)?[u] as List? ?? const ['fecha', 'amigo', 'comida', 'extras', 'invitados'])) '$a',
+        },
+    };
+    final mio = {...permisos[usuario] ?? const <String>{}};
+    final nombre = '${e.aCargo.where((x) => x['username'] == usuario).firstOrNull?['nombre'] ?? usuario}';
+    final r = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('¿De qué está a cargo $nombre?', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                for (final (clave, texto, icono) in _areasACargo)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: Icon(icono),
+                    title: Text(texto),
+                    value: mio.contains(clave),
+                    onChanged: (v) => set(() => v == true ? mio.add(clave) : mio.remove(clave)),
+                  ),
+                const SizedBox(height: 12),
+                FilledButton(onPressed: () => Navigator.pop(h, 'guardar'), child: const Text('Guardar')),
+                TextButton(onPressed: () => Navigator.pop(h, 'quitar'), child: const Text('Ya no es encargadx')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (r == null || !mounted) return;
+    if (r == 'quitar') {
+      encargados.remove(usuario);
+      permisos.remove(usuario);
+    } else {
+      permisos[usuario] = mio;
+    }
+    try {
+      await _social.guardar({
+        'encargados': encargados,
+        'permisos': {for (final u in encargados) u: permisos[u]!.toList()},
+      });
+      await _cargar();
+    } catch (err) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.toString())));
+    }
+  }
 
   /// Invitar a alguien de fuera del equipo (desde Tu asistencia).
   Future<void> abrirInvitados() => showModalBottomSheet<void>(

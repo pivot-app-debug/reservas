@@ -1593,7 +1593,7 @@ async function adminResolverRevisionEquipo(params: Record<string, any>): Promise
   const { error } = await supabase.from('equipo').update(u).eq('username', nombre);
   if (error) return { exito: false, error: error.message };
   await _registrarAjuste('revisionEquipo', r, { decision: devolver ? 'devolver' : 'mantener' }, email);
-  await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Revisión de tu equipo' }, contents: { es: texto }, url: APP_URL + '/' }).catch(() => {});
+  await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Revisión de tu equipo' }, contents: { es: texto }, url: APP_URL + '/', pantalla: 'equipo' }).catch(() => {});
   return { exito: true };
 }
 

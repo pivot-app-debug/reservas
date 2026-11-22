@@ -183,20 +183,26 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            child: ValueListenableBuilder<int>(
-              valueListenable: _irAHoy.lejos,
-              builder: (context, lejos, _) => AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                transitionBuilder: (hijo, anim) => FadeTransition(
-                  opacity: anim,
-                  child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(anim), child: hijo),
-                ),
-                child: lejos == 0 || indiceActual != 0
-                    ? _IconoHoy(key: const ValueKey('dia'), dia: Fechas.hoy().day)
-                    : _IconoFlechaHoy(key: ValueKey(lejos), arriba: lejos < 0),
-              ),
+            // Hoy: recuadro rojo con el número claro. Otra fecha del timeline o un
+            // evento abierto: el número de ese día (Victor, 2026-11-22).
+            child: ListenableBuilder(
+              listenable: Listenable.merge([_irAHoy.lejos, _irAHoy.dia, Navegacion.diaEvento]),
+              builder: (context, _) {
+                final hoy = Fechas.hoy();
+                final evento = Navegacion.diaEvento.value;
+                final DateTime dia = evento ?? (_irAHoy.lejos.value == 0 || indiceActual != 0 ? hoy : (_irAHoy.dia.value ?? hoy));
+                final esHoy = evento == null && Fechas.soloDia(dia) == hoy;
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (hijo, anim) => FadeTransition(
+                    opacity: anim,
+                    child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(anim), child: hijo),
+                  ),
+                  child: _IconoHoy(key: ValueKey('${dia.day}-$esHoy'), dia: dia.day, relleno: esHoy),
+                );
+              },
             ),
           ),
           label: 'Calendario',
@@ -286,30 +292,21 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   }
 }
 
-/// Flecha hacia hoy (arriba o abajo): aparece en lugar
-/// del número del día cuando el timeline se aleja de hoy.
-class _IconoFlechaHoy extends StatelessWidget {
-  const _IconoFlechaHoy({super.key, required this.arriba});
-  final bool arriba;
-
-  @override
-  Widget build(BuildContext context) {
-    // Sin el puntito rojo (Victor, 2026-11-16): solo la flecha.
-    return Icon(arriba ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded);
-  }
-}
-
 /// Ícono de Eventos: cuadrado redondeado con el número del día adentro
 /// (como el de Google Calendar). Siempre en contorno: la selección ya la marca el fondo
 /// de la pestaña (un ícono lleno se veía como un cuadrado sin forma).
 class _IconoHoy extends StatelessWidget {
-  const _IconoHoy({super.key, required this.dia});
+  const _IconoHoy({super.key, required this.dia, this.relleno = false});
   final int dia;
+
+  /// Hoy: recuadro rojo lleno y número claro.
+  final bool relleno;
 
   @override
   Widget build(BuildContext context) {
     final tema = IconTheme.of(context);
-    final color = tema.color ?? context.pivot.texto;
+    final p = context.pivot;
+    final color = relleno ? p.sobreMarca : (tema.color ?? p.texto);
     return SizedBox(
       width: 24,
       height: 24,
@@ -322,7 +319,8 @@ class _IconoHoy extends StatelessWidget {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              border: Border.all(color: color, width: 2),
+              color: relleno ? p.marca : null,
+              border: Border.all(color: relleno ? p.marca : color, width: 2),
               borderRadius: BorderRadius.circular(PivotRadios.iconoDia),
             ),
           ),
