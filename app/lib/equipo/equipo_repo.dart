@@ -202,20 +202,37 @@ class EquipoRepo extends ChangeNotifier {
   Future<void> archivar(Integrante p) => _admin('adminEliminarUsuario', {'nombre': p.username});
 
   /// Pago de cuota registrado a mano (efectivo, De Una o banco).
-  Future<void> registrarPago(Integrante p, {required DateTime mes, required double monto, required String forma, String notas = ''}) =>
-      _admin('adminRegistrarPago', {
-        'datosJson': jsonEncode({
-          'nombre': p.username,
-          'mes': mes.month,
-          'anio': mes.year,
-          'monto': monto,
-          'formaPago': forma,
-          'tipo': 'mensual',
-          'esManual': true,
-          'fecha': Fechas.iso(Fechas.hoy()),
-          if (notas.trim().isNotEmpty) 'notas': notas.trim(),
-        }),
-      });
+  /// Clases para registrar un pago a mano (con si debe, está pagada o pendiente),
+  /// precios de su equipo y su saldo (Victor, 2026-11-21).
+  Future<Map<String, dynamic>> clasesParaPago(Integrante p) async {
+    final r = await _api.get('adminClasesParaPago', {'adminToken': sesion.adminToken, 'nombre': p.username});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudieron cargar las clases.'}');
+    return r;
+  }
+
+  /// tipo: 'mensual' (mes), 'clase' (idEvento) o 'saldo' (todo queda a favor).
+  Future<void> registrarPago(
+    Integrante p, {
+    required DateTime mes,
+    required double monto,
+    required String forma,
+    String notas = '',
+    String tipo = 'mensual',
+    String? idEvento,
+  }) => _admin('adminRegistrarPago', {
+    'datosJson': jsonEncode({
+      'nombre': p.username,
+      'mes': mes.month,
+      'anio': mes.year,
+      'monto': monto,
+      'formaPago': forma,
+      'tipo': tipo,
+      'idEvento': ?idEvento,
+      'esManual': true,
+      'fecha': Fechas.iso(Fechas.hoy()),
+      if (notas.trim().isNotEmpty) 'notas': notas.trim(),
+    }),
+  });
 
   /// "No paga (mes)": excepción manual de ese mes, queda en su historial.
   Future<void> noPagaMes(Integrante p, DateTime mes, {String notas = ''}) => _admin('guardarExcepcionCuota', {
@@ -232,7 +249,12 @@ class EquipoRepo extends ChangeNotifier {
 
   /// Asistencia fuera de la liga (web `_eqRegistrarAsistExterna()`); recalcula puntos.
   /// Clase gratis de bienvenida: darla o quitarla (web "Cupones").
-  Future<void> cambiarCupon(Integrante p, bool disponible) => _admin('adminToggleCupon', {'nombre': p.username, 'cuponDisponible': '$disponible'});
+  /// No espera a recargar Equipo: la ficha ya muestra el cambio.
+  Future<void> cambiarCupon(Integrante p, bool disponible) async {
+    final r = await _api.post('adminToggleCupon', {'adminToken': sesion.adminToken, 'nombre': p.username, 'cuponDisponible': '$disponible'});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo guardar.'}');
+    unawaited(cargar(forzar: true));
+  }
 
   /// Asistencias externas de una persona, de la más nueva a la más vieja.
   Future<List<Map<String, dynamic>>> asistenciasExternas(Integrante p) async {

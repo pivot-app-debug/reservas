@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-21 (pagos a mano y saldo a favor)
+- Registrar pago es una subsección que abre al instante: mensualidad (6 meses atrás y 6 adelante), una clase (también la que quedó debiendo por venir sin reserva) o dinero a favor. Lo que pase del precio queda como saldo a favor.
+- Al pagar o reservar, cada quien elige cuánto de su saldo a favor usar (todo, la mitad o lo que quiera), también en clases.
+- En Tesorería se puede devolver el saldo a favor, con motivo.
+- La clase de hoy que ya cerró aparece en Reservar con la hora a la que cerraron las reservas.
+- No paga un mes: 6 meses atrás y 6 adelante. Asistencias externas: ver y registrar en una misma subsección. Marcar viaje: el gesto de volver ya no saca de la ficha. El cupón de clase gratis cambia al instante.
+- Habilidades salió de Equipo: se marcan y se gestionan en la ficha deportiva de cada persona.
+
 ## 2026-11-20 (vista de fiesta rediseñada)
 - Cada tarjeta tiene el mismo formato: ícono en un cuadrito, título y una pastilla con tu estado (Tu parte 50 %, Participas, 1 de 2).
 - Nuevo orden: lo que te toca primero (Qué lleva, Amigo secreto, Regalo robado, +1) y al final una tarjeta "Detalles" con Dress code, Playlist, Premios y Dudas y preguntas, que se abren al tocarlas.

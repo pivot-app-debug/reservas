@@ -314,7 +314,7 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminClasesParaPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
@@ -604,7 +604,7 @@ function _horaTextoADate(horaStr: string | null): Date | null {
   return d;
 }
 
-async function _proximosEntrenamientos(): Promise<any[]> {
+async function _proximosEntrenamientos(incluirCerradas = false): Promise<any[]> {
   const reglasRes = await _reglasLiga();
   const cierraMs = (Number(reglasRes.reservaCierraHoras) >= 0 ? Number(reglasRes.reservaCierraHoras) : 2) * 3600 * 1000;
   const ecuadorNow = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
@@ -620,9 +620,14 @@ async function _proximosEntrenamientos(): Promise<any[]> {
     const [yr, mo, dy] = f.fecha.split('-').map(Number);
     const [h, m] = (f.inicia ?? '00:00').split(':').map(Number);
     const inicioUTC = new Date(Date.UTC(yr, mo - 1, dy, h + 5, m, 0, 0)); // Ecuador = UTC-5
-        const limite = new Date(inicioUTC.getTime() - cierraMs);
-    return ahora < limite;
+                const limite = new Date(inicioUTC.getTime() - cierraMs);
+    if (ahora < limite) return true;
+    // Las de hoy que ya cerraron también se muestran, con el motivo (Victor, 2026-11-21:
+    // alguien entró a reservar y no vio la clase de hoy ni por qué).
+    if (incluirCerradas && f.fecha === hoyISO && ahora < inicioUTC) { f._cerrada = limite; return true; }
+    return false;
   }).map((f: any) => ({
+    cerradaDesde: f._cerrada ? new Date(f._cerrada.getTime() - 5 * 3600 * 1000).toISOString().slice(11, 16) : null,
     idEvento: f.id_evento, fecha: f.fecha, donde: f.donde,
     horaInicio: f.inicia ? f.inicia.substring(0, 5) : '',
     horaFin:    f.termina ? f.termina.substring(0, 5) : '',
@@ -6158,7 +6163,7 @@ function _faltaDeLiga(o: { eq: Record<string, string>; listas: ListaEntrenar[]; 
 async function getFechasDisponibles(params: Record<string, any>): Promise<any[]> {
   const { nombre, talla, necesitaProtecciones } = params;
     const otras = await _otrasDeLiga(String(nombre ?? ''), params.equipo);
-  const proximos = await _proximosEntrenamientos();
+    const proximos = await _proximosEntrenamientos(true);
   const { data: tallasSupa } = await supabase.from('equipamiento_tallas').select('talla, cantidad');
   const stockPatines: Record<string, number> = {};
   (tallasSupa ?? []).forEach((t: any) => { stockPatines[t.talla] = t.cantidad; });
@@ -6172,7 +6177,8 @@ async function getFechasDisponibles(params: Record<string, any>): Promise<any[]>
   return proximos.map((ev: any) => {
     const idEvento = ev.idEvento;
     const extra = { mapsUrl: ev.mapsUrl, descripcion: ev.descripcion, horaFin: ev.horaFin, duracion: ev.duracion, donde: ev.donde, horaInicio: ev.horaInicio, fechaCalendario: ev.fecha, videoInstructivo: ev.videoInstructivo ?? '' };
-    const yaReservo = resArr.some((r: any) => r.nombre_usuario === nombre && r.id_evento === idEvento);
+        const yaReservo = resArr.some((r: any) => r.nombre_usuario === nombre && r.id_evento === idEvento);
+    if (ev.cerradaDesde && !yaReservo) return { ...extra, fecha: idEvento, disponible: false, razon: `Las reservas para esta clase cerraron a las ${ev.cerradaDesde}` };
     if (yaReservo) return { ...extra, fecha: idEvento, disponible: false, razon: 'Ya tienes una reserva para esta fecha' };
     const reservasEstaFecha = resArr.filter((r: any) => r.id_evento === idEvento);
     if (talla && talla !== '') {
@@ -6279,8 +6285,10 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
   if (montoFinal > 0 && (await _validarToken(String(params.token ?? ''))) === nombre) {
     const pide = String(params.saldo ?? '');
     const disp = await _saldoDisponible(nombre);
-    if (pide === 'usar' && esMensual && disp > 0) {
-      saldoAplicado = _num2(Math.min(disp, montoFinal)); montoFinal = _num2(montoFinal - saldoAplicado);
+        // La persona elige cuánto usar (Victor, 2026-11-21), también en clases.
+    const tope = Number(params.saldoMonto) > 0 ? Number(params.saldoMonto) : Infinity;
+    if (pide === 'usar' && disp > 0) {
+      saldoAplicado = _num2(Math.min(disp, montoFinal, tope)); montoFinal = _num2(montoFinal - saldoAplicado);
     } else if (disp < 0) {
       const obligada = await _deudaClases(nombre, disp);
       const deuda = pide === 'pagar' ? -disp : obligada;
@@ -6327,7 +6335,7 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
         medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
   }).select('id, monto').maybeSingle();
   // El id permite subir el comprobante justo después (2026-11-14).
-  return { exito: true, id: nueva?.id ?? null, monto: Number(nueva?.monto) || 0 };
+  return { exito: true, id: nueva?.id ?? null, monto: Number(nueva?.monto) || 0, saldoAplicado: saldoAplicado ?? 0 };
 }
 
 // Fin del mes que cubre una reserva mensual (mismo cálculo que
@@ -7159,18 +7167,24 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     // tipo: 'a_favor' (pagó de más / el equipo le debe), 'cargo' (debe), 'prestamo'
     // (el equipo le prestó: sale de una cuenta), 'abono' (paga lo que debe: entra a una cuenta).
     const u = String(d.username ?? '').trim();
-    const tipo = ['cargo', 'abono', 'prestamo', 'a_favor'].includes(String(d.tipo)) ? String(d.tipo) : '';
+        // 'devolucion' (Victor, 2026-11-21): se le devuelve su saldo a favor; sale de una cuenta y pide motivo.
+    const tipo = ['cargo', 'abono', 'prestamo', 'a_favor', 'devolucion'].includes(String(d.tipo)) ? String(d.tipo) : '';
     const monto = _num2(Math.abs(Number(d.monto)));
     if (!u || !tipo) return { exito: false, error: 'Faltan datos.' };
     if (!(monto > 0)) return { exito: false, error: 'El monto debe ser mayor a 0.' };
     const concepto = String(d.concepto ?? '').trim().slice(0, 200);
     if (!concepto) return { exito: false, error: 'Escribe el concepto.' };
-    const signo = tipo === 'a_favor' || tipo === 'abono' ? 1 : -1;
+        const signo = tipo === 'a_favor' || tipo === 'abono' ? 1 : -1;
+    if (tipo === 'devolucion') {
+      const disp = await _saldoDisponible(u);
+      if (monto > disp) return { exito: false, error: `Solo tiene ${_monedaLiga}${_num2(Math.max(0, disp))} a favor.` };
+    }
     let movimientoId: string | null = null;
-    if ((tipo === 'prestamo' || tipo === 'abono' || tipo === 'a_favor') && d.cuentaId) {
+    if ((tipo === 'prestamo' || tipo === 'abono' || tipo === 'a_favor' || tipo === 'devolucion') && d.cuentaId) {
+      const sale = tipo === 'prestamo' || tipo === 'devolucion';
       movimientoId = await _registrarMovimiento({
-        fecha: fechaOk(d.fecha) ?? hoy, tipo: tipo === 'prestamo' ? 'egreso' : 'ingreso', monto, cuenta_id: d.cuentaId,
-        categoria: tipo === 'prestamo' ? 'prestamo' : 'abono', descripcion: concepto, persona: u, origen: 'saldo', registrado_por: email,
+        fecha: fechaOk(d.fecha) ?? hoy, tipo: sale ? 'egreso' : 'ingreso', monto, cuenta_id: d.cuentaId,
+        categoria: tipo === 'prestamo' ? 'prestamo' : tipo === 'devolucion' ? 'otro' : 'abono', descripcion: tipo === 'devolucion' ? `Devolución de saldo: ${concepto}` : concepto, persona: u, origen: 'saldo', registrado_por: email,
       });
     }
     const { error } = await supabase.from('saldos_movimientos').insert({
@@ -7297,14 +7311,108 @@ async function getTransparencia(params: Record<string, any>): Promise<Record<str
 // (hoy el 100% de `pagos` se origina en una acción admin manual); `idEvento`
 // -- solo se completa para `tipo:'clase'`, trazabilidad hacia el evento real
 // (ver migración `20260912160000_pagos_manual_wizard.sql`).
+/// Clases de una persona para registrarle un pago a mano (Victor, 2026-11-21):
+/// las de los últimos 45 días y los próximos 30, con si ya está pagada, si
+/// quedó debiendo (vino sin reserva o pasó a deuda) o si tiene una reserva
+/// pendiente de aprobar.
+async function adminClasesParaPago(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const nombre = String(params.nombre ?? '').trim();
+  if (!nombre) return { exito: false, error: 'Falta la persona.' };
+  const hoy = _hoyEcuadorISO();
+  const desde = new Date(Date.parse(hoy) - 45 * 86400000).toISOString().slice(0, 10);
+  const hasta = new Date(Date.parse(hoy) + 30 * 86400000).toISOString().slice(0, 10);
+  const [{ data: evs }, { data: res }, { data: p }] = await Promise.all([
+    supabase.from('asistencias').select('id_evento, fecha, inicia, donde, estado, tipo_evento').eq('tipo_evento', 'Entrenamiento')
+      .not('estado', 'in', '("Evento Cancelado","Eliminado")').gte('fecha', desde).lte('fecha', hasta).order('fecha', { ascending: false }),
+    supabase.from('reservas').select('id_evento, estado, motivo_rechazo, monto').eq('nombre_usuario', nombre).not('id_evento', 'is', null).gte('fecha_pago', desde),
+    supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle(),
+  ]);
+    const precios = await getPreciosClases({}, p?.categoria ?? null);
+  const precio = Number(precios.precioPorClase) || 0;
+  const clases = (evs ?? []).map((e: any) => {
+    const rs = (res ?? []).filter((r: any) => r.id_evento === e.id_evento);
+    const deuda = rs.find((r: any) => r.estado === 'Cancelada' && (r.motivo_rechazo === VINO_SIN_RESERVA || r.motivo_rechazo === 'Pasó a deuda'));
+    const estado = rs.some((r: any) => r.estado === 'Confirmada') ? 'pagada' : rs.some((r: any) => r.estado === 'Pendiente') ? 'pendiente' : deuda ? 'debe' : '';
+    return { idEvento: e.id_evento, fecha: e.fecha, hora: String(e.inicia ?? '').slice(0, 5), lugar: e.donde ?? '', estado, monto: deuda ? _num2(Number(deuda.monto) || 0) : precio };
+  });
+    return { exito: true, clases, precioPorClase: precio, precioMensual: Number(precios.precioMensual) || 0, saldo: await _saldoDisponible(nombre) };
+}
+
 async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
   const adminEmail = await _validarAdminToken(params.adminToken);
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
   let datos = params.datosJson ?? params.datos;
   if (typeof datos === 'string') datos = JSON.parse(datos);
+  const nombre = String(datos.nombre ?? '').trim();
+  const montoTotal = _num2(Number(datos.monto) || 0);
+  const cuentaPago = async () => String(datos.cuentaId ?? '') || await _cuentaPorMedio(String(datos.formaPago ?? '').toLowerCase().includes('deuna') ? 'deuna' : String(datos.formaPago ?? '').toLowerCase().includes('efectivo') ? 'efectivo' : 'transferencia');
+  const aFavor = async (monto: number, concepto: string) => {
+    if (!(monto > 0)) return;
+    await supabase.from('saldos_movimientos').insert({
+      username: nombre, persona_nombre: await _nombrePersona(nombre), fecha: _hoyEcuadorISO(), monto: _num2(monto), tipo: 'a_favor', aplicar: 'aparte', concepto, por: adminEmail,
+    });
+  };
+  // Pago libre (Victor, 2026-11-21): todo queda como saldo a favor para usar después.
+  if (datos.tipo === 'saldo') {
+    if (!nombre || !(montoTotal > 0)) return { exito: false, error: 'Indica el monto.' };
+    const cuenta = await cuentaPago();
+    const movId = cuenta ? await _registrarMovimiento({
+      fecha: _hoyEcuadorISO(), tipo: 'ingreso', monto: montoTotal, cuenta_id: cuenta, categoria: 'abono',
+      descripcion: String(datos.notas ?? '').trim() || 'Saldo a favor', persona: nombre, origen: 'saldo', registrado_por: adminEmail,
+    }) : null;
+    await supabase.from('saldos_movimientos').insert({
+      username: nombre, persona_nombre: await _nombrePersona(nombre), fecha: _hoyEcuadorISO(), monto: montoTotal, tipo: 'a_favor', aplicar: 'aparte',
+      concepto: String(datos.notas ?? '').trim().slice(0, 200) || 'Pago a favor', movimiento_id: movId, por: adminEmail,
+    });
+    return { exito: true, saldo: (await _saldoPersonas(nombre))[nombre] ?? 0 };
+  }
+  // Pago de una clase: salda la deuda si vino sin reserva o pasó a deuda; si no,
+  // queda su reserva confirmada (así no se le cobra al tomar asistencia).
+  let extraClase = 0;
+  if (datos.tipo === 'clase') {
+    const idEvento = String(datos.idEvento ?? '');
+    if (!nombre || !idEvento) return { exito: false, error: 'Elige la clase.' };
+    if (!(montoTotal > 0)) return { exito: false, error: 'Indica el monto.' };
+    const { data: rs } = await supabase.from('reservas').select('id, estado, motivo_rechazo, monto, saldo_movimiento_id').eq('nombre_usuario', nombre).eq('id_evento', idEvento);
+    if ((rs ?? []).some((r: any) => r.estado === 'Confirmada')) return { exito: false, error: 'Esa clase ya está pagada.' };
+    if ((rs ?? []).some((r: any) => r.estado === 'Pendiente')) return { exito: false, error: 'Tiene una reserva pendiente para esa clase: apruébala desde Novedades.' };
+    const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
+    const que = ev?.fecha ? `Clase del ${_fechaCorta(ev.fecha)}` : 'Clase';
+    const deuda = (rs ?? []).find((r: any) => r.estado === 'Cancelada' && (r.motivo_rechazo === VINO_SIN_RESERVA || r.motivo_rechazo === 'Pasó a deuda'));
+    if (deuda) {
+      const debe = _num2(Number(deuda.monto) || 0);
+      const paga = Math.min(montoTotal, debe);
+      await supabase.from('saldos_movimientos').insert({
+        username: nombre, persona_nombre: await _nombrePersona(nombre), fecha: _hoyEcuadorISO(), monto: _num2(paga), tipo: 'abono', aplicar: 'con_cuota',
+        concepto: `${que}: pagada`, por: adminEmail,
+      });
+      extraClase = _num2(montoTotal - paga);
+    } else {
+      const precio = Number((await getPreciosClases({}, (await supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle()).data?.categoria ?? null)).precioPorClase) || montoTotal;
+      const paga = Math.min(montoTotal, precio);
+      await supabase.from('reservas').insert({
+        nombre_usuario: nombre, id_evento: idEvento, tipo: 'clase', estado: 'Confirmada', monto: _num2(paga), fecha_pago: _hoyEcuadorISO(),
+        medio_pago: String(datos.formaPago ?? '').toLowerCase().includes('deuna') ? 'deuna' : String(datos.formaPago ?? '').toLowerCase().includes('efectivo') ? 'efectivo' : 'transferencia',
+      });
+      extraClase = _num2(montoTotal - paga);
+    }
+    await aFavor(extraClase, `${que}: pagó de más`);
+  }
+  // Mensualidad: si paga más que la cuota, el resto queda a favor.
+  let montoPago = montoTotal;
+  if (datos.tipo !== 'clase' && !datos.exoneradx && montoTotal > 0 && nombre) {
+    const cat = (await supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle()).data?.categoria ?? null;
+    const precioMes = Number((await getPreciosClases({}, cat)).precioMensual) || 0;
+    if (precioMes > 0 && montoTotal > precioMes) {
+      montoPago = _num2(precioMes);
+      await aFavor(_num2(montoTotal - precioMes), `Cuota ${datos.mes}/${datos.anio}: pagó de más`);
+    }
+  }
   const { data, error } = await supabase.from('pagos').insert({
     nombre_usuario: datos.nombre, mes: datos.mes, anio: datos.anio, exoneradx: !!datos.exoneradx,
-    monto: datos.monto ?? 0, forma_pago: datos.formaPago ?? null, comprobante_url: datos.comprobanteUrl ?? null,
+        monto: datos.tipo === 'clase' ? montoTotal : montoPago, forma_pago: datos.formaPago ?? null, comprobante_url: datos.comprobanteUrl ?? null,
     notas: datos.notas ?? null, fecha: datos.fecha ?? null,
     tipo: datos.tipo === 'clase' ? 'clase' : 'mensual',
     es_manual: datos.esManual !== false,
@@ -7315,7 +7423,8 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
   if (pago && Number(pago.monto) > 0 && !pago.exoneradx) {
     const cuenta = String(datos.cuentaId ?? '') || await _cuentaPorMedio(String(datos.formaPago ?? '').toLowerCase().includes('deuna') ? 'deuna' : String(datos.formaPago ?? '').toLowerCase().includes('efectivo') ? 'efectivo' : 'transferencia');
     if (cuenta) await _registrarMovimiento({
-      fecha: _hoyEcuadorISO(), tipo: 'ingreso', monto: Number(pago.monto), cuenta_id: cuenta, categoria: pago.tipo === 'clase' ? 'clase' : 'cuota',
+            // Entra a la cuenta todo lo que pagó (también lo que quedó a favor).
+      fecha: _hoyEcuadorISO(), tipo: 'ingreso', monto: montoTotal || Number(pago.monto), cuenta_id: cuenta, categoria: pago.tipo === 'clase' ? 'clase' : 'cuota',
       descripcion: pago.tipo === 'clase' ? 'Clase' : `Cuota ${pago.mes}/${pago.anio}`, persona: pago.nombre_usuario, origen: 'pago', origen_id: String(pago.id), registrado_por: adminEmail,
     });
   }
@@ -13194,7 +13303,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'actualizarTallaReserva':          return json(await actualizarTallaReserva(params));
       case 'usarCreditos':                    return json(await usarCreditos(params));
       // Pagos
-      case 'adminRegistrarPago':              return json(await adminRegistrarPago(params));
+            case 'adminRegistrarPago':              return json(await adminRegistrarPago(params));
+      case 'adminClasesParaPago':             return json(await adminClasesParaPago(params));
       case 'adminRegistrarIngreso':           return json(await adminRegistrarIngreso(params));
       case 'adminRegistrarEgreso':            return json(await adminRegistrarEgreso(params));
       case 'adminGetEstadoPagosMes':          return json(await adminGetEstadoPagosMes(params));

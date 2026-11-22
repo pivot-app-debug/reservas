@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../coach/coach_screen.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
+import '../core/moneda.dart';
 import '../core/reloj.dart';
 import '../core/tema.dart';
 import '../reservas/gestionar_reserva.dart';
@@ -450,7 +451,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
       child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Fiesta: cuánto falta, arriba de todo (Victor, 2026-11-20).
           if (ev.tipo == kTipoSocial && !ev.yaEmpezo) ...[
@@ -518,6 +519,13 @@ class _DetalleScreenState extends State<DetalleScreen> {
 
   /// Clase de gracia usada y el mes sin pagar: ofrece ir a pagar.
   Future<void> _pagarCuota(CuotaPendiente e) async {
+    // Con saldo a favor se le dice que puede usarlo (Victor, 2026-11-21).
+    double saldo = 0;
+    try {
+      final r = await repo.sesion.api.get('getMiSaldo');
+      saldo = ((r['saldo'] as num?) ?? 0).toDouble();
+    } catch (_) {}
+    if (!mounted) return;
     final ir = await showModalBottomSheet<bool>(
       useRootNavigator: true,
       context: context,
@@ -529,9 +537,19 @@ class _DetalleScreenState extends State<DetalleScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Tu cuota de ${Fechas.mes(e.mes)}', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                saldo > 0 ? 'Registra tu suscripción de ${Fechas.mes(e.mes)}' : 'Tu cuota de ${Fechas.mes(e.mes)}',
+                style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
               Text(e.mensaje),
+              if (saldo > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Tienes ${Moneda.s}${saldo.toStringAsFixed(2)} a favor: puedes usar todo o una parte para pagar ese mes.',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: h.pivot.marcaTexto),
+                ),
+              ],
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: () => Navigator.of(h).pop(true),

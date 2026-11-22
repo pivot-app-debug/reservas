@@ -54,6 +54,9 @@ class _ReservaScreenState extends State<ReservaScreen> {
 
   /// Saldo con el equipo (solo cuotas): a favor (+) o en contra (−) y si la persona lo aplica.
   double _saldo = 0, _deudaClases = 0;
+
+  /// Cuánto del saldo a favor usar (Victor, 2026-11-21: la persona elige).
+  double? _usarSaldo;
   bool _aplicarSaldo = false;
   List<FechaClase>? _clases;
   List<MesReserva>? _meses;
@@ -152,7 +155,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
             for (final c in _clases ?? const <FechaClase>[])
               if (_clasesSel.contains(c.id)) c.fecha,
           ],
-          saldo: _aplicarSaldo ? _saldo : 0,
+          saldo: _aplicarSaldo ? (_saldo > 0 ? (_usarSaldo ?? _saldo) : _saldo) : 0,
           deudaObligatoria: _deudaClases,
         );
 
@@ -689,6 +692,12 @@ class _ReservaScreenState extends State<ReservaScreen> {
 
   // ─── Paso 2: pago ─────────────────────────────────────────────────────
 
+  /// Lo máximo del saldo que se puede usar en este pago.
+  double _maxSaldo(Total t) {
+    final sinSaldo = t.monto + (t.saldo > 0 ? t.saldo : 0);
+    return double.parse((_saldo < sinSaldo ? _saldo : sinSaldo).toStringAsFixed(2));
+  }
+
   Widget _pasoPago(BuildContext context, Total t) {
     final p = context.pivot;
     final cuponPosible = !_esMes && _hayCupon && _cantidad - t.sinCobro > t.aFavor;
@@ -712,7 +721,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
                     ),
                   ),
                 )
-              : _esMes && _saldo != 0
+              : _saldo > 0 || (_esMes && _saldo != 0)
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Material(
@@ -725,11 +734,44 @@ class _ReservaScreenState extends State<ReservaScreen> {
                       title: Text(_saldo > 0 ? 'Usar mi saldo a favor' : 'Pagar lo que debo junto con la cuota'),
                       subtitle: Text(
                         _saldo > 0
-                            ? 'Tienes ${ReservasRepo.dinero(_saldo)} a favor con el equipo. Se descuenta de esta cuota.'
+                            ? 'Tienes ${ReservasRepo.dinero(_saldo)} a favor con el equipo. Elige cuánto usar en este pago.'
                             : 'Tienes ${ReservasRepo.dinero(-_saldo)} pendientes con el equipo. Se suman a esta cuota.',
                       ),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
                     ),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+        // Cuánto usar del saldo a favor: todo, una parte o lo que quieras.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          child: _aplicarSaldo && _saldo > 0 && _maxSaldo(t) > 0
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Usar ${ReservasRepo.dinero(_usarSaldo ?? _maxSaldo(t))}',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                      ),
+                      Slider(
+                        value: (_usarSaldo ?? _maxSaldo(t)).clamp(0, _maxSaldo(t)).toDouble(),
+                        max: _maxSaldo(t),
+                        divisions: (_maxSaldo(t) * 4).ceil().clamp(1, 400),
+                        label: ReservasRepo.dinero(_usarSaldo ?? _maxSaldo(t)),
+                        onChanged: (v) => setState(() => _usarSaldo = (v * 4).round() / 4),
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          ActionChip(label: const Text('Todo'), onPressed: () => setState(() => _usarSaldo = null)),
+                          ActionChip(label: const Text('La mitad'), onPressed: () => setState(() => _usarSaldo = ((_maxSaldo(t) / 2) * 100).round() / 100)),
+                        ],
+                      ),
+                    ],
                   ),
                 )
               : const SizedBox(width: double.infinity),

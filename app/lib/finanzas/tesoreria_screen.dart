@@ -1725,6 +1725,8 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
     'prestamo': ('Préstamo del equipo', 'El equipo le prestó dinero: sale de una cuenta.', Icons.handshake_outlined),
     'abono': ('Paga lo que debe', 'Entra a una cuenta y baja su deuda.', Icons.call_received_rounded),
     'a_favor': ('Tiene a favor', 'Ej. pagó de más o puso dinero por el equipo.', Icons.savings_outlined),
+    // Victor, 2026-11-21.
+    'devolucion': ('Devolverle su saldo a favor', 'Sale de una cuenta. Escribe el motivo.', Icons.undo_rounded),
   };
 
   Future<void> _registrar() async {
@@ -1740,7 +1742,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
       isScrollControlled: true,
       builder: (h) => StatefulBuilder(
         builder: (h, set) {
-          final mueveDinero = tipo == 'prestamo' || tipo == 'abono';
+          final mueveDinero = tipo == 'prestamo' || tipo == 'abono' || tipo == 'devolucion';
           return SafeArea(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
@@ -1768,12 +1770,14 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
                   TextField(
                     controller: concepto,
                     textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(labelText: 'Concepto'),
+                    decoration: InputDecoration(labelText: tipo == 'devolucion' ? 'Motivo' : 'Concepto'),
                   ),
                   if (mueveDinero || tipo == 'a_favor') ...[
                     const SizedBox(height: 12),
                     Text(
-                      tipo == 'prestamo' ? '¿De qué cuenta salió?' : (tipo == 'a_favor' ? '¿Entró dinero a una cuenta? (opcional)' : '¿A qué cuenta entró?'),
+                      tipo == 'prestamo' || tipo == 'devolucion'
+                          ? '¿De qué cuenta salió?'
+                          : (tipo == 'a_favor' ? '¿Entró dinero a una cuenta? (opcional)' : '¿A qué cuenta entró?'),
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     Wrap(
@@ -1788,7 +1792,7 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
                       ],
                     ),
                   ],
-                  if (tipo != 'abono') ...[
+                  if (tipo != 'abono' && tipo != 'devolucion') ...[
                     const SizedBox(height: 12),
                     const Text('¿Cómo se aplica?', style: TextStyle(fontWeight: FontWeight.w700)),
                     Wrap(

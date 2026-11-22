@@ -553,14 +553,17 @@ class ReservasRepo {
     // Clases que pasaron a deuda: se pagan con la primera clase cobrada.
     final deuda = cobradas > 0 ? deudaObligatoria : 0.0;
     final desc = cobradas > 0 ? double.parse((precioDe.first * p.descuentoPct / 100).toStringAsFixed(2)) : 0.0;
+    // Saldo a favor también en clases (Victor, 2026-11-21): lo que la persona elija.
+    final antes = subtotal + deuda - desc;
+    final usa = saldo > 0 && cobradas > 0 ? (saldo < subtotal - desc ? saldo : subtotal - desc) : 0.0;
     return Total(
       cantidad: cantidad,
       aFavor: aFavor,
       cupon: conCupon,
       cobradas: cobradas,
-      monto: double.parse((subtotal + deuda - desc).toStringAsFixed(2)),
+      monto: double.parse((antes - usa).toStringAsFixed(2)),
       precio: p.porClase,
-      saldo: -deuda,
+      saldo: usa > 0 ? usa : -deuda,
       descuento: desc,
       sinCobro: cantidad - pagables.length,
       mensualidades: subtotal,
@@ -667,6 +670,7 @@ class ReservasRepo {
             'medio': ?medio,
             'medioNombre': ?medioNombre,
             if (total.saldo != 0) 'saldo': total.saldo > 0 ? 'usar' : 'pagar',
+            if (total.saldo > 0) 'saldoMonto': total.saldo.toStringAsFixed(2),
             'planId': ?planId,
           });
           if (r['exito'] == false) throw ApiException('${r['mensaje'] ?? r['error'] ?? 'No se pudo guardar'}');
@@ -678,6 +682,7 @@ class ReservasRepo {
       }
     } else {
       var aFavor = total.aFavor, cupon = total.cupon;
+      var saldoRestante = total.saldo > 0 ? total.saldo : 0.0;
       for (final c in clases) {
         // No se cobra por un mes o periodo sin cobro: no gasta clase a favor ni cupón.
         final sinCobro = (precios?.pctClase(c.fecha) ?? 100) == 0;
@@ -699,7 +704,12 @@ class ReservasRepo {
             'email': email,
             if (!gratis && !sinCobro) 'medio': ?medio,
             if (!gratis && !sinCobro) 'medioNombre': ?medioNombre,
+            if (!gratis && !sinCobro && saldoRestante > 0) ...{'saldo': 'usar', 'saldoMonto': saldoRestante.toStringAsFixed(2)},
           });
+          if (!gratis && !sinCobro && saldoRestante > 0) {
+            saldoRestante = saldoRestante - (r['saldoAplicado'] as num? ?? total.precio).toDouble();
+            if (saldoRestante < 0.005) saldoRestante = 0;
+          }
           if (r['exito'] == false) throw ApiException('${r['mensaje'] ?? r['error'] ?? 'No se pudo guardar'}');
           guardados.add(etiqueta);
           if (r['id'] != null && ((r['monto'] as num?) ?? 0) > 0) ids.add('${r['id']}');

@@ -22,8 +22,8 @@ import 'emergencia_screen.dart';
 import 'equipo_modelos.dart';
 import 'estadisticas.dart';
 import 'equipo_repo.dart';
+import 'registrar_pago_screen.dart';
 import '../core/vidrio.dart';
-import '../core/moneda.dart';
 import '../core/esqueleto.dart';
 
 /// Ficha de una persona del equipo (web: `_eqRenderPerfil()`): encabezado,
@@ -337,6 +337,7 @@ class _Administracion extends StatefulWidget {
 
 class _AdministracionState extends State<_Administracion> {
   bool _ocupado = false;
+  bool? _cupon;
 
   Future<void> _hacer(Future<void> Function() f, String ok) async {
     setState(() => _ocupado = true);
@@ -410,12 +411,6 @@ class _AdministracionState extends State<_Administracion> {
     await _hacer(() => widget.repo.cambiarTier(p, v.isEmpty ? 'auto' : 'fijo', equipo: v), 'Equipo actualizado');
   }
 
-  /// Mes anterior, este y el siguiente.
-  static List<DateTime> _mesesCerca() {
-    final h = Fechas.hoy();
-    return [DateTime(h.year, h.month - 1), DateTime(h.year, h.month), DateTime(h.year, h.month + 1)];
-  }
-
   /// Cupón manual: elegir el % o quitarlo.
   Future<void> _elegirDescuento(Integrante p) async {
     final pct = await showModalBottomSheet<int>(
@@ -454,80 +449,11 @@ class _AdministracionState extends State<_Administracion> {
     await _hacer(() => widget.repo.cuponDescuento(p, pct), pct == 0 ? 'Descuento quitado' : 'Descuento de $pct % listo');
   }
 
+  /// Subsección propia (Victor, 2026-11-21): abre al instante y permite
+  /// mensualidad, clase o saldo a favor.
   Future<void> _registrarPago() async {
-    final p = widget.p;
-    final precio = await widget.repo.precioMensual().catchError((_) => 0.0);
-    if (!mounted) return;
-    var mes = _mesesCerca()[1];
-    var forma = 'Efectivo';
-    final monto = TextEditingController(text: precio > 0 ? precio.toStringAsFixed(2) : '');
-    final notas = TextEditingController();
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (hoja) => StatefulBuilder(
-        builder: (hoja, refrescar) {
-          final pal = hoja.pivot;
-          Text titulo(String t) => Text(
-            t,
-            style: TextStyle(fontWeight: FontWeight.w700, color: pal.texto),
-          );
-          final valor = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
-          return Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(hoja).bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Pago de ${p.nombreMostrar}', style: Theme.of(hoja).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 16),
-                titulo('Mes'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final m in _mesesCerca()) ChoiceChip(label: Text(Fechas.mesAnio(m)), selected: m == mes, onSelected: (_) => refrescar(() => mes = m)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                titulo('Medio de pago'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final f in const ['Efectivo', 'De Una', 'Transferencia'])
-                      ChoiceChip(label: Text(f), selected: f == forma, onSelected: (_) => refrescar(() => forma = f)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: monto,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
-                  onChanged: (_) => refrescar(() {}),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notas,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Notas (opcional)'),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: valor <= 0 ? null : () => Navigator.of(hoja).pop(true),
-                  child: Text('Registrar ${Moneda.s}${valor.toStringAsFixed(2)} de ${Fechas.mes(mes)}'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final valor = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
-    await _hacer(() => widget.repo.registrarPago(p, mes: mes, monto: valor, forma: forma, notas: notas.text), 'Pago registrado');
+    final ok = await SubAjustes.abrir<bool>(context, RegistrarPagoScreen(repo: widget.repo, persona: widget.p));
+    if (ok == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado')));
   }
 
   Future<void> _noPagaMes() async {
@@ -545,13 +471,15 @@ class _AdministracionState extends State<_Administracion> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('¿Qué mes no paga ${p.nombreMostrar}?', style: Theme.of(hoja).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
             ),
-            for (final m in _mesesCerca())
-              ListTile(
-                leading: const Icon(Icons.event_busy_outlined),
-                title: Text('No paga ${Fechas.mes(m)} ${m.year}'),
-                onTap: () => Navigator.of(hoja).pop(m),
+            // Últimos 6 meses, este y los próximos 6 (Victor, 2026-11-21).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [for (final m in RegistrarPagoScreen.meses()) ActionChip(label: Text(Fechas.mesAnio(m)), onPressed: () => Navigator.of(hoja).pop(m))],
               ),
-            const SizedBox(height: 8),
+            ),
           ],
         ),
       ),
@@ -569,13 +497,19 @@ class _AdministracionState extends State<_Administracion> {
 
   Future<void> _marcarViaje() async {
     final hoy = Fechas.hoy();
-    final r = await showDateRangePicker(
-      context: context,
-      firstDate: hoy.subtract(const Duration(days: 60)),
-      lastDate: hoy.add(const Duration(days: 365)),
-      initialDateRange: DateTimeRange(start: hoy, end: hoy.add(const Duration(days: 7))),
-      helpText: 'Fechas del viaje',
-      saveText: 'Guardar',
+    // Como pantalla en el mismo navegador (Victor, 2026-11-21): el gesto de
+    // volver cierra el calendario y deja la ficha donde estaba.
+    final r = await Navigator.of(context).push<DateTimeRange>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => DateRangePickerDialog(
+          firstDate: hoy.subtract(const Duration(days: 60)),
+          lastDate: hoy.add(const Duration(days: 365)),
+          initialDateRange: DateTimeRange(start: hoy, end: hoy.add(const Duration(days: 7))),
+          helpText: 'Fechas del viaje',
+          saveText: 'Guardar',
+        ),
+      ),
     );
     if (r == null || !mounted) return;
     setState(() => _ocupado = true);
@@ -588,81 +522,6 @@ class _AdministracionState extends State<_Administracion> {
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }
-  }
-
-  /// Lista de asistencias externas con borrar (recalcula los puntos de ese mes).
-  Future<void> _verExternas() async {
-    final repo = widget.repo, p = widget.p;
-    final m = ScaffoldMessenger.of(context);
-    List<Map<String, dynamic>> l;
-    try {
-      l = await repo.asistenciasExternas(p);
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudieron cargar. Revisa tu conexión.')));
-      return;
-    }
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(h).height * 0.75),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              children: [
-                Text('Asistencias externas', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text('Borrar una le resta los puntos de asistencia de ese mes.', style: TextStyle(color: h.pivot.textoSecundario)),
-                const SizedBox(height: 8),
-                if (l.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No tiene asistencias externas.', style: TextStyle(color: h.pivot.textoSecundario)),
-                  ),
-                for (final x in l)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.event_available_rounded, color: h.pivot.marcaTexto),
-                    title: Text(DateTime.tryParse('${x['fecha']}') == null ? '${x['fecha']}' : Fechas.corta(DateTime.parse('${x['fecha']}'))),
-                    subtitle: '${x['lugar'] ?? ''}'.isEmpty ? null : Text('${x['lugar']}'),
-                    trailing: IconButton(
-                      tooltip: 'Borrar',
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      onPressed: () async {
-                        if (!await _confirmar('¿Borrar esta asistencia externa?', 'Se le restan los puntos de asistencia de ese mes.', 'Borrar')) return;
-                        try {
-                          await repo.eliminarAsistenciaExterna('${x['idEvento']}');
-                          set(() => l.remove(x));
-                          m.showSnackBar(const SnackBar(content: Text('Asistencia externa borrada')));
-                        } catch (e) {
-                          m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo borrar.')));
-                        }
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _asistenciaExterna() async {
-    final res = await showModalBottomSheet<(DateTime, String)>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => const _HojaAsistenciaExterna(),
-    );
-    if (res == null) return;
-    await _hacer(() => widget.repo.registrarAsistenciaExterna(widget.p, res.$1, res.$2), 'Asistencia externa registrada');
   }
 
   static const _estados = {
@@ -899,19 +758,14 @@ class _AdministracionState extends State<_Administracion> {
                     onTap: _noPagaMes,
                   ),
                 ],
+                // Ver y registrar en una subsección (Victor, 2026-11-21).
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.add_task_rounded, color: pal.marcaTexto),
-                  title: const Text('Registrar asistencia externa'),
-                  subtitle: const Text('Un entrenamiento fuera de la liga. Suma puntos de asistencia.'),
-                  onTap: _asistenciaExterna,
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.history_rounded, color: pal.marcaTexto),
-                  title: const Text('Ver asistencias externas'),
-                  subtitle: const Text('Las registradas, con opción de borrar una.'),
-                  onTap: _verExternas,
+                  title: const Text('Asistencias externas'),
+                  subtitle: const Text('Entrenamientos fuera de la liga. Suman puntos de asistencia.'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => SubAjustes.abrir<void>(context, _ExternasScreen(repo: widget.repo, p: widget.p)),
                 ),
                 // Clase gratis de bienvenida (web "Cupones", Victor 2026-11-14).
                 SwitchListTile(
@@ -919,8 +773,19 @@ class _AdministracionState extends State<_Administracion> {
                   secondary: Icon(Icons.local_activity_outlined, color: pal.marcaTexto),
                   title: const Text('Clase gratis disponible'),
                   subtitle: const Text('Cupón de bienvenida para reservar una clase sin pagar.'),
-                  value: p.cuponDisponible,
-                  onChanged: (v) => _hacer(() => repo.cambiarCupon(p, v), v ? 'Tiene una clase gratis' : 'Ya no tiene clase gratis'),
+                  // Cambia al instante y se guarda detrás (Victor, 2026-11-21: tardaba).
+                  value: _cupon ?? p.cuponDisponible,
+                  onChanged: (v) async {
+                    setState(() => _cupon = v);
+                    final m = ScaffoldMessenger.of(context);
+                    try {
+                      await repo.cambiarCupon(p, v);
+                      m.showSnackBar(SnackBar(content: Text(v ? 'Tiene una clase gratis' : 'Ya no tiene clase gratis')));
+                    } catch (e) {
+                      if (mounted) setState(() => _cupon = !v);
+                      m.showSnackBar(SnackBar(content: Text(e.toString())));
+                    }
+                  },
                 ),
                 // Archivar solo con inactividad (Victor, 2026-11-07); el
                 // servidor además lo impide con reservas o cuotas activas.
@@ -940,6 +805,128 @@ class _AdministracionState extends State<_Administracion> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Asistencias externas de una persona: la lista (con borrar) y registrar
+/// una nueva, en la misma subsección (Victor, 2026-11-21).
+class _ExternasScreen extends StatefulWidget {
+  const _ExternasScreen({required this.repo, required this.p});
+  final EquipoRepo repo;
+  final Integrante p;
+
+  @override
+  State<_ExternasScreen> createState() => _ExternasScreenState();
+}
+
+class _ExternasScreenState extends State<_ExternasScreen> {
+  List<Map<String, dynamic>>? _l;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    try {
+      final l = await widget.repo.asistenciasExternas(widget.p);
+      if (mounted) setState(() => _l = l);
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudieron cargar. Revisa tu conexión.');
+    }
+  }
+
+  void _aviso(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+
+  Future<void> _nueva() async {
+    final res = await showModalBottomSheet<(DateTime, String)>(
+      useRootNavigator: true,
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => const _HojaAsistenciaExterna(),
+    );
+    if (res == null) return;
+    try {
+      await widget.repo.registrarAsistenciaExterna(widget.p, res.$1, res.$2);
+      _aviso('Asistencia externa registrada');
+      await _cargar();
+    } catch (e) {
+      _aviso(e.toString());
+    }
+  }
+
+  Future<void> _borrar(Map<String, dynamic> x) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('¿Borrar esta asistencia externa?'),
+        content: const Text('Se le restan los puntos de asistencia de ese mes.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Borrar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await widget.repo.eliminarAsistenciaExterna('${x['idEvento']}');
+      setState(() => _l?.remove(x));
+      _aviso('Asistencia externa borrada');
+    } catch (e) {
+      _aviso(e is ApiException ? e.message : 'No se pudo borrar.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final l = _l;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Asistencias externas')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
+            Text(
+              'Entrenamientos de ${widget.p.nombreMostrar} fuera de la liga. Borrar una le resta los puntos de ese mes.',
+              style: TextStyle(color: p.textoSecundario),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              onPressed: _nueva,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Registrar asistencia externa'),
+            ),
+            const SizedBox(height: 12),
+            if (_error != null)
+              Text(_error!, style: TextStyle(color: p.marcaTexto))
+            else if (l == null)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (l.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text('No tiene asistencias externas.', style: TextStyle(color: p.textoSecundario)),
+              )
+            else
+              for (final x in l)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.event_available_rounded, color: p.marcaTexto),
+                  title: Text(DateTime.tryParse('${x['fecha']}') == null ? '${x['fecha']}' : Fechas.corta(DateTime.parse('${x['fecha']}'))),
+                  subtitle: '${x['lugar'] ?? ''}'.isEmpty ? null : Text('${x['lugar']}'),
+                  trailing: IconButton(tooltip: 'Borrar', icon: const Icon(Icons.delete_outline_rounded), onPressed: () => _borrar(x)),
+                ),
+          ],
         ),
       ),
     );

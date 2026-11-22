@@ -1029,7 +1029,22 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
     final notas = [for (final n in (d?['notas'] as List? ?? const [])) Map<String, dynamic>.from(n as Map)];
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: barraCoach(widget.username == null ? 'Mi ficha deportiva' : (widget.nombre ?? 'Ficha deportiva')),
+      // Gestionar la lista de habilidades desde la ficha (Victor, 2026-11-21:
+      // salió el botón Habilidades de Equipo).
+      appBar: barraCoach(
+        widget.username == null ? 'Mi ficha deportiva' : (widget.nombre ?? 'Ficha deportiva'),
+        acciones: [
+          if (_puedeEditar)
+            IconButton(
+              tooltip: 'Lista de habilidades',
+              icon: const Icon(Icons.checklist_rounded),
+              onPressed: () async {
+                await SubAjustes.abrir<void>(context, HabilidadesEquipoScreen(sesion: s, lista: true));
+                _cargar();
+              },
+            ),
+        ],
+      ),
       floatingActionButton: _puedeEditar
           ? FloatingActionButton.extended(onPressed: _nuevaNota, icon: const Icon(Icons.mic_none_rounded), label: const Text('Nota'))
           : null,
