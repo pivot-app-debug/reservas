@@ -15,6 +15,7 @@ import 'core/tour.dart';
 import 'ajustes/ajustes_screen.dart';
 import 'core/aviso_sin_conexion.dart';
 import 'equipo/equipo_repo.dart';
+import 'equipo/avisos_liga.dart';
 import 'equipo/equipo_screen.dart';
 import 'eventos/eventos_repo.dart';
 import 'eventos/widgets_comunes.dart' show AvatarPersona;
@@ -83,6 +84,13 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
 
     // Datos del perfil pendientes: al entrar, sin tapar el tour de primera vez.
     Future.delayed(const Duration(milliseconds: 2500), _recordarDatos);
+    // Avisos de Liga (viajes, lesiones, cosas para llevar) aunque no hayas
+    // entrado a Liga: la lista del equipo se pide una vez, un rato después.
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      AvisosLiga.de(widget.sesion);
+      EquipoRepo.de(widget.sesion).cargar();
+    });
   }
 
   Future<void> _recordarDatos() async {
@@ -161,7 +169,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           // rojo; al volver, regresa el número del día (opción A, 2026-11-16).
           // Punto rojo si hay novedades en Notificaciones (Victor, 2026-11-17).
           icon: ListenableBuilder(
-            listenable: BandejaRepo.de(widget.sesion),
+            listenable: Listenable.merge([BandejaRepo.de(widget.sesion), Navegacion.puntoCalendario]),
             // El punto va centrado sobre la esquina redondeada del recuadro del
             // día (el Badge de Material lo dejaba metido y descuadrado; QA 2026-11-18).
             builder: (context, hijo) => Stack(
@@ -172,7 +180,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                   right: -2.5,
                   top: -2.5,
                   child: AnimatedScale(
-                    scale: BandejaRepo.de(widget.sesion).hayNovedades ? 1 : 0,
+                    // También si hay algo nuevo en Tareas o Cursos (Victor, 2026-11-22).
+                    scale: BandejaRepo.de(widget.sesion).hayNovedades || Navegacion.puntoCalendario.value ? 1 : 0,
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutBack,
                     child: Container(
@@ -213,7 +222,17 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       ),
       (
         // Equipo pasó a Liga (Victor, 2026-11-22): Comunidad, Redes, Inventario y Finanzas.
-        const NavigationDestination(icon: Icon(Icons.group_outlined), selectedIcon: Icon(Icons.group), label: 'Liga'),
+        NavigationDestination(
+          icon: ValueListenableBuilder<bool>(
+            valueListenable: Navegacion.puntoLiga,
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.group_outlined)),
+          ),
+          selectedIcon: ValueListenableBuilder<bool>(
+            valueListenable: Navegacion.puntoLiga,
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.group)),
+          ),
+          label: 'Liga',
+        ),
         EquipoScreen(repo: EquipoRepo.de(widget.sesion)),
       ),
       // Finanzas y Coach salieron de la barra (Victor, 2026-11-19): viven en

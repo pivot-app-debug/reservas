@@ -5,6 +5,7 @@ import '../core/tema.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
 import '../eventos/widgets_comunes.dart';
+import 'avisos_liga.dart';
 import 'equipo_repo.dart';
 
 /// Cosas para llevar a los eventos de hoy y mañana (Victor, 2026-11-22): solo
@@ -59,16 +60,27 @@ class AvisoCosasParaLlevar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CosasParaLlevarScreen(eventos: eventos, equipo: equipo),
-                        ),
-                      ),
+                      onTap: () {
+                        AvisosLiga.de(eventos.sesion).verCosas();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CosasParaLlevarScreen(eventos: eventos, equipo: equipo),
+                          ),
+                        );
+                      },
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
                         child: Row(
                           children: [
-                            Icon(Icons.content_paste_rounded, color: p.sobreSuave),
+                            ListenableBuilder(
+                              listenable: AvisosLiga.de(eventos.sesion),
+                              builder: (context, _) => Badge(
+                                isLabelVisible: AvisosLiga.de(eventos.sesion).cosasNuevas,
+                                smallSize: 9,
+                                backgroundColor: p.marca,
+                                child: Icon(Icons.content_paste_rounded, color: p.sobreSuave),
+                              ),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(

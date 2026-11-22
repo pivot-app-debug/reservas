@@ -908,15 +908,26 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           // Barra (Victor, 2026-11-20): la casita (Avisos, Tareas, Cursos y
           // Fiestas), Filtros y Buscar. Punto rojo con novedades; a los Pivots,
           // el número de pendientes.
+          Builder(
+            builder: (context) {
+              // El punto sigue hasta la barra de abajo (Victor, 2026-11-22).
+              final hay = (_bandeja.esPivot && _bandeja.total > 0) || _cursos.nuevos || _tareas.disponibles.isNotEmpty;
+              if (Navegacion.puntoCalendario.value != hay) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => Navegacion.puntoCalendario.value = hay);
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           IconButton(
             key: _kBandeja,
             tooltip: _bandeja.hayNovedades ? 'Avisos, tareas, cursos, eventos y pagos (hay novedades)' : 'Avisos, tareas, cursos, eventos y pagos',
             icon: Badge(
-              isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos,
+              isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos || _tareas.disponibles.isNotEmpty,
               smallSize: 9,
               backgroundColor: p.marca,
               label: _bandeja.esPivot && _bandeja.total > 0 ? Text('${_bandeja.total}') : null,
-              child: const Icon(Symbols.home),
+              // Bandeja en vez de la casita (Victor, 2026-11-22).
+              child: const Icon(Symbols.inbox),
             ),
             onPressed: () => _abrirActividad(),
           ),

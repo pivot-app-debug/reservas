@@ -19,6 +19,7 @@ import '../finanzas/tesoreria_screen.dart';
 import '../pivots/categorias_screen.dart' show VerEquipoScreen, NuevoEquipoScreen;
 import '../pivots/ajustes_liga_screen.dart' show AjustesLigaScreen;
 import 'buscador_equipo.dart';
+import 'avisos_liga.dart';
 import 'cosas_para_llevar.dart';
 import 'comunidad_screen.dart';
 import 'inventario_screen.dart';
@@ -52,6 +53,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   List<PestanaLiga> _pestanas = const [];
 
   bool get _pivot => repo.sesion.esAdmin && repo.sesion.adminToken != null;
+  AvisosLiga get _avisos => AvisosLiga.de(repo.sesion);
 
   List<PestanaLiga> _calcularPestanas() => [
     PestanaLiga.comunidad,
@@ -116,7 +118,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     super.dispose();
   }
 
-  void _abrir(Integrante p) => PersonaScreen.abrir(context, repo, p.username);
+  void _abrir(Integrante p) {
+    _avisos.verPersona(p);
+    PersonaScreen.abrir(context, repo, p.username);
+  }
 
   void _alternarBusqueda() {
     setState(() {
@@ -207,7 +212,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   Widget _comunidad(BuildContext context, PivotPaleta p) => ListenableBuilder(
-    listenable: repo,
+    listenable: Listenable.merge([repo, _avisos]),
     builder: (context, _) {
       final personas = repo.personas;
       final Widget cuerpo;
@@ -276,7 +281,19 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(_iconoLiga(x), size: 24, color: i == actual ? p.marcaTexto : p.textoSecundario),
+                          ListenableBuilder(
+                            listenable: _avisos,
+                            builder: (context, _) => Badge(
+                              isLabelVisible: switch (x) {
+                                PestanaLiga.comunidad => _avisos.comunidad,
+                                PestanaLiga.inventario => _avisos.inventario,
+                                _ => false,
+                              },
+                              smallSize: 9,
+                              backgroundColor: p.marca,
+                              child: Icon(_iconoLiga(x), size: 24, color: i == actual ? p.marcaTexto : p.textoSecundario),
+                            ),
+                          ),
                           AnimatedSize(
                             duration: const Duration(milliseconds: 260),
                             curve: Curves.easeOutCubic,
@@ -741,7 +758,9 @@ class _AvatarEstado extends StatelessWidget {
       ),
       child: AvatarPersona(nombre: p.nombreMostrar, foto: p.foto, tamano: tamano),
     );
-    return hero ? HeroAvatar(tag: 'avatar-${p.username}', child: avatar) : avatar;
+    // Punto si se fue de viaje o se lesionó y no lo viste (Victor, 2026-11-22).
+    final conPunto = Badge(isLabelVisible: AvisosLiga.actual?.nueva(p) ?? false, smallSize: 11, backgroundColor: pal.marca, child: avatar);
+    return hero ? HeroAvatar(tag: 'avatar-${p.username}', child: conPunto) : conPunto;
   }
 }
 

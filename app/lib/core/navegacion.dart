@@ -18,4 +18,10 @@ class Navegacion {
   /// Fecha del evento abierto (Victor, 2026-11-22): el ícono del Calendario
   /// muestra ese día mientras se ve el detalle.
   static final diaEvento = ValueNotifier<DateTime?>(null);
+
+  /// Punto de aviso en la barra de abajo (Victor, 2026-11-22): Calendario lo
+  /// prende si hay algo nuevo en Actividad; Liga, si hay alguien de viaje o
+  /// lesionadx que no viste o cosas para llevar.
+  static final puntoCalendario = ValueNotifier<bool>(false);
+  static final puntoLiga = ValueNotifier<bool>(false);
 }
