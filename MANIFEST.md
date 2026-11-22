@@ -151,7 +151,7 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Decidido: "Pivot"/"Pivots" reemplaza a admin/administradorxs en toda la app (etapa 4).
 
 ### Próxima ronda
-- `PENDIENTES_2026-11-12.md`: lista al día de lo que falta (reescrita el 2026-11-17). El historial de rondas está en `PENDIENTES_HISTORIAL.md`.
+- `PENDIENTES.md`: lista al día de lo que falta (reescrita el 2026-11-17). El historial de rondas está en `PENDIENTES_HISTORIAL.md`.
 
 ### Tareas nativa (entrega 2, 2026-11-08)
 - Pestaña Tareas en Android (`lib/tareas/`): `TareasRepo` (una llamada, `getTareasApp`) y `TareasScreen` con el lenguaje de Ajustes. Orden: tarjeta del mes (puntos contra la meta del primer tier que pide puntos, y tareas activas contra el límite), Mis tareas (vence antes arriba, vencidas en rojo, en revisión al final), Sugeridas para ti (solo si faltan puntos y no repite toda la lista), Disponibles con filtro por área, Sin cupos y Baúl.
