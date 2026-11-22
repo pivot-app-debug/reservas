@@ -34,6 +34,10 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   // vez). Se precarga al abrir Ajustes y se refresca en segundo plano.
   static List<Map<String, dynamic>>? _cacheTipos;
   static Map<String, bool> _cachePrefs = {};
+
+  /// Horas antes del evento para el resumen de Pivots (1, 2 o 3).
+  static int _cacheHoras = 1;
+  int _horas = _cacheHoras;
   static bool _cacheActivas = true;
 
   @override
@@ -64,6 +68,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     ];
     _cacheActivas = p['activas'] != false;
     _cachePrefs = {for (final e in ((p['preferencias'] as Map?) ?? const {}).entries) '${e.key}': e.value == true};
+    _cacheHoras = ((p['preferencias'] as Map?)?['resumenHoras'] as num?)?.toInt() ?? 1;
   }
 
   Future<void> _cargar() async {
@@ -75,6 +80,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         _tipos = _cacheTipos;
         _activas = _cacheActivas;
         _prefs = Map.of(_cachePrefs);
+        _horas = _cacheHoras;
       });
     } catch (_) {
       // Con copia en pantalla, el error no tapa nada.
@@ -133,6 +139,36 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
           ),
         ),
 
+        // Cuándo llega el resumen de cada evento (Victor, 2026-11-22).
+        if (mias.contains('asistencia'))
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Resumen antes de cada evento', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text('Quiénes vienen y qué equipamiento llevar.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                  const SizedBox(height: 10),
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 1, label: Text('1 h antes')),
+                      ButtonSegment(value: 2, label: Text('2 h antes')),
+                      ButtonSegment(value: 3, label: Text('3 h antes')),
+                    ],
+                    selected: {_horas},
+                    onSelectionChanged: (v) {
+                      final antes = _horas;
+                      _guardar({'clave': 'resumenHoras', 'valor': '${v.first}'}, () => _horas = v.first, () => _horas = antes);
+                      _cacheHoras = v.first;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
         for (final a in areasPivot.entries)
           if (mias.contains(a.key) && avisosPivot[a.key] != null)
             _Categoria(

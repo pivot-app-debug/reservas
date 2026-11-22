@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (resumen de Pivots: 1, 2 o 3 horas antes)
+- El resumen de cada evento para Pivots (quiénes vienen y qué equipamiento llevar) llega 1 hora antes por defecto; cada Pivot lo cambia a 2 o 3 horas en Mi perfil → Notificaciones → Avisos de Pivot.
+
 ## 2026-11-22 (suscripción aprobada → Asistiré)
 - Verificado y corregido: al aprobarse una suscripción a una clase, la persona queda en "Asistiré" en cualquier equipo (antes solo si su equipo se llamaba Mirlxs). También cuando un Pivot registra a mano el pago de una clase que todavía no pasó.
 

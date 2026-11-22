@@ -10846,6 +10846,14 @@ async function guardarPreferenciasPush(params: Record<string, any>): Promise<Rec
   if (!username) return { exito: false, error: 'Sesión inválida.' };
   const update: Record<string, any> = {};
   if (params.activas !== undefined) update.push_notificaciones_activas = (params.activas === 'true' || params.activas === true);
+  // Cuántas horas antes llega el resumen del evento a un Pivot (1, 2 o 3).
+  if (params.clave === 'resumenHoras') {
+    const h = Number(params.valor);
+    if (![1, 2, 3].includes(h)) return { exito: false, error: 'Elige 1, 2 o 3 horas.' };
+    const { data: fila } = await supabase.from('equipo').select('push_preferencias').eq('username', username).maybeSingle();
+    const { error } = await supabase.from('equipo').update({ push_preferencias: { ...((fila?.push_preferencias as Record<string, unknown>) ?? {}), resumenHoras: h } }).eq('username', username);
+    return error ? { exito: false, error: error.message } : { exito: true };
+  }
   if (params.clave !== undefined) {
     const clave = String(params.clave);
         // Avisos de Pivot por área (pivot_<area>, 2026-11-13).
@@ -11612,13 +11620,30 @@ async function cronAdminEvento(): Promise<Record<string, any>> {
   // Recordatorios de feedback a lxs coaches (Victor, 2026-11-16).
     // Sin recordatorio al coach después de cada clase (Victor, 2026-11-17): lo
   // pendiente se ve al abrir Coach. A las personas, aviso semanal (cronDiario).
+  // Cada Pivot elige 1, 2 o 3 horas antes (Victor, 2026-11-22; por defecto 1):
+  // `push_preferencias.resumenHoras`.
+  const todos = await _adminDestinatariosPush(undefined, 'asistencia', 'resumen');
+  if (!todos.length) return { exito: true, eventos: 0, enviados: 0 };
+  const { data: prefs } = await supabase.from('equipo').select('username, push_preferencias').in('username', todos);
+  const horasDe: Record<string, number> = {};
+  (prefs ?? []).forEach((r: any) => { horasDe[r.username] = Number(r.push_preferencias?.resumenHoras) || 1; });
+  let eventos = 0, enviados = 0;
+  for (const h of [1, 2, 3]) {
+    const dest = todos.filter((u) => (horasDe[u] ?? 1) === h);
+    if (!dest.length) continue;
+    const r = await _resumenAdminEvento(h, dest);
+    eventos += r.eventos;
+    enviados += r.enviados;
+  }
+  return { exito: true, eventos, enviados };
+}
+
+async function _resumenAdminEvento(horas: number, adminDestinatarios: string[]): Promise<{ eventos: number; enviados: number }> {
   const ahora = Date.now();
-  const enVentana = await _eventosEnVentana(ahora + 55 * 60 * 1000, ahora + 65 * 60 * 1000, [0, 1]);
-  if (!enVentana.length) return { exito: true, eventos: 0, enviados: 0 };
+  const enVentana = await _eventosEnVentana(ahora + (horas * 60 - 5) * 60 * 1000, ahora + (horas * 60 + 5) * 60 * 1000, [0, 1]);
+  if (!enVentana.length) return { eventos: 0, enviados: 0 };
 
   const asistPorEvento = await _ultimaAsistenciaPorPersonaTodas(enVentana.map((e: any) => e.id_evento));
-  const adminDestinatarios = await _adminDestinatariosPush(undefined, 'asistencia', 'resumen');
-  if (!adminDestinatarios.length) return { exito: true, eventos: enVentana.length, enviados: 0 };
   // Mínimo de personas para sugerir cancelar (Mi Liga → reglas, por defecto 5).
   const minPersonas = Number((await _reglasLiga()).eventosMinPersonas) || 0;
   let enviados = 0;
@@ -11651,7 +11676,7 @@ async function cronAdminEvento(): Promise<Record<string, any>> {
     if (pocos) partes.push('Son pocas personas: puedes cancelarlo.');
 
     const url = _urlEvento(String(ev.id_evento));
-    const titulo = `El ${tipo} ${_cuandoEvento(ev.fecha)} empieza en 1 hora`;
+    const titulo = `El ${tipo} ${_cuandoEvento(ev.fecha)} empieza en ${horas === 1 ? '1 hora' : `${horas} horas`}`;
     if (pocos) {
       await sendPush({
         tipo: 'avisos_admin',
@@ -11681,7 +11706,7 @@ async function cronAdminEvento(): Promise<Record<string, any>> {
     }
     enviados++;
   }
-  return { exito: true, eventos: enVentana.length, enviados };
+  return { eventos: enVentana.length, enviados };
 }
 
 // ─── Push: cambio de asistencia + solicitud pendiente (feat nueva) ────────────
