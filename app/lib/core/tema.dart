@@ -1,4 +1,8 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
+
+import 'espacio_barra.dart';
+
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -352,7 +356,17 @@ ThemeData construirTema(Brightness brillo) {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(PivotRadios.boton), borderSide: BorderSide.none),
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: PredictiveBackPageTransitionsBuilder()}),
+    // Con espacio para la barra de abajo en las subsecciones (Victor, 2026-11-22).
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: TransicionConBarra(PredictiveBackPageTransitionsBuilder()),
+        TargetPlatform.iOS: TransicionConBarra(CupertinoPageTransitionsBuilder()),
+        TargetPlatform.macOS: TransicionConBarra(CupertinoPageTransitionsBuilder()),
+        TargetPlatform.windows: TransicionConBarra(FadeForwardsPageTransitionsBuilder()),
+        TargetPlatform.linux: TransicionConBarra(FadeForwardsPageTransitionsBuilder()),
+        TargetPlatform.fuchsia: TransicionConBarra(FadeForwardsPageTransitionsBuilder()),
+      },
+    ),
   );
 }
 

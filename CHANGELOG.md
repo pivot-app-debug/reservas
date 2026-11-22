@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (notificaciones que llevan a su pantalla)
+- Cada notificación abre su parte de la app: el evento, Pagos y suscripciones, Tareas, Cursos, Novedades, Equipo o la suscripción que quedó a medias (con la clase o el mes que se había elegido). En la web, si la app ya está abierta, también va a esa pantalla.
+- La suscripción sin terminar ahora dice "Tu suscripción aún no se completó. Si quieres suscribirte a …, completa el registro."
+- Las notificaciones de reservas hablan de suscripciones.
+- Las pantallas que se abren dentro de una pestaña ya no quedan tapadas al final por la barra de abajo (p. ej. la ficha de emergencia).
+
 ## 2026-11-22 (meses pagados, reservas a medias y dejar de ir a una fiesta)
 - No paga un mes muestra qué meses están pagados o ya no pagan; esos no se pueden elegir.
 - Si alguien llega al pago de una reserva y cierra la app sin terminar, a los 30 minutos se le pregunta una vez si quiere terminarla (si salió con volver, no).

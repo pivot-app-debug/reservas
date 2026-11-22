@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/espacio_barra.dart';
+
 import '../coach/coach_screen.dart' show BotonDictar, FichaDeportivaScreen, QuienVe, barraCoach, errorCoach;
 import '../core/api.dart';
 import '../core/deporte.dart';
@@ -682,7 +684,7 @@ class _MarcarPersonasState extends State<_MarcarPersonas> {
 Route<T> _ruta<T>(Widget pantalla) => PageRouteBuilder<T>(
   transitionDuration: const Duration(milliseconds: 280),
   reverseTransitionDuration: const Duration(milliseconds: 220),
-  pageBuilder: (_, _, _) => pantalla,
+  pageBuilder: (_, _, _) => EspacioBarraAbajo(child: pantalla),
   transitionsBuilder: (_, a, _, child) {
     final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
     return FadeTransition(

@@ -24,9 +24,14 @@ import '../core/tema.dart';
 /// Lo que pide abrir una notificación tocada: un evento y, opcionalmente,
 /// una acción (`cancelar` = abrir la confirmación de cancelar, solo admins).
 class AperturaPush {
-  const AperturaPush({required this.eventoId, this.accion});
+  const AperturaPush({this.eventoId = '', this.accion, this.pantalla});
   final String eventoId;
   final String? accion;
+
+  /// Pantalla que abre la notificación (Victor, 2026-11-22): 'novedades',
+  /// 'tareas', 'cursos', 'pagos', 'equipo', `suscribirse:clase:ID` o
+  /// `suscribirse:mes:AAAA-MM`.
+  final String? pantalla;
 }
 
 /// Mensaje de FCM recibido con la app cerrada o en segundo plano. Corre en
@@ -177,7 +182,7 @@ class Push {
         botones.add(AndroidNotificationAction(id, texto, showsUserInterface: abreApp, cancelNotification: true));
       }
     } catch (_) {}
-    final payload = jsonEncode({'evento_id': eventoId, 'token_accion': data['token_accion'] ?? ''});
+    final payload = jsonEncode({'evento_id': eventoId, 'token_accion': data['token_accion'] ?? '', 'pantalla': data['pantalla'] ?? ''});
     await _notis.show(
       id: '${data['tipo']}|$eventoId|$titulo'.hashCode & 0x7fffffff,
       title: titulo,
@@ -232,8 +237,13 @@ class Push {
     try {
       final p = jsonDecode(r.payload ?? '{}') as Map<String, dynamic>;
       final id = (p['evento_id'] ?? '').toString();
-      if (id.isEmpty) return null;
-      return AperturaPush(eventoId: id, accion: r.actionId == 'cancelar' || r.actionId == 'no-asistire' ? r.actionId : null);
+      final pantalla = (p['pantalla'] ?? '').toString();
+      if (id.isEmpty && pantalla.isEmpty) return null;
+      return AperturaPush(
+        eventoId: id,
+        accion: r.actionId == 'cancelar' || r.actionId == 'no-asistire' ? r.actionId : null,
+        pantalla: pantalla.isEmpty ? null : pantalla,
+      );
     } catch (_) {
       return null;
     }

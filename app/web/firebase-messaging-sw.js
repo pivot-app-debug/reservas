@@ -23,7 +23,8 @@ firebase.messaging().onBackgroundMessage(function (m) {
     body: d.cuerpo || '',
     icon: APP + 'icons/Icon-192.png',
     badge: APP + 'icons/Icon-192.png',
-    data: { url: APP + (d.evento_id ? '?evento=' + encodeURIComponent(d.evento_id) : '') },
+    // Cada aviso abre su pantalla (Victor, 2026-11-22): un evento o ?abrir=<pantalla>.
+    data: { url: APP + (d.evento_id ? '?evento=' + encodeURIComponent(d.evento_id) : d.pantalla ? '?abrir=' + encodeURIComponent(d.pantalla) : '') },
   });
 });
 
@@ -33,7 +34,11 @@ self.addEventListener('notificationclick', function (e) {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (lista) {
       for (var i = 0; i < lista.length; i++) {
-        if (lista[i].url.indexOf(APP) !== -1 && 'focus' in lista[i]) return lista[i].focus();
+        var c = lista[i];
+        if (c.url.indexOf(APP) === -1 || !('focus' in c)) continue;
+        // Con la app abierta, la lleva a esa pantalla (antes solo la traía al frente).
+        if (url === APP || !('navigate' in c)) return c.focus();
+        return c.navigate(url).then(function (n) { return (n || c).focus(); }).catch(function () { return clients.openWindow(url); });
       }
       return clients.openWindow(url);
     })

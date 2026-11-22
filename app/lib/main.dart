@@ -19,6 +19,9 @@ import 'sesion/sesion.dart';
 import 'core/cargando.dart';
 import 'core/intro.dart';
 import 'core/puerta_instalar.dart';
+import 'core/navegacion.dart';
+import 'reservas/reserva_screen.dart';
+import 'reservas/reservas_repo.dart' show TipoReserva;
 
 final _navegador = GlobalKey<NavigatorState>();
 
@@ -120,8 +123,9 @@ class _RaizState extends State<_Raiz> {
     if (kIsWeb) {
       final q = Uri.base.queryParameters;
       final ev = q['evento'] ?? '';
-      if (ev.isNotEmpty) {
-        _pendiente = AperturaPush(eventoId: ev, accion: q['accion']);
+      final abrir = q['abrir'] ?? '';
+      if (ev.isNotEmpty || abrir.isNotEmpty) {
+        _pendiente = AperturaPush(eventoId: ev, accion: q['accion'], pantalla: abrir.isEmpty ? null : abrir);
         _abrirPendiente();
       }
       // Enlace de invitación a un curso (Victor, 2026-11-17).
@@ -183,6 +187,12 @@ class _RaizState extends State<_Raiz> {
     final a = _pendiente;
     if (a == null || !widget.sesion.activa) return;
     _pendiente = null;
+    // Cada notificación abre su pantalla (Victor, 2026-11-22).
+    final pantalla = a.pantalla;
+    if (a.eventoId.isEmpty && pantalla != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _abrirPantalla(pantalla));
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _navegador.currentState?.push(
         MaterialPageRoute(
@@ -190,6 +200,30 @@ class _RaizState extends State<_Raiz> {
         ),
       );
     });
+  }
+
+  void _abrirPantalla(String pantalla) {
+    final partes = pantalla.split(':');
+    switch (partes.first) {
+      case 'suscribirse':
+        final mes = partes.length > 2 && partes[1] == 'mes' ? DateTime.tryParse('${partes[2]}-01') : null;
+        final clase = partes.length > 2 && partes[1] == 'clase' ? partes[2].split(',').first : null;
+        _navegador.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => ReservaScreen(
+              repo: _repo,
+              tipo: mes != null || (partes.length > 1 && partes[1] == 'mes') ? TipoReserva.mes : TipoReserva.clase,
+              claseInicial: clase == null || clase.isEmpty ? null : clase,
+              mesInicial: mes,
+            ),
+          ),
+        );
+      case 'equipo':
+        Navegacion.ir.value = Pestana.equipo;
+      case 'novedades' || 'tareas' || 'cursos' || 'pagos':
+        Navegacion.ir.value = Pestana.calendario;
+        Navegacion.actividad.value = partes.first;
+    }
   }
 
   @override

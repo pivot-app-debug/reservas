@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../../core/espacio_barra.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/moneda.dart';
@@ -488,7 +491,9 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 350),
         reverseTransitionDuration: const Duration(milliseconds: 250),
-        pageBuilder: (_, _, _) => RuletaScreen(repo: widget.repo, tope: widget.estado.topeAmigo, simbolo: widget.simbolo),
+        pageBuilder: (_, _, _) => EspacioBarraAbajo(
+          child: RuletaScreen(repo: widget.repo, tope: widget.estado.topeAmigo, simbolo: widget.simbolo),
+        ),
         transitionsBuilder: (_, a, _, child) => FadeTransition(
           opacity: a,
           child: SlideTransition(

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../core/espacio_barra.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../pivots/formas_pago_screen.dart' show LogoMedio, copiarDato;
@@ -174,11 +177,17 @@ class _ReservaScreenState extends State<ReservaScreen> {
     if (_paso == _Paso.pago && !_avisadoEnCurso) {
       _avisadoEnCurso = true;
       final clases = _clases?.where((c) => _clasesSel.contains(c.id)).toList() ?? const <FechaClase>[];
+      final meses = _mesesSel.toList()..sort();
       _r.enCurso(
+        // "Si quieres suscribirte a …, completa el registro." (Victor, 2026-11-22)
         detalle: _esMes
-            ? (_mesesSel.length == 1 ? 'la cuota de ${ReglaAnticipada.nombreMes(_mesesSel.first)}' : 'tu cuota')
+            ? (meses.length == 1 ? 'la mensualidad de ${ReglaAnticipada.nombreMes(meses.first)}' : 'tus mensualidades')
             : (clases.length == 1 ? 'la clase del ${ReservasRepo.etiquetaClase(clases.first)}' : 'tus clases'),
         clases: [for (final c in clases) c.id],
+        // Al tocar el aviso se abre la suscripción con lo que había elegido.
+        pantalla: _esMes
+            ? (meses.isEmpty ? 'suscribirse:mes:' : 'suscribirse:mes:${meses.first.year}-${meses.first.month.toString().padLeft(2, '0')}')
+            : 'suscribirse:clase:${clases.map((c) => c.id).join(',')}',
       );
     }
   }
@@ -1000,7 +1009,9 @@ class _ReservaScreenState extends State<ReservaScreen> {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 320),
-        pageBuilder: (_, _, _) => ReservaExitoScreen(resultado: resultado, total: total, esClase: !_esMes, repo: _r),
+        pageBuilder: (_, _, _) => EspacioBarraAbajo(
+          child: ReservaExitoScreen(resultado: resultado, total: total, esClase: !_esMes, repo: _r),
+        ),
         transitionsBuilder: (_, a, _, child) => FadeTransition(
           opacity: a,
           child: ScaleTransition(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/espacio_barra.dart';
+
 import '../core/api.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -158,7 +160,7 @@ class SubAjustes extends StatelessWidget {
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 280),
         reverseTransitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (_, _, _) => pantalla,
+        pageBuilder: (_, _, _) => EspacioBarraAbajo(child: pantalla),
         transitionsBuilder: (_, a, _, child) {
           final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
           return FadeTransition(

@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
+import '../core/espacio_barra.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config_liga.dart';
@@ -33,7 +36,9 @@ class EmergenciaScreen extends StatefulWidget {
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 260),
         reverseTransitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (_, _, _) => EmergenciaScreen(repo: repo, persona: p),
+        pageBuilder: (_, _, _) => EspacioBarraAbajo(
+          child: EmergenciaScreen(repo: repo, persona: p),
+        ),
         transitionsBuilder: (_, a, _, child) => FadeTransition(
           opacity: a,
           child: SlideTransition(

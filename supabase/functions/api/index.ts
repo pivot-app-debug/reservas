@@ -6396,8 +6396,8 @@ async function _notificarReservaMensualCambio(r: Record<string, any>, nombre: st
   await sendPush({
     tipo: 'avisos_admin',
     include_external_user_ids: await _adminDestinatariosPush(undefined, 'finanzas', 'reservas'),
-    headings: { es: accion === 'cancelar' ? 'Reserva cancelada' : 'Reserva reagendada' },
-    contents: { es: `${nombre} ${accion === 'cancelar' ? 'canceló' : 'reagendó'} su reserva mensual.` },
+    headings: { es: accion === 'cancelar' ? 'Suscripción cancelada' : 'Suscripción reagendada' },
+    contents: { es: `${nombre} ${accion === 'cancelar' ? 'canceló' : 'reagendó'} su suscripción mensual.` },
     url: APP_URL + '/?tab=miliga',
   });
 }
@@ -6415,7 +6415,7 @@ async function avisarPagoPendiente(params: Record<string, any>): Promise<Record<
     tipo: 'avisos_admin',
     include_external_user_ids: await _adminDestinatariosPush(undefined, 'finanzas', 'pagos'),
     headings: { es: 'Pago pendiente de revisión' },
-    contents: { es: `${nombre} registró un pago de $${monto.toFixed(2)}${detalle ? ` (${detalle})` : ''}. Revísalo para aprobar la reserva.` },
+    contents: { es: `${nombre} registró un pago de $${monto.toFixed(2)}${detalle ? ` (${detalle})` : ''}. Revísalo para aprobar la suscripción.` },
     url: APP_URL + '/?tab=miliga',
   });
   return { exito: true };
@@ -6642,7 +6642,7 @@ async function subirComprobante(params: Record<string, any>): Promise<Record<str
   const quien = await _nombrePersona(yo);
   const pivots = await _adminDestinatariosPush(undefined, 'finanzas', 'pagos');
   await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivots, headings: { es: 'Comprobante recibido' },
-    contents: { es: `${quien} subió el comprobante de ${mias[0].tipo === 'mensual' ? `su mensualidad ${mias[0].mes_texto ?? ''}`.trim() : 'su reserva'}. Ya puedes revisarlo en Notificaciones.` }, url: APP_URL }).catch(() => {});
+    contents: { es: `${quien} subió el comprobante de ${mias[0].tipo === 'mensual' ? `su mensualidad ${mias[0].mes_texto ?? ''}`.trim() : 'su suscripción a la clase'}. Ya puedes revisarlo en Novedades.` }, url: APP_URL }).catch(() => {});
   return { exito: true, reservas: mias.length };
 }
 
@@ -6658,7 +6658,7 @@ async function adminPedirComprobante(params: Record<string, any>): Promise<Recor
   const mensual = r.tipo === 'mensual';
   await sendPush({ tipo: 'comprobante_pendiente', include_external_user_ids: [r.nombre_usuario],
     headings: { es: mensual ? `Falta tu comprobante: suscripción a ${String(r.mes_texto ?? '').toLowerCase()}`.trim() : 'Falta tu comprobante' },
-    contents: { es: `Adjunta tu comprobante en las próximas 24 h; si no, la solicitud se descarta y tendrás que volver a ${mensual ? 'suscribirte' : 'reservar'}.` }, url: APP_URL });
+    contents: { es: `Adjunta tu comprobante en las próximas 24 h; si no, la solicitud se descarta y tendrás que volver a suscribirte.` }, url: APP_URL });
   await supabase.from('reservas').update({ comprobante_avisos: (Number(r.comprobante_avisos) || 0) + 1, comprobante_ultimo_aviso: new Date().toISOString() }).eq('id', r.id);
   const { data: conPlazo } = await supabase.from('reservas').update({ comprobante_limite: limite }).eq('id', r.id).is('comprobante_limite', null).select('comprobante_limite');
   const fin = conPlazo?.[0]?.comprobante_limite ?? (await supabase.from('reservas').select('comprobante_limite').eq('id', r.id).maybeSingle()).data?.comprobante_limite ?? limite;
@@ -6676,8 +6676,8 @@ async function _descartarSinComprobante(ahora = Date.now()): Promise<void> {
   for (const r of data ?? []) {
     const mensual = r.tipo === 'mensual';
     await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario],
-      headings: { es: mensual ? `Se descartó tu suscripción a ${String(r.mes_texto ?? '').toLowerCase()}`.trim() : 'Se descartó tu reserva' },
-      contents: { es: `Pasaron 24 h sin comprobante. Si todavía quieres, vuelve a ${mensual ? 'suscribirte' : 'reservar'} y adjunta tu comprobante de pago.` }, url: APP_URL }).catch(() => {});
+      headings: { es: mensual ? `Se descartó tu suscripción a ${String(r.mes_texto ?? '').toLowerCase()}`.trim() : 'Se descartó tu suscripción a la clase' },
+      contents: { es: `Pasaron 24 h sin comprobante. Si todavía quieres, vuelve a suscribirte y adjunta tu comprobante de pago.` }, url: APP_URL }).catch(() => {});
   }
 }
 
@@ -6697,7 +6697,7 @@ async function _recordarComprobantes(ahora: number): Promise<void> {
   for (const [u, rs] of Object.entries(porPersona)) {
     const una = rs.length === 1;
     await sendPush({ tipo: 'comprobante_pendiente', include_external_user_ids: [u], headings: { es: 'Falta tu comprobante' },
-      contents: { es: una ? `Sube el comprobante de ${rs[0].tipo === 'mensual' ? `tu mensualidad ${rs[0].mes_texto ?? ''}`.trim() : 'tu reserva'} para que un Pivot pueda confirmarla.` : `Sube el comprobante de tus ${rs.length} reservas para que un Pivot pueda confirmarlas.` },
+      contents: { es: una ? `Sube el comprobante de ${rs[0].tipo === 'mensual' ? `tu mensualidad ${rs[0].mes_texto ?? ''}`.trim() : 'tu suscripción a la clase'} para que un Pivot pueda confirmarla.` : `Sube el comprobante de tus ${rs.length} suscripciones para que un Pivot pueda confirmarlas.` },
       url: APP_URL }).catch(() => {});
     for (const r of rs) await supabase.from('reservas').update({ comprobante_avisos: (Number(r.comprobante_avisos) || 0) + 1, comprobante_ultimo_aviso: new Date(ahora).toISOString() }).eq('id', r.id);
   }
@@ -6813,7 +6813,10 @@ async function reservaEnCurso(params: Record<string, any>): Promise<Record<strin
     let clases: string[] = [];
     try { clases = JSON.parse(String(params.clases ?? '[]')).map(String).slice(0, 20); } catch { /* sin clases */ }
     await supabase.from('reservas_en_curso').upsert(
-      { nombre: yo, detalle: String(params.detalle ?? '').slice(0, 200) || null, clases, creado_en: new Date().toISOString(), avisado_en: null },
+            {
+        nombre: yo, detalle: String(params.detalle ?? '').slice(0, 200) || null, clases, creado_en: new Date().toISOString(), avisado_en: null,
+        pantalla: /^suscribirse:(clase|mes):[\w,-]{1,400}$/.test(String(params.pantalla ?? '')) ? String(params.pantalla) : null,
+      },
       { onConflict: 'liga_id,nombre' },
     );
   } else {
@@ -6836,9 +6839,10 @@ async function _avisarReservasSinTerminar(): Promise<void> {
     if (clases.length && !clases.some((c) => abiertas.has(c))) continue; // ya cerró la reserva de esas clases
     await sendPush({
       tipo: 'reserva_sin_terminar', include_external_user_ids: [f.nombre], personal: true,
-      headings: { es: '¿Terminamos tu reserva?' },
-      contents: { es: f.detalle ? `Dejaste a medias tu reserva de ${f.detalle}. Toca para terminarla.` : 'Dejaste una reserva a medias. Toca para terminarla.' },
-      url: APP_URL,
+            // Son suscripciones (Victor, 2026-11-22): se abre la suscripción con lo que había elegido.
+      headings: { es: 'Tu suscripción aún no se completó' },
+      contents: { es: f.detalle ? `Si quieres suscribirte a ${f.detalle}, completa el registro.` : 'Si quieres suscribirte a una clase o mensualidad, completa el registro.' },
+      pantalla: f.pantalla ?? 'pagos',
     }).catch(() => {});
   }
 }
@@ -6878,7 +6882,7 @@ async function _pasarADeuda(r: Record<string, any>, que: string, monto: number, 
     monto: -monto, tipo: 'cargo', aplicar: 'con_cuota', concepto: `${que} sin pagar`, por,
   });
   await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Quedó una deuda' },
-    contents: { es: `No pudimos confirmar el pago de tu ${que.toLowerCase()}. Quedó una deuda de $${monto.toFixed(2)} que pagarás junto con tu próxima reserva.` }, url: APP_URL }).catch(() => {});
+    contents: { es: `No pudimos confirmar el pago de tu ${que.toLowerCase()}. Quedó una deuda de $${monto.toFixed(2)} que pagarás junto con tu próxima suscripción.` }, url: APP_URL }).catch(() => {});
 }
 
 // Reservas de clase nunca aprobadas (Victor, 2026-11-14): 2 h después de que
@@ -6914,8 +6918,8 @@ async function _cerrarReservasVencidas(ahora: number): Promise<void> {
     if (monto > 0 && await _vinoAlEvento(r.nombre_usuario, r.id_evento)) { await _pasarADeuda(r, que, monto, 'automático'); continue; }
     const u = await supabase.from('reservas').update({ estado: 'Cancelada', motivo_rechazo: SIN_APROBAR }).eq('id', r.id).eq('estado', 'Pendiente').select('id');
     if (!u.data?.length) continue;
-    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Se canceló tu reserva' },
-      contents: { es: `Tu reserva de la ${que.toLowerCase()} se canceló porque el pago no se aprobó antes de la clase. Si ya pagaste, escríbele a un Pivot.` }, url: APP_URL }).catch(() => {});
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [r.nombre_usuario], headings: { es: 'Se canceló tu suscripción' },
+      contents: { es: `Tu suscripción a la ${que.toLowerCase()} se canceló porque el pago no se aprobó antes de la clase. Si ya pagaste, escríbele a un Pivot.` }, url: APP_URL }).catch(() => {});
   }
 }
 
@@ -6969,7 +6973,7 @@ async function _deudaVinoSinReserva(nombre: string, idEvento: string): Promise<v
     monto, fecha_pago: e.fecha, saldo_movimiento_id: mov?.id ?? null,
   });
   await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Quedó una deuda' },
-    contents: { es: `Viniste a la ${que.toLowerCase()} sin reserva, así que quedó una deuda de ${_monedaLiga}${monto}. Se cobra junto con tu próximo pago.` }, url: APP_URL }).catch(() => {});
+    contents: { es: `Viniste a la ${que.toLowerCase()} sin suscribirte, así que quedó una deuda de ${_monedaLiga}${monto}. Se cobra junto con tu próximo pago.` }, url: APP_URL }).catch(() => {});
 }
 
 /** Si se corrige la asistencia (ya no vino), se anula la deuda de "vino sin reserva". */
@@ -8923,7 +8927,7 @@ async function adminCuponDescuento(params: Record<string, any>): Promise<Record<
   if (pct) {
     await sendPush({
       tipo: 'solicitud_resuelta', include_external_user_ids: [nombre], headings: { es: 'Tienes un descuento' },
-      contents: { es: pct === 100 ? 'Tu próximo pago es gratis. Se aplica solo al reservar.' : `Tienes ${pct} % de descuento en tu próximo pago. Se aplica solo al reservar.` }, url: APP_URL + '/',
+      contents: { es: pct === 100 ? 'Tu próximo pago es gratis. Se aplica solo al suscribirte.' : `Tienes ${pct} % de descuento en tu próximo pago. Se aplica solo al suscribirte.` }, url: APP_URL + '/',
     }).catch(() => {});
   }
   return { exito: true };
@@ -10749,7 +10753,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
         { clave: 'comprobante_pendiente', nombre: 'Comprobante pendiente', descripcion: 'Si hiciste una reserva y falta subir el comprobante de pago.', categoria: 'Cuenta' },
     { clave: 'cuota_pendiente', nombre: 'Recordatorios de cuota', descripcion: 'El día 1, el día antes de la fecha límite, el día después y después de tu clase de gracia, solo si aún no pagaste. No llegan si ya pagaste o tu pago está en revisión.', categoria: 'Cuenta' },
     { clave: 'cambio_categoria', nombre: 'Cambio de categoría', descripcion: 'Cuando cambia tu categoría (Mirlxs/Quindes).', categoria: 'Cuenta' },
-    { clave: 'reserva_sin_terminar', nombre: 'Reserva sin terminar', descripcion: 'Si dejaste una reserva a medias, te preguntamos una vez si quieres terminarla.', categoria: 'Cuenta' },
+      { clave: 'reserva_sin_terminar', nombre: 'Suscripción sin terminar', descripcion: 'Si dejaste a medias una suscripción a una clase o mensualidad, te avisamos una vez para completarla.', categoria: 'Cuenta' },
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
             { clave: 'curso_nuevo', nombre: 'Cursos nuevos', descripcion: 'Cuando se abre un curso o una clínica que puedes tomar.', categoria: 'Entrenamientos' },
       { clave: 'tarea_nueva', nombre: 'Tareas nuevas', descripcion: 'Cuando se publica una tarea que puedes tomar.', categoria: 'Tareas' },
@@ -10920,7 +10924,7 @@ async function _tokensFcmDe(usernames: string[]): Promise<Map<string, string[]>>
 }
 
 async function _enviarFcm(tokens: string[], payload: {
-  tipo: string; headings: { es: string }; contents: { es: string }; url?: string;
+  tipo: string; headings: { es: string }; contents: { es: string }; url?: string; pantalla?: string;
   web_buttons?: { id: string; text: string; url: string }[]; data?: Record<string, any>;
 }): Promise<void> {
   const acceso = await _fcmAccessToken();
@@ -10931,7 +10935,8 @@ async function _enviarFcm(tokens: string[], payload: {
     cuerpo: payload.contents.es,
   };
   if (payload.url) datos.url = payload.url;
-  if (payload.data?.evento_id) datos.evento_id = String(payload.data.evento_id);
+    if (payload.data?.evento_id) datos.evento_id = String(payload.data.evento_id);
+  if (payload.pantalla) datos.pantalla = payload.pantalla;
   if (payload.data?.token) datos.token_accion = String(payload.data.token);
   if (payload.web_buttons?.length) {
     datos.botones = JSON.stringify(payload.web_buttons.map((b) => ({ id: b.id, texto: b.text })));
@@ -11057,13 +11062,29 @@ async function sendPush(payload: {
   // Sin esto, los tipos de TIPOS_PUSH_EVENTO lo toman de `data.evento_id`
   // o de `?evento=` en la url.
   evento?: AlcanceEvento | null;
-  // Aviso personal con un tipo de evento (ej. curso movido, clase a favor):
+    // Aviso personal con un tipo de evento (ej. curso movido, clase a favor):
   // no se filtra por estado ni por equipo.
   personal?: boolean;
+  // Pantalla que abre al tocarla (Victor, 2026-11-22). Sin esto se usa la
+  // del tipo (PANTALLA_POR_TIPO); con un evento, abre el evento.
+  pantalla?: string;
 }): Promise<void> {
-  if (!CATALOGO_CLAVES.has(payload.tipo)) {
+    if (!CATALOGO_CLAVES.has(payload.tipo)) {
     console.error('sendPush: tipo no registrado en el catálogo, no se envía:', payload.tipo);
     return;
+  }
+  // Cada notificación lleva a su pantalla (Victor, 2026-11-22): el evento si
+  // tiene uno (también en Android, que antes solo lo leía de data.evento_id) o
+  // la pantalla de su tipo.
+  {
+    const enUrl = /[?&]evento=([^&#]+)/.exec(payload.url ?? '')?.[1];
+    const evId = payload.data?.evento_id ?? payload.evento?.idEvento ?? (enUrl ? decodeURIComponent(enUrl) : null);
+    if (evId) payload = { ...payload, data: { ...(payload.data ?? {}), evento_id: evId } };
+    else {
+      const pantalla = payload.pantalla ?? PANTALLA_POR_TIPO[payload.tipo];
+      const sinDestino = !payload.url || payload.url.replace(/\/+$/, '') === APP_URL.replace(/\/+$/, '');
+      if (pantalla && sinDestino) payload = { ...payload, pantalla, url: `${APP_URL.replace(/\/+$/, '')}/?abrir=${encodeURIComponent(pantalla)}` };
+    }
   }
   const aplicaAlcance = !payload.personal && (TIPOS_PUSH_EVENTO.has(payload.tipo) || !!payload.evento);
   let destinatarios: string[];
@@ -11237,6 +11258,15 @@ const EQUIPO_ACTIVO_FILTRO = (r: { estado_miembro?: string | null }) =>
 const TIPOS_PUSH_EVENTO = new Set(['recordatorio_1h', 'recordatorio_1dia', 'entrenamiento_hoy', 'evento_creado', 'evento_editado', 'evento_cancelado', 'descanso_programado', 'cambios_asistencia']);
 const COLS_ALCANCE = 'email, estado_miembro, categoria, eliminado_en';
 type AlcanceEvento = { idEvento?: string | null; equipos?: string[] | null };
+
+/// Pantalla de la app que abre cada tipo de notificación sin evento (Victor, 2026-11-22).
+const PANTALLA_POR_TIPO: Record<string, string> = {
+  comprobante_pendiente: 'pagos', cuota_pendiente: 'pagos', solicitud_resuelta: 'pagos', reserva_sin_terminar: 'pagos',
+  tarea_nueva: 'tareas', tarea_vence: 'tareas', tarea_revisada: 'tareas',
+  curso_nuevo: 'cursos',
+  avisos_admin: 'novedades', aviso_pivots: 'novedades', cumpleanos: 'novedades', cumpleanos_propio: 'novedades', aniversario: 'novedades', social: 'novedades',
+  integrante_nuevo: 'equipo', cambio_estado_miembro: 'equipo', cambio_categoria: 'equipo',
+};
 
 function _esActivx(row: { estado_miembro?: string | null } | null | undefined): boolean {
   const e = String(row?.estado_miembro ?? '').trim();
@@ -12901,7 +12931,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
     await sendPush({
       tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario],
       headings: { es: `Se rechazó ${que}` },
-      contents: { es: mensaje || `Motivo: ${motivo}. Puedes reservar de nuevo cuando lo tengas listo.` },
+      contents: { es: mensaje || `Motivo: ${motivo}. Puedes suscribirte de nuevo cuando lo tengas listo.` },
       url: APP_URL,
     }).catch(() => {});
   }
@@ -12994,12 +13024,12 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
         const texto = reservaAntes.tipo === 'mensual'
       ? `Recibimos tu pago de ${mesTxt}, ¡gracias!${premio ? ` Por pagar a tiempo recibes ${premio}.` : ''}`
       : reservaAntes.tipo === 'plan'
-            ? `Tu plan ${reservaAntes.mes_texto ?? ''} está activo. Ya puedes reservar tus clases sin pagar cada una.`
+            ? `Tu plan ${reservaAntes.mes_texto ?? ''} está activo. Ya puedes suscribirte a tus clases sin pagar cada una.`
       : reservaAntes.tipo === 'curso'
       ? `Ya estás inscritx en ${reservaAntes.mes_texto ?? 'el curso'}. Las fechas están en tu calendario.`
 
-      : 'Tu reserva fue confirmada. ¡Nos vemos en la pista!';
-    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario], headings: { es: reservaAntes.tipo === 'mensual' ? 'Pago confirmado' : 'Reserva confirmada' }, contents: { es: texto }, url: APP_URL }).catch(() => {});
+      : 'Tu suscripción a la clase quedó confirmada. ¡Nos vemos!';
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [reservaAntes.nombre_usuario], headings: { es: reservaAntes.tipo === 'mensual' ? 'Pago confirmado' : 'Suscripción confirmada' }, contents: { es: texto }, url: APP_URL }).catch(() => {});
   }
   // Saldo usado o pagado junto con la cuota: se registra al confirmar y se
   // anula si la reserva se cancela después.
@@ -13047,7 +13077,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
       include_external_user_ids: [reservaAntes.nombre_usuario],
       headings: { es: 'Tienes una clase a favor' },
       personal: true, // aviso de pago, no del evento
-      contents: { es: 'Tu próxima clase reservada no tendrá costo: se descuenta sola al reservar.' },
+      contents: { es: 'Tu próxima suscripción a una clase no tendrá costo: se descuenta sola al suscribirte.' },
       url: APP_URL + '/?tab=eventos',
     });
   }

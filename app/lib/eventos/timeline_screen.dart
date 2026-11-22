@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/vidrio.dart';
 import '../core/fechas.dart';
 import '../core/reloj.dart';
+import '../core/navegacion.dart';
 import '../core/tema.dart';
 import '../core/tour.dart';
 import '../reservas/gestionar_reserva.dart';
@@ -190,6 +191,23 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     _bandeja.cargar(forzar: true);
     _bandeja.cargarMia();
     _cargarCursos();
+    // Notificación que abre Actividad en una pestaña (Victor, 2026-11-22).
+    Navegacion.actividad.addListener(_abrirDesdeAviso);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _abrirDesdeAviso());
+  }
+
+  void _abrirDesdeAviso() {
+    final que = Navegacion.actividad.value;
+    if (que == null || !mounted) return;
+    Navegacion.actividad.value = null;
+    // Si ya había una subsección abierta en el Calendario, se vuelve al inicio.
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    _abrirActividad(switch (que) {
+      'tareas' => PestanaActividad.tareas,
+      'cursos' => PestanaActividad.clases,
+      'pagos' => PestanaActividad.pagos,
+      _ => PestanaActividad.notificaciones,
+    });
   }
 
   // ─── Búsqueda y filtros guardados (pedido 2026-11-06: siempre) ─────────
@@ -256,6 +274,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     _posiciones.itemPositions.removeListener(_alDesplazar);
     widget.irAHoy?.removeListener(_irAHoy);
     RelojMinuto.instancia.removeListener(_alPasarMinuto);
+    Navegacion.actividad.removeListener(_abrirDesdeAviso);
     _tareas.removeListener(_alCambiarTareas);
     _bandeja.removeListener(_alPasarMinuto);
     _calCtrl.dispose();
