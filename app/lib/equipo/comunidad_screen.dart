@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/vidrio.dart' show altoBarra;
+
 import '../core/config_liga.dart';
 import '../pivots/editores_liga.dart';
 
@@ -145,8 +147,11 @@ Future<void> abrirEnlace(BuildContext context, String url) async {
 /// tienen el mosaico "Agregar" y al tocar uno eligen abrir, editar o
 /// eliminar (Victor, 2026-11-13: sin lápiz).
 class ComunidadScreen extends StatefulWidget {
-  const ComunidadScreen({super.key, required this.repo});
+  const ComunidadScreen({super.key, required this.repo, this.embebida = false});
   final ComunidadRepo repo;
+
+  /// Dentro de la pestaña Redes de Liga: sin barra propia.
+  final bool embebida;
 
   @override
   State<ComunidadScreen> createState() => _ComunidadScreenState();
@@ -239,14 +244,20 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Comunidad', style: TextStyle(fontWeight: FontWeight.w700)),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              title: const Text('Comunidad', style: TextStyle(fontWeight: FontWeight.w700)),
 
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(3),
-          child: AnimatedOpacity(opacity: _guardando ? 1 : 0, duration: const Duration(milliseconds: 200), child: const LinearProgressIndicator(minHeight: 3)),
-        ),
-      ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(3),
+                child: AnimatedOpacity(
+                  opacity: _guardando ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const LinearProgressIndicator(minHeight: 3),
+                ),
+              ),
+            ),
       body: ListenableBuilder(
         listenable: repo,
         builder: (context, _) {
@@ -284,7 +295,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
             final n = repo.enlaces.length;
             cuerpo = ListView(
               key: const ValueKey('lista'),
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+              padding: EdgeInsets.fromLTRB(16, 8 + (widget.embebida ? altoBarra(context) : 0), 16, 40 + MediaQuery.paddingOf(context).bottom),
               children: [
                 GridView.builder(
                   shrinkWrap: true,

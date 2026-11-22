@@ -66,7 +66,7 @@ class PrivacidadScreen extends StatelessWidget {
               FilaAjuste(
                 icono: Icons.celebration_outlined,
                 titulo: 'Mi cumpleaños',
-                valor: 'Aparece en la línea de tiempo y en Equipo',
+                valor: 'Aparece en la línea de tiempo y en Liga',
                 derecha: Switch(
                   value: cumple,
                   onChanged: (v) => guardar(c: v),

@@ -460,6 +460,13 @@ class _Seccion extends StatelessWidget {
   );
 }
 
+class _SoloLectura extends InheritedWidget {
+  const _SoloLectura({required super.child});
+  static bool de(BuildContext c) => c.dependOnInheritedWidgetOfExactType<_SoloLectura>() != null;
+  @override
+  bool updateShouldNotify(_SoloLectura old) => false;
+}
+
 class _Fila extends StatelessWidget {
   const _Fila({required this.icono, required this.titulo, required this.texto, required this.alTocar, this.final_});
   final IconData icono;
@@ -469,6 +476,11 @@ class _Fila extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_SoloLectura.de(context)) return _Fila(icono: icono, titulo: titulo, texto: texto, alTocar: null)._dibujar(context);
+    return _dibujar(context);
+  }
+
+  Widget _dibujar(BuildContext context) {
     final p = context.pivot;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -891,11 +903,15 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
 /// Resumen de un equipo: cada fila se cambia por separado en una hoja corta
 /// que muestra a quién afecta (Victor, 2026-11-13).
 class _EquipoScreen extends StatefulWidget {
-  const _EquipoScreen({required this.sesion, required this.tiers, required this.indice, required this.gente});
+  const _EquipoScreen({required this.sesion, required this.tiers, required this.indice, required this.gente, this.soloLectura = false});
   final Sesion sesion;
   final List<Map<String, dynamic>> tiers;
   final int indice;
   final List<_Persona> gente;
+
+  /// Quien no es Pivot ve las reglas de su equipo sin poder cambiarlas
+  /// (Victor, 2026-11-22: así sabe qué le afecta).
+  final bool soloLectura;
 
   @override
   State<_EquipoScreen> createState() => _EquipoScreenState();
@@ -911,7 +927,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarReglas();
+    if (!widget.soloLectura) _cargarReglas();
   }
 
   Future<void> _cargarReglas() async {
@@ -1373,123 +1389,151 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
           children: _filtrar(context, [
-            Center(
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _logo,
-                child: Stack(
+            if (widget.soloLectura) ...[
+              Center(
+                child: LogoEquipo(nombre: _nombre, url: t['logo'] as String?, tamano: 88),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'Así funciona $_nombre. Solo los Pivots pueden cambiarlo.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: p.textoSecundario),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SoloLectura(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    LogoEquipo(nombre: _nombre, url: t['logo'] as String?, tamano: 88),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: CircleAvatar(
-                        radius: 15,
-                        backgroundColor: p.marca,
-                        child: Icon(Icons.edit_rounded, size: 16, color: p.sobreMarca),
-                      ),
-                    ),
+                    if (!_piso) ...[
+                      _Fila(icono: Icons.verified_outlined, titulo: 'Mantenerse en el equipo', texto: 'Pide ${r.texto}.', alTocar: null),
+                      _Fila(icono: Icons.trending_up_rounded, titulo: 'Ascenso al equipo', texto: 'Desde $_nombreDebajo: ${r.textoSubir}.', alTocar: null),
+                      _Fila(icono: Icons.trending_down_rounded, titulo: 'Descenso del equipo', texto: '${r.textoBajar}.', alTocar: null),
+                    ],
+                    ..._reglasDelEquipo(context),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                _piso
-                    ? 'Equipo inicial: quien se une entra aquí.'
-                    : (miembros.isEmpty ? 'Nadie entra hoy en el cálculo.' : 'Hoy lo cumplen $cumplen de ${miembros.length}.'),
-                style: TextStyle(color: p.textoSecundario),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Fila(icono: Icons.badge_outlined, titulo: 'Nombre del equipo', texto: _nombre, alTocar: _renombrar),
-            if (!_piso) ...[
-              _Fila(icono: Icons.verified_outlined, titulo: 'Mantenerse en el equipo', texto: 'Pide ${r.texto}.', alTocar: _mantener),
-              _Fila(icono: Icons.trending_up_rounded, titulo: 'Ascenso al equipo', texto: 'Desde $_nombreDebajo: ${r.textoSubir}.', alTocar: _subir),
-              _Fila(icono: Icons.trending_down_rounded, titulo: 'Descenso del equipo', texto: '${r.textoBajar}.', alTocar: _bajar),
-              if (otros.length > 1)
-                _Fila(
-                  icono: Icons.swap_vert_rounded,
-                  titulo: 'Orden',
-                  texto: 'Puesto ${pos + 1} de ${otros.length} (el de arriba es el más exigente)',
-                  alTocar: null,
-                  final_: Row(
-                    mainAxisSize: MainAxisSize.min,
+            ] else ...[
+              Center(
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _logo,
+                  child: Stack(
                     children: [
-                      IconButton(tooltip: 'Más arriba', onPressed: pos > 0 ? () => _mover(-1) : null, icon: const Icon(Icons.arrow_upward_rounded)),
-                      IconButton(
-                        tooltip: 'Más abajo',
-                        onPressed: pos < otros.length - 1 ? () => _mover(1) : null,
-                        icon: const Icon(Icons.arrow_downward_rounded),
+                      LogoEquipo(nombre: _nombre, url: t['logo'] as String?, tamano: 88),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: p.marca,
+                          child: Icon(Icons.edit_rounded, size: 16, color: p.sobreMarca),
+                        ),
                       ),
                     ],
                   ),
                 ),
-            ],
-            // Invitar al equipo (Victor, 2026-11-15): a la vista y fácil de
-            // compartir. Quien no cumple lo que pide el equipo entra al inicial
-            // y la inscripción le explica por qué.
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.person_add_alt_1_rounded, color: PivotPaleta.sobreSeccion),
-                        SizedBox(width: 8),
-                        Text(
-                          'Invita al equipo',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(_textoInvitar, style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92))),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(backgroundColor: PivotPaleta.sobreSeccion, foregroundColor: p.marcaTexto),
-                            onPressed: () => SharePlus.instance.share(ShareParams(text: 'Únete a $_nombre en Pivot: $_enlace')),
-                            icon: const Icon(Icons.share_rounded),
-                            label: const Text('Compartir'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: PivotPaleta.sobreSeccion,
-                              side: BorderSide(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.7)),
-                            ),
-                            onPressed: () async {
-                              await Clipboard.setData(ClipboardData(text: _enlace));
-                              _aviso('Enlace copiado');
-                            },
-                            icon: const Icon(Icons.copy_rounded),
-                            label: const Text('Copiar'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  _piso
+                      ? 'Equipo inicial: quien se une entra aquí.'
+                      : (miembros.isEmpty ? 'Nadie entra hoy en el cálculo.' : 'Hoy lo cumplen $cumplen de ${miembros.length}.'),
+                  style: TextStyle(color: p.textoSecundario),
                 ),
               ),
-            ),
-            // Reglas del equipo dentro del equipo (Victor, 2026-11-16); las
-            // de toda la liga que lo afectan, con su etiqueta.
-            ..._reglasDelEquipo(context),
-            if (!_piso) ...[
               const SizedBox(height: 16),
-              Center(
-                child: TextButton.icon(onPressed: _borrar, icon: const Icon(Icons.delete_outline_rounded), label: Text('Borrar $_nombre')),
+              _Fila(icono: Icons.badge_outlined, titulo: 'Nombre del equipo', texto: _nombre, alTocar: _renombrar),
+              if (!_piso) ...[
+                _Fila(icono: Icons.verified_outlined, titulo: 'Mantenerse en el equipo', texto: 'Pide ${r.texto}.', alTocar: _mantener),
+                _Fila(icono: Icons.trending_up_rounded, titulo: 'Ascenso al equipo', texto: 'Desde $_nombreDebajo: ${r.textoSubir}.', alTocar: _subir),
+                _Fila(icono: Icons.trending_down_rounded, titulo: 'Descenso del equipo', texto: '${r.textoBajar}.', alTocar: _bajar),
+                if (otros.length > 1)
+                  _Fila(
+                    icono: Icons.swap_vert_rounded,
+                    titulo: 'Orden',
+                    texto: 'Puesto ${pos + 1} de ${otros.length} (el de arriba es el más exigente)',
+                    alTocar: null,
+                    final_: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(tooltip: 'Más arriba', onPressed: pos > 0 ? () => _mover(-1) : null, icon: const Icon(Icons.arrow_upward_rounded)),
+                        IconButton(
+                          tooltip: 'Más abajo',
+                          onPressed: pos < otros.length - 1 ? () => _mover(1) : null,
+                          icon: const Icon(Icons.arrow_downward_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              // Invitar al equipo (Victor, 2026-11-15): a la vista y fácil de
+              // compartir. Quien no cumple lo que pide el equipo entra al inicial
+              // y la inscripción le explica por qué.
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.person_add_alt_1_rounded, color: PivotPaleta.sobreSeccion),
+                          SizedBox(width: 8),
+                          Text(
+                            'Invita al equipo',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(_textoInvitar, style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92))),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(backgroundColor: PivotPaleta.sobreSeccion, foregroundColor: p.marcaTexto),
+                              onPressed: () => SharePlus.instance.share(ShareParams(text: 'Únete a $_nombre en Pivot: $_enlace')),
+                              icon: const Icon(Icons.share_rounded),
+                              label: const Text('Compartir'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: PivotPaleta.sobreSeccion,
+                                side: BorderSide(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.7)),
+                              ),
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: _enlace));
+                                _aviso('Enlace copiado');
+                              },
+                              icon: const Icon(Icons.copy_rounded),
+                              label: const Text('Copiar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
+              // Reglas del equipo dentro del equipo (Victor, 2026-11-16); las
+              // de toda la liga que lo afectan, con su etiqueta.
+              ..._reglasDelEquipo(context),
+              if (!_piso) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton.icon(onPressed: _borrar, icon: const Icon(Icons.delete_outline_rounded), label: Text('Borrar $_nombre')),
+                ),
+              ],
             ],
           ]),
         ),
@@ -2104,6 +2148,60 @@ class _AjustesEquipoScreenState extends State<AjustesEquipoScreen> {
       );
     }
     return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: _gente);
+  }
+}
+
+/// Ver un equipo desde Comunidad (Victor, 2026-11-22): los Pivots lo editan;
+/// el resto ve sus reglas sin poder cambiarlas.
+class VerEquipoScreen extends StatefulWidget {
+  const VerEquipoScreen({super.key, required this.sesion, required this.nombre});
+  final Sesion sesion;
+  final String nombre;
+
+  @override
+  State<VerEquipoScreen> createState() => _VerEquipoScreenState();
+}
+
+class _VerEquipoScreenState extends State<VerEquipoScreen> {
+  List<Map<String, dynamic>>? _tiers;
+  String? _error;
+
+  bool get _pivot => widget.sesion.esAdmin && widget.sesion.adminToken != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_pivot) return;
+    widget.sesion.api
+        .get('getEquipoPublico')
+        .then((r) {
+          if (!mounted) return;
+          setState(() {
+            _tiers = [
+              for (final t in (r['tiers'] as List? ?? const []))
+                if (t is Map<String, dynamic>) t,
+            ]..sort((a, b) => ((a['orden'] as num?) ?? 0).compareTo((b['orden'] as num?) ?? 0));
+          });
+        })
+        .catchError((Object e) {
+          if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
+        });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_pivot) return AjustesEquipoScreen(sesion: widget.sesion, nombre: widget.nombre);
+    final l = _tiers;
+    final i = l?.indexWhere((t) => '${t['nombre']}' == widget.nombre) ?? -1;
+    if (l == null || i < 0) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.nombre)),
+        body: Center(
+          child: _error != null ? Text(_error!) : (l == null ? const Esqueleto(forma: FormaEsqueleto.ajustes) : const Text('Ese equipo ya no existe.')),
+        ),
+      );
+    }
+    return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: const [], soloLectura: true);
   }
 }
 

@@ -836,7 +836,7 @@ class _AdministracionState extends State<_Administracion> {
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.archive_outlined, color: pal.marcaTexto),
                     title: Text('Archivar a ${p.nombreMostrar}', style: TextStyle(color: pal.marcaTexto)),
-                    subtitle: const Text('Deja de aparecer en Equipo. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx.'),
+                    subtitle: const Text('Deja de aparecer en Liga. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx.'),
                     onTap: () async {
                       final nav = Navigator.of(context);
                       if (!await _confirmar('¿Archivar?', 'No se puede archivar si tiene reservas activas o cuotas pendientes.', 'Archivar')) return;

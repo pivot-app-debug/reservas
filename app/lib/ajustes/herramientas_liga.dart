@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../coach/coach_screen.dart' show CoachScreen, CoachesScreen;
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/tema.dart';
@@ -54,7 +53,7 @@ class GrupoHerramientasLiga extends StatelessWidget {
   final EventosRepo eventos;
 
   /// Hay algo que mostrar para esta persona.
-  static bool visible(Sesion s) => (s.esAdmin && s.adminToken != null) || s.tieneArea('finanzas') || FuncionesLiga.usaCoach(s);
+  static bool visible(Sesion s) => (s.esAdmin && s.adminToken != null) || s.tieneArea('finanzas');
 
   Future<void> _activar(BuildContext context, String clave, String nombre, String que) async {
     final ok = await showModalBottomSheet<bool>(
@@ -114,16 +113,16 @@ class GrupoHerramientasLiga extends StatelessWidget {
                     : () => _activar(context, 'finanzasActiva', 'Finanzas', textoFinanzas),
                 derecha: Switch(value: finanzas, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'finanzasActiva', v)),
               ),
-            if (FuncionesLiga.usaCoach(sesion) || FuncionesLiga.puedeCambiarCoach(sesion))
+            // Los ajustes de coaches viven en Liga → Comunidad → Coaches
+            // (Victor, 2026-11-22); aquí queda solo activarlo o no.
+            if (pivot)
               FilaAjuste(
                 icono: Icons.sports_rounded,
                 seccion: 'entrenamientos',
                 titulo: 'Coach',
-                valor: !coach ? 'Desactivado para la liga' : (sesion.esCoach ? 'Habilidades, cursos y ajustes de coach' : 'Quién es coach y qué equipos lleva'),
-                alTocar: !coach
-                    ? (pivot ? () => _activar(context, 'coachActivo', 'Coach', textoCoach) : null)
-                    : () => SubAjustes.abrir(context, sesion.esCoach ? CoachScreen(sesion: sesion, eventos: eventos) : CoachesScreen(sesion: sesion)),
-                derecha: pivot ? Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)) : null,
+                valor: coach ? 'Activado · sus ajustes están en Liga → Coaches' : 'Desactivado para la liga',
+                alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Coach', textoCoach),
+                derecha: Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)),
               ),
           ],
         );

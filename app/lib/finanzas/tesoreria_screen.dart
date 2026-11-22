@@ -97,8 +97,11 @@ Future<Integrante?> elegirPersona(BuildContext context, Sesion s, {String titulo
 
 /// Mi perfil → Tesorería (Pivots con Finanzas).
 class TesoreriaScreen extends StatefulWidget {
-  const TesoreriaScreen({super.key, required this.sesion, this.resaltar});
+  const TesoreriaScreen({super.key, required this.sesion, this.resaltar, this.embebida = false});
   final Sesion sesion;
+
+  /// Dentro de la pestaña Finanzas de Liga: sin barra propia.
+  final bool embebida;
 
   /// Fila a resaltar al abrir (desde el buscador de Mi Liga).
   final String? resaltar;
@@ -691,14 +694,16 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     final r = _r;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Finanzas', style: TextStyle(fontWeight: FontWeight.w700)),
-        actions: [LupaSeccion(seccion: 'tesoreria', donde: 'Finanzas', resaltado: _resaltado)],
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              flexibleSpace: const Vidrio(child: SizedBox.expand()),
+              title: const Text('Finanzas', style: TextStyle(fontWeight: FontWeight.w700)),
+              actions: [LupaSeccion(seccion: 'tesoreria', donde: 'Finanzas', resaltado: _resaltado)],
+            ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: r == null

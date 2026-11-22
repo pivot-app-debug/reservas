@@ -42,7 +42,7 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
       context: context,
       builder: (d) => AlertDialog(
         title: Text('¿Restaurar a ${x['nombreDerby']}?'),
-        content: const Text('Vuelve a aparecer en Equipo con su historial.'),
+        content: const Text('Vuelve a aparecer en Liga con su historial.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Restaurar')),

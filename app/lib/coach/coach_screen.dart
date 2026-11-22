@@ -167,7 +167,7 @@ class _CoachScreenState extends State<CoachScreen> {
                   ..._enCurso(context),
                   const SizedBox(height: 12),
                   Text(
-                    'Las fichas deportivas y "Marcar habilidades" están en Equipo. Para evaluar un entrenamiento, ábrelo en el Calendario y toca "Evaluar".',
+                    'Las fichas deportivas y "Marcar habilidades" están en Liga. Para evaluar un entrenamiento, ábrelo en el Calendario y toca "Evaluar".',
                     style: TextStyle(fontSize: 12.5, height: 1.35, color: p.textoSecundario),
                   ),
                 ],
@@ -1505,7 +1505,7 @@ class FilaSerCoach extends StatelessWidget {
             const Text('Quiero ser coach', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás Coach en Ajustes y Habilidades en Equipo para seguir a tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás Coaches en Liga y las fichas deportivas para seguir a tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),

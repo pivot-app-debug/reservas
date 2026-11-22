@@ -17,6 +17,7 @@ import 'core/aviso_sin_conexion.dart';
 import 'equipo/equipo_repo.dart';
 import 'equipo/equipo_screen.dart';
 import 'eventos/eventos_repo.dart';
+import 'eventos/widgets_comunes.dart' show AvatarPersona;
 import 'eventos/timeline_screen.dart';
 import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
@@ -211,14 +212,33 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
         TimelineScreen(repo: widget.repo, irAHoy: _irAHoy),
       ),
       (
-        const NavigationDestination(icon: Icon(Icons.group_outlined), selectedIcon: Icon(Icons.group), label: 'Equipo'),
+        // Equipo pasó a Liga (Victor, 2026-11-22): Comunidad, Redes, Inventario y Finanzas.
+        const NavigationDestination(icon: Icon(Icons.group_outlined), selectedIcon: Icon(Icons.group), label: 'Liga'),
         EquipoScreen(repo: EquipoRepo.de(widget.sesion)),
       ),
       // Finanzas y Coach salieron de la barra (Victor, 2026-11-19): viven en
       // Ajustes → Herramientas de la liga, junto con Mi Liga.
       // Ajustes (antes Mi perfil): ícono de engranaje (Victor, 2026-11-16).
       (
-        const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Ajustes'),
+        // Mi perfil con tu avatar (Victor, 2026-11-22).
+        NavigationDestination(
+          icon: ListenableBuilder(
+            listenable: widget.sesion,
+            builder: (context, _) => AvatarPersona(nombre: widget.sesion.nombreMostrar, foto: widget.sesion.fotoPerfil, tamano: 26),
+          ),
+          selectedIcon: ListenableBuilder(
+            listenable: widget.sesion,
+            builder: (context, _) => Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: context.pivot.marca, width: 2),
+              ),
+              child: AvatarPersona(nombre: widget.sesion.nombreMostrar, foto: widget.sesion.fotoPerfil, tamano: 24),
+            ),
+          ),
+          label: 'Mi perfil',
+        ),
         AjustesScreen(sesion: widget.sesion, eventos: widget.repo),
       ),
     ];

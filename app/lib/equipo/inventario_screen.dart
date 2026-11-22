@@ -13,6 +13,8 @@ import '../ajustes/componentes.dart' show SubAjustes;
 import '../ajustes/datos_screens.dart' show EquipamientoScreen;
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
+import '../eventos/eventos_repo.dart';
+import 'cosas_para_llevar.dart';
 import 'equipo_repo.dart';
 import 'inventario_asistentes.dart';
 import 'inventario_modelos.dart';
@@ -25,8 +27,11 @@ import '../pivots/categorias_screen.dart' show elegirYSubirLogo;
 /// (temporal con recordatorio cada 7 días o permanente) y pedidos para usar
 /// equipamiento. Pivots crean listas y registran; todos ven y avisan.
 class InventarioScreen extends StatefulWidget {
-  const InventarioScreen({super.key, required this.sesion});
+  const InventarioScreen({super.key, required this.sesion, this.embebida = false});
   final Sesion sesion;
+
+  /// Dentro de la pestaña Inventario de Liga: sin barra propia.
+  final bool embebida;
 
   @override
   State<InventarioScreen> createState() => _InventarioScreenState();
@@ -252,6 +257,9 @@ class _InventarioScreenState extends State<InventarioScreen> {
           children: [
             // Atajos en la portada en vez del "+" (Victor, 2026-11-17).
             _atajos(context),
+            // Cosas para llevar hoy o mañana, también aquí (Victor, 2026-11-22).
+            if (_pivot && EventosRepo.actual != null)
+              AvisoCosasParaLlevar(eventos: EventosRepo.actual!, equipo: EquipoRepo.de(widget.sesion), margen: const EdgeInsets.only(bottom: 12)),
             // Recordatorio a la persona: "¿Ya lo devolviste?" (se renueva cada 7 días).
             for (final pr in preguntarme)
               _Aviso(
@@ -369,20 +377,22 @@ class _InventarioScreenState extends State<InventarioScreen> {
     }
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Inventario', style: TextStyle(fontWeight: FontWeight.w700)),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(3),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: _guardando ? const LinearProgressIndicator(minHeight: 3) : const SizedBox(height: 3),
-          ),
-        ),
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              flexibleSpace: const Vidrio(child: SizedBox.expand()),
+              title: const Text('Inventario', style: TextStyle(fontWeight: FontWeight.w700)),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(3),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _guardando ? const LinearProgressIndicator(minHeight: 3) : const SizedBox(height: 3),
+                ),
+              ),
+            ),
       // Pivots: "Nueva lista" con texto; lo demás son atajos en la portada (Victor, 2026-11-17).
       floatingActionButton: !_cargado || !_pivot
           ? null

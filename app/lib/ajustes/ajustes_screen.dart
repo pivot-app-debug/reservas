@@ -61,7 +61,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text('Ajustes', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        title: Text('Mi perfil', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([sesion, eventos]),

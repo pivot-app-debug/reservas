@@ -1129,7 +1129,7 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
       (
         Icons.settings_rounded,
         'Todo se cambia en Mi Liga',
-        'En Ajustes → Mi Liga están los equipos, las cuotas, las reglas, los entrenamientos y los permisos.',
+        'En Liga, con el ícono del estadio, están los equipos, las cuotas, las reglas, los entrenamientos y los permisos.',
       ),
       (Icons.qr_code_2_rounded, 'Invita a tu gente', 'En Mi Liga → Equipos tienes el enlace y el código QR de inscripción de cada equipo para compartirlo.'),
       (

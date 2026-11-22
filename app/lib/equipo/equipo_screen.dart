@@ -12,7 +12,14 @@ import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/componentes.dart';
+import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
+import '../coach/coach_screen.dart' show CoachScreen, CoachesScreen;
+import '../eventos/eventos_repo.dart';
+import '../finanzas/tesoreria_screen.dart';
+import '../pivots/categorias_screen.dart' show VerEquipoScreen, NuevoEquipoScreen;
+import '../pivots/ajustes_liga_screen.dart' show AjustesLigaScreen;
 import 'buscador_equipo.dart';
+import 'cosas_para_llevar.dart';
 import 'comunidad_screen.dart';
 import 'inventario_screen.dart';
 import 'emergencia_screen.dart';
@@ -35,8 +42,49 @@ class EquipoScreen extends StatefulWidget {
   State<EquipoScreen> createState() => _EquipoScreenState();
 }
 
-class _EquipoScreenState extends State<EquipoScreen> {
+/// Pestañas de Liga (Victor, 2026-11-22): Comunidad (la gente), Redes,
+/// Inventario y, para quien gestiona finanzas, Finanzas.
+enum PestanaLiga { comunidad, redes, inventario, finanzas }
+
+class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMixin {
   EquipoRepo get repo => widget.repo;
+  TabController? _tabs;
+  List<PestanaLiga> _pestanas = const [];
+
+  bool get _pivot => repo.sesion.esAdmin && repo.sesion.adminToken != null;
+
+  List<PestanaLiga> _calcularPestanas() => [
+    PestanaLiga.comunidad,
+    PestanaLiga.redes,
+    PestanaLiga.inventario,
+    if (repo.sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(repo.sesion)) PestanaLiga.finanzas,
+  ];
+
+  /// Rehace las pestañas si cambia el permiso de Finanzas.
+  TabController _controlador() {
+    final l = _calcularPestanas();
+    if (_tabs == null || l.length != _pestanas.length) {
+      final antes = _tabs == null ? PestanaLiga.comunidad : _pestanas[_tabs!.index];
+      _tabs?.dispose();
+      _pestanas = l;
+      _tabs = TabController(length: l.length, vsync: this, initialIndex: l.indexOf(antes).clamp(0, l.length - 1))..addListener(() => setState(() {}));
+    }
+    return _tabs!;
+  }
+
+  static String _nombreLiga(PestanaLiga x) => switch (x) {
+    PestanaLiga.comunidad => 'Comunidad',
+    PestanaLiga.redes => 'Redes',
+    PestanaLiga.inventario => 'Inventario',
+    PestanaLiga.finanzas => 'Finanzas',
+  };
+
+  static IconData _iconoLiga(PestanaLiga x) => switch (x) {
+    PestanaLiga.comunidad => Icons.groups_rounded,
+    PestanaLiga.redes => Icons.forum_rounded,
+    PestanaLiga.inventario => Icons.content_paste_rounded,
+    PestanaLiga.finanzas => Icons.account_balance_wallet_rounded,
+  };
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
   bool _buscando = false;
@@ -60,6 +108,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
   @override
   void dispose() {
+    _tabs?.dispose();
     _reloj?.cancel();
     _tick.dispose();
     _busqueda.dispose();
@@ -80,7 +129,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final t = Theme.of(context).textTheme;
+    final tabs = _controlador();
+    final enComunidad = _pestanas[tabs.index] == PestanaLiga.comunidad;
     return PopScope(
       canPop: !_buscando,
       onPopInvokedWithResult: (hizo, _) {
@@ -118,14 +168,10 @@ class _EquipoScreenState extends State<EquipoScreen> {
                       ),
                     ),
                   )
-                : Text(
-                    'Equipo',
-                    key: const ValueKey('titulo'),
-                    style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-                  ),
+                : Align(key: const ValueKey('titulo'), alignment: Alignment.centerLeft, child: _pillsLiga(p, tabs)),
           ),
           actions: [
-            if (!_buscando)
+            if (!_buscando && enComunidad)
               ListenableBuilder(
                 listenable: repo,
                 builder: (context, _) => IconButton(
@@ -134,53 +180,127 @@ class _EquipoScreenState extends State<EquipoScreen> {
                   icon: Badge(isLabelVisible: repo.hayFiltros, smallSize: 8, child: const Icon(Icons.tune_rounded)),
                 ),
               ),
-            if (!_buscando) IconButton(tooltip: 'Buscar', onPressed: _alternarBusqueda, icon: const Icon(Icons.search_rounded)),
+            if (!_buscando && enComunidad) IconButton(tooltip: 'Buscar', onPressed: _alternarBusqueda, icon: const Icon(Icons.search_rounded)),
+            // Ajustes de la liga con el ícono del estadio (Victor, 2026-11-22).
+            if (!_buscando && _pivot)
+              IconButton(
+                tooltip: 'Ajustes de la liga',
+                onPressed: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: repo.sesion, pestana: true)),
+                icon: const Icon(Icons.stadium_rounded),
+              ),
           ],
         ),
-        body: ListenableBuilder(
-          listenable: repo,
-          builder: (context, _) {
-            final personas = repo.personas;
-            final Widget cuerpo;
-            if (personas == null) {
-              cuerpo = repo.error != null
-                  ? Center(
-                      key: const ValueKey('error'),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(repo.error!),
-                          const SizedBox(height: 12),
-                          OutlinedButton(onPressed: () => repo.cargar(forzar: true), child: const Text('Reintentar')),
-                        ],
-                      ),
-                    )
-                  : const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('cargando'));
-            } else if (_buscando && _busqueda.text.trim().isNotEmpty) {
-              cuerpo = _resultados(context, p, personas);
-            } else {
-              cuerpo = _lista(context, p, personas);
-            }
-            return Stack(
-              children: [
-                AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: cuerpo),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: AnimatedOpacity(
-                    opacity: repo.cargando && personas != null ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const LinearProgressIndicator(minHeight: 2),
-                  ),
-                ),
-              ],
-            );
-          },
+        body: TabBarView(
+          controller: tabs,
+          children: [
+            for (final x in _pestanas)
+              switch (x) {
+                PestanaLiga.comunidad => _comunidad(context, p),
+                PestanaLiga.redes => ComunidadScreen(repo: ComunidadRepo.de(repo.sesion), embebida: true),
+                PestanaLiga.inventario => InventarioScreen(sesion: repo.sesion, embebida: true),
+                PestanaLiga.finanzas => TesoreriaScreen(sesion: repo.sesion, embebida: true),
+              },
+          ],
         ),
       ),
     );
   }
+
+  Widget _comunidad(BuildContext context, PivotPaleta p) => ListenableBuilder(
+    listenable: repo,
+    builder: (context, _) {
+      final personas = repo.personas;
+      final Widget cuerpo;
+      if (personas == null) {
+        cuerpo = repo.error != null
+            ? Center(
+                key: const ValueKey('error'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(repo.error!),
+                    const SizedBox(height: 12),
+                    OutlinedButton(onPressed: () => repo.cargar(forzar: true), child: const Text('Reintentar')),
+                  ],
+                ),
+              )
+            : const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('cargando'));
+      } else if (_buscando && _busqueda.text.trim().isNotEmpty) {
+        cuerpo = _resultados(context, p, personas);
+      } else {
+        cuerpo = _lista(context, p, personas);
+      }
+      return Stack(
+        children: [
+          AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: cuerpo),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedOpacity(
+              opacity: repo.cargando && personas != null ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const LinearProgressIndicator(minHeight: 2),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  /// Pills como en Actividad: la elegida con ícono y nombre en rojo.
+  Widget _pillsLiga(PivotPaleta p, TabController tabs) => AnimatedBuilder(
+    animation: tabs.animation!,
+    builder: (context, _) {
+      final actual = tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (i, x) in _pestanas.indexed)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Semantics(
+                  selected: i == actual,
+                  button: true,
+                  label: _nombreLiga(x),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(PivotRadios.chip),
+                    onTap: () => tabs.animateTo(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      height: 44,
+                      padding: EdgeInsets.symmetric(horizontal: i == actual ? 14 : 10),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_iconoLiga(x), size: 24, color: i == actual ? p.marcaTexto : p.textoSecundario),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: i == actual
+                                ? Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      _nombreLiga(x),
+                                      style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
 
   Widget _envolverScroll(Widget hijo) => NotificationListener<ScrollNotification>(
     onNotification: (n) {
@@ -221,8 +341,11 @@ class _EquipoScreenState extends State<EquipoScreen> {
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).top)),
           if (repo.hayFiltros) SliverToBoxAdapter(child: _filtrosActivos(p)),
-          // Comunidad e Inventario, para todo el equipo (Victor, 2026-11-12).
-          if (!repo.hayFiltros) SliverToBoxAdapter(child: _accesos(context)),
+          // Cosas para llevar hoy o mañana, para Pivots (Victor, 2026-11-22).
+          if (!repo.hayFiltros && _pivot && EventosRepo.actual != null)
+            SliverToBoxAdapter(
+              child: AvisoCosasParaLlevar(eventos: EventosRepo.actual!, equipo: repo),
+            ),
           if (favoritos.isNotEmpty && !repo.hayFiltros) ...[
             _encabezado(p, 'Favoritos', favoritos.length),
             SliverToBoxAdapter(
@@ -269,6 +392,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                 ),
               ],
             ),
+          if (!repo.hayFiltros) SliverToBoxAdapter(child: _extras(context, p)),
           if (conGente.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -286,78 +410,63 @@ class _EquipoScreenState extends State<EquipoScreen> {
     );
   }
 
-  Widget _accesos(BuildContext context) {
-    final p = context.pivot;
-    Widget acceso(IconData icono, String seccion, String titulo, String sub, VoidCallback alTocar) {
-      final (degradado, sobre) = PivotPaleta.seccion(seccion, Theme.of(context).brightness);
-      return Expanded(
-        child: Material(
-          color: p.tarjeta,
-          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-            onTap: alTocar,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(10)),
-                    child: Icon(icono, size: 20, color: sobre),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+  /// Debajo de los equipos (Victor, 2026-11-22): Coaches abre sus ajustes y
+  /// un Pivot puede crear un equipo nuevo.
+  Widget _extras(BuildContext context, PivotPaleta p) {
+    final s = repo.sesion;
+    final coaches = FuncionesLiga.coach(s) && (FuncionesLiga.usaCoach(s) || _pivot);
+    if (!coaches && !_pivot) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (coaches)
+            Material(
+              color: p.fondo,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                side: BorderSide(color: p.suave),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                onTap: () => SubAjustes.abrir(
+                  context,
+                  s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s),
+                ),
+                child: SizedBox(
+                  height: 48,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
                       children: [
                         Text(
-                          titulo,
-                          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                          'Coaches',
+                          style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: p.textoSecundario),
                         ),
-                        Text(
-                          sub,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
-                        ),
+                        const Spacer(),
+                        Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }
-
-    final fila = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Row(
-        children: [
-          acceso(
-            Icons.groups_2_rounded,
-            'notificaciones',
-            'Comunidad',
-            'Grupos y redes',
-            () => SubAjustes.abrir(context, ComunidadScreen(repo: ComunidadRepo.de(repo.sesion))),
-          ),
-          const SizedBox(width: 10),
-          acceso(
-            Icons.content_paste_rounded,
-            'privacidad',
-            'Inventario',
-            'Equipamiento',
-            () => SubAjustes.abrir(context, InventarioScreen(sesion: repo.sesion)),
-          ),
+          if (_pivot) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              onPressed: () async {
+                await SubAjustes.abrir<void>(context, NuevoEquipoScreen(sesion: s));
+                if (mounted) repo.cargar(forzar: true);
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Crear un equipo'),
+            ),
+          ],
         ],
       ),
     );
-    // Habilidades salió de aquí (Victor, 2026-11-21): se marcan y se
-    // gestionan en la ficha deportiva de cada persona.
-    return fila;
   }
 
   /// Encabezado del acordeón: tarjeta con nombre, cantidad y flecha.
@@ -405,6 +514,17 @@ class _EquipoScreenState extends State<EquipoScreen> {
                         ),
                       ),
                       const Spacer(),
+                      // Ver el equipo y sus reglas (Victor, 2026-11-22).
+                      if (titulo != 'Inactivxs')
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: ActionChip(
+                            visualDensity: VisualDensity.compact,
+                            label: const Text('Ver equipo'),
+                            avatar: const Icon(Icons.shield_outlined, size: 16),
+                            onPressed: () => SubAjustes.abrir(context, VerEquipoScreen(sesion: repo.sesion, nombre: titulo)),
+                          ),
+                        ),
                       AnimatedRotation(
                         turns: abierta ? 0.5 : 0,
                         duration: dur,
@@ -488,7 +608,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       builder: (c) => AlertDialog(
         title: Text('¿Archivar a ${x.nombreMostrar}?'),
         content: const Text(
-          'Deja de aparecer en Equipo. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. No se puede archivar si tiene reservas activas o cuotas pendientes.',
+          'Deja de aparecer en Liga. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. No se puede archivar si tiene reservas activas o cuotas pendientes.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Volver')),

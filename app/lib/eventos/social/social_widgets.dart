@@ -1388,7 +1388,7 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
             padding: const EdgeInsets.only(top: 10),
             child: Text(
               'Tienes una dieta o alergias en Salud que no se están tomando en cuenta. Si quieres que se usen (sin tu nombre), '
-              'préndelas en Ajustes → Salud y emergencia → Comida en eventos.',
+              'préndelas en Mi perfil → Salud y emergencia → Comida en eventos.',
               style: TextStyle(fontSize: 13, color: p.textoSecundario),
             ),
           ),

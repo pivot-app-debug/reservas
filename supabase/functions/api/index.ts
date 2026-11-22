@@ -3785,7 +3785,7 @@ async function _avisarPrestamosLargos(): Promise<void> {
     const cada = Math.max(1, Number(p.recordar_cada_dias) || 7) * 86400000;
     const ultimo = new Date(p.aviso_7d_en ?? p.desde).getTime();
     if (Date.now() - ultimo >= cada) {
-      await avisar(p, `¿Aún tienes ${que}? Respóndelo en Equipo → Inventario.`, `¿${quien} aún tiene ${que}? Revísalo en Equipo → Inventario.`);
+      await avisar(p, `¿Aún tienes ${que}? Respóndelo en Liga → Inventario.`, `¿${quien} aún tiene ${que}? Revísalo en Liga → Inventario.`);
       await supabase.from('inventario_prestamos').update({ aviso_7d_en: ahora, aviso_persona_en: ahora }).eq('id', p.id);
     }
   }
@@ -13507,6 +13507,20 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'subirFotoPerfil':        return json(await subirFotoPerfil(params));
       case 'subirFotoInscripcion':   return json(await subirFotoInscripcion(params));
       // Mi Liga — config de tiers (categorías de equipo)
+            // Reglas de los equipos para cualquiera de la liga, solo para leer
+      // (Victor, 2026-11-22), sin el código de invitación.
+      case 'getEquipoPublico': {
+        const yo = await _validarToken(String(params.token ?? ''));
+        if (!yo) return json({ error: 'Sesión inválida.' }, 401);
+        const { data } = await supabase.from('config_tiers').select('*').order('orden');
+        const le = await _listasEntrenar();
+        return json({
+          tiers: (data ?? []).map((t: any) => {
+            const { codigo_invitacion: _c, ...resto } = t;
+            return { ...resto, propioNombres: le.filter((l) => _propioDe(t.requisitos ?? {}, le).includes(l.id)).map((l) => l.nombre) };
+          }),
+        });
+      }
       case 'getTiers': {
         const adminEmail = await _validarAdminToken(params.adminToken);
         if (!adminEmail) return json({ error: 'Sesión admin inválida.' }, 401);

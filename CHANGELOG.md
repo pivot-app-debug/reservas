@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (Liga)
+- Equipo pasó a llamarse Liga y tiene pestañas: Comunidad (la gente), Redes, Inventario y, para quien gestiona finanzas, Finanzas.
+- En Comunidad, cada equipo tiene "Ver equipo": los Pivots lo editan y el resto ve sus reglas sin poder cambiarlas. Debajo de los equipos está Coaches (sus ajustes salieron de Mi perfil) y, para Pivots, "Crear un equipo".
+- Los Pivots ven arriba de Comunidad, y en Inventario, un aviso de las cosas para llevar a los eventos de hoy y mañana, con el desglose por persona. Desaparece cuando termina el evento.
+- Los ajustes de la liga se abren con el ícono del estadio en la barra de Liga.
+- Ajustes pasó a llamarse Mi perfil y en la barra de abajo se ve tu avatar.
+
 ## 2026-11-22 (ícono del calendario y encargadxs)
 - El ícono del Calendario en la barra: hoy va relleno en rojo; si miras otra fecha muestra ese día, y dentro de un evento, el día del evento.
 - "Revisión de tu equipo" abre Equipo.
