@@ -22,6 +22,9 @@ import 'tomar_asistencia_screen.dart';
 import 'video_screen.dart';
 import 'rectificacion.dart';
 import 'social/social_evento.dart';
+import 'social/social_vista.dart';
+import 'social/que_lleva_calculo.dart';
+import 'social/social_repo.dart' show EstadoSocial;
 import 'tipos_evento.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
@@ -52,7 +55,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
   bool _confirmacionPedida = false;
 
   /// Sube al editar el Social o fiesta para recargar sus piezas.
-  int _versionSocial = 0;
+  final _kSocial = GlobalKey<SocialEnEventoState>();
 
   // Tour del detalle de un evento (Victor, 2026-11-15).
   final _kResumen = GlobalKey(debugLabel: 'tour-ev-resumen');
@@ -136,7 +139,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
         // Social o fiesta: se edita con su asistente (Victor, 2026-11-20).
         final ok = await editarSocial(context, repo, ev);
         if (ok == true && mounted) {
-          setState(() => _versionSocial++);
+          _kSocial.currentState?.recargar();
           _avisar('Cambios guardados.');
         }
       case 'editar':
@@ -335,6 +338,27 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   padding: const EdgeInsets.only(right: 16),
                   child: Etiqueta(texto: textoEstadoEvento(ev), apagada: true),
                 ),
+              // Fiesta (Victor, 2026-11-21): cuánto falta y Dudas y preguntas en la barra.
+              if (ev.tipo == kTipoSocial && !ev.cancelado && !ev.yaEmpezo)
+                Etiqueta(
+                  icono: Icons.celebration_outlined,
+                  texto: switch (DateUtils.dateOnly(ev.fecha).difference(Fechas.hoy()).inDays) {
+                    <= 0 => 'Es hoy',
+                    1 => 'Mañana',
+                    final n => 'Faltan $n días',
+                  },
+                ),
+              if (ev.tipo == kTipoSocial && !ev.cancelado)
+                ValueListenableBuilder<int>(
+                  valueListenable: versionSocial,
+                  builder: (_, _, _) => (estadosSociales[ev.id]?.aCargo.isNotEmpty ?? false)
+                      ? IconButton(
+                          tooltip: 'Dudas y preguntas',
+                          icon: const Icon(Icons.help_outline_rounded),
+                          onPressed: () => _kSocial.currentState?.abrirDudas(),
+                        )
+                      : const SizedBox(width: 8),
+                ),
             ],
           ),
           floatingActionButton: _esAdmin
@@ -351,7 +375,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   onPressed: () async {
                     final ok = await editarSocial(context, repo, ev);
                     if (ok == true && mounted) {
-                      setState(() => _versionSocial++);
+                      _kSocial.currentState?.recargar();
                       _avisar('Cambios guardados.');
                     }
                   },
@@ -362,6 +386,21 @@ class _DetalleScreenState extends State<DetalleScreen> {
           body: ListView(
             padding: EdgeInsets.fromLTRB(0, 20 + altoBarra(context), 0, 96 + MediaQuery.paddingOf(context).bottom), // barra de 68
             children: [
+              // Fiesta: lo que te falta completar, con atajos (Victor, 2026-11-21).
+              if (ev.tipo == kTipoSocial && !ev.cancelado && !ev.finalizado)
+                ValueListenableBuilder<int>(
+                  valueListenable: versionSocial,
+                  builder: (_, _, _) {
+                    final e = estadosSociales[ev.id];
+                    if (e == null) return const SizedBox.shrink();
+                    return PendientesFiesta(
+                      estado: e,
+                      alParticipar: () => _kSocial.currentState?.participarAmigo(),
+                      alDeseos: () => _kSocial.currentState?.abrirDeseos(),
+                      alComida: () => _kSocial.currentState?.abrirQueLleva(),
+                    );
+                  },
+                ),
               KeyedSubtree(key: _kResumen, child: _resumen(context, ev)),
               // Plan del coach: "Qué veremos" si lo compartió (Victor, 2026-11-16).
               // Un Social o fiesta no lleva plan: ya se arma con sus piezas (2026-11-20).
@@ -388,7 +427,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
               // Pasado o cancelado (Victor, 2026-11-12): sin botones de respuesta.
               if (!ev.finalizado && !ev.cancelado) KeyedSubtree(key: _kRespuesta, child: _tuAsistencia(context, ev)),
               // Evento social (Naviquinde): +1, amigo secreto, regalo robado y comida.
-              if (ev.tipo == kTipoSocial && !ev.cancelado) SocialEnEvento(key: ValueKey('social-$_versionSocial'), repo: repo, evento: ev),
+              if (ev.tipo == kTipoSocial && !ev.cancelado) SocialEnEvento(key: _kSocial, repo: repo, evento: ev),
               if (!ev.cancelado) _tuReserva(context, ev),
               if (ev.cancelado)
                 _ibanAIr(context, ev)
@@ -453,18 +492,6 @@ class _DetalleScreenState extends State<DetalleScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fiesta: cuánto falta, arriba de todo (Victor, 2026-11-20).
-          if (ev.tipo == kTipoSocial && !ev.yaEmpezo) ...[
-            Etiqueta(
-              icono: Icons.celebration_outlined,
-              texto: switch (DateUtils.dateOnly(ev.fecha).difference(Fechas.hoy()).inDays) {
-                <= 0 => 'Es hoy',
-                1 => 'Es mañana',
-                final n => 'Faltan $n días',
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
           Row(
             children: [
               Expanded(child: _dato(p, Icons.schedule_rounded, ev.rangoHorario, duracion)),
@@ -613,16 +640,6 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
                 ),
               ),
-              // Fiesta: tu respuesta en una pastilla (Victor, 2026-11-20).
-              if (ev.tipo == kTipoSocial)
-                Etiqueta(
-                  texto: switch (ev.miEstado) {
-                    EstadoRsvp.asistire => 'Asistirás',
-                    EstadoRsvp.noAsistire => 'No asistirás',
-                    _ => 'Sin responder',
-                  },
-                  apagada: ev.miEstado != EstadoRsvp.asistire,
-                ),
             ],
           ),
           // Social o fiesta con amigo secreto: hasta cuándo inscribirse (Victor, 2026-11-20).
@@ -685,6 +702,25 @@ class _DetalleScreenState extends State<DetalleScreen> {
           // Asistencia anticipada aquí, junto a tu respuesta (Victor, 2026-11-17).
           // Sin asistencia anticipada en un Social o fiesta: es un evento especial (2026-11-20).
           if (repo.anticipada.disponible && ev.tipo != kTipoSocial) ...[const SizedBox(height: 12), _botonAnticipada(context)],
+          // Fiesta: invitar a alguien de fuera del equipo desde aquí (Victor, 2026-11-21).
+          if (ev.tipo == kTipoSocial)
+            ValueListenableBuilder<int>(
+              valueListenable: versionSocial,
+              builder: (_, _, _) {
+                final e = estadosSociales[ev.id];
+                if (e == null || !e.modulo('invitados') || !e.asiste) return const SizedBox.shrink();
+                final n = e.misInvitados.length;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                    onPressed: () => _kSocial.currentState?.abrirInvitados(),
+                    icon: const Icon(Icons.person_add_alt_1_outlined),
+                    label: Text(n == 0 ? 'Invita a alguien' : 'Tus invitadxs ($n de ${e.maxInvitados})'),
+                  ),
+                );
+              },
+            ),
           // Fiesta: quiénes van, no van y no respondieron, en la misma tarjeta (Victor, 2026-11-20).
           if (ev.tipo == kTipoSocial) ...[const SizedBox(height: 16), KeyedSubtree(key: _kEquipo, child: _equipo(context, ev, embebido: true))],
         ],
@@ -1028,6 +1064,17 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
   }
 
+  /// Texto de lo que lleva alguien en una fiesta y si va bien (rosado) o le
+  /// falta (gris). Quien organiza ve también a quien no anotó nada.
+  (String, bool)? _llevaSocial(EstadoSocial e, String usuario) {
+    final l = e.llevaDe(usuario);
+    final cuenta = e.seccionesParte.isNotEmpty;
+    final completo = !cuenta || e.parteDeUsuario(usuario) >= 1;
+    if (l.isEmpty) return e.organiza && cuenta ? ('Sin anotar', false) : null;
+    final texto = l.length > 2 ? '${l.take(2).join(', ')} +${l.length - 2}' : l.join(', ');
+    return (e.organiza && !completo ? '$texto · le falta' : texto, e.organiza ? completo : true);
+  }
+
   /// En una fiesta (`embebido`) va dentro de Tu asistencia: sin No jugador,
   /// con Sin respuesta para todxs y la lista cerrada hasta tocar un número.
   bool _listaAbierta = false;
@@ -1176,7 +1223,16 @@ class _DetalleScreenState extends State<DetalleScreen> {
                                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.texto),
                                       ),
                                     ),
-                                    if (_llevar[per.username.toLowerCase()] case final llevar?)
+                                    // Fiesta: lo que lleva cada quien; quien organiza ve si le falta (Victor, 2026-11-21).
+                                    if (ev.tipo == kTipoSocial && estadosSociales[ev.id] != null) ...[
+                                      if (_llevaSocial(estadosSociales[ev.id]!, per.username) case final t?)
+                                        Flexible(
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(left: 6),
+                                            child: Etiqueta(texto: t.$1, icono: Icons.restaurant_rounded, apagada: !t.$2),
+                                          ),
+                                        ),
+                                    ] else if (_llevar[per.username.toLowerCase()] case final llevar?)
                                       Padding(
                                         padding: const EdgeInsets.only(left: 6),
                                         child: Etiqueta(texto: llevar, icono: Icons.content_paste_rounded),

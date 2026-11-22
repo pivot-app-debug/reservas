@@ -94,7 +94,7 @@ class _PistasScreenState extends State<PistasScreen> {
       context: context,
       builder: (d) => AlertDialog(
         scrollable: true,
-        title: Text(item == null ? 'Agregar a mi wishlist' : 'Editar'),
+        title: Text(item == null ? 'Agregar a mi lista de deseos' : 'Editar'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -193,7 +193,7 @@ class _PistasScreenState extends State<PistasScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Wishlist',
+                    'Lista de deseos',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
                   ),
                 ),
@@ -262,7 +262,7 @@ class _PistasScreenState extends State<PistasScreen> {
             TextField(
               controller: _link,
               keyboardType: TextInputType.url,
-              decoration: const InputDecoration(labelText: 'Link de mi wishlist (opcional)', prefixIcon: Icon(Icons.link_rounded)),
+              decoration: const InputDecoration(labelText: 'Link de mi lista de deseos (opcional)', prefixIcon: Icon(Icons.link_rounded)),
               onChanged: (_) => setState(() => _cambios = true),
             ),
           ],

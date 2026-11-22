@@ -5,7 +5,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AsyncLocalStorage } from 'node:async_hooks';
 // Evento social (Naviquinde, 2026-11-19): acciones social* en su propio módulo.
-import { ACCIONES_SOCIAL, accionSocial, alcanceSocial, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales, socialPorAprobar } from './social.ts';
+import { ACCIONES_SOCIAL, accionSocial, alcanceSocial, cronSocialPendientes, cronSocialRecordatorios, type DepsSocial, filtrarEventosSociales, socialPorAprobar } from './social.ts';
 function _depsSocial(): DepsSocial {
     return { db: supabase, validarToken: _validarToken, validarAdminToken: _validarAdminToken, ligaEnCurso: _ligaEnCurso, push: sendPush, pivots: _administradorxs, appUrl: APP_URL, areasDe: _areasDe };
 }
@@ -10685,7 +10685,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'tarea_vence', nombre: 'Tareas por vencer', descripcion: 'Un día antes de que venza una tarea que tomaste.', categoria: 'Tareas' },
   { clave: 'tarea_revisada', nombre: 'Revisión de tus tareas', descripcion: 'Cuando admins aprueban o devuelven una tarea que enviaste.', categoria: 'Tareas' },
     { clave: 'aviso_pivots', nombre: 'Avisos de los Pivots', descripcion: 'Mensajes que los Pivots envían al equipo.', categoria: 'Equipo' },
-  { clave: 'social', nombre: 'Sociales y fiestas', descripcion: 'Amigo secreto listo, tu evento aprobado o con cambios y mensajes para ti.', categoria: 'Equipo' },
+  { clave: 'social', nombre: 'Sociales y fiestas', descripcion: 'Amigo secreto listo, lo que te falta completar, tu evento aprobado o con cambios y mensajes para ti.', categoria: 'Equipo' },
   { clave: 'avisos_admin', nombre: 'Avisos para admins', descripcion: 'Resumen antes del entrenamiento, bajas de última hora, solicitudes pendientes y cambios de reservas.', categoria: 'Administración', soloAdmin: true },
 ];
 const CATALOGO_CLAVES = new Set(CATALOGO_NOTIFICACIONES.map((c) => c.clave));
@@ -12161,7 +12161,8 @@ async function adminEliminarTemporadaDescanso(params: Record<string, any>): Prom
 // acá, porque necesita leer `req.headers`, no `params`.
 async function cronDiario(): Promise<Record<string, any>> {
   // Evento social: aviso del día antes (amigo secreto / regalo robado).
-  try { await cronSocialRecordatorios(_depsSocial()); } catch (e) { console.error('[social] recordatorio:', e); }
+    try { await cronSocialRecordatorios(_depsSocial()); } catch (e) { console.error('[social] recordatorio:', e); }
+  try { await cronSocialPendientes(_depsSocial()); } catch (e) { console.error('[social] pendientes:', e); }
     try { await _extenderExcepcionesIndefinidas(); } catch (e) { console.error('[excepciones] extender:', e); }
   try { await _avisarNovedadesFicha(); } catch (e) { console.error('[coach] novedades:', e); }
   // Puntos de asistencia del mes actual y el anterior (bug 2026-11-13: antes solo con botón manual).

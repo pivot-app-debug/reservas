@@ -1509,7 +1509,7 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
     ('amigo', 'Amigo secreto y regalo robado', Icons.redeem_rounded),
     ('comida', 'Comida y qué traer', Icons.restaurant_rounded),
     ('extras', 'Playlist, dress code y premios', Icons.music_note_rounded),
-    ('invitados', 'Invitadxs (+1)', Icons.person_add_alt_rounded),
+    ('invitados', 'Invitadxs', Icons.person_add_alt_rounded),
     ('homenaje', 'Homenaje y sorpresa', Icons.favorite_border_rounded),
   ];
 

@@ -201,11 +201,12 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
                           curve: Curves.easeOutCubic,
                           height: 44,
                           padding: EdgeInsets.symmetric(horizontal: i == actual ? 16 : 12),
-                          decoration: BoxDecoration(color: i == actual ? p.marca : p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                          // Sin recuadro (Victor, 2026-11-21): la elegida va con texto e ícono en rojo.
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(PivotRadios.chip)),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _iconoCon(p, x, i == actual ? p.sobreMarca : p.textoSecundario, i == actual),
+                              _iconoCon(p, x, i == actual ? p.marcaTexto : p.textoSecundario, i == actual),
                               AnimatedSize(
                                 duration: const Duration(milliseconds: 260),
                                 curve: Curves.easeOutCubic,
@@ -214,7 +215,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
                                         padding: const EdgeInsets.only(left: 8),
                                         child: Text(
                                           _corto(x),
-                                          style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreMarca),
+                                          style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
                                         ),
                                       )
                                     : const SizedBox.shrink(),

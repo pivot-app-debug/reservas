@@ -16,6 +16,8 @@ import 'social_piezas.dart';
 import 'social_editar_tarjetas.dart';
 import 'social_repo.dart';
 import 'social_widgets.dart';
+import 'pistas_screen.dart';
+import 'social_vista.dart';
 
 /// Secciones del "Social o fiesta" en su detalle (NAVIQUINDE.md): encabezado
 /// (nombre, sorpresa, aprobación), +1, amigo secreto, regalo robado, comida,
@@ -27,10 +29,10 @@ class SocialEnEvento extends StatefulWidget {
   final Evento evento;
 
   @override
-  State<SocialEnEvento> createState() => _SocialEnEventoState();
+  State<SocialEnEvento> createState() => SocialEnEventoState();
 }
 
-class _SocialEnEventoState extends State<SocialEnEvento> {
+class SocialEnEventoState extends State<SocialEnEvento> {
   late final SocialRepo _social = SocialRepo.miembro(widget.repo.sesion.api, idEvento: widget.evento.id, adminToken: widget.repo.sesion.adminToken);
   EstadoSocial? _estado;
   String? _error;
@@ -55,7 +57,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
   Future<void> _cargar() async {
     try {
       final e = await _social.cargar();
-      _estadosSociales[widget.evento.id] = e;
+      guardarEstadoSocial(widget.evento.id, e);
       if (mounted) {
         setState(() {
           _estado = e;
@@ -127,7 +129,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         content: Text(
           rehacer
               ? 'Se arma un sorteo nuevo con quienes confirmaron hoy ($n). ${e.admin?['revelados'] ?? 0} personas ya vieron a quién le regalan y tendrán que volver a descubrirlo con el sorteo nuevo.'
-              : 'Entran $n personas (quienes marcaron Asistiré y sus +1). Se sortea a quién le regala cada persona y se les avisa para que lo descubran en el evento. Quien se sume después no entra al amigo secreto.',
+              : 'Entran $n personas (quienes marcaron Asistiré y sus invitadxs). Se sortea a quién le regala cada persona y se les avisa para que lo descubran en el evento. Quien se sume después no entra al amigo secreto.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
@@ -209,7 +211,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: Text('${inv['nombre'] ?? ''}'.isEmpty ? 'Enlace para tu +1' : 'Enlace de ${inv['nombre']}'),
+              title: Text('${inv['nombre'] ?? ''}'.isEmpty ? 'Enlace para tu invitadx' : 'Enlace de ${inv['nombre']}'),
               subtitle: const Text('Es para una sola persona: con él entra sin crear cuenta y escribe su nombre.'),
             ),
             // Las apps de mensajería que usa la liga (Comunidad en Equipo) y SMS.
@@ -285,22 +287,22 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
     final lista = e.misInvitados;
     final max = e.maxInvitados;
     return TarjetaSocial(
-      titulo: max == 1 ? 'Tu +1' : 'Tus +$max',
+      titulo: 'Invitadxs',
       icono: Icons.person_add_alt_1_outlined,
       estado: e.asiste ? '${lista.length} de $max' : null,
       estadoActivo: lista.length < max,
       accion: e.puedeArea('invitados') ? EditarTarjetas.boton(() => EditarTarjetas(context, _social, e, _cargar).invitados()) : null,
       children: [
+        // Texto de Victor (2026-11-21), en español neutro.
+        Text(
+          'Puedes invitar a ${max == 1 ? 'alguien' : 'hasta $max personas'} que no ${max == 1 ? 'esté' : 'estén'} en el equipo con un enlace. '
+          '${max == 1 ? 'Esa persona decide' : 'Cada una decide'} si participa en algunas actividades del evento y no necesita registrarse en Pivot.',
+          style: TextStyle(color: p.textoSecundario),
+        ),
+        const SizedBox(height: 8),
         if (!e.asiste)
-          Text('Marca Asistiré para sumar a tu +1.', style: TextStyle(color: p.textoSecundario))
+          Text('Marca Asistiré para invitar a alguien.', style: TextStyle(color: p.textoSecundario))
         else ...[
-          if (lista.isEmpty)
-            Text(
-              max == 1
-                  ? 'Mándale un enlace a tu +1: entra sin crear cuenta, escribe su nombre y ve todo el evento. El enlace es para una persona.'
-                  : 'Puedes invitar hasta $max personas. Mándale un enlace a cada una: entra sin crear cuenta, escribe su nombre y ve todo el evento.',
-              style: TextStyle(color: p.textoSecundario),
-            ),
           for (final inv in lista)
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -325,18 +327,131 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           Align(
             alignment: Alignment.centerLeft,
             child: lista.length >= max
-                ? Text(max == 1 ? 'Ya invitaste a tu +1.' : 'Ya invitaste a $max personas.', style: TextStyle(color: p.textoSecundario))
+                ? Text(max == 1 ? 'Ya invitaste a alguien.' : 'Ya invitaste a $max personas.', style: TextStyle(color: p.textoSecundario))
                 : TextButton.icon(
                     onPressed: _creandoInvitado ? null : _agregarInvitado,
                     icon: _creandoInvitado
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.add_rounded),
-                    label: Text(_creandoInvitado ? 'Creando el enlace…' : (lista.isEmpty ? 'Invitar a mi +1' : 'Invitar a otra persona')),
+                    label: Text(_creandoInvitado ? 'Creando el enlace…' : (lista.isEmpty ? 'Invitar a alguien' : 'Invitar a otra persona')),
                   ),
           ),
         ],
       ],
     );
+  }
+
+  // ─── Subsecciones (Victor, 2026-11-21) ──────────────────────────────────
+
+  String get _id => widget.evento.id;
+
+  Future<void> recargar() => _cargar();
+
+  Future<void> abrirQueLleva() => abrirSubseccionSocial(
+    context,
+    idEvento: _id,
+    titulo: 'Qué lleva cada quien',
+    contenido: (e) => ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+  );
+
+  Future<void> abrirActividad(String que) => abrirSubseccionSocial(
+    context,
+    idEvento: _id,
+    titulo: switch (que) {
+      'amigo' => 'Amigo secreto',
+      'robado' => 'Regalo robado',
+      'playlist' => 'Playlist',
+      'dress' => 'Dress code',
+      _ => 'Premios',
+    },
+    contenido: (e) => switch (que) {
+      'amigo' => AmigoSecretoTarjeta(
+        repo: _social,
+        estado: e,
+        alCambiar: _cargar,
+        pronombres: widget.repo.sesion.datos['pronombres'],
+        organizar: e.organiza && e.estadoAprobacion == 'publicado' ? _organizar(e) : null,
+      ),
+      'robado' => RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
+      'playlist' =>
+        e.playlist == null
+            ? const SizedBox.shrink()
+            : PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
+      'dress' => DressTarjeta(
+        texto: '${e.dress?['texto'] ?? ''}',
+        alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).dress() : null,
+      ),
+      _ => PremiosTarjeta(lista: e.premios ?? const []),
+    },
+  );
+
+  /// Dudas y preguntas: las personas a cargo, desde la barra del evento.
+  Future<void> abrirDudas() => abrirSubseccionSocial(
+    context,
+    idEvento: _id,
+    titulo: 'Dudas y preguntas',
+    contenido: (e) =>
+        ACargoTarjeta(personas: e.aCargo, redes: _redes, alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null),
+  );
+
+  /// Invitar a alguien de fuera del equipo (desde Tu asistencia).
+  Future<void> abrirInvitados() => showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (h) => SafeArea(
+      child: ValueListenableBuilder<int>(
+        valueListenable: versionSocial,
+        builder: (_, _, _) {
+          final e = estadosSociales[_id] ?? _estado;
+          if (e == null) return const SizedBox.shrink();
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        e.maxInvitados == 1 ? 'Invita a alguien' : 'Invita hasta ${e.maxInvitados} personas',
+                        style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    if (e.puedeArea('invitados'))
+                      IconButton(
+                        tooltip: 'Cuántas personas puede invitar cada quien',
+                        icon: const Icon(Icons.tune_rounded),
+                        onPressed: () => EditarTarjetas(context, _social, e, _cargar).invitados(),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SinMarcoSocial(child: _invitados(e)),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+
+  Future<void> participarAmigo() async {
+    final e = _estado;
+    if (e == null) return;
+    await EditarTarjetas(context, _social, e, _cargar).participacion(amigo: true);
+  }
+
+  Future<void> abrirDeseos() async {
+    final e = _estado;
+    if (e == null) return;
+    final cambio = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PistasScreen(repo: _social, inicial: e.perfil),
+      ),
+    );
+    if (cambio == true) unawaited(_cargar());
   }
 
   // ─── Estás a cargo (Victor, 2026-11-20) ─────────────────────────────────
@@ -401,10 +516,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
                 : 'Falta aún para el evento: ${faltan.join(', ')}.',
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
-          atajo(Icons.restaurant_rounded, 'Gestionar lo que lleva cada quien', () {
-            final c = _kComida.currentContext;
-            if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
-          }),
+          atajo(Icons.restaurant_rounded, 'Gestionar lo que lleva cada quien', abrirQueLleva),
         ],
         if (areas.contains('amigo')) ...[
           if (e.modulo('amigoSecreto')) atajo(Icons.redeem_rounded, 'Editar el amigo secreto (tope y cierre)', editar.amigo),
@@ -414,7 +526,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (e.playlist != null) atajo(Icons.queue_music_rounded, 'Editar la playlist', editar.playlist),
           if (e.dress != null) atajo(Icons.checkroom_rounded, 'Editar el dress code', editar.dress),
         ],
-        if (areas.contains('invitados')) atajo(Icons.person_add_alt_1_outlined, 'Editar lxs invitadxs (+1)', editar.invitados),
+        if (areas.contains('invitados')) atajo(Icons.person_add_alt_1_outlined, 'Editar lxs invitadxs', editar.invitados),
         if (areas.contains('fecha'))
           atajo(Icons.event_outlined, 'Cambiar fecha, hora o lugar', () async {
             await editarSocial(context, widget.repo, widget.evento);
@@ -441,7 +553,7 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
         ),
         const SizedBox(height: 6),
         Text(
-          '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} +1)'
+          '${a['participantes'] ?? 0} personas en el amigo secreto (${a['invitados'] ?? 0} invitadxs)'
           '${e.sorteado ? ' · ${a['revelados'] ?? 0} de ${a['sorteados'] ?? 0} ya vieron a quién le regalan' : ''}.',
           style: TextStyle(color: p.texto),
         ),
@@ -514,60 +626,14 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
           if (_aCargoDe(e).isNotEmpty) _estasACargo(e),
           if (e.paraTi != null) ParaTiTarjeta(mensajes: e.paraTi!),
           if (e.homenaje != null) HomenajeTarjeta(repo: _social, estado: e, alCambiar: _cargar, alLiberar: e.organiza ? _liberar : null),
-          // Orden (Victor, 2026-11-20): lo que te toca primero, los detalles al final.
+          // Vista nueva (Victor, 2026-11-21): Qué lleva resumida y fija, y las
+          // actividades en cards que se deslizan. Cada una abre su subsección.
           if (e.modulo('comida'))
             KeyedSubtree(
               key: _kComida,
-              child: ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+              child: QueLlevaResumen(repo: _social, estado: e, alCambiar: _cargar, alAbrir: abrirQueLleva),
             ),
-          if (e.modulo('amigoSecreto'))
-            AmigoSecretoTarjeta(
-              repo: _social,
-              estado: e,
-              alCambiar: _cargar,
-              pronombres: widget.repo.sesion.datos['pronombres'],
-              organizar: e.organiza && e.estadoAprobacion == 'publicado' ? _organizar(e) : null,
-            ),
-          if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, repo: _social, alCambiar: _cargar),
-          if (e.modulo('invitados')) _invitados(e),
-          // Detalles en filas: dress code, playlist, premios y dudas.
-          if (e.dress != null || e.playlist != null || e.premios != null || e.aCargo.isNotEmpty)
-            DetallesSocial(
-              filas: [
-                if (e.dress != null)
-                  (
-                    Icons.checkroom_rounded,
-                    'Dress code',
-                    '${e.dress!['texto'] ?? ''}'.trim().isEmpty ? 'Ven como quieras' : '${e.dress!['texto']}'.trim(),
-                    DressTarjeta(
-                      texto: '${e.dress!['texto'] ?? ''}',
-                      alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).dress() : null,
-                    ),
-                  ),
-                if (e.playlist != null)
-                  (
-                    Icons.queue_music_rounded,
-                    'Playlist',
-                    '${e.playlist!['link'] ?? ''}'.isEmpty ? 'Sin enlace todavía' : 'Agrega canciones',
-                    PlaylistTarjeta(datos: e.playlist!, alEditar: e.puedeArea('extras') ? () => EditarTarjetas(context, _social, e, _cargar).playlist() : null),
-                  ),
-                if (e.premios != null)
-                  (Icons.emoji_events_outlined, 'Premios', e.premios!.isEmpty ? 'Por definir' : '${e.premios!.length}', PremiosTarjeta(lista: e.premios!)),
-                // Personas a cargo con su contacto, para consultar dudas (Victor, 2026-11-20).
-                if (e.aCargo.isNotEmpty)
-                  (
-                    Icons.help_outline_rounded,
-                    'Dudas y preguntas',
-                    '${e.aCargo.length} a cargo',
-                    ACargoTarjeta(
-                      personas: e.aCargo,
-                      redes: _redes,
-                      // Solo quien creó el evento (o un Pivot): responsables y responsabilidades (Victor, 2026-11-20).
-                      alEditar: e.organiza && e.editable?['misPermisos'] is! List ? _editarResponsables : null,
-                    ),
-                  ),
-              ],
-            ),
+          ActividadesSocial(estado: e, alAbrir: abrirActividad),
         ],
       );
     }
@@ -585,15 +651,12 @@ class _SocialEnEventoState extends State<SocialEnEvento> {
 
 /// Editar un Social o fiesta con su asistente desde el menú del evento
 /// (Victor, 2026-11-20). Devuelve true si se guardaron cambios.
-/// Último estado cargado de cada Social o fiesta (solo en memoria): así el
-/// asistente abre al toque desde el botón del evento.
-final _estadosSociales = <String, EstadoSocial>{};
 
 Future<bool?> editarSocial(BuildContext context, EventosRepo repo, Evento ev) async {
   final s = repo.sesion;
   final social = SocialRepo.miembro(s.api, idEvento: ev.id, adminToken: s.adminToken);
   try {
-    var estado = _estadosSociales[ev.id];
+    var estado = estadosSociales[ev.id];
     if (estado == null) {
       // Sin datos todavía: se muestra que está cargando en vez de quedarse trabado.
       unawaited(

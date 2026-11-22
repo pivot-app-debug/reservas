@@ -608,7 +608,9 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
         cerrada: (meta > 0 && aportado >= meta) || (limite > 0 && aportado >= limite),
         // Lxs +1 solo ven lo que llevan ellxs.
         aportes: ap.filter((a: any) => !esInv || a.clave === q.clave).map((a: any) => ({
-                    id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave, paraTodxs: a.para_todxs ?? null,
+                                        id: a.id, nombre: a.nombre, cantidad: Number(a.cantidad), detalle: a.detalle ?? '', mio: a.clave === q.clave, paraTodxs: a.para_todxs ?? null,
+                    // Para mostrar en Asistencia qué lleva cada quien (Victor, 2026-11-21).
+                    usuario: esInv || String(a.clave ?? '').startsWith('inv:') ? null : a.clave,
           foto: fotos.get(a.clave)?.foto ?? '',
         })),
       };
@@ -2126,6 +2128,69 @@ export async function cronSocialRecordatorios(deps: DepsSocial): Promise<number>
         });
         enviados++;
       } catch { /* best-effort */ }
+    }
+  }
+  return enviados;
+}
+
+// ─── Pendientes de una fiesta (Victor, 2026-11-21) ──────────────────────────
+// Una vez por pendiente (y un recordatorio 2 días antes del cierre si sigue):
+// no participa del amigo secreto, su lista de deseos está vacía o todavía no
+// anotó nada de comida o bebida. Se toca y abre el evento.
+export async function cronSocialPendientes(deps: DepsSocial): Promise<number> {
+  if (!deps.push) return 0;
+  const db = deps.db;
+  const hoy = _hoyEc();
+  const hasta = _restarDias(hoy, -30);
+  const { data: evs } = await db.from('asistencias').select('id_evento, fecha, estado').eq('tipo_evento', 'Social').gt('fecha', hoy).lte('fecha', hasta);
+  let enviados = 0;
+  for (const ev of evs ?? []) {
+    if (/cancel|eliminado/i.test(String(ev.estado ?? ''))) continue;
+    const cfg = await _config(db, ev.id_evento);
+    if (!cfg || !publicado(cfg)) continue;
+    const asisten = [...(await _asistentes(db, ev.id_evento))];
+    if (!asisten.length) continue;
+    const cierreAmigo: string | null = cfg.cierre ?? null;
+    const amigoAbierto = !!cfg.amigo_secreto && !cfg.sorteado_en && (!cierreAmigo || hoy <= cierreAmigo);
+    const [{ data: part }, { data: perfiles }, { data: avisos }] = await Promise.all([
+      db.from('social_participacion').select('clave, amigo').eq('id_evento', ev.id_evento),
+      db.from('social_perfiles').select('clave, wishlist, gustos, wishlist_link').in('clave', asisten),
+      db.from('social_pendientes_avisos').select('id, clave, tipo, recordado_en').eq('id_evento', ev.id_evento),
+    ]);
+    let conComida = new Set<string>(), haySecciones = false;
+    if (cfg.comida) {
+      const { data: cats } = await db.from('social_comida_categorias').select('id, unidad, modo').eq('id_evento', ev.id_evento);
+      const ids = (cats ?? []).filter((c: any) => c.modo !== 'libre' && c.modo !== 'cada' && /porci|^(litros?|l|lts?)$/i.test(String(c.unidad ?? '').trim())).map((c: any) => c.id);
+      haySecciones = ids.length > 0;
+      if (haySecciones) {
+        const { data: aps } = await db.from('social_comida_aportes').select('clave').in('categoria_id', ids);
+        conComida = new Set((aps ?? []).map((a: any) => String(a.clave)));
+      }
+    }
+    for (const u of asisten) {
+      if (esSecretoPara(cfg, u)) continue;
+      const participa = (part ?? []).find((x: any) => x.clave === u)?.amigo !== false;
+      const pf = (perfiles ?? []).find((x: any) => x.clave === u);
+      const sinDeseos = !pf || (!(pf.wishlist ?? []).length && !(pf.gustos ?? []).length && !String(pf.wishlist_link ?? '').trim());
+      const pendientes: [string, string, string | null][] = [];
+      if (amigoAbierto && !participa) pendientes.push(['amigo', 'No participas del amigo secreto. ¿Quieres participar?', cierreAmigo]);
+      if (cfg.amigo_secreto && participa && (amigoAbierto || cfg.sorteado_en) && sinDeseos) pendientes.push(['deseos', 'Tu lista de deseos está vacía. ¿La completas para tu amigo secreto?', cierreAmigo ?? ev.fecha]);
+      if (haySecciones && !conComida.has(u)) pendientes.push(['comida', 'Todavía no anotas qué llevas al evento. ¿Lo anotas ahora?', ev.fecha]);
+      for (const [tipo, texto, cierre] of pendientes) {
+        const ya = (avisos ?? []).find((a: any) => a.clave === u && a.tipo === tipo);
+        const recordar = ya && !ya.recordado_en && cierre && _restarDias(cierre, 2) === hoy;
+        if (ya && !recordar) continue;
+        try {
+          await deps.push({
+            tipo: 'social', include_external_user_ids: [u], personal: true,
+            headings: { es: tituloPara(cfg, 'completa', (x: string) => x) || 'Tu evento' }, contents: { es: texto },
+            url: _url(deps, ev.id_evento), evento: { idEvento: ev.id_evento },
+          });
+          enviados++;
+        } catch { /* best-effort */ }
+        if (ya) await db.from('social_pendientes_avisos').update({ recordado_en: new Date().toISOString() }).eq('id', ya.id);
+        else await db.from('social_pendientes_avisos').insert({ id_evento: ev.id_evento, clave: u, tipo, liga_id: deps.ligaEnCurso() });
+      }
     }
   }
   return enviados;

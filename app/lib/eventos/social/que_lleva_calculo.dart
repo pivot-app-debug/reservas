@@ -32,6 +32,28 @@ extension ParteSocial on EstadoSocial {
     return cantidad / refDe(c) / n;
   }
 
+  /// Qué lleva una persona (Asistencia, Victor 2026-11-21).
+  List<String> llevaDe(String usuario) {
+    final u = usuario.trim().toLowerCase();
+    return [
+      for (final c in comida)
+        for (final a in c.aportes)
+          if ('${a['usuario'] ?? ''}'.trim().toLowerCase() == u) '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
+    ];
+  }
+
+  /// Cuánto de su parte cubrió una persona (para quien organiza).
+  double parteDeUsuario(String usuario) {
+    final u = usuario.trim().toLowerCase();
+    var s = 0.0;
+    for (final c in seccionesParte) {
+      for (final a in c.aportes) {
+        if ('${a['usuario'] ?? ''}'.trim().toLowerCase() == u && a['paraTodxs'] != false) s += parteDe(c, (a['cantidad'] as num?) ?? 0);
+      }
+    }
+    return s;
+  }
+
   /// Lo que ya cubriste con lo que llevas para todxs (1 = 100 %).
   double get miParte {
     var s = 0.0;

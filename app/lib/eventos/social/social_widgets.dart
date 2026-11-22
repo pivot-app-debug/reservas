@@ -34,12 +34,16 @@ class TarjetaSocial extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    // Dentro de "Detalles" va sin marco ni título: lo pone la fila.
-    if (SinMarcoSocial.de(context)) {
+    // Dentro de una subsección va sin marco ni título: los pone la pantalla, y
+    // el lápiz sube a su barra (Victor, 2026-11-21: los lápices se veían colgados).
+    final sinMarco = context.dependOnInheritedWidgetOfExactType<SinMarcoSocial>();
+    if (sinMarco != null) {
+      final barra = sinMarco.accion;
+      if (barra != null) WidgetsBinding.instance.addPostFrameCallback((_) => barra.value = accion);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (accion != null) Align(alignment: Alignment.centerRight, child: accion),
+          if (accion != null && barra == null) Align(alignment: Alignment.centerRight, child: accion),
           ...children,
         ],
       );
@@ -101,7 +105,10 @@ class IconoTarjetaSocial extends StatelessWidget {
 
 /// Marca que una tarjeta va dentro de otra (filas de "Detalles").
 class SinMarcoSocial extends InheritedWidget {
-  const SinMarcoSocial({super.key, required super.child});
+  const SinMarcoSocial({super.key, required super.child, this.accion});
+
+  /// Si está, el lápiz de la tarjeta va a la barra de la pantalla.
+  final ValueNotifier<Widget?>? accion;
   static bool de(BuildContext context) => context.dependOnInheritedWidgetOfExactType<SinMarcoSocial>() != null;
   @override
   bool updateShouldNotify(SinMarcoSocial oldWidget) => false;
@@ -421,7 +428,7 @@ class FichaAmigoVista extends StatelessWidget {
         if (deseos.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
-            'Wishlist',
+            'Lista de deseos',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.textoSecundario),
           ),
           for (final d in deseos)
@@ -446,7 +453,7 @@ class FichaAmigoVista extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => launchUrl(Uri.parse(pf.wishlistLink), mode: LaunchMode.externalApplication),
             icon: const Icon(Icons.open_in_new_rounded),
-            label: const Text('Ver su wishlist en otra app'),
+            label: const Text('Ver su lista de deseos en otra app'),
           ),
         ],
       ],
@@ -612,7 +619,7 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
         contentPadding: EdgeInsets.zero,
         leading: Icon(Icons.lightbulb_outline_rounded, color: fuera ? p.textoSecundario : p.marcaTexto),
         title: Text(
-          'Mis pistas y wishlist',
+          'Mis pistas y lista de deseos',
           style: TextStyle(color: p.texto, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
@@ -620,7 +627,7 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
               ? 'No hace falta: esta vez no participas'
               : pf.vacio
               ? 'Cuéntale a tu amigo secreto qué te gusta'
-              : '${pf.gustos.length + pf.sobreMi.length + pf.noRegalar.length} pistas · ${pf.wishlist.length} en tu wishlist',
+              : '${pf.gustos.length + pf.sobreMi.length + pf.noRegalar.length} pistas · ${pf.wishlist.length} en tu lista de deseos',
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: fuera ? null : _pistas,
@@ -1254,6 +1261,9 @@ class ComidaTarjeta extends StatelessWidget {
     }
   }
 
+  /// Para el resumen de la tarjeta (Victor, 2026-11-21: quitar con un "−").
+  Future<void> quitarAporte(BuildContext context, String id) => _quitar(context, id);
+
   Future<void> _quitar(BuildContext context, String id) async {
     try {
       await repo.quitarAporte(id);
@@ -1317,8 +1327,6 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
     return TarjetaSocial(
       titulo: 'Qué lleva cada quien',
       icono: Icons.restaurant_rounded,
-      estado: e.asiste && e.seccionesParte.isNotEmpty ? (e.miParte >= 1 ? 'Tu parte ✓' : 'Tu parte ${(e.miParte * 100).round()} %') : null,
-      estadoActivo: e.miParte < 1,
       // Lápiz: cuánto come y toma cada persona; "+": agregar con sugerencias (Victor, 2026-11-20).
       accion: admin
           ? Row(

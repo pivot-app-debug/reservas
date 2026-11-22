@@ -1682,156 +1682,178 @@ class _TarjetaEvento extends StatelessWidget {
     // Reserva de esta clase (Mirlxs): estado y "Cancelar o reagendar", como la web.
     final filaReserva = repo.reservaDe(ev);
     final reserva = filaReserva == null ? null : ReservaActiva.desde(filaReserva);
+    // Fiesta (Victor, 2026-11-21): fondo rojizo que se desvanece y un detalle
+    // animado según la festividad (luces, fuegos artificiales, conejo…).
+    final festiva = ev.socialFestivo && !apagado && ev.socialSorpresa == null;
     final tarjeta = Material(
-      color: apagado ? p.apagadoFondo : p.tarjeta,
+      color: apagado ? p.apagadoFondo : (festiva ? Colors.transparent : p.tarjeta),
       borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-        onTap: alAbrir,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
+      clipBehavior: festiva ? Clip.antiAlias : Clip.none,
+      child: Ink(
+        decoration: festiva
+            ? BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.suave, p.tarjeta], stops: const [0, 0.75]),
+              )
+            : null,
+        child: Stack(
+          children: [
+            if (festiva)
+              Positioned.fill(
+                child: IgnorePointer(child: _DecoFiesta(clave: ev.socialIcono ?? '')),
+              ),
+            InkWell(
+              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              onTap: alAbrir,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            if (ev.enCurso) ...[const _PuntoEnVivo(), const SizedBox(width: 6)],
-                            Text(
-                              ev.enCurso ? 'En curso · ${ev.rangoHorario}' : ev.rangoHorario,
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: apagado ? p.apagado : p.marcaTexto),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            // Social o fiesta: ícono propio (regalo si es sorpresa), nunca para quien no debe enterarse.
-                            if (ev.socialFestivo) ...[
-                              Icon(
-                                ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
-                                size: 18,
-                                color: apagado ? p.apagado : p.marcaTexto,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  if (ev.enCurso) ...[const _PuntoEnVivo(), const SizedBox(width: 6)],
+                                  Text(
+                                    ev.enCurso ? 'En curso · ${ev.rangoHorario}' : ev.rangoHorario,
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: apagado ? p.apagado : p.marcaTexto),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                            ],
-                            Flexible(
-                              child: Text(
-                                ev.titulo,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: apagado ? p.apagado : p.texto,
-                                  decoration: apagado ? TextDecoration.lineThrough : null,
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  // Social o fiesta: ícono propio (regalo si es sorpresa), nunca para quien no debe enterarse.
+                                  if (ev.socialFestivo) ...[
+                                    // Se mueve un poco para que resalte (Victor, 2026-11-21).
+                                    _IconoFiesta(
+                                      icono: ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
+                                      color: apagado ? p.apagado : p.marcaTexto,
+                                      quieto: apagado,
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      ev.titulo,
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                        color: apagado ? p.apagado : p.texto,
+                                        decoration: apagado ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(ev.lugar, style: TextStyle(fontSize: 13, color: apagado ? p.apagado : p.textoSecundario)),
+                              // Social o fiesta: sorpresa o aprobación pendiente (solo quien puede verlo).
+                              if (ev.socialSorpresa != null || (ev.socialEstado != null && ev.socialEstado != 'publicado')) ...[
+                                const SizedBox(height: 4),
+                                Etiqueta(
+                                  texto: ev.socialEstado == 'por_aprobar'
+                                      ? 'Por aprobar'
+                                      : ev.socialEstado == 'rechazado'
+                                      ? 'Necesita cambios'
+                                      : ev.socialSorpresa!,
+                                  icono: ev.socialEstado == 'publicado' || ev.socialEstado == null
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.hourglass_top_rounded,
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(ev.lugar, style: TextStyle(fontSize: 13, color: apagado ? p.apagado : p.textoSecundario)),
-                        // Social o fiesta: sorpresa o aprobación pendiente (solo quien puede verlo).
-                        if (ev.socialSorpresa != null || (ev.socialEstado != null && ev.socialEstado != 'publicado')) ...[
-                          const SizedBox(height: 4),
-                          Etiqueta(
-                            texto: ev.socialEstado == 'por_aprobar'
-                                ? 'Por aprobar'
-                                : ev.socialEstado == 'rechazado'
-                                ? 'Necesita cambios'
-                                : ev.socialSorpresa!,
-                            icono: ev.socialEstado == 'publicado' || ev.socialEstado == null ? Icons.visibility_off_outlined : Icons.hourglass_top_rounded,
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
+                        if (apagado)
+                          Etiqueta(texto: textoEstadoEvento(ev), apagada: true)
+                        else if (ev.miEstado != null && !ev.finalizado)
+                          Etiqueta(texto: textoMiEstado(ev.miEstado!), icono: iconoMiEstado(ev.miEstado!)),
                       ],
                     ),
-                  ),
-                  if (apagado)
-                    Etiqueta(texto: textoEstadoEvento(ev), apagada: true)
-                  else if (ev.miEstado != null && !ev.finalizado)
-                    Etiqueta(texto: textoMiEstado(ev.miEstado!), icono: iconoMiEstado(ev.miEstado!)),
-                ],
-              ),
-              // Evento pasado con asistencia tomada (Victor, 2026-11-12): lo que pasó de verdad.
-              // Va en su propia línea para no aplastar el título (2026-11-13).
-              // Sin botón de Pivot, la pill va aquí; con "Editar asistencia",
-              // justo debajo de ese botón (Victor, 2026-11-13).
-              if (!apagado && miReal != null && !tomarAsistencia) ...[
-                const SizedBox(height: 10),
-                PillAsistencia(repo: repo, ev: ev, texto: miReal.$1, icono: miReal.$2, completa: true),
-              ],
-              if (!apagado && asisten.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    PilaAvatares(personas: asisten),
-                    Text(
-                      reales
-                          ? '${asisten.length} ${asisten.length == 1 ? 'asistió' : 'asistieron'}'
-                          : '${asisten.length} ${asisten.length == 1 ? 'asistirá' : 'asistirán'}',
-                      style: TextStyle(fontSize: 12, color: p.textoSecundario),
+                    // Evento pasado con asistencia tomada (Victor, 2026-11-12): lo que pasó de verdad.
+                    // Va en su propia línea para no aplastar el título (2026-11-13).
+                    // Sin botón de Pivot, la pill va aquí; con "Editar asistencia",
+                    // justo debajo de ese botón (Victor, 2026-11-13).
+                    if (!apagado && miReal != null && !tomarAsistencia) ...[
+                      const SizedBox(height: 10),
+                      PillAsistencia(repo: repo, ev: ev, texto: miReal.$1, icono: miReal.$2, completa: true),
+                    ],
+                    if (!apagado && asisten.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          PilaAvatares(personas: asisten),
+                          Text(
+                            reales
+                                ? '${asisten.length} ${asisten.length == 1 ? 'asistió' : 'asistieron'}'
+                                : '${asisten.length} ${asisten.length == 1 ? 'asistirá' : 'asistirán'}',
+                            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (reserva != null && !apagado)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
+                          children: [
+                            EstadoReserva(estado: reserva.estado),
+                            const Spacer(),
+                            if (reserva.gestionable && !ev.yaEmpezo)
+                              TextButton(
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: p.marcaTexto),
+                                onPressed: () => gestionarReserva(context, repo, reserva),
+                                child: const Text('Cancelar o reagendar'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      child: pedirRespuesta
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: FilledButton.tonal(
+                                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(40), backgroundColor: p.suave, foregroundColor: p.sobreSuave),
+                                onPressed: alAbrir,
+                                child: const Text('¿Vas a ir? Responde'),
+                              ),
+                            )
+                          : const SizedBox(width: double.infinity),
                     ),
+                    if (tomarAsistencia)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: ev.enCurso
+                            ? FilledButton.icon(
+                                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(42)),
+                                onPressed: () => _abrirTomarAsistencia(context),
+                                icon: const Icon(Icons.how_to_reg_rounded, size: 20),
+                                label: const Text('Tomar asistencia'),
+                              )
+                            : OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
+                                onPressed: () => _abrirTomarAsistencia(context),
+                                icon: const Icon(Icons.how_to_reg_outlined, size: 20),
+                                label: Text(ev.asistentes.isEmpty ? 'Tomar asistencia' : 'Editar asistencia'),
+                              ),
+                      ),
+                    if (!apagado && miReal != null && tomarAsistencia) ...[
+                      const SizedBox(height: 10),
+                      PillAsistencia(repo: repo, ev: ev, texto: miReal.$1, icono: miReal.$2, completa: true),
+                    ],
                   ],
                 ),
-              ],
-              if (reserva != null && !apagado)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(
-                    children: [
-                      EstadoReserva(estado: reserva.estado),
-                      const Spacer(),
-                      if (reserva.gestionable && !ev.yaEmpezo)
-                        TextButton(
-                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: p.marcaTexto),
-                          onPressed: () => gestionarReserva(context, repo, reserva),
-                          child: const Text('Cancelar o reagendar'),
-                        ),
-                    ],
-                  ),
-                ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                child: pedirRespuesta
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: FilledButton.tonal(
-                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(40), backgroundColor: p.suave, foregroundColor: p.sobreSuave),
-                          onPressed: alAbrir,
-                          child: const Text('¿Vas a ir? Responde'),
-                        ),
-                      )
-                    : const SizedBox(width: double.infinity),
               ),
-              if (tomarAsistencia)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: ev.enCurso
-                      ? FilledButton.icon(
-                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(42)),
-                          onPressed: () => _abrirTomarAsistencia(context),
-                          icon: const Icon(Icons.how_to_reg_rounded, size: 20),
-                          label: const Text('Tomar asistencia'),
-                        )
-                      : OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
-                          onPressed: () => _abrirTomarAsistencia(context),
-                          icon: const Icon(Icons.how_to_reg_outlined, size: 20),
-                          label: Text(ev.asistentes.isEmpty ? 'Tomar asistencia' : 'Editar asistencia'),
-                        ),
-                ),
-              if (!apagado && miReal != null && tomarAsistencia) ...[
-                const SizedBox(height: 10),
-                PillAsistencia(repo: repo, ev: ev, texto: miReal.$1, icono: miReal.$2, completa: true),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1851,6 +1873,149 @@ class _TarjetaEvento extends StatelessWidget {
 /// Borde nítido que respira despacio: el evento está pasando ahora.
 /// Victor, 2026-11-14: el resplandor rojo difuminado parecía un "moretón";
 /// ahora no hay sombra roja, solo el borde (y el punto en vivo late).
+/// Ícono de una fiesta en la línea de tiempo: se mece despacio.
+class _IconoFiesta extends StatefulWidget {
+  const _IconoFiesta({required this.icono, required this.color, this.quieto = false});
+  final IconData icono;
+  final Color color;
+  final bool quieto;
+
+  @override
+  State<_IconoFiesta> createState() => _IconoFiestaState();
+}
+
+class _IconoFiestaState extends State<_IconoFiesta> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.quieto) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icono = Icon(widget.icono, size: 18, color: widget.color);
+    if (widget.quieto || MediaQuery.disableAnimationsOf(context)) return icono;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, hijo) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Transform.rotate(
+          angle: (t - 0.5) * 0.35,
+          child: Transform.scale(scale: 1 + 0.12 * t, child: hijo),
+        );
+      },
+      child: icono,
+    );
+  }
+}
+
+/// Detalle animado de una festividad dentro de la tarjeta (Victor, 2026-11-21):
+/// luces en Navidad, fuegos artificiales en Año Nuevo, un huevo que salta en
+/// Pascua, la luna en Halloween. Las demás no llevan nada aparte del ícono.
+class _DecoFiesta extends StatefulWidget {
+  const _DecoFiesta({required this.clave});
+  final String clave;
+
+  @override
+  State<_DecoFiesta> createState() => _DecoFiestaState();
+}
+
+class _DecoFiestaState extends State<_DecoFiesta> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(seconds: 3));
+
+  bool get _tiene => const {'navidad', 'anio_nuevo', 'pascua', 'halloween'}.contains(widget.clave);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_tiene) _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_tiene || MediaQuery.disableAnimationsOf(context)) return const SizedBox.shrink();
+    final p = context.pivot;
+    return RepaintBoundary(
+      child: switch (widget.clave) {
+        'pascua' || 'halloween' => AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) {
+            final t = _c.value;
+            final salto = widget.clave == 'pascua' ? -(math.sin(t * math.pi * 4).abs()) * 10 : math.sin(t * math.pi * 2) * 4;
+            return Align(
+              alignment: const Alignment(0.92, 0.85),
+              child: Transform.translate(
+                offset: Offset(0, salto),
+                child: Icon(widget.clave == 'pascua' ? Icons.egg_rounded : Icons.dark_mode_rounded, size: 26, color: p.marca.withValues(alpha: 0.35)),
+              ),
+            );
+          },
+        ),
+        _ => CustomPaint(painter: _PintorFiesta(_c, widget.clave, [p.marca, p.marcaTexto, p.sobreSuave])),
+      },
+    );
+  }
+}
+
+class _PintorFiesta extends CustomPainter {
+  _PintorFiesta(this.reloj, this.clave, this.colores) : super(repaint: reloj);
+  final Animation<double> reloj;
+  final String clave;
+  final List<Color> colores;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = reloj.value;
+    if (clave == 'navidad') {
+      // Una guirnalda de luces arriba que se prenden y apagan.
+      const n = 9;
+      final cable = Paint()
+        ..color = colores[2].withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      final camino = Path()..moveTo(0, 4);
+      for (var i = 0; i <= n; i++) {
+        final x = size.width * i / n;
+        camino.quadraticBezierTo(x - size.width / n / 2, 12, x, 4);
+      }
+      canvas.drawPath(camino, cable);
+      for (var i = 0; i < n; i++) {
+        final x = size.width * (i + 0.5) / n;
+        final brillo = 0.35 + 0.65 * ((math.sin((t * 2 + i / 3) * math.pi * 2) + 1) / 2);
+        canvas.drawCircle(Offset(x, 10), 3.2, Paint()..color = colores[i % colores.length].withValues(alpha: brillo * 0.8));
+      }
+      return;
+    }
+    // Año nuevo: dos estallidos que se abren y se desvanecen a la derecha.
+    for (final (i, c) in [(0, Offset(size.width * 0.86, size.height * 0.3)), (1, Offset(size.width * 0.72, size.height * 0.62))]) {
+      final f = (t + i * 0.5) % 1;
+      final r = 6 + f * 22;
+      final pintura = Paint()..color = colores[i].withValues(alpha: (1 - f) * 0.55);
+      for (var k = 0; k < 10; k++) {
+        final a = k / 10 * math.pi * 2;
+        canvas.drawCircle(c + Offset(math.cos(a) * r, math.sin(a) * r), 1.8, pintura);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PintorFiesta old) => old.clave != clave || old.colores != colores;
+}
+
 class _BrilloEnCurso extends StatefulWidget {
   const _BrilloEnCurso({required this.child});
   final Widget child;
