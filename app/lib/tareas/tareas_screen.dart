@@ -2,6 +2,7 @@ import '../equipo/equipo_repo.dart';
 
 import 'package:flutter/material.dart';
 
+import '../core/api.dart' show ApiException;
 import '../core/banner_ayuda.dart';
 
 import '../core/sincroniza.dart';
@@ -40,6 +41,22 @@ class TareasScreen extends StatefulWidget {
 class _TareasScreenState extends State<TareasScreen> {
   TareasRepo get repo => widget.repo;
   String? _area; // filtro de Disponibles
+  String? _tomando;
+
+  /// "Toma esta tarea" desde la lista (Victor, 2026-11-22).
+  Future<void> _tomar(Tarea t) async {
+    if (_tomando != null) return;
+    setState(() => _tomando = t.id);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      await repo.tomar(t);
+      m.showSnackBar(const SnackBar(content: Text('Tarea tomada')));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo completar. Revisa tu conexión.')));
+    } finally {
+      if (mounted) setState(() => _tomando = null);
+    }
+  }
 
   // Recurrentes y archivadas se piden al abrir y la lista aparece con todo
   // junto, sin cosas que asoman después (Victor, 2026-11-17).
@@ -297,7 +314,14 @@ class _TareasScreenState extends State<TareasScreen> {
           _SinTareas(esPivot: repo.esAdmin, alCrear: _nueva)
         else
           GrupoAjustes(
-            filas: [for (final x in disponibles) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
+            filas: [
+              for (final x in disponibles)
+                FilaTarea(
+                  tarea: x,
+                  alTocar: () => _abrir(x),
+                  alTomar: _tomando != null || repo.enLimite || x.tiene(repo.yo) || x.libres == 0 ? null : () => _tomar(x),
+                ),
+            ],
           ),
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
 
@@ -382,8 +406,11 @@ class _SinTareas extends StatelessWidget {
 
 /// Fila de una tarea: ícono del área, título, vencimiento o cupos, puntos.
 class FilaTarea extends StatelessWidget {
-  const FilaTarea({super.key, required this.tarea, this.mia, this.alTocar, this.hero = true});
+  const FilaTarea({super.key, required this.tarea, this.mia, this.alTocar, this.hero = true, this.alTomar});
   final Tarea tarea;
+
+  /// Botón "Toma esta tarea" en la fila (Victor, 2026-11-22).
+  final VoidCallback? alTomar;
 
   /// Vuela el ícono al detalle. Apagado donde la misma tarea puede repetirse (Sugeridas).
   final bool hero;
@@ -471,6 +498,18 @@ class FilaTarea extends StatelessWidget {
                           const Spacer(),
                           if (personas.isNotEmpty) PilaAvatares(personas: personas),
                         ],
+                      ),
+                    ),
+                  if (alTomar != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.tonalIcon(
+                          onPressed: alTomar,
+                          icon: const Icon(Icons.add_task_rounded, size: 18),
+                          label: const Text('Toma esta tarea'),
+                        ),
                       ),
                     ),
                 ],

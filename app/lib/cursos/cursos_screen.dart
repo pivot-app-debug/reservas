@@ -26,7 +26,7 @@ import '../reservas/reserva_screen.dart' show ReservaExitoScreen;
 import '../reservas/reservas_repo.dart';
 import '../sesion/sesion.dart';
 import '../eventos/anticipada.dart' show horaAmPm;
-import '../eventos/widgets_comunes.dart' show AvatarPersona;
+import '../eventos/widgets_comunes.dart' show AvatarPersona, Etiqueta;
 import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
@@ -248,6 +248,9 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
   bool _guardando = false;
   Sesion get s => widget.sesion;
 
+  /// Los que no habías visto (antes de marcarlos): llevan "Nuevo".
+  Set<String> _nuevos = const {};
+
   @override
   void initState() {
     super.initState();
@@ -259,8 +262,19 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
       final r = await s.api.get('getCursos', const {});
       final l = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))];
       l.sort((a, b) => (a.id == widget.destacado ? 0 : 1).compareTo(b.id == widget.destacado ? 0 : 1));
+      final pr = await SharedPreferences.getInstance();
+      final vistos = (pr.getStringList(_kCursosVistos) ?? const <String>[]).toSet();
+      final nuevos = {
+        for (final c in l)
+          if (c.mia == null && !vistos.contains(c.id)) c.id,
+      };
       unawaited(marcarCursosVistos(l.map((c) => c.id)));
-      if (mounted) setState(() => _cursos = l);
+      if (mounted) {
+        setState(() {
+          _cursos = l;
+          if (_nuevos.isEmpty) _nuevos = nuevos;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _error = 'No se pudo cargar. Revisa tu conexión.');
     }
@@ -365,9 +379,29 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            c.nombre,
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.texto),
+                          // Como las tareas (Victor, 2026-11-22): ícono en degradado y "Nuevo".
+                          Row(
+                            children: [
+                              Builder(
+                                builder: (context) {
+                                  final (degradado, sobre) = PivotPaleta.seccion('entrenamientos', Theme.of(context).brightness);
+                                  return Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+                                    child: Icon(Icons.school_rounded, size: 22, color: sobre),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  c.nombre,
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.texto),
+                                ),
+                              ),
+                              if (_nuevos.contains(c.id)) const Etiqueta(texto: 'Nuevo', icono: Icons.fiber_new_rounded),
+                            ],
                           ),
                           if (c.descripcion.isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -391,7 +425,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
                               'pendiente' => const FilledButton.tonal(onPressed: null, child: Text('Inscripción por confirmar')),
                               _ => FilledButton(
                                 onPressed: _guardando || c.libres == 0 ? null : () => _inscribirme(c),
-                                child: Text(c.libres == 0 ? 'Sin cupo' : 'Inscribirme'),
+                                child: Text(c.libres == 0 ? 'Sin cupo' : 'Suscríbete a este curso'),
                               ),
                             },
                           ),

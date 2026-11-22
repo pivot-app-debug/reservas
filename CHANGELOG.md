@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (Actividad y puntos de aviso)
+- La casita del Calendario pasó a ser una bandeja de entrada.
+- El punto de aviso sigue el camino hasta lo nuevo: la pestaña de Actividad (Novedades, Tareas o Cursos), la bandeja y Calendario en la barra de abajo. En Liga: el avatar de quien se fue de viaje o se lesionó, el aviso de cosas para llevar, su pestaña y Liga en la barra. Se apaga al verlo.
+- Tareas: "Toma esta tarea" directo en la lista de disponibles.
+- Cursos y Novedades con el estilo de Tareas: ícono en degradado; los cursos nuevos llevan "Nuevo" y el botón dice "Suscríbete a este curso".
+
 ## 2026-11-22 (Liga)
 - Equipo pasó a llamarse Liga y tiene pestañas: Comunidad (la gente), Redes, Inventario y, para quien gestiona finanzas, Finanzas.
 - En Comunidad, cada equipo tiene "Ver equipo": los Pivots lo editan y el resto ve sus reglas sin poder cambiarlas. Debajo de los equipos está Coaches (sus ajustes salieron de Mi perfil) y, para Pivots, "Crear un equipo".

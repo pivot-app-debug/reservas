@@ -1365,6 +1365,12 @@ class _TarjetaNovedad extends StatelessWidget {
       'comunicado' => Icons.campaign_outlined,
       _ => '${n['titulo']}'.contains('no asistirá') ? Icons.event_busy_outlined : Icons.event_available_outlined,
     };
+    // Ícono en degradado como en Tareas (Victor, 2026-11-22).
+    final (degradado, sobre) = PivotPaleta.seccion(switch (n['tipo']) {
+      'cumple' => 'pronombres',
+      'comunicado' => 'notificaciones',
+      _ => 'reservas',
+    }, Theme.of(context).brightness);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -1372,7 +1378,12 @@ class _TarjetaNovedad extends StatelessWidget {
         borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-          leading: Icon(icono, color: p.marcaTexto),
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+            child: Icon(icono, size: 20, color: sobre),
+          ),
           title: Text('${n['titulo']}', style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: '${n['detalle'] ?? ''}'.isEmpty ? null : Text('${n['detalle']}', maxLines: 3, overflow: TextOverflow.ellipsis),
           trailing: alDescartar == null
