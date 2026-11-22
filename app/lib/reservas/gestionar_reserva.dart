@@ -45,6 +45,105 @@ class _HojaGestionarState extends State<_HojaGestionar> {
   bool _confirmando = false;
   bool _ocupado = false;
 
+  /// Listas propias de la liga (sin patines ni protecciones del sistema).
+  List<Map<String, dynamic>> _otras = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.reserva.mensual) _cargarListas();
+  }
+
+  Future<void> _cargarListas() async {
+    try {
+      final r = await widget.repo.sesion.api.get('getMiEquipoLiga');
+      final l = [
+        for (final x in (r['listas'] as List? ?? const []))
+          if (x is Map && x['sistema'] == null) Map<String, dynamic>.from(x),
+      ];
+      if (mounted) setState(() => _otras = l);
+    } catch (_) {}
+  }
+
+  /// Cambiar el resto del equipamiento de la liga (Victor, 2026-11-22).
+  Future<void> _cambiarEquipo() async {
+    final m = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    final usa = Map<String, String>.of(widget.reserva.equipo);
+    final ok = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (h) => StatefulBuilder(
+        builder: (h, set) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            children: [
+              Text('Equipamiento de la liga', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('Solo para esta clase.', style: TextStyle(color: h.pivot.textoSecundario)),
+              for (final l in _otras) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${l['nombre']}'),
+                  value: usa.containsKey('${l['id']}'),
+                  onChanged: (v) => set(() => v ? usa['${l['id']}'] = '' : usa.remove('${l['id']}')),
+                ),
+                if (usa.containsKey('${l['id']}') && l['tipo'] == 'tallas')
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in [for (final x in (l['tallas'] as List? ?? const [])) '$x'])
+                        ChoiceChip(label: Text('Talla $t'), selected: usa['${l['id']}'] == t, onSelected: (_) => set(() => usa['${l['id']}'] = t)),
+                    ],
+                  ),
+                if (usa.containsKey('${l['id']}') && l['tipo'] == 'set' && (l['piezas'] as List? ?? const []).isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final x in [for (final y in l['piezas'] as List) '$y'])
+                        FilterChip(
+                          label: Text(x),
+                          selected: (usa['${l['id']}'] ?? '').split(',').map((y) => y.trim()).contains(x),
+                          onSelected: (v) => set(() {
+                            final todas = [for (final y in l['piezas'] as List) '$y'];
+                            final el = (usa['${l['id']}'] ?? '').split(',').map((y) => y.trim()).where(todas.contains).toSet();
+                            v ? el.add(x) : el.remove(x);
+                            usa['${l['id']}'] = todas.where(el.contains).join(', ');
+                          }),
+                        ),
+                    ],
+                  ),
+              ],
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _otras.any((l) => l['tipo'] == 'tallas' && usa.containsKey('${l['id']}') && (usa['${l['id']}'] ?? '').isEmpty)
+                    ? null
+                    : () => Navigator.of(h).pop(true),
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _ocupado = true);
+    try {
+      await ReservasRepo(widget.repo.sesion).cambiarEquipo(widget.reserva, usa);
+      await widget.repo.recargarCuota();
+      nav.pop();
+      m.showSnackBar(const SnackBar(content: Text('Equipamiento actualizado')));
+    } catch (e) {
+      if (mounted) setState(() => _ocupado = false);
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar.')));
+    }
+  }
+
   Future<void> _cancelar() async {
     setState(() => _ocupado = true);
     final mensajero = ScaffoldMessenger.of(context);
@@ -168,6 +267,15 @@ class _HojaGestionarState extends State<_HojaGestionar> {
                             onPressed: _ocupado ? null : _cambiarTalla,
                             icon: const Icon(Icons.roller_skating_outlined),
                             label: Text('Cambiar talla de patines (${r.talla})'),
+                          ),
+                        ],
+                        if (!r.mensual && _otras.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                            onPressed: _ocupado ? null : _cambiarEquipo,
+                            icon: const Icon(Icons.content_paste_rounded),
+                            label: const Text('Cambiar equipamiento de la liga'),
                           ),
                         ],
                         if (!r.mensual && r.conProtecciones) ...[

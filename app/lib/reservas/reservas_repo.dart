@@ -213,8 +213,12 @@ class ReservaActiva {
     this.id = '',
     this.faltaComprobante = false,
     this.comprobanteLimite,
+    this.equipo = const {},
   });
   final String clave;
+
+  /// Otras cosas de la liga reservadas para esa clase {listaId: talla o piezas}.
+  final Map<String, String> equipo;
 
   /// Id de la reserva y si falta su comprobante de pago; `comprobanteLimite` =
   /// "Esperando comprobante": hasta cuándo tiene para adjuntarlo (Victor, 2026-11-19).
@@ -285,6 +289,10 @@ class ReservaActiva {
       id: id,
       faltaComprobante: falta,
       comprobanteLimite: limite,
+      equipo: {
+        if (r['equipo'] is Map)
+          for (final e in (r['equipo'] as Map).entries) '${e.key}': '${e.value ?? ''}',
+      },
     );
   }
 }
@@ -452,6 +460,12 @@ class ReservasRepo {
   /// Cambiar la talla o las protecciones de una reserva de clase hecha.
   Future<void> cambiarTalla(ReservaActiva r, String talla) async {
     final res = await _api.post('actualizarTallaReserva', {'nombre': sesion.nombre, 'fecha': r.clave, 'tallaNueva': talla});
+    if (res['exito'] == false) throw ApiException('${res['error'] ?? 'No se pudo guardar.'}');
+  }
+
+  /// Las listas propias de la liga de una reserva hecha (Victor, 2026-11-22).
+  Future<void> cambiarEquipo(ReservaActiva r, Map<String, String> equipo) async {
+    final res = await _api.post('actualizarEquipoReserva', {'nombre': sesion.nombre, 'fecha': r.clave, 'equipo': equipo});
     if (res['exito'] == false) throw ApiException('${res['error'] ?? 'No se pudo guardar.'}');
   }
 

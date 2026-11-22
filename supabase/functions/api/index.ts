@@ -6524,6 +6524,25 @@ async function actualizarTallaReserva(params: Record<string, any>): Promise<Reco
   return { exito: true };
 }
 
+/// Cambiar el equipamiento de la liga de una suscripción ya hecha (Victor,
+/// 2026-11-22): las listas propias de la liga (no patines ni protecciones,
+/// que siguen por talla/protecciones). `equipo` = {listaId: talla o piezas}.
+async function actualizarEquipoReserva(params: Record<string, any>): Promise<Record<string, any>> {
+  const nombre = String(params.nombre ?? ''), idEvento = String(params.fecha ?? params.idEvento ?? '');
+  if (!nombre || (await _validarToken(params.token)) !== nombre) return { exito: false, error: 'Sesión inválida.' };
+  if (!idEvento) return { exito: false, error: 'Faltan datos.' };
+  const { data: mia } = await supabase.from('reservas').select('id').eq('nombre_usuario', nombre).eq('id_evento', idEvento).neq('estado', 'Cancelada').limit(1).maybeSingle();
+  if (!mia) return { exito: false, error: 'Reserva no encontrada.' };
+  const pedido = params.equipo && typeof params.equipo === 'object' ? params.equipo : (() => { try { return JSON.parse(String(params.equipo ?? '{}')); } catch { return {}; } })();
+  const o = await _otrasDeLiga(nombre, pedido ?? {});
+  const { data: delEvento } = await supabase.from('reservas').select('equipo').eq('id_evento', idEvento).neq('estado', 'Cancelada').neq('id', mia.id);
+  const falta = _faltaDeLiga(o, delEvento ?? []);
+  if (falta) return { exito: false, error: falta + ' para esa clase.' };
+  const { error } = await supabase.from('reservas').update({ equipo: Object.keys(o.eq).length ? o.eq : null }).eq('id', mia.id);
+  if (error) return { exito: false, error: 'No se pudo guardar.' };
+  return { exito: true };
+}
+
 async function usarCreditos(params: Record<string, any>): Promise<Record<string, any>> {
   const nombre = params.nombre, cantidad = parseInt(params.cantidad, 10) || 0;
   if (cantidad <= 0) return { exito: true, usados: 0 };
@@ -13437,6 +13456,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'reagendarReserva':                return json(await reagendarReserva(params));
       case 'getTallasDisponiblesParaFecha':   return json(await getTallasDisponiblesParaFecha(params));
       case 'actualizarTallaReserva':          return json(await actualizarTallaReserva(params));
+      case 'actualizarEquipoReserva':         return json(await actualizarEquipoReserva(params));
       case 'usarCreditos':                    return json(await usarCreditos(params));
       // Pagos
             case 'adminRegistrarPago':              return json(await adminRegistrarPago(params));
