@@ -350,8 +350,13 @@ class SocialEnEventoState extends State<SocialEnEvento> {
   Future<void> abrirQueLleva() => abrirSubseccionSocial(
     context,
     idEvento: _id,
-    titulo: 'Qué lleva cada quien',
-    contenido: (e) => ComidaTarjeta(repo: _social, estado: e, alCambiar: _cargar),
+    titulo: 'Qué llevar',
+    contenido: (e) => QueLlevarVista(
+      repo: _social,
+      estado: e,
+      alCambiar: _cargar,
+      asisten: [for (final r in widget.evento.con(EstadoRsvp.asistire)) (r.persona.username, r.persona.nombreMostrar)],
+    ),
   );
 
   Future<void> abrirActividad(String que) => abrirSubseccionSocial(

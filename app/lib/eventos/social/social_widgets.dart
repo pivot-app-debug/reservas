@@ -413,7 +413,7 @@ class FichaAmigoVista extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.texto),
                   ),
                   if (ficha.invitadxDe != null) Text('Invitadx de ${ficha.invitadxDe}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                  if (tope != null) Text('Tope: ${montoSocial(tope, simbolo)}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                  if (tope != null) Text('Tope del regalo: ${montoSocial(tope, simbolo)}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
                 ],
               ),
             ),
@@ -855,10 +855,31 @@ class _PintorRuleta extends CustomPainter {
 /// lista de secciones. Todxs ven quién lleva qué para no repetir; quien está a
 /// cargo arma las secciones desde aquí, marca lo que hace falta y deja ideas.
 class ComidaTarjeta extends StatelessWidget {
-  const ComidaTarjeta({super.key, required this.repo, required this.estado, required this.alCambiar});
+  const ComidaTarjeta({
+    super.key,
+    required this.repo,
+    required this.estado,
+    required this.alCambiar,
+    this.vista = 'todo',
+    this.asisten = const [],
+    this.alAgregar,
+  });
   final SocialRepo repo;
   final EstadoSocial estado;
   final VoidCallback alCambiar;
+
+  /// Qué llevar en 3 pestañas (Victor, 2026-11-22): 'mio' (Yo llevo),
+  /// 'resto' (El resto lleva) o 'falta' (lo que hay que llevar). 'todo' = todo junto.
+  final String vista;
+
+  /// Quienes van (usuario, nombre): quien organiza ve en "El resto lleva" a quién le falta.
+  final List<(String, String)> asisten;
+
+  /// "Agregar algo" en Yo llevo: pasa a la pestaña Falta.
+  final VoidCallback? alAgregar;
+
+  /// Anotarse en una sección (desde la tarjeta resumida).
+  Future<void> anotarEn(BuildContext context, CategoriaComida c) => _anotar(context, c);
 
   /// Anotarse (Victor, 2026-11-20): cuánto rinde lo que llevas lo decides tú,
   /// en la unidad de la sección (porciones, litros…).
@@ -1340,8 +1361,10 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
         for (final a in c.aportes)
           if (a['mio'] == true) (c, a),
     ];
+    if (t.vista == 'mio') return _vistaMia(context, p, mias);
+    if (t.vista == 'resto') return _vistaResto(context, p);
     return TarjetaSocial(
-      titulo: 'Qué lleva cada quien',
+      titulo: 'Qué llevar',
       icono: Icons.restaurant_rounded,
       // Lápiz: cuánto come y toma cada persona; "+": agregar con sugerencias (Victor, 2026-11-20).
       accion: admin
@@ -1393,7 +1416,7 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           ),
         // Tu parte (Victor, 2026-11-20): el termómetro siempre a la vista;
         // la frase y lo que llevas, plegados.
-        if ((e.asiste && e.seccionesParte.isNotEmpty) || mias.isNotEmpty)
+        if (t.vista == 'todo' && ((e.asiste && e.seccionesParte.isNotEmpty) || mias.isNotEmpty))
           _TuParte(
             valor: e.asiste && e.seccionesParte.isNotEmpty ? e.miParte : null,
             secciones: e.seccionesParte.length,
@@ -1468,6 +1491,149 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
   }
 
   bool _tuParteAbierta = false, _verFaltan = true, _verResto = true;
+
+  String _linea(CategoriaComida c, Map a) => [
+    '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
+    if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
+    if (ComidaTarjeta._para(a['paraTodxs']).isNotEmpty) ComidaTarjeta._para(a['paraTodxs']),
+  ].join(' · ');
+
+  /// Yo llevo: tu parte, lo que llevas (con quitar) y "Agregar algo".
+  Widget _vistaMia(BuildContext context, PivotPaleta p, List<(CategoriaComida, Map<String, dynamic>)> mias) {
+    final e = _e, t = widget.t;
+    final v = e.asiste && e.seccionesParte.isNotEmpty ? e.miParte.clamp(0, 1).toDouble() : null;
+    return TarjetaSocial(
+      titulo: 'Yo llevo',
+      children: [
+        if (v != null) ...[
+          Row(
+            children: [
+              Text(
+                'Tu parte',
+                style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(PivotRadios.chip),
+                  child: LinearProgressIndicator(value: v, minHeight: 6, backgroundColor: p.suave, color: p.marca),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${(v * 100).round()} %',
+                style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            v >= 1 ? 'Ya cubriste tu parte. Si quieres, puedes llevar más.' : 'Con comida o bebida en cualquier sección cubres tu parte.',
+            style: TextStyle(fontSize: 13, color: p.textoSecundario),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (!e.asiste)
+          Text('Confirma tu asistencia para anotarte.', style: TextStyle(color: p.textoSecundario))
+        else if (mias.isEmpty)
+          Text('Todavía no te anotaste en ninguna sección.', style: TextStyle(color: p.textoSecundario))
+        else
+          for (final (c, a) in mias)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+              decoration: BoxDecoration(
+                border: Border.all(color: p.bordeSuave),
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.nombre, style: TextStyle(fontSize: 12, color: p.textoSecundario)),
+                        Text(
+                          _linea(c, a),
+                          style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: () => t._quitar(context, '${a['id']}')),
+                ],
+              ),
+            ),
+        if (e.asiste) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            onPressed: t.alAgregar,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Agregar algo'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// El resto lleva: por sección, quién lleva qué. Quien organiza ve además a
+  /// quién le falta completar su parte.
+  Widget _vistaResto(BuildContext context, PivotPaleta p) {
+    final e = _e;
+    final secciones = [
+      for (final c in e.comida)
+        if (c.aportes.any((a) => a['mio'] != true)) c,
+    ];
+    final faltaA = e.organiza && e.seccionesParte.isNotEmpty
+        ? [
+            for (final (u, n) in widget.t.asisten)
+              if (e.parteDeUsuario(u) < 1) (n, e.llevaDe(u).isEmpty),
+          ]
+        : const <(String, bool)>[];
+    return TarjetaSocial(
+      titulo: 'El resto lleva',
+      children: [
+        if (faltaA.isNotEmpty) ...[
+          Text(
+            'Les falta completar su parte (${faltaA.length})',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [for (final (n, nada) in faltaA) Etiqueta(texto: nada ? '$n · sin anotar' : n, apagada: !nada)],
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (secciones.isEmpty) Text('Nadie más se anotó todavía.', style: TextStyle(color: p.textoSecundario)),
+        for (final c in secciones) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
+            child: Text(
+              c.nombre,
+              style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+            ),
+          ),
+          for (final a in c.aportes)
+            if (a['mio'] != true)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                child: Row(
+                  children: [
+                    AvatarPersona(nombre: '${a['nombre'] ?? ''}', foto: '${a['foto'] ?? ''}', tamano: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('${a['nombre']} · ${_linea(c, a)}', style: TextStyle(color: p.texto)),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ],
+    );
+  }
 
   Widget _grupo(
     PivotPaleta p, {
@@ -1779,31 +1945,53 @@ class RegaloRobadoTarjeta extends StatelessWidget {
           style: TextStyle(color: p.texto),
         ),
         if (estado.recordatorioRobado.isNotEmpty) ...[const SizedBox(height: 6), Text(estado.recordatorioRobado, style: TextStyle(color: p.textoSecundario))],
-        // Reglas del juego (plantilla o las que escribió quien organiza).
-        if (estado.reglasRobado.isNotEmpty)
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: p.tarjeta),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(bottom: 8),
-              title: Text(
-                'Reglas del juego',
-                style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
-              ),
-              expandedAlignment: Alignment.topLeft,
-              children: [
-                Text(
-                  estado.reglasRobado.replaceAll('{tope}', estado.topeRobado != null ? montoSocial(estado.topeRobado, simbolo) : 'el tope acordado'),
-                  style: TextStyle(height: 1.4, color: p.texto),
-                ),
-              ],
-            ),
+        // Reglas del juego siempre a la vista, en pasos numerados (Victor, 2026-11-22).
+        // Salen de la plantilla con las opciones del evento, o de lo que escribió
+        // quien organiza: cada línea es un paso.
+        if (estado.reglasRobado.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(
+            'Reglas del juego',
+            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
           ),
+          const SizedBox(height: 8),
+          for (final (i, paso) in pasosReglas(
+            estado.reglasRobado.replaceAll('{tope}', estado.topeRobado != null ? montoSocial(estado.topeRobado, simbolo) : 'el tope acordado'),
+          ).indexed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: p.suave, shape: BoxShape.circle),
+                    child: Text(
+                      '${i + 1}',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.sobreSuave),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(paso, style: TextStyle(height: 1.35, color: p.texto)),
+                  ),
+                ],
+              ),
+            ),
+        ],
         _boton(context, p),
       ],
     );
   }
 }
+
+/// Reglas en pasos: una por línea, sin la numeración o viñeta que traiga.
+List<String> pasosReglas(String texto) => [
+  for (final l in texto.split(RegExp(r'\n+')))
+    if (l.trim().replaceFirst(RegExp(r'^(\d+[.)]|[-•*])\s*'), '').isNotEmpty) l.trim().replaceFirst(RegExp(r'^(\d+[.)]|[-•*])\s*'), ''),
+];
 
 String _aCargoDe(Map<String, dynamic> x) {
   if (x['organiza'] == true) return 'Organiza todo el evento';

@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (Qué llevar y eventos especiales)
+- "Qué lleva cada quien" pasó a "Qué llevar": una tarjeta chica con tu parte, lo que falta y, si te falta, las secciones para anotarte con un toque. Adentro, tres pestañas: Yo llevo, El resto lleva y Falta.
+- Amigo secreto y regalo robado: "Participas" ya no se corta y el tope se lee claro ("Tope del regalo: $10"). Las reglas del regalo robado están siempre a la vista, en pasos.
+- El aviso de lo que te falta tiene el formato de las ayudas, con un botón por cosa.
+- La tarjeta de fecha y lugar de una fiesta es su portada: fondo rojizo y el detalle de la festividad. "Faltan N días" lleva el ícono de la festividad. El nombre de una fiesta tiene hasta 40 caracteres.
+- En el timeline, cumpleaños con el mismo diseño de las fiestas (confeti e ícono), offseason con cielo nocturno y estrellas, y las animaciones quedan quietas cuando el evento ya pasó. Ya no hay íconos que se mueven.
+- En el calendario expandido, cada día especial tiene su emoji (🎁 cumpleaños, 🎄, 🎆, 🐣, 🎃, 🎉 y 🌙 offseason).
+
 ## 2026-11-22 (notificaciones que llevan a su pantalla)
 - Cada notificación abre su parte de la app: el evento, Pagos y suscripciones, Tareas, Cursos, Novedades, Equipo o la suscripción que quedó a medias (con la clase o el mes que se había elegido). En la web, si la app ya está abierta, también va a esa pantalla.
 - La suscripción sin terminar ahora dice "Tu suscripción aún no se completó. Si quieres suscribirte a …, completa el registro."

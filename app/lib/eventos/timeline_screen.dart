@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -22,6 +21,7 @@ import '../reservas/reservas_repo.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
 import 'social/social_plantillas.dart';
+import 'deco_fiesta.dart';
 import 'detalle_screen.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
@@ -1718,7 +1718,9 @@ class _TarjetaEvento extends StatelessWidget {
           children: [
             if (festiva)
               Positioned.fill(
-                child: IgnorePointer(child: _DecoFiesta(clave: ev.socialIcono ?? '')),
+                child: IgnorePointer(
+                  child: DecoFiesta(clave: ev.socialIcono ?? '', animada: !ev.finalizado),
+                ),
               ),
             InkWell(
               borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
@@ -1749,11 +1751,11 @@ class _TarjetaEvento extends StatelessWidget {
                                 children: [
                                   // Social o fiesta: ícono propio (regalo si es sorpresa), nunca para quien no debe enterarse.
                                   if (ev.socialFestivo) ...[
-                                    // Se mueve un poco para que resalte (Victor, 2026-11-21).
-                                    _IconoFiesta(
-                                      icono: ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
+                                    // Quieto (Victor, 2026-11-22: sin íconos que se mueven).
+                                    Icon(
+                                      ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
+                                      size: 18,
                                       color: apagado ? p.apagado : p.marcaTexto,
-                                      quieto: apagado,
                                     ),
                                     const SizedBox(width: 6),
                                   ],
@@ -1892,149 +1894,6 @@ class _TarjetaEvento extends StatelessWidget {
 /// Borde nítido que respira despacio: el evento está pasando ahora.
 /// Victor, 2026-11-14: el resplandor rojo difuminado parecía un "moretón";
 /// ahora no hay sombra roja, solo el borde (y el punto en vivo late).
-/// Ícono de una fiesta en la línea de tiempo: se mece despacio.
-class _IconoFiesta extends StatefulWidget {
-  const _IconoFiesta({required this.icono, required this.color, this.quieto = false});
-  final IconData icono;
-  final Color color;
-  final bool quieto;
-
-  @override
-  State<_IconoFiesta> createState() => _IconoFiestaState();
-}
-
-class _IconoFiestaState extends State<_IconoFiesta> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
-
-  @override
-  void initState() {
-    super.initState();
-    if (!widget.quieto) _c.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final icono = Icon(widget.icono, size: 18, color: widget.color);
-    if (widget.quieto || MediaQuery.disableAnimationsOf(context)) return icono;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, hijo) {
-        final t = Curves.easeInOut.transform(_c.value);
-        return Transform.rotate(
-          angle: (t - 0.5) * 0.35,
-          child: Transform.scale(scale: 1 + 0.12 * t, child: hijo),
-        );
-      },
-      child: icono,
-    );
-  }
-}
-
-/// Detalle animado de una festividad dentro de la tarjeta (Victor, 2026-11-21):
-/// luces en Navidad, fuegos artificiales en Año Nuevo, un huevo que salta en
-/// Pascua, la luna en Halloween. Las demás no llevan nada aparte del ícono.
-class _DecoFiesta extends StatefulWidget {
-  const _DecoFiesta({required this.clave});
-  final String clave;
-
-  @override
-  State<_DecoFiesta> createState() => _DecoFiestaState();
-}
-
-class _DecoFiestaState extends State<_DecoFiesta> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(seconds: 3));
-
-  bool get _tiene => const {'navidad', 'anio_nuevo', 'pascua', 'halloween'}.contains(widget.clave);
-
-  @override
-  void initState() {
-    super.initState();
-    if (_tiene) _c.repeat();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_tiene || MediaQuery.disableAnimationsOf(context)) return const SizedBox.shrink();
-    final p = context.pivot;
-    return RepaintBoundary(
-      child: switch (widget.clave) {
-        'pascua' || 'halloween' => AnimatedBuilder(
-          animation: _c,
-          builder: (_, _) {
-            final t = _c.value;
-            final salto = widget.clave == 'pascua' ? -(math.sin(t * math.pi * 4).abs()) * 10 : math.sin(t * math.pi * 2) * 4;
-            return Align(
-              alignment: const Alignment(0.92, 0.85),
-              child: Transform.translate(
-                offset: Offset(0, salto),
-                child: Icon(widget.clave == 'pascua' ? Icons.egg_rounded : Icons.dark_mode_rounded, size: 26, color: p.marca.withValues(alpha: 0.35)),
-              ),
-            );
-          },
-        ),
-        _ => CustomPaint(painter: _PintorFiesta(_c, widget.clave, [p.marca, p.marcaTexto, p.sobreSuave])),
-      },
-    );
-  }
-}
-
-class _PintorFiesta extends CustomPainter {
-  _PintorFiesta(this.reloj, this.clave, this.colores) : super(repaint: reloj);
-  final Animation<double> reloj;
-  final String clave;
-  final List<Color> colores;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = reloj.value;
-    if (clave == 'navidad') {
-      // Una guirnalda de luces arriba que se prenden y apagan.
-      const n = 9;
-      final cable = Paint()
-        ..color = colores[2].withValues(alpha: 0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1;
-      final camino = Path()..moveTo(0, 4);
-      for (var i = 0; i <= n; i++) {
-        final x = size.width * i / n;
-        camino.quadraticBezierTo(x - size.width / n / 2, 12, x, 4);
-      }
-      canvas.drawPath(camino, cable);
-      for (var i = 0; i < n; i++) {
-        final x = size.width * (i + 0.5) / n;
-        final brillo = 0.35 + 0.65 * ((math.sin((t * 2 + i / 3) * math.pi * 2) + 1) / 2);
-        canvas.drawCircle(Offset(x, 10), 3.2, Paint()..color = colores[i % colores.length].withValues(alpha: brillo * 0.8));
-      }
-      return;
-    }
-    // Año nuevo: dos estallidos que se abren y se desvanecen a la derecha.
-    for (final (i, c) in [(0, Offset(size.width * 0.86, size.height * 0.3)), (1, Offset(size.width * 0.72, size.height * 0.62))]) {
-      final f = (t + i * 0.5) % 1;
-      final r = 6 + f * 22;
-      final pintura = Paint()..color = colores[i].withValues(alpha: (1 - f) * 0.55);
-      for (var k = 0; k < 10; k++) {
-        final a = k / 10 * math.pi * 2;
-        canvas.drawCircle(c + Offset(math.cos(a) * r, math.sin(a) * r), 1.8, pintura);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PintorFiesta old) => old.clave != clave || old.colores != colores;
-}
-
 class _BrilloEnCurso extends StatefulWidget {
   const _BrilloEnCurso({required this.child});
   final Widget child;
@@ -2163,44 +2022,66 @@ class _TarjetaDescanso extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
     final esAdmin = repo.sesion.esAdmin && repo.sesion.adminToken != null;
+    // Cielo nocturno con estrellas (Victor, 2026-11-22). En curso: borde azul;
+    // cuando termina, las estrellas quedan quietas.
+    final hoy = Fechas.hoy();
+    final paso = Fechas.soloDia(temporada.hasta).isBefore(hoy);
+    final enCurso = !paso && !Fechas.soloDia(temporada.desde).isAfter(hoy);
     return Material(
-      color: p.apagadoFondo,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-        onTap: esAdmin ? () => _acciones(context) : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(color: p.tarjeta, shape: BoxShape.circle),
-                child: Icon(Icons.bedtime_outlined, color: p.textoSecundario),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: PivotPaleta.degradadoNoche,
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          border: enCurso ? Border.all(color: PivotPaleta.nocheBorde, width: 2) : null,
+          boxShadow: enCurso ? [BoxShadow(color: PivotPaleta.nocheBorde.withValues(alpha: 0.45), blurRadius: 12)] : null,
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoFiesta(clave: 'offseason', animada: !paso),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+              onTap: esAdmin ? () => _acciones(context) : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
                   children: [
-                    Text(
-                      temporada.nombre,
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: p.texto),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(color: PivotPaleta.sobreNoche.withValues(alpha: 0.12), shape: BoxShape.circle),
+                      child: const Icon(Icons.bedtime_rounded, color: PivotPaleta.estrella),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Sin entrenamientos del ${Fechas.corta(temporada.desde)} al ${Fechas.corta(temporada.hasta)}',
-                      style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            temporada.nombre,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: PivotPaleta.sobreNoche),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Sin entrenamientos del ${Fechas.corta(temporada.desde)} al ${Fechas.corta(temporada.hasta)}',
+                            style: const TextStyle(fontSize: 13, color: PivotPaleta.sobreNocheSecundario),
+                          ),
+                        ],
+                      ),
                     ),
+                    if (esAdmin) Icon(Icons.more_vert_rounded, color: PivotPaleta.sobreNocheSecundario),
                   ],
                 ),
               ),
-              if (esAdmin) Icon(Icons.more_vert_rounded, color: p.textoSecundario),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -2241,94 +2122,32 @@ class _TarjetaCumple extends StatelessWidget {
               ],
             ),
           ),
-          Text(anios != null ? '🎉' : '🎈', style: const TextStyle(fontSize: 20)),
+          // Ícono de Material, no emoji (Victor, 2026-11-22).
+          Icon(anios != null ? Icons.celebration_rounded : Icons.cake_rounded, size: 22, color: p.marcaTexto),
         ],
       ),
     );
+    // Mismo formato que las fiestas: fondo rojizo y confeti; si ya pasó, quieto.
+    final pasado = Fechas.soloDia(cumple.fecha).isBefore(Fechas.hoy());
     return Container(
       decoration: BoxDecoration(
-        color: esHoy ? p.suave : p.fondo,
-        border: Border.all(color: esHoy ? p.marca : p.tarjetaBorde),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.suave, p.tarjeta], stops: const [0, 0.75]),
+        border: Border.all(color: esHoy ? p.marca : p.tarjetaBorde, width: esHoy ? 1.5 : 1),
         borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
       ),
       clipBehavior: Clip.antiAlias,
-      child: esHoy
-          ? Stack(
-              children: [
-                contenido,
-                const Positioned.fill(child: IgnorePointer(child: _Confeti())),
-              ],
-            )
-          : contenido,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoFiesta(clave: 'cumple', animada: !pasado),
+            ),
+          ),
+          contenido,
+        ],
+      ),
     );
   }
-}
-
-/// Confeti que cae sin parar (papelitos que giran y se mecen).
-class _Confeti extends StatefulWidget {
-  const _Confeti();
-
-  @override
-  State<_Confeti> createState() => _ConfetiState();
-}
-
-class _ConfetiState extends State<_Confeti> with SingleTickerProviderStateMixin {
-  late final AnimationController _reloj = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
-  late final List<_Papelito> _papelitos = List.generate(26, _Papelito.new);
-
-  @override
-  void dispose() {
-    _reloj.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => RepaintBoundary(child: CustomPaint(painter: _PintorConfeti(_reloj, _papelitos)));
-}
-
-class _Papelito {
-  _Papelito(int i)
-    : x = _azar(i, 1),
-      fase = _azar(i, 2),
-      velocidad = (1 + (_azar(i, 3) * 2).floor()).toDouble(), // entero: el loop no salta
-      giro = (_azar(i, 4) - 0.5) * 12,
-      vaiven = 4 + _azar(i, 5) * 8,
-      ancho = 4 + _azar(i, 6) * 3,
-      color = PivotPaleta.confeti[i % PivotPaleta.confeti.length];
-  final double x, fase, velocidad, giro, vaiven, ancho;
-  final Color color;
-
-  // Pseudoazar fijo: cada papelito siempre igual, sin saltos entre cuadros.
-  static double _azar(int i, int k) {
-    final v = ((i + 1) * 9301 + k * 49297) % 233280;
-    return v / 233280;
-  }
-}
-
-class _PintorConfeti extends CustomPainter {
-  _PintorConfeti(this.reloj, this.papelitos) : super(repaint: reloj);
-  final Animation<double> reloj;
-  final List<_Papelito> papelitos;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = reloj.value;
-    final pincel = Paint();
-    for (final p in papelitos) {
-      final avance = (t * p.velocidad + p.fase) % 1.0;
-      final y = avance * (size.height + 20) - 10;
-      final x = p.x * size.width + math.sin((avance + p.fase) * math.pi * 4) * p.vaiven;
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(avance * p.giro);
-      pincel.color = p.color;
-      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.ancho, height: p.ancho * 0.55), pincel);
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PintorConfeti viejo) => false;
 }
 
 class _Accion {

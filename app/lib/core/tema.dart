@@ -120,6 +120,14 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
   static const cargandoRosa = Color(0xFFFFD9D9);
   static const sobreSeccion = Color(0xFFFFFFFF);
 
+  /// Offseason (Victor, 2026-11-22): cielo nocturno azulado con estrellas, en
+  /// claro y en oscuro. Texto claro encima; borde azul cuando está en curso.
+  static const degradadoNoche = LinearGradient(colors: [Color(0xFF22345C), Color(0xFF0B1328)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+  static const sobreNoche = Color(0xFFEAF0FF);
+  static const sobreNocheSecundario = Color(0xFFB8C5E6);
+  static const nocheBorde = Color(0xFF6F8FD8);
+  static const estrella = Color(0xFFFFF4CC);
+
   /// Confeti de la tarjeta de cumpleaños (mismo en claro y oscuro).
   static const confeti = [Color(0xFFE8000D), Color(0xFFFFB300), Color(0xFF43A047), Color(0xFF1E88E5), Color(0xFF8E24AA), Color(0xFFFF7043)];
 

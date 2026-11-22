@@ -672,7 +672,8 @@ class _CrearSocialScreenState extends State<CrearSocialScreen> {
         TextField(
           controller: _nombre,
           enabled: _todo,
-          maxLength: 80,
+          // 40 como el resto de los eventos: así no se corta en la barra (Victor, 2026-11-22).
+          maxLength: 40,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(labelText: 'Nombre', counterText: ''),
           onChanged: (_) => setState(() {}),

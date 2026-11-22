@@ -260,6 +260,21 @@ class _Mes extends StatelessWidget {
     );
   }
 
+  /// Emoji de los días especiales (Victor, 2026-11-22): cumpleaños con regalo,
+  /// fiestas con el de su festividad y el offseason con la luna.
+  static const _emojis = {'navidad': '🎄', 'anio_nuevo': '🎆', 'pascua': '🐣', 'halloween': '🎃'};
+
+  String? _emojiDe(DateTime dia, List<Evento> eventos, bool cumple) {
+    if (cumple) return '🎁';
+    for (final e in eventos) {
+      if (e.socialFestivo && !e.cancelado) return _emojis[e.socialIcono] ?? '🎉';
+    }
+    for (final t in repo.temporadas) {
+      if (!dia.isBefore(Fechas.soloDia(t.desde)) && !dia.isAfter(Fechas.soloDia(t.hasta))) return '🌙';
+    }
+    return null;
+  }
+
   Widget _celda(PivotPaleta p, DateTime dia, Map<DateTime, List<Evento>> porDia, Set<DateTime> cumples, DateTime hoy) {
     final ajeno = dia.month != mes.month;
     // Días de los meses vecinos: solo el número, tenue (sin puntos ni globos).
@@ -324,9 +339,10 @@ class _Mes extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Cumpleaños: globo a color en la esquina del número (un emoji
+                // Días especiales con emoji en la esquina del número (un emoji
                 // se reconoce mucho mejor que un ícono de una línea a este tamaño).
-                if (cumple) const Positioned(right: -8, top: -4, child: Text('🎈', style: TextStyle(fontSize: 12, height: 1))),
+                if (ajeno ? null : _emojiDe(dia, eventos, cumple) case final emoji?)
+                  Positioned(right: -8, top: -4, child: Text(emoji, style: const TextStyle(fontSize: 12, height: 1))),
               ],
             ),
             const SizedBox(height: 2),

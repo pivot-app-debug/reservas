@@ -64,9 +64,20 @@ Future<void> abrirSubseccionSocial(
 
 /// Card de una pieza: ícono, título, una línea de estado y se toca para abrir.
 class _CardPieza extends StatelessWidget {
-  const _CardPieza({required this.icono, required this.titulo, required this.texto, this.estado, this.estadoActivo = true, required this.alTocar});
+  const _CardPieza({
+    required this.icono,
+    required this.titulo,
+    required this.texto,
+    this.estado,
+    this.estadoActivo = true,
+    required this.alTocar,
+    this.destacado,
+  });
   final IconData icono;
   final String titulo, texto;
+
+  /// Lo más importante, en negrita (ej. "Tope del regalo: $15").
+  final String? destacado;
   final String? estado;
   final bool estadoActivo;
   final VoidCallback alTocar;
@@ -89,21 +100,27 @@ class _CardPieza extends StatelessWidget {
                 Row(
                   children: [
                     IconoTarjetaSocial(icono: icono),
-                    const Spacer(),
-                    if (estado != null)
-                      Flexible(
-                        child: Etiqueta(texto: estado!, apagada: !estadoActivo),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        titulo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: p.texto),
                       ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  titulo,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: p.texto),
-                ),
-                const SizedBox(height: 2),
+                // La pastilla debajo del título, para que nunca se corte (Victor, 2026-11-22).
+                if (estado != null) ...[const SizedBox(height: 8), Etiqueta(texto: estado!, apagada: !estadoActivo)],
+                const SizedBox(height: 8),
+                if (destacado != null)
+                  Text(
+                    destacado!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.texto),
+                  ),
                 Text(
                   texto,
                   maxLines: 2,
@@ -119,8 +136,9 @@ class _CardPieza extends StatelessWidget {
   }
 }
 
-/// "Qué lleva cada quien" resumido: tu parte, lo que llevas (con "−"), lo que
-/// falta y "+" para anotarte. Tocarla abre todo el detalle.
+/// "Qué llevar" en la vista del evento (Victor, 2026-11-22): compacta. El
+/// título con "Tu parte N %", lo que falta y, si no cubriste tu parte, las
+/// secciones donde puedes anotarte para deslizar. Al 100 % no muestra más.
 class QueLlevaResumen extends StatelessWidget {
   const QueLlevaResumen({super.key, required this.repo, required this.estado, required this.alCambiar, required this.alAbrir});
   final SocialRepo repo;
@@ -133,18 +151,18 @@ class QueLlevaResumen extends StatelessWidget {
     final p = context.pivot;
     final e = estado;
     final t = ComidaTarjeta(repo: repo, estado: e, alCambiar: alCambiar);
-    final mias = [
-      for (final c in e.comida)
-        for (final a in c.aportes)
-          if (a['mio'] == true) (c, a),
-    ];
     final faltan = [
       for (final c in e.comida)
         if (!c.cerrada && (c.falta || (c.meta > 0 && c.aportado < c.meta))) c.nombre,
     ];
     final cuenta = e.asiste && e.seccionesParte.isNotEmpty;
     final parte = e.miParte.clamp(0, 1).toDouble();
-    final total = (e.conteo['total'] as num?) ?? 0;
+    final paraAnotar = cuenta && parte < 1
+        ? [
+            for (final c in e.comida)
+              if (!c.llena && !c.cerrada) c,
+          ]
+        : const <CategoriaComida>[];
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Material(
@@ -162,87 +180,81 @@ class QueLlevaResumen extends StatelessWidget {
                   children: [
                     const IconoTarjetaSocial(icono: Icons.restaurant_rounded),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Qué lleva cada quien',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
-                      ),
+                    Text(
+                      'Qué llevar',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
                     ),
-                    if (e.asiste) IconButton(tooltip: 'Anotar algo', icon: const Icon(Icons.add_rounded), onPressed: alAbrir),
+                    const SizedBox(width: 8),
+                    if (cuenta)
+                      Flexible(
+                        child: Etiqueta(texto: 'Tu parte: ${(parte * 100).round()} %', apagada: parte >= 1),
+                      ),
+                    const Spacer(),
                     Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 6),
-                      Text(
-                        '${total == 1 ? 'Asiste 1 persona' : 'Asisten $total personas'}${e.asiste ? '' : '. Confirma tu asistencia para anotarte.'}',
-                        style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                      ),
-                      if (cuenta) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Text(
-                              'Tu parte',
-                              style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(PivotRadios.chip),
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0, end: parte),
-                                  duration: const Duration(milliseconds: 600),
-                                  curve: Curves.easeOutCubic,
-                                  builder: (_, x, _) => LinearProgressIndicator(value: x, minHeight: 6, backgroundColor: p.suave, color: p.marca),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              '${(parte * 100).round()} %',
-                              style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (mias.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final (c, a) in mias)
-                              InputChip(
-                                label: Text(
-                                  [
-                                    '${a['detalle'] ?? ''}'.isEmpty ? c.nombre : '${a['detalle']}',
-                                    if (!c.porCosa) '${cantidadSocial(a['cantidad'] as num)} ${c.unidad}',
-                                  ].join(' · '),
-                                ),
-                                deleteIcon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-                                deleteButtonTooltipMessage: 'Quitar',
-                                onDeleted: () => t.quitarAporte(context, '${a['id']}'),
-                              ),
-                          ],
-                        ),
-                      ],
-                      if (faltan.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          'Falta aún: ${faltan.join(', ')}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
-                        ),
-                      ],
-                    ],
+                if (faltan.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, right: 6),
+                    child: Text(
+                      'Falta aún: ${faltan.join(', ')}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
+                    ),
                   ),
-                ),
+                if (!e.asiste)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text('Confirma tu asistencia para anotarte.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                  ),
+                if (paraAnotar.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 70,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: paraAnotar.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final c = paraAnotar[i];
+                        final hace = c.falta || (c.meta > 0 && c.aportado < c.meta);
+                        return Material(
+                          color: hace ? p.suave : p.fondo,
+                          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                            onTap: () => t.anotarEn(context, c),
+                            child: Container(
+                              width: 150,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          c.nombre,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontWeight: FontWeight.w700, color: hace ? p.sobreSuave : p.texto),
+                                        ),
+                                        Text(hace ? 'Hace falta' : 'Anótate', style: TextStyle(fontSize: 12, color: hace ? p.sobreSuave : p.textoSecundario)),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.add_circle_outline_rounded, size: 20, color: p.marcaTexto),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -252,11 +264,62 @@ class QueLlevaResumen extends StatelessWidget {
   }
 }
 
+/// Subsección de Qué llevar con tres pestañas: Yo llevo, El resto lleva y Falta.
+class QueLlevarVista extends StatefulWidget {
+  const QueLlevarVista({super.key, required this.repo, required this.estado, required this.alCambiar, this.asisten = const []});
+  final SocialRepo repo;
+  final EstadoSocial estado;
+  final VoidCallback alCambiar;
+  final List<(String, String)> asisten;
+
+  @override
+  State<QueLlevarVista> createState() => _QueLlevarVistaState();
+}
+
+class _QueLlevarVistaState extends State<QueLlevarVista> {
+  late var _vista = widget.estado.asiste && widget.estado.comida.any((c) => c.aportes.any((a) => a['mio'] == true)) ? 'mio' : 'falta';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<String>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: 'mio', label: Text('Yo llevo')),
+            ButtonSegment(value: 'resto', label: Text('El resto lleva')),
+            ButtonSegment(value: 'falta', label: Text('Falta')),
+          ],
+          selected: {_vista},
+          onSelectionChanged: (x) => setState(() => _vista = x.first),
+        ),
+        const SizedBox(height: 16),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: KeyedSubtree(
+            key: ValueKey(_vista),
+            child: ComidaTarjeta(
+              repo: widget.repo,
+              estado: widget.estado,
+              alCambiar: widget.alCambiar,
+              vista: _vista,
+              asisten: widget.asisten,
+              alAgregar: () => setState(() => _vista = 'falta'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Actividades del evento en cards que se deslizan (amigo secreto, regalo
 /// robado, playlist, dress code, premios). Cada una abre su subsección.
 class ActividadesSocial extends StatelessWidget {
-  const ActividadesSocial({super.key, required this.estado, required this.alAbrir});
+  const ActividadesSocial({super.key, required this.estado, required this.alAbrir, this.simbolo});
   final EstadoSocial estado;
+  final String? simbolo;
 
   /// 'amigo' | 'robado' | 'playlist' | 'dress' | 'premios'
   final void Function(String) alAbrir;
@@ -273,17 +336,16 @@ class ActividadesSocial extends StatelessWidget {
           titulo: 'Amigo secreto',
           estado: e.asiste ? (e.participaAmigo ? 'Participas' : 'No participas') : null,
           estadoActivo: e.participaAmigo,
+          destacado: e.topeAmigo != null ? 'Tope del regalo: ${montoSocial(e.topeAmigo, simbolo)}' : null,
           texto: !e.asiste
               ? 'Marca Asistiré para participar.'
               : !e.participaAmigo
               ? (e.inscripcionAbierta ? 'Todavía puedes sumarte.' : 'Esta vez no participas.')
               : e.sorteado
               ? 'Ya puedes ver a quién le regalas.'
-              : [
-                  if (e.topeAmigo != null) 'Tope ${cantidadSocial(e.topeAmigo!)}',
-                  if (cierre != null) 'Sorteo el ${Fechas.corta(cierre)}',
-                  e.perfil.wishlist.isEmpty ? 'Lista de deseos vacía' : '${e.perfil.wishlist.length} en tu lista de deseos',
-                ].join(' · '),
+              : cierre != null
+              ? 'Sorteo el ${Fechas.corta(cierre)}'
+              : 'Sorteo cuando cierre la inscripción',
           alTocar: () => alAbrir('amigo'),
         ),
       if (e.modulo('regaloRobado'))
@@ -292,10 +354,8 @@ class ActividadesSocial extends StatelessWidget {
           titulo: 'Regalo robado',
           estado: e.asiste ? (e.participaRobado ? 'Participas' : 'No participas') : null,
           estadoActivo: e.participaRobado,
-          texto: [
-            if (e.topeRobado != null) 'Tope ${cantidadSocial(e.topeRobado!)}',
-            e.juegoRobado['fase'] != null ? 'El juego ya empezó' : 'Trae un regalo envuelto',
-          ].join(' · '),
+          destacado: e.topeRobado != null ? 'Tope del regalo: ${montoSocial(e.topeRobado, simbolo)}' : null,
+          texto: e.juegoRobado['fase'] != null ? 'El juego ya empezó' : 'Trae un regalo envuelto',
           alTocar: () => alAbrir('robado'),
         ),
       if (e.playlist != null)
@@ -332,7 +392,7 @@ class ActividadesSocial extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 150,
+          height: 176,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -376,36 +436,52 @@ class PendientesFiesta extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: l.isEmpty
           ? const SizedBox(width: double.infinity)
+          // Con el formato de las ayudas (como "¿Qué es un curso?"), pero
+          // siempre abierto y con un botón por cosa (Victor, 2026-11-22).
           : Container(
               width: double.infinity,
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-              decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final (i, (icono, texto, boton, que)) in l.indexed) ...[
-                    if (i > 0) Divider(height: 1, color: p.bordeSuave),
-                    Row(
-                      children: [
-                        Icon(icono, size: 20, color: p.marcaTexto),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(texto, style: TextStyle(fontSize: 14, color: p.sobreSuave)),
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 20, color: p.sobreSuave),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          l.length == 1 ? 'Te falta 1 cosa' : 'Te faltan ${l.length} cosas',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.sobreSuave),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (final (icono, texto, boton, que) in l)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        children: [
+                          Icon(icono, size: 18, color: p.sobreSuave),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(texto, style: TextStyle(height: 1.35, color: p.sobreSuave)),
                           ),
-                        ),
-                        TextButton(
-                          onPressed: switch (que) {
-                            'amigo' => alParticipar,
-                            'deseos' => alDeseos,
-                            _ => alComida,
-                          },
-                          child: Text(boton),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          FilledButton.tonal(
+                            onPressed: switch (que) {
+                              'amigo' => alParticipar,
+                              'deseos' => alDeseos,
+                              _ => alComida,
+                            },
+                            child: Text(boton),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  const SizedBox(height: 6),
                 ],
               ),
             ),

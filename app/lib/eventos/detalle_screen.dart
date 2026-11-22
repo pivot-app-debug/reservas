@@ -11,6 +11,8 @@ import '../core/tema.dart';
 import '../reservas/gestionar_reserva.dart';
 import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
+import 'deco_fiesta.dart';
+import 'social/social_plantillas.dart' show iconoSocial;
 import '../equipo/emergencia_screen.dart';
 import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
@@ -23,8 +25,7 @@ import 'video_screen.dart';
 import 'rectificacion.dart';
 import 'social/social_evento.dart';
 import 'social/social_vista.dart';
-import 'social/que_lleva_calculo.dart';
-import 'social/social_repo.dart' show EstadoSocial, SocialRepo;
+import 'social/social_repo.dart' show SocialRepo;
 import 'tipos_evento.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
@@ -341,7 +342,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
               // Fiesta (Victor, 2026-11-21): cuánto falta y Dudas y preguntas en la barra.
               if (ev.tipo == kTipoSocial && !ev.cancelado && !ev.yaEmpezo)
                 Etiqueta(
-                  icono: Icons.celebration_outlined,
+                  // Con el ícono de la festividad (Victor, 2026-11-22).
+                  icono: ev.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(ev.socialIcono),
                   texto: switch (DateUtils.dateOnly(ev.fecha).difference(Fechas.hoy()).inDays) {
                     <= 0 => 'Es hoy',
                     1 => 'Mañana',
@@ -485,37 +487,57 @@ class _DetalleScreenState extends State<DetalleScreen> {
           titulo: 'Cómo llegar a ${ev.lugar}',
         ),
     ];
+    // Fiesta (Victor, 2026-11-22): esta tarjeta es su portada, con el fondo
+    // rojizo y el detalle animado de la festividad (quieto si ya pasó).
+    final festiva = ev.socialFestivo && !ev.cancelado && ev.socialSorpresa == null;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: festiva ? null : p.tarjeta,
+        gradient: festiva ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.suave, p.tarjeta], stops: const [0, 0.8]) : null,
+        borderRadius: BorderRadius.circular(PivotRadios.grande),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(child: _dato(p, Icons.schedule_rounded, ev.rangoHorario, duracion)),
-              Container(width: 1, height: 36, color: p.tarjetaBorde),
-              const SizedBox(width: 12),
-              Expanded(child: _dato(p, Icons.place_outlined, ev.lugar, null)),
-            ],
-          ),
-          if (botones.isNotEmpty) ...[const SizedBox(height: 14), Wrap(spacing: 8, runSpacing: 8, children: botones)],
-          if (ev.descripcion.trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Divider(height: 1, color: p.tarjetaBorde),
-            const SizedBox(height: 12),
-            Row(
+          if (festiva)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoFiesta(clave: ev.socialIcono ?? '', animada: !ev.finalizado),
+              ),
+            ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, festiva && ev.socialIcono == 'navidad' ? 24 : 16, 16, 16),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline_rounded, size: 20, color: p.textoSecundario),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(ev.descripcion.trim(), style: TextStyle(fontSize: 14, height: 1.45, color: p.texto)),
+                Row(
+                  children: [
+                    Expanded(child: _dato(p, Icons.schedule_rounded, ev.rangoHorario, duracion)),
+                    Container(width: 1, height: 36, color: p.tarjetaBorde),
+                    const SizedBox(width: 12),
+                    Expanded(child: _dato(p, Icons.place_outlined, ev.lugar, null)),
+                  ],
                 ),
+                if (botones.isNotEmpty) ...[const SizedBox(height: 14), Wrap(spacing: 8, runSpacing: 8, children: botones)],
+                if (ev.descripcion.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Divider(height: 1, color: p.tarjetaBorde),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 20, color: p.textoSecundario),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(ev.descripcion.trim(), style: TextStyle(fontSize: 14, height: 1.45, color: p.texto)),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -676,7 +698,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Tu asistencia',
+                  // En una fiesta, "Asistencia" (Victor, 2026-11-22).
+                  ev.tipo == kTipoSocial ? 'Asistencia' : 'Tu asistencia',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
                 ),
               ),
@@ -1115,17 +1138,6 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
   }
 
-  /// Texto de lo que lleva alguien en una fiesta y si va bien (rosado) o le
-  /// falta (gris). Quien organiza ve también a quien no anotó nada.
-  (String, bool)? _llevaSocial(EstadoSocial e, String usuario) {
-    final l = e.llevaDe(usuario);
-    final cuenta = e.seccionesParte.isNotEmpty;
-    final completo = !cuenta || e.parteDeUsuario(usuario) >= 1;
-    if (l.isEmpty) return e.organiza && cuenta ? ('Sin anotar', false) : null;
-    final texto = l.length > 2 ? '${l.take(2).join(', ')} +${l.length - 2}' : l.join(', ');
-    return (e.organiza && !completo ? '$texto · le falta' : texto, e.organiza ? completo : true);
-  }
-
   /// En una fiesta (`embebido`) va dentro de Tu asistencia: sin No jugador,
   /// con Sin respuesta para todxs y la lista cerrada hasta tocar un número.
   bool _listaAbierta = false;
@@ -1274,19 +1286,11 @@ class _DetalleScreenState extends State<DetalleScreen> {
                                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.texto),
                                       ),
                                     ),
-                                    // Fiesta: lo que lleva cada quien; quien organiza ve si le falta (Victor, 2026-11-21).
-                                    if (ev.tipo == kTipoSocial && estadosSociales[ev.id] != null) ...[
-                                      if (_llevaSocial(estadosSociales[ev.id]!, per.username) case final t?)
-                                        Flexible(
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(left: 6),
-                                            child: Etiqueta(texto: t.$1, icono: Icons.restaurant_rounded, apagada: !t.$2),
-                                          ),
-                                        ),
-                                    ] else if (_llevar[per.username.toLowerCase()] case final llevar?)
+                                    // Fiesta: lo que lleva cada quien se ve en Qué llevar (Victor, 2026-11-22).
+                                    if (ev.tipo != kTipoSocial && _llevar[per.username.toLowerCase()] != null)
                                       Padding(
                                         padding: const EdgeInsets.only(left: 6),
-                                        child: Etiqueta(texto: llevar, icono: Icons.content_paste_rounded),
+                                        child: Etiqueta(texto: _llevar[per.username.toLowerCase()]!, icono: Icons.content_paste_rounded),
                                       ),
                                     if (_esAdmin &&
                                         marcadxs.contains(per.username.trim().toLowerCase()) &&

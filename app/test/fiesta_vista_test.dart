@@ -72,13 +72,14 @@ void main() {
     expect(t.takeException(), isNull);
     expect(find.text('No participas del amigo secreto. ¿Quieres participar?'), findsOneWidget);
     expect(find.text('Te falta completar lo que llevas.'), findsOneWidget);
-    expect(find.text('Tu parte'), findsOneWidget);
+    expect(find.textContaining('Tu parte:'), findsOneWidget);
+    expect(find.text('Hace falta'), findsWidgets);
     expect(find.text('Actividades del evento'), findsOneWidget);
     await t.tap(find.text('Participar'));
     expect(amigo, 1);
     await t.tap(find.text('Amigo secreto'));
     expect(abierta, 'amigo');
-    await t.tap(find.text('Qué lleva cada quien'));
+    await t.tap(find.text('Qué llevar'));
     expect(comida, 1);
   });
 }
