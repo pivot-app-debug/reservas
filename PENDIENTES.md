@@ -14,7 +14,7 @@ Cursos en la barra; cada pestaña recuerda dónde estabas; notificaciones casi o
 - [ ] Requisito de equipo "tener aprobado tal curso".
 - [ ] Plan del evento para un nivel de Coach (hoy por equipo o toda la liga).
 - [ ] Comunicados que se envían al momento guardados para que aparezcan en la campana (hoy solo los programados).
-- [ ] Qué llevar (equipamiento): aviso 1 h antes por defecto; cada Pivot puede cambiarlo a 2 o 3 h.
+- [x] Qué llevar (equipamiento): resumen 1, 2 o 3 h antes (22/11).
 - [ ] Verificar: suscripción a una clase aprobada → la persona queda "Asistiré" en ese evento.
 - [ ] Mi Liga: el buscador lleva directo al ajuste.
 - [ ] Tours guiados según las funciones activadas (Coach, Finanzas, reglas).
