@@ -4585,7 +4585,11 @@ async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Rec
         tipo: 'avisos_admin',
         include_external_user_ids: await _adminDestinatariosPush(undefined, 'asistencia', 'cambios'),
         headings: { es: 'Baja de asistencia' },
-        contents: { es: `${nombre} no asistirá al ${ev.tipo_evento || 'evento'} de ${esHoy ? 'hoy' : _fechaEs(ev.fecha)} · ${_horaEs(ev.inicia)} · ${ev.donde || ''}` },
+        contents: {
+          es: ev.tipo_evento === 'Social'
+            ? `${nombre} no asistirá al ${await _eventoFraseAviso(String(idEvento), ev.tipo_evento, ev.fecha)} · ${_horaEs(ev.inicia)}`
+            : `${nombre} no asistirá al ${ev.tipo_evento || 'evento'} de ${esHoy ? 'hoy' : _fechaEs(ev.fecha)} · ${_horaEs(ev.inicia)} · ${ev.donde || ''}`,
+        },
         url: APP_URL + '/?tab=eventos',
         evento: { idEvento: String(idEvento) },
       });
@@ -10429,8 +10433,19 @@ async function _novedadesEquipo(yo: string): Promise<any[]> {
       const nombre = quien[String(r.nombre_usuario).toUpperCase()]?.nombreDerby || r.nombre_usuario;
       out.push({
         tipo: 'asistencia', idEvento: r.id_evento, fecha: r.marca_temporal,
-        titulo: r.estado === 'No asistiré' ? `${nombre} no asistirá` : r.estado === 'Asistiré' ? `${nombre} asistirá` : `${nombre}: ${r.estado}`,
-        detalle: _eventoFrase(ev?.tipo_evento, ev?.fecha),
+        ...(ev?.tipo_evento === 'Social'
+          // Una sola frase (Victor, 2026-11-22): "Tormento asistirá al evento Naviquinde del próximo 10 de diciembre".
+          ? await (async () => {
+            const frase = await _eventoFraseAviso(String(r.id_evento), ev?.tipo_evento, ev?.fecha);
+            return {
+              titulo: r.estado === 'No asistiré' ? `${nombre} no asistirá al ${frase}` : r.estado === 'Asistiré' ? `${nombre} asistirá al ${frase}` : `${nombre}: ${r.estado} en el ${frase}`,
+              detalle: '',
+            };
+          })()
+          : {
+            titulo: r.estado === 'No asistiré' ? `${nombre} no asistirá` : r.estado === 'Asistiré' ? `${nombre} asistirá` : `${nombre}: ${r.estado}`,
+            detalle: _eventoFrase(ev?.tipo_evento, ev?.fecha),
+          }),
       });
     }
   }
@@ -11381,6 +11396,23 @@ function _tipoEventoMin(tipo?: string | null): string {
 function _eventoFrase(tipo: string | null | undefined, fecha: string): string {
   return `${_tipoEventoMin(tipo)} ${_cuandoEvento(fecha)}`.trim();
 }
+/** Fiestas y sociales (Victor, 2026-11-22): "evento Naviquinde del próximo
+ *  10 de diciembre" en vez de "social de…". Con sorpresa, el nombre neutro
+ *  (el aviso lo puede leer quien no debe enterarse). El resto, como siempre. */
+async function _eventoFraseAviso(idEvento: string, tipo: string | null | undefined, fecha: string): Promise<string> {
+  if (String(tipo ?? '') !== 'Social') return _eventoFrase(tipo, fecha);
+  const { data: cfg } = await supabase.from('social_eventos').select('nombre, nombre_neutro, sorpresa').eq('id_evento', idEvento).maybeSingle();
+  const neutro = String(cfg?.nombre_neutro ?? '').trim();
+  const nombre = cfg?.sorpresa ? neutro : (String(cfg?.nombre ?? '').trim() || neutro);
+  const f = String(fecha ?? '').substring(0, 10);
+  let cuando = '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f)) {
+    const dif = _diasEntreISO(_hoyEcuadorISO(), f);
+    const [, m, d] = f.split('-').map(Number);
+    cuando = dif === 0 ? 'de hoy' : dif === 1 ? 'de mañana' : `${dif > 0 ? 'del próximo' : 'del'} ${d} de ${MESES_ES[m - 1]}`;
+  }
+  return `evento ${nombre || 'social'} ${cuando}`.trim();
+}
 function _listaNombresEs(nombres: string[]): string {
   if (nombres.length <= 1) return nombres.join('');
   return nombres.slice(0, -1).join(', ') + ' y ' + nombres[nombres.length - 1];
@@ -11517,7 +11549,7 @@ async function cronRecordatorio1Dia(): Promise<Record<string, any>> {
     const respondieron = new Set((asistPorEvento[ev.id_evento] ?? []).map((a: any) => a.nombre));
     const pendientes = await _filtrarDestinatariosEvento({ idEvento: idEv, equipos: equiposPorEvento[idEv] ?? [] },
       todos.filter((u) => !respondieron.has(u) && !yaEnviados.has(idEv + '|' + u)), { filas: filasEquipo });
-    const evento = _eventoFrase(ev.tipo_evento, ev.fecha);
+    const evento = await _eventoFraseAviso(idEv, ev.tipo_evento, ev.fecha);
     const detalle = [_horaEs(ev.inicia), ev.donde].filter(Boolean).join(' · ');
     const url = _urlEvento(idEv);
     await Promise.allSettled(pendientes.map(async (username) => {
@@ -11872,7 +11904,7 @@ async function _notificarCambioAsistenciaCore(username: string, idEventoRaw: unk
   ]);
   if (!ev) return { exito: false };
   const nombre = _nombreMostrar(quien ?? { username });
-  const evento = _eventoFrase(ev.tipo_evento, ev.fecha);
+  const evento = await _eventoFraseAviso(idEvento, ev.tipo_evento, ev.fecha);
   let texto: string;
   if (!estadoAnterior) {
     texto = estadoNuevo === 'Asistiré' ? `${nombre} confirmó que asistirá al ${evento}.`

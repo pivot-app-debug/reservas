@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (avisos de fiestas)
+- Las notificaciones y novedades de asistencia a fiestas y sociales dicen el nombre del evento y la fecha completa: "Tormento asistirá al evento Naviquinde del próximo 10 de diciembre". Si es sorpresa, usan el nombre neutro.
+
 ## 2026-11-22 (eventos especiales, pasados y buscador de Mi perfil)
 - Cumpleaños y fiestas son tan llamativos como el offseason: fondo con el degradado de cada festividad y texto claro. El confeti del cumpleaños solo cae el mismo día; en los que vienen no hay confeti.
 - La estrella fugaz del offseason ahora entra y sale suave, una por vuelta.
