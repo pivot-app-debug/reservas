@@ -176,16 +176,21 @@ class SocialEnEventoState extends State<SocialEnEvento> {
   Future<void> _agregarInvitado() async {
     if (_creandoInvitado) return;
     setState(() => _creandoInvitado = true);
+    versionSocial.value++;
     try {
       final inv = await _social.agregarInvitado('', '');
       if (!mounted) return;
       setState(() => _creandoInvitado = false);
+      versionSocial.value++;
       unawaited(_cargar());
       await _compartir(inv);
     } catch (e) {
       if (mounted) avisarSocial(context, e.toString());
     } finally {
-      if (mounted && _creandoInvitado) setState(() => _creandoInvitado = false);
+      if (mounted && _creandoInvitado) {
+        setState(() => _creandoInvitado = false);
+        versionSocial.value++;
+      }
     }
   }
 
@@ -274,13 +279,21 @@ class SocialEnEventoState extends State<SocialEnEvento> {
       ),
     );
     if (ok != true) return;
+    // Se ve que está quitando y no se traba (Victor, 2026-11-22).
+    setState(() => _quitando.add('${inv['id']}'));
+    versionSocial.value++;
     try {
       await _social.quitarInvitado('${inv['id']}');
       await _cargar();
     } catch (e) {
       if (mounted) avisarSocial(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _quitando.remove('${inv['id']}'));
+      versionSocial.value++;
     }
   }
+
+  final _quitando = <String>{};
 
   Widget _invitados(EstadoSocial e) {
     final p = context.pivot;
@@ -320,7 +333,13 @@ class SocialEnEventoState extends State<SocialEnEvento> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(tooltip: 'Enviar enlace', icon: const Icon(Icons.send_outlined), onPressed: () => _compartir(inv)),
-                  if (inv['enSorteo'] != true) IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: () => _quitarInvitado(inv)),
+                  if (inv['enSorteo'] != true)
+                    _quitando.contains('${inv['id']}')
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : IconButton(tooltip: 'Quitar', icon: const Icon(Icons.close_rounded), onPressed: () => _quitarInvitado(inv)),
                 ],
               ),
             ),
@@ -474,47 +493,9 @@ class SocialEnEventoState extends State<SocialEnEvento> {
   }
 
   /// Invitar a alguien de fuera del equipo (desde Tu asistencia).
-  Future<void> abrirInvitados() => showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (h) => SafeArea(
-      child: ValueListenableBuilder<int>(
-        valueListenable: versionSocial,
-        builder: (_, _, _) {
-          final e = estadosSociales[_id] ?? _estado;
-          if (e == null) return const SizedBox.shrink();
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        e.maxInvitados == 1 ? 'Invita a alguien' : 'Invita hasta ${e.maxInvitados} personas',
-                        style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    if (e.puedeArea('invitados'))
-                      IconButton(
-                        tooltip: 'Cuántas personas puede invitar cada quien',
-                        icon: const Icon(Icons.tune_rounded),
-                        onPressed: () => EditarTarjetas(context, _social, e, _cargar).invitados(),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SinMarcoSocial(child: _invitados(e)),
-              ],
-            ),
-          );
-        },
-      ),
-    ),
-  );
+  // Subsección (Victor, 2026-11-22): antes una hoja, y lo que se abría desde
+  // ahí quedaba debajo.
+  Future<void> abrirInvitados() => abrirSubseccionSocial(context, idEvento: _id, titulo: 'Invitadxs', contenido: _invitados);
 
   Future<void> participarAmigo() async {
     final e = _estado;

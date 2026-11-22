@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (Qué llevar e invitadxs)
+- El resto lleva: más grande y claro. Arriba, a quién le falta completar su parte y cuánto ("Le falta 40 %", con barra); después cada sección en su recuadro con quién lleva qué. Sin "para todxs".
+- Falta: todo lo que falta a la vista, sin desplegables y sin las completadas.
+- Invitadxs se abre como subsección (antes era una hoja y lo que se abría desde ahí quedaba debajo). Invitar y quitar muestran que están trabajando y no se traban.
+
 ## 2026-11-22 (Liga y bandeja más ordenadas)
 - Liga: pestañas Gente, Redes, Inventario, Finanzas y, para Pivots, Mi Liga (sin el ícono del estadio). Buscar y filtrar están arriba de la lista de Gente, no en la barra.
 - Para entrar a un equipo, tócalo cuando ya está abierto (se fue "Ver equipo"). Coaches es una sección más, con las personas que son coach (solo sus datos y su ficha); abierta, te lleva a los ajustes de coach.

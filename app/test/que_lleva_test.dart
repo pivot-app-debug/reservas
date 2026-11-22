@@ -91,8 +91,8 @@ void main() {
     expect(find.text('Hace falta'), findsOneWidget);
     expect(find.text('Te falta 1'), findsOneWidget);
     expect(find.text('Completadas (1)'), findsOneWidget);
-    // La idea ya tomada no se repite.
-    expect(find.text('Luces navideñas'), findsNothing);
+    // La idea ya tomada no se repite: solo queda quien la lleva.
+    expect(find.text('Luces navideñas'), findsOneWidget);
     expect(find.text('Guirnaldas'), findsOneWidget);
     expect(t.takeException(), isNull);
     // La ventana para anotarse no se corta en un teléfono bajito.
