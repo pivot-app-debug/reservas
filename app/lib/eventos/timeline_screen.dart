@@ -22,6 +22,7 @@ import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
 import 'social/social_plantillas.dart';
 import 'deco_fiesta.dart';
+import 'tarjeta_cumple.dart';
 import 'detalle_screen.dart';
 import 'eventos_repo.dart';
 import 'modelos.dart';
@@ -1298,7 +1299,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           : f.item!.temporada != null
           ? _TarjetaDescanso(temporada: f.item!.temporada!, repo: repo)
           : f.item!.cumple != null
-          ? _TarjetaCumple(cumple: f.item!.cumple!)
+          ? TarjetaCumple(cumple: f.item!.cumple!)
           : f.item!.evento!.id == _idTarjetaTour
           ? KeyedSubtree(
               key: _kTarjeta,
@@ -1682,7 +1683,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
     final Decoration d;
     if (ev == null) {
       d = deco(p.fondo, p.lineaTimeline, 2.5);
-    } else if (ev.cancelado || ev.miEstado == EstadoRsvp.noAsistire) {
+    } else if (ev.cancelado || ev.miEstado == EstadoRsvp.noAsistire || ev.finalizado) {
+      // Lo que ya pasó, gris (Victor, 2026-11-22).
       d = deco(p.apagadoPunto, p.fondo, 2);
     } else if (ev.miEstado != null) {
       d = deco(p.marca, p.fondo, 2);
@@ -1701,6 +1703,19 @@ class _TarjetaEvento extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ev = evento;
+    final fuerte = ev.socialFestivo && !ev.cancelado && ev.socialSorpresa == null && !ev.finalizado;
+    if (!fuerte) return _construir(context);
+    // Texto claro sobre el fondo festivo (o oscuro en Pascua).
+    final (_, t, sec, _) = PivotPaleta.festivo(ev.socialIcono ?? '');
+    final tema = Theme.of(context);
+    return Theme(
+      data: tema.copyWith(extensions: [context.pivot.sobreFestivo(t, sec)]),
+      child: Builder(builder: _construir),
+    );
+  }
+
+  Widget _construir(BuildContext context) {
     final p = context.pivot;
     final ev = evento;
     final apagado = ev.cancelado;
@@ -1726,14 +1741,28 @@ class _TarjetaEvento extends StatelessWidget {
     // Fiesta (Victor, 2026-11-21): fondo rojizo que se desvanece y un detalle
     // animado según la festividad (luces, fuegos artificiales, conejo…).
     final festiva = ev.socialFestivo && !apagado && ev.socialSorpresa == null;
+    // Lo que ya pasó, apagado: solo el fondo (Victor, 2026-11-22).
+    final pasado = ev.finalizado && !apagado;
+    // Fiesta por venir o en curso: tan llamativa como el offseason.
+    final fuerte = festiva && !pasado;
+    final (degFestivo, sobreF, sobreFSec, bordeF) = PivotPaleta.festivo(ev.socialIcono ?? '');
     final tarjeta = Material(
-      color: apagado ? p.apagadoFondo : (festiva ? Colors.transparent : p.tarjeta),
+      color: apagado ? p.apagadoFondo : (festiva ? Colors.transparent : (pasado ? p.recuerdoFondo : p.tarjeta)),
       borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
       clipBehavior: festiva ? Clip.antiAlias : Clip.none,
       child: Ink(
         decoration: festiva
             ? BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.suave, p.tarjeta], stops: const [0, 0.75]),
+                gradient: fuerte
+                    ? degFestivo
+                    : LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [p.apagadoEtiqueta, p.recuerdoFondo],
+                        stops: const [0, 0.75],
+                      ),
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                border: fuerte && ev.enCurso ? Border.all(color: bordeF, width: 2) : null,
               )
             : null,
         child: Stack(
@@ -1741,7 +1770,7 @@ class _TarjetaEvento extends StatelessWidget {
             if (festiva)
               Positioned.fill(
                 child: IgnorePointer(
-                  child: DecoFiesta(clave: ev.socialIcono ?? '', animada: !ev.finalizado),
+                  child: DecoFiesta(clave: ev.socialIcono ?? '', animada: !ev.finalizado, fuerte: fuerte),
                 ),
               ),
             InkWell(
@@ -1784,12 +1813,7 @@ class _TarjetaEvento extends StatelessWidget {
                                   Flexible(
                                     child: Text(
                                       ev.titulo,
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
-                                        color: apagado ? p.apagado : p.texto,
-                                        decoration: apagado ? TextDecoration.lineThrough : null,
-                                      ),
+                                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: apagado ? p.apagado : p.texto),
                                     ),
                                   ),
                                 ],
@@ -1814,7 +1838,8 @@ class _TarjetaEvento extends StatelessWidget {
                           ),
                         ),
                         if (apagado)
-                          Etiqueta(texto: textoEstadoEvento(ev), apagada: true)
+                          // Roja y sin tachar el título (Victor, 2026-11-22).
+                          Etiqueta(texto: textoEstadoEvento(ev), roja: true)
                         else if (ev.miEstado != null && !ev.finalizado)
                           Etiqueta(texto: textoMiEstado(ev.miEstado!), icono: iconoMiEstado(ev.miEstado!)),
                       ],
@@ -2105,68 +2130,6 @@ class _TarjetaDescanso extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Tarjeta de cumpleaños: avatar de la persona y, si cumple hoy, confeti
-/// cayendo en loop dentro de la tarjeta.
-class _TarjetaCumple extends StatelessWidget {
-  const _TarjetaCumple({required this.cumple});
-  final Cumple cumple;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final esHoy = Fechas.soloDia(cumple.fecha) == Fechas.hoy();
-    final anios = cumple.aniosEquipo;
-    final titulo = anios != null ? 'Aniversario en el equipo' : 'Cumpleaños de ${cumple.nombre}';
-    final detalle = anios == null
-        ? textoCumple(cumple, Fechas.hoy())
-        : '${esHoy ? 'Hoy cumples' : 'Cumples'} $anios ${anios == 1 ? 'año' : 'años'} en el equipo';
-    final contenido = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          AvatarPersona(nombre: cumple.nombre, foto: cumple.fotoPerfil, tamano: 44, borde: esHoy ? p.marca : null),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titulo,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: p.texto),
-                ),
-                const SizedBox(height: 2),
-                Text(detalle, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-              ],
-            ),
-          ),
-          // Ícono de Material, no emoji (Victor, 2026-11-22).
-          Icon(anios != null ? Icons.celebration_rounded : Icons.cake_rounded, size: 22, color: p.marcaTexto),
-        ],
-      ),
-    );
-    // Mismo formato que las fiestas: fondo rojizo y confeti; si ya pasó, quieto.
-    final pasado = Fechas.soloDia(cumple.fecha).isBefore(Fechas.hoy());
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.suave, p.tarjeta], stops: const [0, 0.75]),
-        border: Border.all(color: esHoy ? p.marca : p.tarjetaBorde, width: esHoy ? 1.5 : 1),
-        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoFiesta(clave: 'cumple', animada: !pasado),
-            ),
-          ),
-          contenido,
-        ],
       ),
     );
   }

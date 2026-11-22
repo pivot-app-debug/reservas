@@ -24,6 +24,7 @@ import 'pagos_screen.dart';
 import 'recorte_foto.dart';
 import '../push/avisos_obligatorios.dart';
 import 'herramientas_liga.dart';
+import '../pivots/buscador_liga.dart' show BuscadorLigaScreen, EntradaAjuste, entradasPerfil;
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
 /// ajustes de la app, de seguridad y de emergencia; lo que ve el resto del
@@ -42,6 +43,46 @@ class AjustesScreen extends StatefulWidget {
 class _AjustesScreenState extends State<AjustesScreen> {
   Sesion get sesion => widget.sesion;
   EventosRepo get eventos => widget.eventos;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Lupa de Mi perfil (Victor, 2026-11-22): encuentra un ajuste, aunque esté
+  /// dentro de una subsección, y lo abre.
+  Future<void> _buscar() async {
+    final e = await Navigator.of(context).push<EntradaAjuste>(
+      MaterialPageRoute(
+        builder: (_) => const BuscadorLigaScreen(
+          entradas: entradasPerfil,
+          donde: 'Mi perfil',
+          ejemplo: 'Escribe lo que buscas: "alergias", "contraseña", "cumpleaños", "avisos"…',
+        ),
+      ),
+    );
+    if (e == null || !mounted) return;
+    final Widget? pantalla = switch (e.dentro) {
+      'pagos' => PagosScreen(repo: eventos),
+      'excepcion' => ExcepcionesPanelScreen(sesion: sesion),
+      'salud' => SaludEmergenciaScreen(sesion: sesion),
+      'identidad' => IdentidadScreen(sesion: sesion),
+      'privacidad' => PrivacidadScreen(sesion: sesion),
+      'notificaciones' => NotificacionesScreen(sesion: sesion),
+      'cuenta' => CuentaScreen(sesion: sesion),
+      _ => null,
+    };
+    if (pantalla != null) {
+      SubAjustes.abrir(context, pantalla);
+    } else if (e.id == 'comentarios') {
+      enviarComentarios(context);
+    } else if (_scroll.hasClients) {
+      // Lo de tu perfil está arriba; Ser coach, abajo.
+      _scroll.animateTo(e.id == 'coach' ? _scroll.position.maxScrollExtent : 0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+    }
+  }
 
   @override
   void initState() {
@@ -62,6 +103,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: Text('Mi perfil', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        actions: [IconButton(tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([sesion, eventos]),
@@ -76,6 +118,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
           // Excepción de cuota solo para quien paga cuota mensual (Victor, 2026-11-12).
           final pagaCuota = d['exenta_cuota'] != true && ('${d['categoria'] ?? ''}'.toLowerCase() == 'quindes' || (c?.pagaCuotaMensual ?? false));
           return ListView(
+            controller: _scroll,
             padding: EdgeInsets.fromLTRB(16, 8 + MediaQuery.paddingOf(context).top, 16, 40 + MediaQuery.paddingOf(context).bottom),
             children: [
               // Mi perfil (Victor, 2026-11-12): arriba quién eres y tus datos

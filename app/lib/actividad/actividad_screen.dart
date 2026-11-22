@@ -8,6 +8,7 @@ import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../ajustes/pagos_screen.dart';
 import '../cursos/cursos_screen.dart';
+import '../eventos/tarjeta_cumple.dart';
 import '../eventos/crear_evento_screen.dart';
 import '../eventos/detalle_screen.dart';
 import '../eventos/eventos_repo.dart';
@@ -337,17 +338,11 @@ class _SeccionEventos extends StatelessWidget {
             ],
             if (cumples.isNotEmpty) ...[
               EncabezadoSeccion(titulo: 'Cumpleaños', icono: Icons.cake_outlined, cantidad: cumples.length),
+              // Igual que en el timeline (Victor, 2026-11-22).
               for (final c in cumples)
-                Card(
-                  margin: const EdgeInsets.only(top: 8),
-                  child: ListTile(
-                    leading: Icon(c.esAniversario ? Icons.workspace_premium_outlined : Icons.cake_outlined, color: p.marcaTexto),
-                    title: Text(c.nombre),
-                    subtitle: Text(
-                      '${c.fecha == hoy ? 'Hoy' : '${Fechas.dia(c.fecha)} ${c.fecha.day} de ${Fechas.mes(c.fecha)}'}'
-                      '${c.esAniversario ? ' · ${c.aniosEquipo} ${c.aniosEquipo == 1 ? 'año' : 'años'} en el equipo' : (c.edad != null ? ' · cumple ${c.edad}' : '')}',
-                    ),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TarjetaCumple(cumple: c),
                 ),
             ],
             if (fiestas.isNotEmpty) ...[
@@ -361,23 +356,35 @@ class _SeccionEventos extends StatelessWidget {
     );
   }
 
-  Widget _fila(BuildContext context, PivotPaleta p, Evento e) => Card(
-    margin: const EdgeInsets.only(top: 8),
-    child: ListTile(
-      leading: Icon(
-        e.tipo == kTipoSocial ? (e.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(e.socialIcono)) : Icons.event_outlined,
-        color: p.marcaTexto,
-      ),
-      title: Text(
-        e.tipo == kTipoSocial ? (e.socialTitulo ?? e.lugar) : '${etiquetaTipoEvento(e.tipo)} · ${e.lugar}',
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.rangoHorario}'),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DetalleScreen(repo: eventos, eventoId: e.id),
+  Widget _fila(BuildContext context, PivotPaleta p, Evento e) {
+    // Fiestas con el fondo y la animación del timeline (Victor, 2026-11-22).
+    if (e.socialFestivo && e.socialSorpresa == null && !e.cancelado) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: FondoFestivo(
+          clave: e.socialIcono ?? '',
+          animada: !e.finalizado,
+          child: Builder(builder: (c) => _tile(c, c.pivot, e)),
         ),
+      );
+    }
+    return Card(margin: const EdgeInsets.only(top: 8), child: _tile(context, p, e));
+  }
+
+  Widget _tile(BuildContext context, PivotPaleta p, Evento e) => ListTile(
+    leading: Icon(
+      e.tipo == kTipoSocial ? (e.socialSorpresa != null ? Icons.card_giftcard_rounded : iconoSocial(e.socialIcono)) : Icons.event_outlined,
+      color: p.marcaTexto,
+    ),
+    title: Text(
+      e.tipo == kTipoSocial ? (e.socialTitulo ?? e.lugar) : '${etiquetaTipoEvento(e.tipo)} · ${e.lugar}',
+      style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+    ),
+    subtitle: Text(style: TextStyle(color: p.textoSecundario), '${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.rangoHorario}'),
+    trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+    onTap: () => Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DetalleScreen(repo: eventos, eventoId: e.id),
       ),
     ),
   );

@@ -82,19 +82,22 @@ class PilaAvatares extends StatelessWidget {
 
 /// Etiqueta pequeña (estado propio, "Cancelado", etc.).
 class Etiqueta extends StatelessWidget {
-  const Etiqueta({super.key, required this.texto, this.icono, this.apagada = false});
+  const Etiqueta({super.key, required this.texto, this.icono, this.apagada = false, this.roja = false});
   final String texto;
   final IconData? icono;
   final bool apagada;
 
+  /// Cancelado (Victor, 2026-11-22): rojo de marca.
+  final bool roja;
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final c = apagada ? p.texto : p.sobreSuave;
+    final c = roja ? p.sobreMarca : (apagada ? p.texto : p.sobreSuave);
     return Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(color: apagada ? p.apagadoEtiqueta : p.suave, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+      decoration: BoxDecoration(color: roja ? p.marca : (apagada ? p.apagadoEtiqueta : p.suave), borderRadius: BorderRadius.circular(PivotRadios.chip)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

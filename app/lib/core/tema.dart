@@ -128,6 +128,56 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
   static const nocheBorde = Color(0xFF6F8FD8);
   static const estrella = Color(0xFFFFF4CC);
 
+  /// Eventos especiales tan llamativos como el offseason (Victor,
+  /// 2026-11-22): fondo con degradado propio de cada festividad, texto y texto
+  /// secundario encima y el borde de cuando está en curso.
+  static (LinearGradient, Color, Color, Color) festivo(String clave) {
+    const blanco = Color(0xFFFFFFFF), blancoSec = Color(0xFFFFE3E0);
+    LinearGradient g(int a, int b) => LinearGradient(colors: [Color(a), Color(b)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+    return switch (clave) {
+      'navidad' => (g(0xFF0E5A3A, 0xFF8A0F16), blanco, const Color(0xFFDDF3E6), const Color(0xFFFFD54F)),
+      'anio_nuevo' => (g(0xFF2A1458, 0xFF0C0A24), blanco, const Color(0xFFD9CFFF), const Color(0xFFFFD54F)),
+      'halloween' => (g(0xFF3B1659, 0xFFB34A00), blanco, const Color(0xFFFFE0C2), const Color(0xFFFF9E40)),
+      'pascua' => (g(0xFFFFB7CD, 0xFFAEDCFF), const Color(0xFF2B1B2E), const Color(0xFF4F3B52), const Color(0xFFFF6FA3)),
+      _ => (g(0xFFE8000D, 0xFF7A0012), blanco, blancoSec, const Color(0xFFFFD54F)),
+    };
+  }
+
+  /// La misma paleta con el texto de un fondo festivo encima.
+  PivotPaleta sobreFestivo(Color t, Color sec) => PivotPaleta(
+    marca: marca,
+    marcaTexto: t,
+    fondo: fondo,
+    tarjeta: tarjeta,
+    tarjetaBorde: tarjetaBorde,
+    suave: t.withValues(alpha: 0.18),
+    sobreSuave: t,
+    navegacion: navegacion,
+    texto: t,
+    textoSecundario: sec,
+    borde: borde,
+    bordeSuave: bordeSuave,
+    esqueleto: esqueleto,
+    esqueletoBrillo: esqueletoBrillo,
+    lineaTimeline: lineaTimeline,
+    apagado: apagado,
+    apagadoFondo: apagadoFondo,
+    apagadoPunto: apagadoPunto,
+    apagadoEtiqueta: apagadoEtiqueta,
+    sobreMarca: sobreMarca,
+    velo: velo,
+    veloTour: veloTour,
+    fondoVideo: fondoVideo,
+    textoSobreVideo: textoSobreVideo,
+    avatares: avatares,
+  );
+
+  /// Fondo de lo que ya pasó, "quedó en el recuerdo" (Victor, 2026-11-22).
+  Color get recuerdoFondo => fondo.computeLuminance() > 0.5 ? const Color(0xFFEDEBEA) : const Color(0xFF141414);
+
+  /// Confeti y luces sobre los fondos festivos fuertes.
+  static const confetiFuerte = [Color(0xFFFFFFFF), Color(0xFFFFD54F), Color(0xFF80DEEA), Color(0xFFB9F6CA), Color(0xFFFFAB91), Color(0xFFE1BEE7)];
+
   /// Confeti de la tarjeta de cumpleaños (mismo en claro y oscuro).
   static const confeti = [Color(0xFFE8000D), Color(0xFFFFB300), Color(0xFF43A047), Color(0xFF1E88E5), Color(0xFF8E24AA), Color(0xFFFF7043)];
 

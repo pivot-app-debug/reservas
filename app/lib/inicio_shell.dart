@@ -201,7 +201,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                 final hoy = Fechas.hoy();
                 final evento = Navegacion.diaEvento.value;
                 final DateTime dia = evento ?? (_irAHoy.lejos.value == 0 || indiceActual != 0 ? hoy : (_irAHoy.dia.value ?? hoy));
-                final esHoy = evento == null && Fechas.soloDia(dia) == hoy;
+                // Relleno rojo solo estando en Calendario (Victor, 2026-11-22).
+                final esHoy = evento == null && Fechas.soloDia(dia) == hoy && indiceActual == 0;
                 return AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   switchInCurve: Curves.easeOut,

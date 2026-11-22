@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/encabezado_seccion.dart';
 
@@ -33,6 +34,22 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
   List<Map<String, dynamic>> _l = const [];
   Sesion get s => widget.sesion;
 
+  /// Las que quitaste con la X (Victor, 2026-11-22): no vuelven a salir.
+  static const _pref = 'evaluar.descartados';
+  static String _clave(Map<String, dynamic> y) => '${y['id_evento'] ?? y['idEvento'] ?? y['id'] ?? ''}|${y['fecha'] ?? ''}|${y['equipo'] ?? ''}';
+
+  Future<void> _descartar(Map<String, dynamic> y) async {
+    setState(
+      () => _l = [
+        for (final x in _l)
+          if (_clave(x) != _clave(y)) x,
+      ],
+    );
+    final pr = await SharedPreferences.getInstance();
+    final l = {...?pr.getStringList(_pref), _clave(y)}.toList();
+    await pr.setStringList(_pref, l.length > 100 ? l.sublist(l.length - 100) : l);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +61,15 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
     try {
       final r = await s.api.get('getCoach');
       if (r['exito'] == false || !mounted) return;
-      setState(() => _l = TarjetasPorEvaluar.vigentes(r));
+      final pr = await SharedPreferences.getInstance();
+      final fuera = (pr.getStringList(_pref) ?? const <String>[]).toSet();
+      if (!mounted) return;
+      setState(
+        () => _l = [
+          for (final y in TarjetasPorEvaluar.vigentes(r))
+            if (!fuera.contains(_clave(y))) y,
+        ],
+      );
     } catch (_) {}
   }
 
@@ -78,7 +103,17 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
                         leading: Icon(Icons.groups_outlined, color: p.marcaTexto),
                         title: Text(tituloPendiente(y), style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Text(_frase(y)),
-                        trailing: TextButton(onPressed: () => _evaluar(y), child: const Text('Evaluar')),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(onPressed: () => _evaluar(y), child: const Text('Evaluar')),
+                            IconButton(
+                              tooltip: 'Quitar',
+                              icon: Icon(Icons.close_rounded, size: 20, color: p.textoSecundario),
+                              onPressed: () => _descartar(y),
+                            ),
+                          ],
+                        ),
                         onTap: () => _evaluar(y),
                       ),
                     ),

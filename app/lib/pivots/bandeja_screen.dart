@@ -58,7 +58,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     final c = BandejaRepo.claveNovedad(n);
     if (_novSaliendo.contains(c)) return;
     setState(() => _novSaliendo.add(c));
-    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     await repo.descartarNovedad(n);
     if (mounted) setState(() => _novSaliendo.remove(c));
   }
@@ -587,24 +587,28 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               final c = BandejaRepo.claveNovedad(n);
               final sale = _novSaliendo.contains(c);
               delEquipo.add(
-                AnimatedSize(
+                // Sale deslizándose y desvaneciéndose mientras se cierra su
+                // lugar, sin que la lista salte (Victor, 2026-11-22).
+                ClipRect(
                   key: ValueKey('nov-$c'),
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutCubic,
-                  child: AnimatedSlide(
-                    offset: sale ? const Offset(0.15, 0) : Offset.zero,
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    child: AnimatedOpacity(
-                      opacity: sale ? 0 : 1,
-                      duration: const Duration(milliseconds: 200),
-                      child: sale
-                          ? const SizedBox(width: double.infinity)
-                          : _TarjetaNovedad(
-                              n: n,
-                              alTocar: n['tipo'] == 'cumple' ? () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${n['usuario']}') : null,
-                              alDescartar: () => _descartarNovedad(n),
-                            ),
+                  child: AnimatedAlign(
+                    alignment: Alignment.topCenter,
+                    heightFactor: sale ? 0 : 1,
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeInOutCubic,
+                    child: AnimatedSlide(
+                      offset: sale ? const Offset(0.12, 0) : Offset.zero,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      child: AnimatedOpacity(
+                        opacity: sale ? 0 : 1,
+                        duration: const Duration(milliseconds: 180),
+                        child: _TarjetaNovedad(
+                          n: n,
+                          alTocar: n['tipo'] == 'cumple' ? () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${n['usuario']}') : null,
+                          alDescartar: sale ? null : () => _descartarNovedad(n),
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -121,11 +121,39 @@ String _sinTildes(String s) => s
     .replaceAll(RegExp('[óò]'), 'o')
     .replaceAll(RegExp('[úùü]'), 'u');
 
-List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo}) {
+/// Mi perfil (Victor, 2026-11-22): sus filas y lo que hay dentro de cada una.
+/// `dentro` es la pantalla que se abre.
+const entradasPerfil = [
+  EntradaAjuste('perfil', 'Foto de perfil', 'Mi perfil', 'foto imagen avatar cambiar'),
+  EntradaAjuste('perfil', 'Nombre derby y número', 'Mi perfil', 'nombre apodo número camiseta'),
+  EntradaAjuste('perfil', 'Pronombres', 'Mi perfil', 'él ella elle pronombre'),
+  EntradaAjuste('perfil', 'Teléfono', 'Mi perfil', 'celular whatsapp número contacto'),
+  EntradaAjuste('perfil', 'Roles en el equipo', 'Mi perfil', 'rol jammer blocker pivot jugadorx árbitro'),
+  EntradaAjuste('perfil', 'Entraste al equipo', 'Mi perfil', 'fecha ingreso aniversario'),
+  EntradaAjuste('pagos', 'Mis pagos y reservas', 'Mi perfil', 'recibos cuota suscripciones clases mensualidad deuda comprobante', dentro: 'pagos'),
+  EntradaAjuste('excepcion', 'Excepción de cuota', 'Mi perfil', 'no pagar mes viaje lesión pedir excepción', dentro: 'excepcion'),
+  EntradaAjuste('salud', 'Salud y emergencia', 'Mi perfil', 'contacto de emergencia ficha médica', dentro: 'salud'),
+  EntradaAjuste('salud', 'Alergias', 'Mi perfil › Salud y emergencia', 'alergia alimentos medicamentos', dentro: 'salud'),
+  EntradaAjuste('salud', 'Dieta', 'Mi perfil › Salud y emergencia', 'vegetariana vegana comida eventos fiestas', dentro: 'salud'),
+  EntradaAjuste('salud', 'Medicamentos y antecedentes', 'Mi perfil › Salud y emergencia', 'medicamentos enfermedades antecedentes', dentro: 'salud'),
+  EntradaAjuste('salud', 'Seguro', 'Mi perfil › Salud y emergencia', 'seguro médico privado público contacto del seguro', dentro: 'salud'),
+  EntradaAjuste('identidad', 'Identidad y dirección', 'Mi perfil', 'documento cédula pasaporte nombre legal dirección dónde vives', dentro: 'identidad'),
+  EntradaAjuste('privacidad', 'Privacidad', 'Mi perfil', 'qué ve el equipo ocultar público', dentro: 'privacidad'),
+  EntradaAjuste('privacidad', 'Mi cumpleaños y mi edad', 'Mi perfil › Privacidad', 'fecha de nacimiento cumpleaños edad mostrar', dentro: 'privacidad'),
+  EntradaAjuste('notificaciones', 'Notificaciones', 'Mi perfil', 'avisos push alertas recordatorios silenciar', dentro: 'notificaciones'),
+  EntradaAjuste('coach', 'Ser coach', 'Mi perfil', 'coach entrenador entrenadora pedir'),
+  EntradaAjuste('cuenta', 'Cuenta y acceso', 'Mi perfil', 'usuario correo contraseña clave', dentro: 'cuenta'),
+  EntradaAjuste('cuenta', 'Cerrar sesión', 'Mi perfil › Cuenta y acceso', 'salir cerrar sesión', dentro: 'cuenta'),
+  EntradaAjuste('cuenta', 'Ver de nuevo los tours guiados', 'Mi perfil › Cuenta y acceso', 'tour ayuda guía tutorial', dentro: 'cuenta'),
+  EntradaAjuste('cuenta', 'Eliminar cuenta', 'Mi perfil › Cuenta y acceso', 'borrar cuenta darme de baja', dentro: 'cuenta'),
+  EntradaAjuste('comentarios', 'Enviar comentarios', 'Mi perfil', 'error idea duda sugerencia ayuda soporte'),
+];
+
+List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo, List<EntradaAjuste> entradas = entradasLiga}) {
   final palabras = _sinTildes(q).split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (palabras.isEmpty) return const [];
   final r = <(int, EntradaAjuste)>[];
-  for (final e in entradasLiga) {
+  for (final e in entradas) {
     if (solo != null && e.dentro != solo) continue;
     if (!tesoreria && (e.id == 'tesoreria' || e.id == 'viajes' || e.dentro == 'tesoreria' || e.dentro == 'cobros')) continue;
     final t = _sinTildes(e.titulo), todo = _sinTildes('${e.titulo} ${e.ruta} ${e.palabras}');
@@ -139,8 +167,10 @@ List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo
 
 /// Pantalla del buscador. Devuelve la entrada elegida.
 class BuscadorLigaScreen extends StatefulWidget {
-  const BuscadorLigaScreen({super.key, this.tesoreria = true, this.solo, this.donde = 'Mi Liga'});
+  const BuscadorLigaScreen({super.key, this.tesoreria = true, this.solo, this.donde = 'Mi Liga', this.entradas = entradasLiga, this.ejemplo});
   final bool tesoreria;
+  final List<EntradaAjuste> entradas;
+  final String? ejemplo;
 
   /// Solo los ajustes de una sección ('reglas', 'cobros'…), para su propia lupa.
   final String? solo;
@@ -156,7 +186,7 @@ class _BuscadorLigaScreenState extends State<BuscadorLigaScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final r = buscarAjustes(_q, tesoreria: widget.tesoreria, solo: widget.solo);
+    final r = buscarAjustes(_q, tesoreria: widget.tesoreria, solo: widget.solo, entradas: widget.entradas);
     return Scaffold(
       appBar: AppBar(
         title: TextField(
@@ -173,7 +203,7 @@ class _BuscadorLigaScreenState extends State<BuscadorLigaScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'Escribe lo que buscas: "tarde", "precio", "whatsapp", "deudas"…',
+                    widget.ejemplo ?? 'Escribe lo que buscas: "tarde", "precio", "whatsapp", "deudas"…',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: p.textoSecundario),
                   ),

@@ -10,7 +10,10 @@ import '../core/tema.dart';
 /// estrellas y estrellas fugaces en el offseason. Si el evento ya pasó, la
 /// animación queda congelada (`animada: false`).
 class DecoFiesta extends StatefulWidget {
-  const DecoFiesta({super.key, required this.clave, this.animada = true});
+  const DecoFiesta({super.key, required this.clave, this.animada = true, this.fuerte = false});
+
+  /// Sobre un fondo festivo fuerte: colores claros que se vean.
+  final bool fuerte;
 
   /// 'navidad' | 'anio_nuevo' | 'pascua' | 'halloween' | 'cumple' | 'offseason';
   /// cualquier otra fiesta lleva confeti.
@@ -67,20 +70,27 @@ class _DecoFiestaState extends State<DecoFiesta> with SingleTickerProviderStateM
               alignment: const Alignment(0.92, 0.85),
               child: Transform.translate(
                 offset: Offset(0, salto),
-                child: Icon(clave == 'pascua' ? Icons.egg_rounded : Icons.dark_mode_rounded, size: 26, color: p.marca.withValues(alpha: 0.35)),
+                child: Icon(
+                  clave == 'pascua' ? Icons.egg_rounded : Icons.dark_mode_rounded,
+                  size: 26,
+                  color: (widget.fuerte ? PivotPaleta.confetiFuerte[0] : p.marca).withValues(alpha: widget.fuerte ? 0.55 : 0.35),
+                ),
               ),
             );
           },
         ),
-        _ => CustomPaint(painter: _Pintor(_c, clave, [p.marca, p.marcaTexto, p.sobreSuave])),
+        _ => CustomPaint(
+          painter: _Pintor(_c, clave, widget.fuerte ? PivotPaleta.confetiFuerte.take(3).toList() : [p.marca, p.marcaTexto, p.sobreSuave], widget.fuerte),
+        ),
       },
     );
   }
 }
 
 class _Pintor extends CustomPainter {
-  _Pintor(this.reloj, this.clave, this.colores) : super(repaint: reloj);
+  _Pintor(this.reloj, this.clave, this.colores, this.fuerte) : super(repaint: reloj);
   final Animation<double> reloj;
+  final bool fuerte;
   final String clave;
   final List<Color> colores;
 
@@ -124,27 +134,39 @@ class _Pintor extends CustomPainter {
           final brillo = 0.25 + 0.75 * ((math.sin((t * 3 + _azar(i, 3)) * math.pi * 2) + 1) / 2);
           canvas.drawCircle(Offset(x, y), 0.8 + _azar(i, 4) * 1.2, Paint()..color = PivotPaleta.estrella.withValues(alpha: brillo * 0.9));
         }
-        final f = (t * 1.6) % 1;
-        if (f < 0.35) {
-          final k = f / 0.35;
-          final ini = Offset(size.width * (0.15 + 0.7 * k), size.height * (0.1 + 0.5 * k));
-          final cola = Paint()
-            ..shader = LinearGradient(
-              colors: [
-                PivotPaleta.estrella.withValues(alpha: 0),
-                PivotPaleta.estrella.withValues(alpha: 0.85 * (1 - k)),
-              ],
-            ).createShader(Rect.fromPoints(ini - const Offset(36, 18), ini))
-            ..strokeWidth = 1.6
-            ..strokeCap = StrokeCap.round;
-          canvas.drawLine(ini - const Offset(36, 18), ini, cola);
+        // Estrella fugaz (Victor, 2026-11-22: la anterior saltaba): una por
+        // vuelta, entra y sale con suavidad y la cola crece y se achica.
+        const dura = 0.22, empieza = 0.55;
+        final f = (t - empieza) / dura;
+        if (f > 0 && f < 1) {
+          final k = Curves.easeInOut.transform(f);
+          final opacidad = math.sin(f * math.pi);
+          final cabeza = Offset(size.width * (0.2 + 0.55 * k), size.height * (0.12 + 0.35 * k));
+          final largo = 18 + 26 * math.sin(f * math.pi);
+          final dir = const Offset(0.84, 0.54);
+          final cola = cabeza - dir * largo;
+          canvas.drawLine(
+            cola,
+            cabeza,
+            Paint()
+              ..shader = LinearGradient(
+                colors: [
+                  PivotPaleta.estrella.withValues(alpha: 0),
+                  PivotPaleta.estrella.withValues(alpha: 0.8 * opacidad),
+                ],
+              ).createShader(Rect.fromPoints(cola, cabeza))
+              ..strokeWidth = 1.4
+              ..strokeCap = StrokeCap.round,
+          );
+          canvas.drawCircle(cabeza, 1.6, Paint()..color = PivotPaleta.estrella.withValues(alpha: 0.9 * opacidad));
         }
       default:
         // Confeti que cae (cumpleaños y fiestas en general).
         for (var i = 0; i < 18; i++) {
           final y = ((_azar(i, 1) + t) % 1) * (size.height + 12) - 6;
           final x = _azar(i, 2) * size.width + math.sin((t * 2 + _azar(i, 3)) * math.pi * 2) * 6;
-          final pintura = Paint()..color = PivotPaleta.confeti[i % PivotPaleta.confeti.length].withValues(alpha: 0.55);
+          final pintura = Paint()
+            ..color = (fuerte ? PivotPaleta.confetiFuerte : PivotPaleta.confeti)[i % PivotPaleta.confeti.length].withValues(alpha: fuerte ? 0.9 : 0.55);
           canvas.save();
           canvas.translate(x, y);
           canvas.rotate((t * 4 + _azar(i, 4)) * math.pi * 2);
@@ -155,5 +177,5 @@ class _Pintor extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_Pintor old) => old.clave != clave || old.colores != colores;
+  bool shouldRepaint(_Pintor old) => old.clave != clave || old.fuerte != fuerte;
 }

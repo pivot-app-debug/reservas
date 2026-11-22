@@ -2,6 +2,18 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (eventos especiales, pasados y buscador de Mi perfil)
+- Cumpleaños y fiestas son tan llamativos como el offseason: fondo con el degradado de cada festividad y texto claro. El confeti del cumpleaños solo cae el mismo día; en los que vienen no hay confeti.
+- La estrella fugaz del offseason ahora entra y sale suave, una por vuelta.
+- Lo que ya pasó queda "en el recuerdo": fondo apagado y punto gris en el timeline. Los botones y pills (Editar asistencia, Llegaste a horario) no cambian.
+- Cancelado: el título ya no se tacha y la pill es roja.
+- Cumpleaños de hoy: "Mándale un mensaje en el grupo" con WhatsApp, si la comunidad tiene grupos de WhatsApp. Con varios grupos pregunta a cuál, y deja copiado un saludo.
+- Novedades: los cumpleaños y las fiestas se ven como en el timeline.
+- El ícono del Calendario solo va relleno en rojo cuando estás en Calendario.
+- Al quitar una novedad con la X, sale suave sin que la lista salte.
+- Las clases por evaluar se pueden quitar con la X.
+- Mi perfil tiene lupa: busca cualquier ajuste, también dentro de sus secciones, y lo abre.
+
 ## 2026-11-22 (Actividad y puntos de aviso)
 - La casita del Calendario pasó a ser una bandeja de entrada.
 - El punto de aviso sigue el camino hasta lo nuevo: la pestaña de Actividad (Novedades, Tareas o Cursos), la bandeja y Calendario en la barra de abajo. En Liga: el avatar de quien se fue de viaje o se lesionó, el aviso de cosas para llevar, su pestaña y Liga en la barra. Se apaga al verlo.
