@@ -298,6 +298,8 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
               padding: EdgeInsets.fromLTRB(16, 8 + (widget.embebida ? altoBarra(context) : 0), 16, 40 + MediaQuery.paddingOf(context).bottom),
               children: [
                 GridView.builder(
+                  // Sin el relleno automático de arriba y abajo (Victor, 2026-11-22).
+                  padding: EdgeInsets.zero,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

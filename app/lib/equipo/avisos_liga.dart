@@ -42,14 +42,14 @@ class AvisosLiga extends ChangeNotifier {
 
   String get claveCosas => 'llevar:${[for (final (e, l) in cosas) '${e.id}-${l.length}'].join(',')}';
 
+  /// Sin punto por viaje o lesión (Victor, 2026-11-22: con la notificación
+  /// alcanza); queda solo el de cosas para llevar.
   bool nueva(Integrante p) {
-    if (_equipo.esYo(p)) return false;
-    final c = clave(p);
-    return c != null && !Vistos.instancia.visto(c);
+    return false;
   }
 
   bool get cosasNuevas => cosas.isNotEmpty && !Vistos.instancia.visto(claveCosas);
-  bool get personasNuevas => (_equipo.personas ?? const <Integrante>[]).any(nueva);
+  bool get personasNuevas => false;
   bool get comunidad => personasNuevas || cosasNuevas;
   bool get inventario => cosasNuevas;
 

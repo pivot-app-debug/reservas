@@ -88,6 +88,9 @@ class Integrante {
   bool get deViaje => estado == 'De viaje';
   bool get lesionadx => estado == 'Lesionadx';
 
+  /// Coach aprobadx (Liga → Gente → Coaches).
+  bool get esCoach => m['esCoach'] == true;
+
   /// Estados nuevos (Victor, 2026-11-15). Al equipo no se le muestra el motivo.
   static const estadosConMotivo = ['Enfermedad', 'Situación personal', 'Otro'];
   bool get fueraConMotivo => estadosConMotivo.contains(estado);

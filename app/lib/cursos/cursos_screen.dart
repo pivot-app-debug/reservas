@@ -26,6 +26,7 @@ import '../reservas/reserva_screen.dart' show ReservaExitoScreen;
 import '../reservas/reservas_repo.dart';
 import '../sesion/sesion.dart';
 import '../eventos/anticipada.dart' show horaAmPm;
+import '../core/encabezado_seccion.dart';
 import '../eventos/widgets_comunes.dart' show AvatarPersona, Etiqueta;
 import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
@@ -555,38 +556,18 @@ class _CursosScreenState extends State<CursosScreen> {
                 children: [
                   const _QueEsUnCurso(),
                   const SizedBox(height: 14),
+                  // Como el recuadro de crear una tarea (Victor, 2026-11-22).
                   if (l.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Todavía no hay cursos.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Arma el primero: sus clases quedan en el calendario.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: p.textoSecundario),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                              ),
-                              onPressed: _editar,
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Crear un curso'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    TarjetaCrear(
+                      icono: Icons.school_rounded,
+                      seccion: 'entrenamientos',
+                      titulo: 'Todavía no hay cursos',
+                      texto: 'Arma el primero: sus clases quedan en el calendario.',
+                      boton: 'Crear un curso',
+                      alTocar: _editar,
+                    )
+                  else
+                    EncabezadoSeccion(titulo: 'Cursos', icono: Icons.school_outlined, cantidad: l.length),
                   for (final c in l)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -595,7 +576,11 @@ class _CursosScreenState extends State<CursosScreen> {
                         borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
-                          leading: Icon(Icons.school_outlined, color: c.estado == 'terminado' ? p.textoSecundario : p.marcaTexto),
+                          leading: IconoRecuadro(
+                            icono: Icons.school_rounded,
+                            seccion: c.estado == 'terminado' ? 'mantenimiento' : 'entrenamientos',
+                            tamano: 36,
+                          ),
                           title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
                           subtitle: Text(
                             '${_estado(c.estado)} · ${c.inscritos}${c.cupo != null ? ' de ${c.cupo}' : ''} ${c.inscritos == 1 ? 'inscritx' : 'inscritxs'}\n${c.resumenFechas}',

@@ -200,7 +200,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
               builder: (context, _) {
                 final hoy = Fechas.hoy();
                 final evento = Navegacion.diaEvento.value;
-                final DateTime dia = evento ?? (_irAHoy.lejos.value == 0 || indiceActual != 0 ? hoy : (_irAHoy.dia.value ?? hoy));
+                // Fuera del Calendario se mantiene el día que mirabas (Victor, 2026-11-22).
+                final DateTime dia = evento ?? (_irAHoy.lejos.value == 0 ? hoy : (_irAHoy.dia.value ?? hoy));
                 // Relleno rojo solo estando en Calendario (Victor, 2026-11-22).
                 final esHoy = evento == null && Fechas.soloDia(dia) == hoy && indiceActual == 0;
                 return AnimatedSwitcher(
@@ -245,17 +246,6 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           icon: ListenableBuilder(
             listenable: widget.sesion,
             builder: (context, _) => AvatarPersona(nombre: widget.sesion.nombreMostrar, foto: widget.sesion.fotoPerfil, tamano: 26),
-          ),
-          selectedIcon: ListenableBuilder(
-            listenable: widget.sesion,
-            builder: (context, _) => Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: context.pivot.marca, width: 2),
-              ),
-              child: AvatarPersona(nombre: widget.sesion.nombreMostrar, foto: widget.sesion.fotoPerfil, tamano: 24),
-            ),
           ),
           label: 'Mi perfil',
         ),

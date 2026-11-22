@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/api.dart' show ApiException;
 import '../core/banner_ayuda.dart';
+import '../core/encabezado_seccion.dart';
 
 import '../core/sincroniza.dart';
 
@@ -173,10 +174,7 @@ class _TareasScreenState extends State<TareasScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'ARCHIVADAS',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
-                    ),
+                    child: EncabezadoSeccion(titulo: 'Archivadas', icono: Icons.archive_outlined, cantidad: _archivadas.length),
                   ),
                   AnimatedRotation(
                     turns: _archivadasAbiertas ? 0.5 : 0,
@@ -234,8 +232,9 @@ class _TareasScreenState extends State<TareasScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined, color: p.marcaTexto),
-                        const SizedBox(height: 6),
+                        // Ícono en recuadro, como "No hay tareas disponibles" (Victor, 2026-11-22).
+                        const IconoRecuadro(icono: Icons.inventory_2_rounded, tamano: 40),
+                        const SizedBox(height: 8),
                         Text(
                           'Ver todas',
                           style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
@@ -252,7 +251,6 @@ class _TareasScreenState extends State<TareasScreen> {
   }
 
   Widget _lista(BuildContext context) {
-    final p = context.pivot;
     final disponibles = repo.disponibles.where((x) => _area == null || x.areas.contains(_area)).toList();
     final areas = {for (final x in repo.disponibles) ...x.areas}.toList()
       ..sort((a, b) => AreaTarea.lista.indexOf(AreaTarea.de(a)).compareTo(AreaTarea.lista.indexOf(AreaTarea.de(b))));
@@ -277,13 +275,8 @@ class _TareasScreenState extends State<TareasScreen> {
           ],
         ),
         // Disponibles primero, con su botón (Victor, 2026-11-20).
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          child: Text(
-            'DISPONIBLES',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: p.textoSecundario),
-          ),
-        ),
+        // Títulos como en Novedades (Victor, 2026-11-22).
+        EncabezadoSeccion(titulo: 'Disponibles', icono: Icons.front_hand_outlined, cantidad: disponibles.isEmpty ? null : disponibles.length),
         if (areas.length > 1)
           SizedBox(
             height: 44,
@@ -326,9 +319,9 @@ class _TareasScreenState extends State<TareasScreen> {
         // Sin la tarjeta roja de puntos (Victor, 2026-11-13): se ve en Estadísticas.
 
         // Sin tareas propias, la sección no aparece (Victor, 2026-11-16).
-        if (repo.mias.isNotEmpty)
+        if (repo.mias.isNotEmpty) ...[
+          EncabezadoSeccion(titulo: 'Mis tareas', icono: Icons.assignment_ind_outlined, cantidad: repo.mias.length),
           GrupoAjustes(
-            titulo: 'MIS TAREAS',
             filas: [
               for (final m in repo.mias)
                 FilaTarea(
@@ -338,23 +331,27 @@ class _TareasScreenState extends State<TareasScreen> {
                 ),
             ],
           ),
-        if (sugeridas.isNotEmpty)
+        ],
+        if (sugeridas.isNotEmpty) ...[
+          EncabezadoSeccion(titulo: 'Sugeridas para ti', icono: Icons.auto_awesome_outlined, cantidad: sugeridas.length),
           GrupoAjustes(
-            titulo: 'SUGERIDAS PARA TI',
             pie: 'Te faltan ${textoPuntos(repo.faltan)} este mes para ${repo.meta!.nombre}.',
             filas: [for (final x in sugeridas) FilaTarea(tarea: x, hero: false, alTocar: () => _abrir(x))],
           ),
-        if (repo.completas.isNotEmpty)
+        ],
+        if (repo.completas.isNotEmpty) ...[
+          EncabezadoSeccion(titulo: 'Sin cupos', icono: Icons.group_off_outlined, cantidad: repo.completas.length),
           GrupoAjustes(
-            titulo: 'SIN CUPOS',
             filas: [for (final x in repo.completas) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
           ),
-        if (repo.baul.isNotEmpty)
+        ],
+        if (repo.baul.isNotEmpty) ...[
+          EncabezadoSeccion(titulo: 'Baúl', icono: Icons.inventory_2_outlined, cantidad: repo.baul.length),
           GrupoAjustes(
-            titulo: 'BAÚL',
             pie: 'Tareas que vencieron sin terminarse. Al rescatar una tienes el mismo plazo que tenía, contado desde hoy.',
             filas: [for (final x in repo.baul) FilaTarea(tarea: x, alTocar: () => _abrir(x))],
           ),
+        ],
         const SizedBox(height: 8),
         if (repo.esAdmin) RecurrentesScreen(repo: repo, inicial: _recurrentes),
         if (repo.esAdmin && _archivadas.isNotEmpty) _carruselArchivadas(context),
@@ -370,38 +367,13 @@ class _SinTareas extends StatelessWidget {
   final VoidCallback alCrear;
 
   @override
-  Widget build(BuildContext context) {
-    final p = context.pivot;
-    final (degradado, sobre) = PivotPaleta.seccion('organizacion', Theme.of(context).brightness);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-            child: Icon(Icons.task_alt_rounded, color: sobre, size: 30),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'No hay tareas disponibles',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            esPivot ? 'Crea una para que el equipo sume puntos ayudando.' : 'Propón una: un Pivot la revisa y la publica.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: p.textoSecundario),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(onPressed: alCrear, icon: const Icon(Icons.add_rounded), label: Text(esPivot ? 'Crear una tarea' : 'Proponer una tarea')),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TarjetaCrear(
+    icono: Icons.task_alt_rounded,
+    titulo: 'No hay tareas disponibles',
+    texto: esPivot ? 'Crea una para que el equipo sume puntos ayudando.' : 'Propón una: un Pivot la revisa y la publica.',
+    boton: esPivot ? 'Crear una tarea' : 'Proponer una tarea',
+    alTocar: alCrear,
+  );
 }
 
 /// Fila de una tarea: ícono del área, título, vencimiento o cupos, puntos.

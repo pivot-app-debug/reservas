@@ -26,7 +26,7 @@ void main() {
     await t.pump(const Duration(seconds: 1));
     // Título según la pestaña; pestañas con íconos.
     // Novedades: primero los próximos eventos, después las notificaciones.
-    expect(find.text('Novedades'), findsWidgets);
+    expect(find.byTooltip('Próximos eventos'), findsOneWidget);
     expect(find.byTooltip('Cursos'), findsOneWidget);
     expect(find.text('Próximos 7 días'), findsOneWidget);
     expect(find.text('No hay eventos en los próximos 7 días.'), findsOneWidget);

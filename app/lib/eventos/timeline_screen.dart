@@ -928,7 +928,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
               backgroundColor: p.marca,
               label: _bandeja.esPivot && _bandeja.total > 0 ? Text('${_bandeja.total}') : null,
               // Bandeja en vez de la casita (Victor, 2026-11-22).
-              child: const Icon(Symbols.inbox),
+              child: const Icon(Symbols.inbox, weight: 600),
             ),
             onPressed: () => _abrirActividad(),
           ),

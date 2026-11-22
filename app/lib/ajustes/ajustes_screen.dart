@@ -23,7 +23,6 @@ import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
 import 'recorte_foto.dart';
 import '../push/avisos_obligatorios.dart';
-import 'herramientas_liga.dart';
 import '../pivots/buscador_liga.dart' show BuscadorLigaScreen, EntradaAjuste, entradasPerfil;
 
 /// Pestaña Ajustes (rediseño de Victor, 2026-11-07/08): como en la web, solo
@@ -126,9 +125,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
 
               BannerAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
-              // Herramientas de la liga (Victor, 2026-11-19): Mi Liga, Finanzas y
-              // Coach, cada una solo para quien le corresponde.
-              GrupoHerramientasLiga(sesion: sesion, eventos: eventos),
+              // Herramientas de la liga salió de Mi perfil (Victor, 2026-11-22):
+              // todo está en Liga; los interruptores, en Mi Liga.
 
               GrupoAjustes(
                 filas: [

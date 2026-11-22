@@ -7,7 +7,7 @@ import '../core/tema.dart';
 /// Detalle animado de los eventos especiales (Victor, 2026-11-21 y 22): luces
 /// en Navidad, fuegos artificiales en Año Nuevo, un huevo que salta en
 /// Pascua, la luna en Halloween, confeti en cumpleaños y fiestas, y cielo con
-/// estrellas y estrellas fugaces en el offseason. Si el evento ya pasó, la
+/// estrellas que titilan en el offseason. Si el evento ya pasó, la
 /// animación queda congelada (`animada: false`).
 class DecoFiesta extends StatefulWidget {
   const DecoFiesta({super.key, required this.clave, this.animada = true, this.fuerte = false});
@@ -128,38 +128,13 @@ class _Pintor extends CustomPainter {
           }
         }
       case 'offseason':
-        // Estrellas que titilan y, de vez en cuando, una estrella fugaz.
+        // Estrellas que titilan.
         for (var i = 0; i < 22; i++) {
           final x = _azar(i, 1) * size.width, y = _azar(i, 2) * size.height;
           final brillo = 0.25 + 0.75 * ((math.sin((t * 3 + _azar(i, 3)) * math.pi * 2) + 1) / 2);
           canvas.drawCircle(Offset(x, y), 0.8 + _azar(i, 4) * 1.2, Paint()..color = PivotPaleta.estrella.withValues(alpha: brillo * 0.9));
         }
-        // Estrella fugaz (Victor, 2026-11-22: la anterior saltaba): una por
-        // vuelta, entra y sale con suavidad y la cola crece y se achica.
-        const dura = 0.22, empieza = 0.55;
-        final f = (t - empieza) / dura;
-        if (f > 0 && f < 1) {
-          final k = Curves.easeInOut.transform(f);
-          final opacidad = math.sin(f * math.pi);
-          final cabeza = Offset(size.width * (0.2 + 0.55 * k), size.height * (0.12 + 0.35 * k));
-          final largo = 18 + 26 * math.sin(f * math.pi);
-          final dir = const Offset(0.84, 0.54);
-          final cola = cabeza - dir * largo;
-          canvas.drawLine(
-            cola,
-            cabeza,
-            Paint()
-              ..shader = LinearGradient(
-                colors: [
-                  PivotPaleta.estrella.withValues(alpha: 0),
-                  PivotPaleta.estrella.withValues(alpha: 0.8 * opacidad),
-                ],
-              ).createShader(Rect.fromPoints(cola, cabeza))
-              ..strokeWidth = 1.4
-              ..strokeCap = StrokeCap.round,
-          );
-          canvas.drawCircle(cabeza, 1.6, Paint()..color = PivotPaleta.estrella.withValues(alpha: 0.9 * opacidad));
-        }
+      // Sin estrella fugaz (Victor, 2026-11-22): solo el cielo que titila.
       default:
         // Confeti que cae (cumpleaños y fiestas en general).
         for (var i = 0; i < 18; i++) {

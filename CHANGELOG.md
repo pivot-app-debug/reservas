@@ -2,6 +2,16 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (Liga y bandeja más ordenadas)
+- Liga: pestañas Gente, Redes, Inventario, Finanzas y, para Pivots, Mi Liga (sin el ícono del estadio). Buscar y filtrar están arriba de la lista de Gente, no en la barra.
+- Para entrar a un equipo, tócalo cuando ya está abierto (se fue "Ver equipo"). Coaches es una sección más, con las personas que son coach (solo sus datos y su ficha); abierta, te lleva a los ajustes de coach.
+- Sin punto por viajes o lesiones (alcanza con la notificación). Redes sin espacios en blanco.
+- Mi perfil: se fue Herramientas de la liga; los interruptores de Finanzas y Coach están en Mi Liga → Funciones de la liga. Sin anillo rojo en el avatar de la barra.
+- El ícono del Calendario mantiene el día que mirabas al cambiar de sección.
+- Bandeja: ícono más grueso; "Novedades" ahora es "Próximos eventos" (en la pastilla, "Eventos"). Tareas y Cursos con títulos como Próximos eventos, y crear una tarea, un curso o un evento usan el mismo recuadro. "Ver todas" de archivadas con ícono en recuadro.
+- Avatares: el "+2" y el "1 asistirá" ya no se pegan a los avatares.
+- Offseason sin estrella fugaz.
+
 ## 2026-11-22 (resumen de Pivots: 1, 2 o 3 horas antes)
 - El resumen de cada evento para Pivots (quiénes vienen y qué equipamiento llevar) llega 1 hora antes por defecto; cada Pivot lo cambia a 2 o 3 horas en Mi perfil → Notificaciones → Avisos de Pivot.
 

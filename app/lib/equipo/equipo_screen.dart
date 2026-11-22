@@ -45,7 +45,7 @@ class EquipoScreen extends StatefulWidget {
 
 /// Pestañas de Liga (Victor, 2026-11-22): Comunidad (la gente), Redes,
 /// Inventario y, para quien gestiona finanzas, Finanzas.
-enum PestanaLiga { comunidad, redes, inventario, finanzas }
+enum PestanaLiga { comunidad, redes, inventario, finanzas, miLiga }
 
 class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMixin {
   EquipoRepo get repo => widget.repo;
@@ -60,6 +60,8 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     PestanaLiga.redes,
     PestanaLiga.inventario,
     if (repo.sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(repo.sesion)) PestanaLiga.finanzas,
+    // Mi Liga como pestaña, para Pivots (Victor, 2026-11-22).
+    if (_pivot) PestanaLiga.miLiga,
   ];
 
   /// Rehace las pestañas si cambia el permiso de Finanzas.
@@ -75,10 +77,12 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   static String _nombreLiga(PestanaLiga x) => switch (x) {
-    PestanaLiga.comunidad => 'Comunidad',
+    // Más corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
+    PestanaLiga.comunidad => 'Gente',
     PestanaLiga.redes => 'Redes',
     PestanaLiga.inventario => 'Inventario',
     PestanaLiga.finanzas => 'Finanzas',
+    PestanaLiga.miLiga => 'Mi Liga',
   };
 
   static IconData _iconoLiga(PestanaLiga x) => switch (x) {
@@ -86,10 +90,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     PestanaLiga.redes => Icons.forum_rounded,
     PestanaLiga.inventario => Icons.content_paste_rounded,
     PestanaLiga.finanzas => Icons.account_balance_wallet_rounded,
+    PestanaLiga.miLiga => Icons.stadium_rounded,
   };
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
-  bool _buscando = false;
 
   /// Sección abierta del acordeón; null = la tuya (o la primera con gente).
   String? _abierto;
@@ -123,23 +127,15 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     PersonaScreen.abrir(context, repo, p.username);
   }
 
-  void _alternarBusqueda() {
-    setState(() {
-      _buscando = !_buscando;
-      if (!_buscando) _busqueda.clear();
-    });
-    if (_buscando) _focoBusqueda.requestFocus();
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
     final tabs = _controlador();
-    final enComunidad = _pestanas[tabs.index] == PestanaLiga.comunidad;
     return PopScope(
-      canPop: !_buscando,
+      // Atrás con texto en el buscador: primero lo borra.
+      canPop: _busqueda.text.isEmpty,
       onPopInvokedWithResult: (hizo, _) {
-        if (!hizo && _buscando) _alternarBusqueda();
+        if (!hizo) setState(_busqueda.clear);
       },
       child: Scaffold(
         // Barra de vidrio: la lista pasa por detrás (Victor, 2026-11-13).
@@ -149,51 +145,13 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
           flexibleSpace: const Vidrio(child: SizedBox.expand()),
-          // Igual que el buscador de Calendario (2026-11-13): flecha para
-          // volver, campo con fondo y la X para borrar dentro del campo.
-          titleSpacing: _buscando ? 0 : null,
-          leading: _buscando ? IconButton(tooltip: 'Cerrar búsqueda', icon: const Icon(Icons.arrow_back_rounded), onPressed: _alternarBusqueda) : null,
-          title: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: _buscando
-                ? Padding(
-                    key: const ValueKey('buscar'),
-                    padding: const EdgeInsets.only(right: 12),
-                    child: TextField(
-                      controller: _busqueda,
-                      focusNode: _focoBusqueda,
-                      textInputAction: TextInputAction.search,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Buscar en el equipo',
-                        isDense: true,
-                        suffixIcon: _busqueda.text.isEmpty
-                            ? null
-                            : IconButton(tooltip: 'Borrar texto', icon: const Icon(Icons.close_rounded), onPressed: () => setState(_busqueda.clear)),
-                      ),
-                    ),
-                  )
-                : Align(key: const ValueKey('titulo'), alignment: Alignment.centerLeft, child: _pillsLiga(p, tabs)),
+          // Solo las pestañas (Victor, 2026-11-22): buscar y filtrar van
+          // dentro de Gente, y Mi Liga es otra pestaña.
+          titleSpacing: 0,
+          title: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Align(alignment: Alignment.centerLeft, child: _pillsLiga(p, tabs)),
           ),
-          actions: [
-            if (!_buscando && enComunidad)
-              ListenableBuilder(
-                listenable: repo,
-                builder: (context, _) => IconButton(
-                  tooltip: 'Filtros',
-                  onPressed: _abrirFiltros,
-                  icon: Badge(isLabelVisible: repo.hayFiltros, smallSize: 8, child: const Icon(Icons.tune_rounded)),
-                ),
-              ),
-            if (!_buscando && enComunidad) IconButton(tooltip: 'Buscar', onPressed: _alternarBusqueda, icon: const Icon(Icons.search_rounded)),
-            // Ajustes de la liga con el ícono del estadio (Victor, 2026-11-22).
-            if (!_buscando && _pivot)
-              IconButton(
-                tooltip: 'Ajustes de la liga',
-                onPressed: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: repo.sesion, pestana: true)),
-                icon: const Icon(Icons.stadium_rounded),
-              ),
-          ],
         ),
         body: TabBarView(
           controller: tabs,
@@ -204,6 +162,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                 PestanaLiga.redes => ComunidadScreen(repo: ComunidadRepo.de(repo.sesion), embebida: true),
                 PestanaLiga.inventario => InventarioScreen(sesion: repo.sesion, embebida: true),
                 PestanaLiga.finanzas => TesoreriaScreen(sesion: repo.sesion, embebida: true),
+                PestanaLiga.miLiga => AjustesLigaScreen(sesion: repo.sesion, pestana: true, embebida: true),
               },
           ],
         ),
@@ -230,16 +189,23 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                 ),
               )
             : const Esqueleto(forma: FormaEsqueleto.lista, key: ValueKey('cargando'));
-      } else if (_buscando && _busqueda.text.trim().isNotEmpty) {
-        cuerpo = _resultados(context, p, personas);
+      } else if (_busqueda.text.trim().isNotEmpty) {
+        cuerpo = Builder(key: const ValueKey('resultados'), builder: (c) => _resultados(c, p, personas));
       } else {
-        cuerpo = _lista(context, p, personas);
+        cuerpo = Builder(key: const ValueKey('lista'), builder: (c) => _lista(c, p, personas));
       }
+      // El buscador queda fijo debajo de la barra; la lista empieza debajo de él.
+      final mq = MediaQuery.of(context);
+      final arriba = altoBarra(context);
       return Stack(
         children: [
-          AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: cuerpo),
+          MediaQuery(
+            data: mq.copyWith(padding: mq.padding.copyWith(top: arriba + _altoBuscador)),
+            child: AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: cuerpo),
+          ),
+          Positioned(top: arriba, left: 0, right: 0, child: _buscador(p)),
           Positioned(
-            top: 0,
+            top: arriba,
             left: 0,
             right: 0,
             child: AnimatedOpacity(
@@ -251,6 +217,39 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
         ],
       );
     },
+  );
+
+  static const _altoBuscador = 60.0;
+
+  /// Buscar y filtrar dentro de Gente (Victor, 2026-11-22: en la barra
+  /// apretaban las pestañas y desaparecían de golpe).
+  Widget _buscador(PivotPaleta p) => Container(
+    height: _altoBuscador,
+    color: p.fondo,
+    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+    child: TextField(
+      controller: _busqueda,
+      focusNode: _focoBusqueda,
+      textInputAction: TextInputAction.search,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        hintText: 'Buscar en la liga',
+        isDense: true,
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_busqueda.text.isNotEmpty)
+              IconButton(tooltip: 'Borrar texto', icon: const Icon(Icons.close_rounded), onPressed: () => setState(_busqueda.clear)),
+            IconButton(
+              tooltip: 'Filtros',
+              onPressed: _abrirFiltros,
+              icon: Badge(isLabelVisible: repo.hayFiltros, smallSize: 8, child: const Icon(Icons.tune_rounded)),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 
   /// Pills como en Actividad: la elegida con ícono y nombre en rojo.
@@ -331,7 +330,8 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   Widget _lista(BuildContext context, PivotPaleta p, List<Integrante> personas) {
     final hoy = Fechas.hoy();
     List<Integrante> grupo(String g) {
-      final l = personas.where((x) => x.grupo == g && repo.pasaRoles(x)).toList()
+      // Coaches (Victor, 2026-11-22): quienes son coach, estén en un equipo o inactivxs.
+      final l = personas.where((x) => (g == 'Coaches' ? x.esCoach : x.grupo == g) && repo.pasaRoles(x)).toList()
         ..sort((a, b) {
           // Tu fila primero; después por nombre.
           if (repo.esYo(a) != repo.esYo(b)) return repo.esYo(a) ? -1 : 1;
@@ -343,7 +343,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final favoritos = personas.where((x) => repo.favoritos.contains(x.username)).toList();
     final mio = personas.where(repo.esYo).map((x) => x.grupo).firstOrNull;
     // Tu grupo arriba: si eres Mirlxs, Mirlxs va antes que Quindes (Victor, 2026-11-07).
-    final secciones = mio == 'Mirlxs' ? const ['Mirlxs', 'Quindes', 'Inactivxs'] : const ['Quindes', 'Mirlxs', 'Inactivxs'];
+    final coaches = FuncionesLiga.coach(repo.sesion);
+    final secciones = [
+      ...(mio == 'Mirlxs' ? const ['Mirlxs', 'Quindes', 'Inactivxs'] : const ['Quindes', 'Mirlxs', 'Inactivxs']),
+      if (coaches) 'Coaches',
+    ];
     final grupos = {for (final g in secciones) g: grupo(g)};
     final conGente = [
       for (final g in secciones)
@@ -404,7 +408,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                 SliverToBoxAdapter(
                   child: _Plegable(
                     abierto: g == abierto,
-                    child: Column(children: [for (final x in grupos[g]!) _fila(context, x, hoy)]),
+                    child: Column(children: [for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy)]),
                   ),
                 ),
               ],
@@ -427,48 +431,45 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     );
   }
 
-  /// Debajo de los equipos (Victor, 2026-11-22): Coaches abre sus ajustes y
-  /// un Pivot puede crear un equipo nuevo.
+  bool _seEntra(String titulo) {
+    if (titulo == 'Inactivxs') return false;
+    if (titulo == 'Coaches') return FuncionesLiga.usaCoach(repo.sesion) || _pivot;
+    return true;
+  }
+
+  void _entrar(String titulo) {
+    final s = repo.sesion;
+    if (titulo == 'Coaches') {
+      SubAjustes.abrir(context, s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s));
+    } else {
+      SubAjustes.abrir(context, VerEquipoScreen(sesion: s, nombre: titulo));
+    }
+  }
+
+  /// Coach en la lista: solo lo básico y su ficha, sin estadísticas.
+  Widget _filaCoach(BuildContext context, PivotPaleta p, Integrante x) => ListTile(
+    key: ValueKey('coach-${x.username}'),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    leading: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: 44),
+    title: Text(
+      x.nombreMostrar,
+      style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+    ),
+    subtitle: Text(x.grupo, style: TextStyle(color: p.textoSecundario)),
+    trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+    onTap: () => _abrir(x),
+  );
+
+  /// Debajo de los equipos (Victor, 2026-11-22): un Pivot puede crear un
+  /// equipo nuevo.
   Widget _extras(BuildContext context, PivotPaleta p) {
     final s = repo.sesion;
-    final coaches = FuncionesLiga.coach(s) && (FuncionesLiga.usaCoach(s) || _pivot);
-    if (!coaches && !_pivot) return const SizedBox.shrink();
+    if (!_pivot) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (coaches)
-            Material(
-              color: p.fondo,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                side: BorderSide(color: p.suave),
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                onTap: () => SubAjustes.abrir(
-                  context,
-                  s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s),
-                ),
-                child: SizedBox(
-                  height: 48,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Coaches',
-                          style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: p.textoSecundario),
-                        ),
-                        const Spacer(),
-                        Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
           if (_pivot) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -508,8 +509,14 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
               type: MaterialType.transparency,
               child: InkWell(
                 borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                // Abierta: tocar de nuevo lleva al equipo o a los ajustes de
+                // coaches (Victor, 2026-11-22).
                 onTap: () {
-                  if (!abierta) setState(() => _abierto = titulo);
+                  if (!abierta) {
+                    setState(() => _abierto = titulo);
+                  } else if (_seEntra(titulo)) {
+                    _entrar(titulo);
+                  }
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -531,22 +538,18 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                         ),
                       ),
                       const Spacer(),
-                      // Ver el equipo y sus reglas (Victor, 2026-11-22).
-                      if (titulo != 'Inactivxs')
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: ActionChip(
-                            visualDensity: VisualDensity.compact,
-                            label: const Text('Ver equipo'),
-                            avatar: const Icon(Icons.shield_outlined, size: 16),
-                            onPressed: () => SubAjustes.abrir(context, VerEquipoScreen(sesion: repo.sesion, nombre: titulo)),
-                          ),
-                        ),
-                      AnimatedRotation(
-                        turns: abierta ? 0.5 : 0,
+                      // Abierta y se puede entrar: flecha hacia el costado.
+                      AnimatedSwitcher(
                         duration: dur,
-                        curve: Curves.easeInOutCubic,
-                        child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                        transitionBuilder: (c, a) => FadeTransition(
+                          opacity: a,
+                          child: RotationTransition(turns: Tween(begin: 0.75, end: 1.0).animate(a), child: c),
+                        ),
+                        child: Icon(
+                          abierta && _seEntra(titulo) ? Icons.chevron_right_rounded : (abierta ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                          key: ValueKey('${abierta && _seEntra(titulo)}-$abierta'),
+                          color: abierta && _seEntra(titulo) ? p.texto : p.textoSecundario,
+                        ),
                       ),
                     ],
                   ),

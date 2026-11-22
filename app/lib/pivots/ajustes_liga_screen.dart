@@ -34,8 +34,12 @@ import 'cobro_equipo_screen.dart' show modosCobro;
 /// lugar para lo que configura la liga. Los roles se editan desde la hoja de
 /// "Roles en el equipo" (botón "Agregar o editar roles").
 class AjustesLigaScreen extends StatefulWidget {
-  const AjustesLigaScreen({super.key, required this.sesion, this.pestana = false});
+  const AjustesLigaScreen({super.key, required this.sesion, this.pestana = false, this.embebida = false});
   final Sesion sesion;
+
+  /// Pestaña Mi Liga dentro de Liga (Victor, 2026-11-22): sin barra propia;
+  /// el buscador va arriba de la lista.
+  final bool embebida;
 
   /// Mi Liga como pestaña de la barra de abajo (Victor, 2026-11-13).
   final bool pestana;
@@ -297,23 +301,25 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   Widget build(BuildContext context) {
     final c = ConfigLiga.de(sesion);
     final pestana = widget.pestana;
-    final arriba = pestana ? MediaQuery.paddingOf(context).top + kToolbarHeight : 0.0;
+    final arriba = widget.embebida ? 8 + altoBarra(context) : (pestana ? MediaQuery.paddingOf(context).top + kToolbarHeight : 0.0);
     return Scaffold(
       // En la pestaña, barra de vidrio como Equipo y Mi perfil.
       extendBodyBehindAppBar: pestana,
-      appBar: AppBar(
-        backgroundColor: pestana ? Colors.transparent : null,
-        surfaceTintColor: pestana ? Colors.transparent : null,
-        scrolledUnderElevation: pestana ? 0 : null,
-        flexibleSpace: pestana ? const Vidrio(child: SizedBox.expand()) : null,
-        title: Row(
-          children: [
-            if (pestana && c.logo.isNotEmpty) ...[LogoEquipo(nombre: 'Liga', url: c.logo, tamano: 32), const SizedBox(width: 10)],
-            Text(pestana ? 'Mi Liga' : 'Ajustes de la liga', style: const TextStyle(fontWeight: FontWeight.w700)),
-          ],
-        ),
-        actions: [IconButton(key: _kLupa, tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
-      ),
+      appBar: widget.embebida
+          ? null
+          : AppBar(
+              backgroundColor: pestana ? Colors.transparent : null,
+              surfaceTintColor: pestana ? Colors.transparent : null,
+              scrolledUnderElevation: pestana ? 0 : null,
+              flexibleSpace: pestana ? const Vidrio(child: SizedBox.expand()) : null,
+              title: Row(
+                children: [
+                  if (pestana && c.logo.isNotEmpty) ...[LogoEquipo(nombre: 'Liga', url: c.logo, tamano: 32), const SizedBox(width: 10)],
+                  Text(pestana ? 'Mi Liga' : 'Ajustes de la liga', style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+              ),
+              actions: [IconButton(key: _kLupa, tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
+            ),
       body: ListenableBuilder(
         listenable: c,
         builder: (context, _) => Sincroniza(
@@ -326,6 +332,29 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.embebida)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      key: _kLupa,
+                      color: context.pivot.tarjeta,
+                      borderRadius: BorderRadius.circular(PivotRadios.chip),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(PivotRadios.chip),
+                        onTap: _buscar,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.search_rounded, color: context.pivot.textoSecundario),
+                              const SizedBox(width: 10),
+                              Text('Buscar un ajuste', style: TextStyle(color: context.pivot.textoSecundario)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 // Liga recién creada: lo que conviene hacer primero.
                 PrimerosPasos(
                   pasos: [
@@ -394,6 +423,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                       ),
                   ],
                 ),
+                _titulo(context, 'FUNCIONES DE LA LIGA'),
+                GrupoHerramientasLiga(sesion: sesion),
                 _titulo(context, 'DATOS DE LA LIGA'),
                 GrupoAjustes(
                   pie: 'El país define el prefijo de teléfono y los números de emergencia. La zona horaria se aplicará a los horarios cuando la app admita varias ligas; por ahora todo usa la hora de Ecuador.',

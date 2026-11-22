@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/tema.dart';
-import '../eventos/eventos_repo.dart';
-import '../finanzas/tesoreria_screen.dart';
-import '../pivots/ajustes_liga_screen.dart';
 import '../sesion/sesion.dart';
 import 'componentes.dart';
 
@@ -48,9 +45,8 @@ class FuncionesLiga {
 /// Grupo "Herramientas de la liga" en Ajustes: Mi Liga, Finanzas y Coach,
 /// cada una solo para quien le corresponde.
 class GrupoHerramientasLiga extends StatelessWidget {
-  const GrupoHerramientasLiga({super.key, required this.sesion, required this.eventos});
+  const GrupoHerramientasLiga({super.key, required this.sesion});
   final Sesion sesion;
-  final EventosRepo eventos;
 
   /// Hay algo que mostrar para esta persona.
   static bool visible(Sesion s) => (s.esAdmin && s.adminToken != null) || s.tieneArea('finanzas');
@@ -82,48 +78,35 @@ class GrupoHerramientasLiga extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // En Mi Liga (Victor, 2026-11-22): activar o no Finanzas y Coach para la
+    // liga. Salió de Mi perfil; Finanzas se abre desde la pestaña de Liga.
     return ListenableBuilder(
       listenable: Listenable.merge([sesion, ConfigLiga.de(sesion)]),
       builder: (context, _) {
-        if (!visible(sesion) && !FuncionesLiga.puedeCambiarCoach(sesion)) return const SizedBox.shrink();
-        final pivot = sesion.esAdmin && sesion.adminToken != null;
+        if (!FuncionesLiga.puedeCambiarCoach(sesion)) return const SizedBox.shrink();
         final finanzas = FuncionesLiga.finanzas(sesion);
         final coach = FuncionesLiga.coach(sesion);
         const textoFinanzas = 'Tesorería, cuotas, cobros y comprobantes de la liga, para quienes gestionan finanzas.';
         const textoCoach = 'Lxs coaches siguen las habilidades de cada persona, evalúan los entrenamientos y arman cursos.';
         return GrupoAjustes(
-          titulo: 'HERRAMIENTAS DE LA LIGA',
+          pie: 'Si la liga no las usa, se ocultan para todo el mundo.',
           filas: [
-            if (pivot)
-              FilaAjuste(
-                icono: Icons.stadium_rounded,
-                seccion: 'liga',
-                titulo: 'Mi Liga',
-                valor: 'Equipos, reglas, Pivots y comunicación',
-                alTocar: () => SubAjustes.abrir(context, AjustesLigaScreen(sesion: sesion, pestana: true)),
-              ),
-            if (sesion.tieneArea('finanzas'))
-              FilaAjuste(
-                icono: Icons.account_balance_wallet_rounded,
-                seccion: 'recaudacion',
-                titulo: 'Finanzas',
-                valor: finanzas ? 'Tesorería, cuotas y cobros' : 'Desactivada para la liga',
-                alTocar: finanzas
-                    ? () => SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion))
-                    : () => _activar(context, 'finanzasActiva', 'Finanzas', textoFinanzas),
-                derecha: Switch(value: finanzas, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'finanzasActiva', v)),
-              ),
-            // Los ajustes de coaches viven en Liga → Comunidad → Coaches
-            // (Victor, 2026-11-22); aquí queda solo activarlo o no.
-            if (pivot)
-              FilaAjuste(
-                icono: Icons.sports_rounded,
-                seccion: 'entrenamientos',
-                titulo: 'Coach',
-                valor: coach ? 'Activado · sus ajustes están en Liga → Coaches' : 'Desactivado para la liga',
-                alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Coach', textoCoach),
-                derecha: Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)),
-              ),
+            FilaAjuste(
+              icono: Icons.account_balance_wallet_rounded,
+              seccion: 'recaudacion',
+              titulo: 'Finanzas',
+              valor: finanzas ? 'Activada · en la pestaña Finanzas de Liga' : 'Desactivada para la liga',
+              alTocar: finanzas ? null : () => _activar(context, 'finanzasActiva', 'Finanzas', textoFinanzas),
+              derecha: Switch(value: finanzas, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'finanzasActiva', v)),
+            ),
+            FilaAjuste(
+              icono: Icons.sports_rounded,
+              seccion: 'entrenamientos',
+              titulo: 'Coach',
+              valor: coach ? 'Activado · en Liga → Coaches' : 'Desactivado para la liga',
+              alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Coach', textoCoach),
+              derecha: Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)),
+            ),
           ],
         );
       },

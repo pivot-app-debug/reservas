@@ -104,7 +104,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         PasoTour(
           clave: _kPills,
           titulo: 'Tus secciones',
-          texto: 'Toca un ícono para cambiar de sección (o desliza): Novedades, Tareas, Cursos y Pagos. La elegida se marca con su nombre.',
+          texto: 'Toca un ícono para cambiar de sección (o desliza): Próximos eventos, Tareas, Cursos y Pagos. La elegida se marca con su nombre.',
         ),
         PasoTour(
           clave: _kCuerpo,
@@ -133,14 +133,19 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
   }
 
   static String nombre(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => 'Novedades',
+    PestanaActividad.notificaciones => 'Próximos eventos',
     PestanaActividad.tareas => 'Tareas',
     PestanaActividad.clases => 'Cursos',
     PestanaActividad.pagos => 'Pagos y suscripciones',
   };
 
   /// Texto corto del pill (el título dice el nombre completo).
-  static String _corto(PestanaActividad x) => x == PestanaActividad.pagos ? 'Pagos' : nombre(x);
+  static String _corto(PestanaActividad x) => switch (x) {
+    PestanaActividad.pagos => 'Pagos',
+    // Corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
+    PestanaActividad.notificaciones => 'Eventos',
+    _ => nombre(x),
+  };
 
   // Material Symbols (Victor, 2026-11-20): los mismos íconos de Google Fonts.
   static IconData _icono(PestanaActividad x) => switch (x) {
@@ -327,15 +332,18 @@ class _SeccionEventos extends StatelessWidget {
               ),
             for (final e in semana) _fila(context, p, e),
             // Crear, justo debajo de lo de esta semana (Victor, 2026-11-20).
-            if (_puede) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                onPressed: () => _crear(context),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta'),
+            // Como el recuadro de crear una tarea (Victor, 2026-11-22).
+            if (_puede)
+              TarjetaCrear(
+                icono: eventos.sesion.esAdmin ? Icons.event_rounded : Icons.celebration_rounded,
+                seccion: 'reservas',
+                titulo: eventos.sesion.esAdmin ? '¿Viene algo nuevo?' : '¿Armas una fiesta?',
+                texto: eventos.sesion.esAdmin
+                    ? 'Entrenamientos, partidos, reuniones o fiestas: quedan en el calendario.'
+                    : 'Se publica cuando un Pivot la aprueba.',
+                boton: eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta',
+                alTocar: () => _crear(context),
               ),
-            ],
             if (cumples.isNotEmpty) ...[
               EncabezadoSeccion(titulo: 'Cumpleaños', icono: Icons.cake_outlined, cantidad: cumples.length),
               // Igual que en el timeline (Victor, 2026-11-22).

@@ -9918,8 +9918,12 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
     return ultima.slice(0, 10) < (fechaUltimoEventoDisponible as string) ? 0 : rachaCruda;
   };
 
+  // Coaches aprobadxs (Victor, 2026-11-22): Liga → Gente → Coaches.
+  const { data: coachesRows } = await supabase.from('coaches').select('username').eq('estado', 'aprobado');
+  const coachesSet = new Set((coachesRows ?? []).map((c: any) => String(c.username)));
   const personasOut = personas.map((r: any) => ({
     id: r.username, nombre: r.username, username: r.username,
+    esCoach: coachesSet.has(String(r.username)),
     nombreDerby: r.nombre_derby ?? '', numeroDerby: r.numero_derby ?? '',
     fotoPerfil: r.foto_perfil ?? '', rol: r.categoria ?? 'Mirlxs',
     pronombres: r.pronombres ?? '', prefijo: r.prefijo ?? '', telefono: r.telefono ?? '', email: r.email ?? '',
