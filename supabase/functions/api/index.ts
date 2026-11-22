@@ -314,7 +314,7 @@ const AREAS_PIVOT = ['finanzas', 'asistencia', 'equipo', 'salud', 'inventario', 
 const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
-    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminClasesParaPago', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
+    'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminClasesParaPago', 'adminMesesCuota', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
     'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
@@ -6335,6 +6335,7 @@ async function guardarReserva(params: Record<string, any>): Promise<Record<strin
         medio_nombre: String(params.medioNombre ?? '').trim().slice(0, 60) || null,
   }).select('id, monto').maybeSingle();
   // El id permite subir el comprobante justo después (2026-11-14).
+    await supabase.from('reservas_en_curso').delete().eq('nombre', nombre);
   return { exito: true, id: nueva?.id ?? null, monto: Number(nueva?.monto) || 0, saldoAplicado: saldoAplicado ?? 0 };
 }
 
@@ -6799,6 +6800,47 @@ async function _deudaClases(username: string, disp?: number): Promise<number> {
   const { data } = await supabase.from('saldos_movimientos').select('monto').eq('username', username).eq('anulado', false).eq('aplicar', 'con_cuota');
   const pendiente = -(data ?? []).reduce((s: number, r: any) => s + (Number(r.monto) || 0), 0);
   return _num2(Math.max(0, Math.min(pendiente, -d)));
+}
+
+// ─── Reserva sin terminar (Victor, 2026-11-22) ───────────────────────────────
+// La app avisa al llegar al paso de pago ('inicio') y al salir con volver o
+// cerrar ('fin'). Guardar la reserva también lo borra. Si a los 30 minutos
+// sigue, se le pregunta una sola vez si quiere terminarla.
+async function reservaEnCurso(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  if (params.accion === 'inicio') {
+    let clases: string[] = [];
+    try { clases = JSON.parse(String(params.clases ?? '[]')).map(String).slice(0, 20); } catch { /* sin clases */ }
+    await supabase.from('reservas_en_curso').upsert(
+      { nombre: yo, detalle: String(params.detalle ?? '').slice(0, 200) || null, clases, creado_en: new Date().toISOString(), avisado_en: null },
+      { onConflict: 'liga_id,nombre' },
+    );
+  } else {
+    await supabase.from('reservas_en_curso').delete().eq('nombre', yo);
+  }
+  return { exito: true };
+}
+
+async function _avisarReservasSinTerminar(): Promise<void> {
+  const antes = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  await supabase.from('reservas_en_curso').delete().lt('creado_en', new Date(Date.now() - 86400000).toISOString());
+  const { data: filas } = await supabase.from('reservas_en_curso').select('*').is('avisado_en', null).lt('creado_en', antes);
+  if (!filas?.length) return;
+  const abiertas = new Set((await _proximosEntrenamientos()).map((e: any) => e.idEvento));
+  for (const f of filas) {
+    await supabase.from('reservas_en_curso').update({ avisado_en: new Date().toISOString() }).eq('id', f.id);
+    const { count } = await supabase.from('reservas').select('id', { count: 'exact', head: true }).eq('nombre_usuario', f.nombre).gte('created_at', f.creado_en);
+    if (count) continue;
+    const clases: string[] = Array.isArray(f.clases) ? f.clases : [];
+    if (clases.length && !clases.some((c) => abiertas.has(c))) continue; // ya cerró la reserva de esas clases
+    await sendPush({
+      tipo: 'reserva_sin_terminar', include_external_user_ids: [f.nombre], personal: true,
+      headings: { es: '¿Terminamos tu reserva?' },
+      contents: { es: f.detalle ? `Dejaste a medias tu reserva de ${f.detalle}. Toca para terminarla.` : 'Dejaste una reserva a medias. Toca para terminarla.' },
+      url: APP_URL,
+    }).catch(() => {});
+  }
 }
 
 async function getMiSaldo(params: Record<string, any>): Promise<Record<string, any>> {
@@ -7311,6 +7353,29 @@ async function getTransparencia(params: Record<string, any>): Promise<Record<str
 // (hoy el 100% de `pagos` se origina en una acción admin manual); `idEvento`
 // -- solo se completa para `tipo:'clase'`, trazabilidad hacia el evento real
 // (ver migración `20260912160000_pagos_manual_wizard.sql`).
+/// Estado de la cuota de una persona en los últimos 6 meses, este y los
+/// próximos 6, para "No paga un mes" (Victor, 2026-11-22): 'pagado' (al día),
+/// 'no_paga' (ya tiene la excepción), 'en_revision' o '' (pendiente).
+async function adminMesesCuota(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const nombre = String(params.nombre ?? '').trim();
+  if (!nombre) return { exito: false, error: 'Falta la persona.' };
+  const h = _hoyEcuadorISO();
+  const y = Number(h.slice(0, 4)), m = Number(h.slice(5, 7));
+  const meses = Array.from({ length: 13 }, (_, i) => { const d = new Date(Date.UTC(y, m - 1 + i - 6, 1)); return d.toISOString().slice(0, 7); });
+  const { data: exc } = await supabase.from('cuota_excepcion').select('mes, tipo').eq('id_miembro', nombre).in('mes', meses);
+  const estados = await Promise.all(meses.map((mes) => _estadosCuotaMes([nombre], mes)));
+  return {
+    exito: true,
+    meses: meses.map((mes, i) => {
+      const e = (exc ?? []).find((x: any) => x.mes === mes);
+      const s = estados[i][nombre];
+      return { mes, estado: e?.tipo === 'exenta' ? 'no_paga' : s === 'al_dia' ? 'pagado' : s === 'en_revision' ? 'en_revision' : '' };
+    }),
+  };
+}
+
 /// Clases de una persona para registrarle un pago a mano (Victor, 2026-11-21):
 /// las de los últimos 45 días y los próximos 30, con si ya está pagada, si
 /// quedó debiendo (vino sin reserva o pasó a deuda) o si tiene una reserva
@@ -8072,7 +8137,12 @@ async function guardarExcepcionCuota(params: Record<string, any>): Promise<Recor
     if (error) return { exito: false, error: error.message };
     return { exito: true };
   }
-  if (!['pago', 'exenta'].includes(tipo)) return { exito: false, error: 'Tipo de excepción inválido.' };
+    if (!['pago', 'exenta'].includes(tipo)) return { exito: false, error: 'Tipo de excepción inválido.' };
+  // Un mes ya pagado no se marca como "no paga" (Victor, 2026-11-22).
+  if (tipo === 'exenta' && /^\d{4}-\d{2}$/.test(mes)) {
+    const { data: ya } = await supabase.from('cuota_excepcion').select('tipo').eq('id_miembro', idMiembro).eq('mes', mes).maybeSingle();
+    if (ya?.tipo !== 'exenta' && (await _estadosCuotaMes([idMiembro], mes))[idMiembro] === 'al_dia') return { exito: false, error: 'Ese mes ya está pagado.' };
+  }
   const monto = tipo === 'pago' && params.monto != null && params.monto !== '' ? Number(params.monto) : null;
   const notas = params.notas != null && params.notas !== '' ? String(params.notas) : null;
   const { error } = await supabase.from('cuota_excepcion')
@@ -10679,6 +10749,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
         { clave: 'comprobante_pendiente', nombre: 'Comprobante pendiente', descripcion: 'Si hiciste una reserva y falta subir el comprobante de pago.', categoria: 'Cuenta' },
     { clave: 'cuota_pendiente', nombre: 'Recordatorios de cuota', descripcion: 'El día 1, el día antes de la fecha límite, el día después y después de tu clase de gracia, solo si aún no pagaste. No llegan si ya pagaste o tu pago está en revisión.', categoria: 'Cuenta' },
     { clave: 'cambio_categoria', nombre: 'Cambio de categoría', descripcion: 'Cuando cambia tu categoría (Mirlxs/Quindes).', categoria: 'Cuenta' },
+    { clave: 'reserva_sin_terminar', nombre: 'Reserva sin terminar', descripcion: 'Si dejaste una reserva a medias, te preguntamos una vez si quieres terminarla.', categoria: 'Cuenta' },
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
             { clave: 'curso_nuevo', nombre: 'Cursos nuevos', descripcion: 'Cuando se abre un curso o una clínica que puedes tomar.', categoria: 'Entrenamientos' },
       { clave: 'tarea_nueva', nombre: 'Tareas nuevas', descripcion: 'Cuando se publica una tarea que puedes tomar.', categoria: 'Tareas' },
@@ -11349,7 +11420,8 @@ const _BTN_NO_ASISTIRE = { id: 'no-asistire', text: 'No asistiré', url: '_osp=d
 //     les lleguen 2 avisos del mismo evento.
 async function cronRecordatorioEvento(): Promise<Record<string, any>> {
   const ahora = Date.now();
-  try { await _enviarAvisosProgramados(); } catch (e) { console.error('[avisos] programados:', e); }
+    try { await _enviarAvisosProgramados(); } catch (e) { console.error('[avisos] programados:', e); }
+  try { await _avisarReservasSinTerminar(); } catch (e) { console.error('[reservas] sin terminar:', e); }
   const enVentana = await _eventosEnVentana(ahora + 55 * 60 * 1000, ahora + 65 * 60 * 1000, [0, 1]);
   if (!enVentana.length) return { exito: true, eventos: 0, enviados: 0 };
 
@@ -13152,7 +13224,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));
                         case 'adminTesoreria':                  return json(await adminTesoreria(params));
             case 'getOpcionesLogin':                return json(await getOpcionesLogin());
-                                    case 'getMiSaldo':                      return json(await getMiSaldo(params));
+                                                                        case 'getMiSaldo':                      return json(await getMiSaldo(params));
+      case 'reservaEnCurso':                  return json(await reservaEnCurso(params));
                                                 case 'cancelarMiSolicitud':             return json(await cancelarMiSolicitud(params));
       case 'editarMiSolicitud':               return json(await editarMiSolicitud(params));
             case 'subirComprobante':                return json(await subirComprobante(params));
@@ -13305,7 +13378,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'usarCreditos':                    return json(await usarCreditos(params));
       // Pagos
             case 'adminRegistrarPago':              return json(await adminRegistrarPago(params));
-      case 'adminClasesParaPago':             return json(await adminClasesParaPago(params));
+            case 'adminClasesParaPago':             return json(await adminClasesParaPago(params));
+      case 'adminMesesCuota':                 return json(await adminMesesCuota(params));
       case 'adminRegistrarIngreso':           return json(await adminRegistrarIngreso(params));
       case 'adminRegistrarEgreso':            return json(await adminRegistrarEgreso(params));
       case 'adminGetEstadoPagosMes':          return json(await adminGetEstadoPagosMes(params));

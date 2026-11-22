@@ -585,6 +585,17 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
           ),
         );
       case 'revelado':
+        if (e.amigoEntregaDespues) {
+          contenido.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Tu amigo secreto no podrá ir a la fiesta, pero sigue participando: entrégale tu regalo después.',
+                style: TextStyle(fontWeight: FontWeight.w600, color: p.marcaTexto),
+              ),
+            ),
+          );
+        }
         contenido.add(
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),

@@ -471,13 +471,55 @@ class _AdministracionState extends State<_Administracion> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('¿Qué mes no paga ${p.nombreMostrar}?', style: Theme.of(hoja).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
             ),
-            // Últimos 6 meses, este y los próximos 6 (Victor, 2026-11-21).
+            // Últimos 6 meses, este y los próximos 6 (Victor, 2026-11-21), con su
+            // estado: un mes pagado no se puede elegir (2026-11-22).
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [for (final m in RegistrarPagoScreen.meses()) ActionChip(label: Text(Fechas.mesAnio(m)), onPressed: () => Navigator.of(hoja).pop(m))],
+              child: FutureBuilder<Map<String, String>>(
+                future: widget.repo.mesesCuota(p),
+                builder: (hoja, f) {
+                  if (f.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final estados = f.data ?? const {};
+                  String clave(DateTime m) => '${m.year}-${m.month.toString().padLeft(2, '0')}';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (f.hasError)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text('No se pudo ver qué meses tiene pagados.', style: TextStyle(color: hoja.pivot.textoSecundario)),
+                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final m in RegistrarPagoScreen.meses())
+                            switch (estados[clave(m)]) {
+                              'pagado' => ActionChip(
+                                avatar: const Icon(Icons.check_rounded, size: 18),
+                                label: Text('${Fechas.mesAnio(m)} · Pagado'),
+                                onPressed: null,
+                              ),
+                              'no_paga' => ActionChip(
+                                avatar: const Icon(Icons.event_busy_outlined, size: 18),
+                                label: Text('${Fechas.mesAnio(m)} · No paga'),
+                                onPressed: null,
+                              ),
+                              final e => ActionChip(
+                                label: Text(e == 'en_revision' ? '${Fechas.mesAnio(m)} · En revisión' : Fechas.mesAnio(m)),
+                                onPressed: () => Navigator.of(hoja).pop(m),
+                              ),
+                            },
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],

@@ -380,6 +380,11 @@ class ReservasRepo {
   Future<double> miSaldo() async => (await miSaldoDetalle()).saldo;
 
   /// Saldo y la deuda de clases que pasaron a deuda (se cobra sí o sí en la próxima reserva).
+  /// Reserva sin terminar (Victor, 2026-11-22): llegó al paso de pago o salió.
+  void enCurso({String? detalle, List<String> clases = const []}) =>
+      _api.post('reservaEnCurso', {'accion': 'inicio', 'detalle': ?detalle, 'clases': jsonEncode(clases)}).catchError((_) => <String, dynamic>{}).ignore();
+  void finEnCurso() => _api.post('reservaEnCurso', {'accion': 'fin'}).catchError((_) => <String, dynamic>{}).ignore();
+
   Future<({double saldo, double deudaClases})> miSaldoDetalle() async {
     try {
       final r = await _api.get('getMiSaldo');

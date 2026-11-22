@@ -51,7 +51,7 @@ export const ACCIONES_SOCIAL = new Set([
   'socialRevelar', 'socialAnotarComida', 'socialQuitarAporte', 'socialSortear',
   'socialEquipo', 'socialAprobar', 'socialRechazar',
         'socialAnotarTraer', 'socialQuitarTraer', 'socialMensaje', 'socialAportarRegalo', 'socialLiberarMensajes', 'socialComidaEditar', 'socialInvitadoNombre',
-            'socialJuego', 'socialEditarPieza', 'socialParticipar', 'socialSinRespuesta',
+                  'socialJuego', 'socialEditarPieza', 'socialParticipar', 'socialSinRespuesta', 'socialDejaDeIr',
 ]);
 
 /// Plantilla de reglas del regalo robado (editable por quien organiza).
@@ -191,7 +191,8 @@ export async function accionSocial(action: string, params: Record<string, any>, 
             case 'socialJuego': return await socialJuego(params, deps);
             case 'socialEditarPieza': return await socialEditarPieza(params, deps);
             case 'socialParticipar': return await socialParticipar(params, deps);
-      case 'socialSinRespuesta': return await socialSinRespuesta(params, deps);
+            case 'socialSinRespuesta': return await socialSinRespuesta(params, deps);
+      case 'socialDejaDeIr': return await socialDejaDeIr(params, deps);
       case 'socialLiberarMensajes': return await socialLiberarMensajes(params, deps);
     }
     return { exito: false, error: 'Acción desconocida: ' + action };
@@ -542,8 +543,10 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
         out.yo = { nombre: q.nombre, asiste: _asiste(q, asisten), anfitrion: null as string | null, necesitaNombre: esInv && !q.nombre } as Record<string, any>;
   // ¿Participa del amigo secreto y del regalo robado? (y si ya respondió).
   if (q.clave) {
-    const { data: pa } = await db.from('social_participacion').select('amigo, robado').eq('id_evento', q.idEvento).eq('clave', q.clave).maybeSingle();
+        const { data: pa } = await db.from('social_participacion').select('amigo, robado, entrega_despues').eq('id_evento', q.idEvento).eq('clave', q.clave).maybeSingle();
     out.yo.participa = { amigo: pa ? pa.amigo !== false : true, robado: pa ? pa.robado !== false : true, respondio: !!pa };
+    // Volvió a marcar Asistiré: ya no entrega después.
+    if (pa?.entrega_despues && out.yo.asiste) await db.from('social_participacion').update({ entrega_despues: false }).eq('id_evento', q.idEvento).eq('clave', q.clave);
   }
     // Tiene dieta o alergias en Salud que no prendió para los eventos: se le sugiere (solo a esa persona).
   if (q.username && social.comida) {
@@ -574,7 +577,11 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     if (!cfg.sorteado_en) out.amigo = { estado: 'sin_sorteo' };
     else if (!mio) out.amigo = { estado: 'fuera' };
     else if (!mio.revelado_en) out.amigo = { estado: 'por_revelar' };
-    else out.amigo = { estado: 'revelado', ficha: await _ficha(db, liga, mio.recibe) };
+        else {
+      // No va a la fiesta pero sigue en el amigo secreto (Victor, 2026-11-22): el regalo se entrega después.
+      const { data: pr } = await db.from('social_participacion').select('entrega_despues').eq('id_evento', q.idEvento).eq('clave', mio.recibe).maybeSingle();
+      out.amigo = { estado: 'revelado', ficha: await _ficha(db, liga, mio.recibe), entregaDespues: pr?.entrega_despues === true };
+    }
   }
 
     // Regalo robado en vivo: si ya empezó, quién dirige y si es el día.
@@ -1721,6 +1728,80 @@ async function socialSinRespuesta(params: Record<string, any>, deps: DepsSocial)
     return { nombre: r.username, nombreDerby: r.nombre_derby ?? '', fotoPerfil: r.foto_perfil ?? '', estadoMiembro: r.estado_miembro ?? 'Activx', ultimaAsistencia: u ? u.slice(0, 10) : null };
   });
   return { exito: true, personas };
+}
+
+/// Pasa a "No asistiré" en una fiesta (Victor, 2026-11-22). La app pregunta
+/// antes: si sigue en el amigo secreto (entrega y recibe después) o sale (se
+/// cierra la cadena: quien le regalaba pasa a regalarle a quien ella tenía), y
+/// si lo que anotó para llevar se quita o igual lo envía al evento. Se aplica
+/// también a sus invitadxs que estaban en el sorteo.
+async function socialDejaDeIr(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {
+  const db = deps.db, liga = deps.ligaEnCurso();
+  const q = await _quien(params, deps);
+  if ('error' in q) return { exito: false, error: q.error };
+  if (q.tipo !== 'miembro' || !q.clave) return { exito: false, error: 'Solo para el equipo.' };
+  const cfg = await _config(db, q.idEvento);
+  if (!cfg) return { exito: true };
+  const amigo = String(params.amigo ?? '');
+  const comida = String(params.comida ?? '');
+  const invitados = (await _invitados(db, q.idEvento)).filter((i: any) => i.anfitrion === q.clave).map((i: any) => 'inv:' + i.id);
+  const claves = [q.clave, ...invitados];
+  const cambiados: string[] = [];
+  if (cfg.sorteado_en && (amigo === 'sigue' || amigo === 'sale')) {
+    const { data: sorteo } = await db.from('social_sorteo').select('da, recibe').eq('id_evento', q.idEvento);
+    for (const c of claves) {
+      const regalaA = (sorteo ?? []).find((s: any) => s.recibe === c)?.da as string | undefined;
+      const recibeDe = (sorteo ?? []).find((s: any) => s.da === c)?.recibe as string | undefined;
+      if (!regalaA && !recibeDe) continue;
+      if (amigo === 'sigue') {
+        await db.from('social_participacion').upsert({ id_evento: q.idEvento, clave: c, liga_id: liga, entrega_despues: true, respondido_en: new Date().toISOString() }, { onConflict: 'id_evento,clave' });
+        if (regalaA && !regalaA.startsWith('inv:')) cambiados.push(`despues:${regalaA}`);
+        continue;
+      }
+      // Sale: se cierra la cadena.
+      await db.from('social_sorteo').delete().eq('id_evento', q.idEvento).eq('da', c);
+      if (regalaA && recibeDe && regalaA !== recibeDe) {
+        await db.from('social_sorteo').update({ recibe: recibeDe, revelado_en: null }).eq('id_evento', q.idEvento).eq('da', regalaA);
+        if (!regalaA.startsWith('inv:')) cambiados.push(`nuevo:${regalaA}`);
+      } else if (regalaA) {
+        // Eran solo 2: quien le regalaba se queda sin amigo secreto; quien organiza decide.
+        await db.from('social_sorteo').delete().eq('id_evento', q.idEvento).eq('da', regalaA);
+        if (!regalaA.startsWith('inv:')) cambiados.push(`sin:${regalaA}`);
+      }
+      // Actualizar la lista en memoria para la siguiente clave.
+      for (const s of sorteo ?? []) if (s.da === regalaA) s.recibe = recibeDe;
+      await db.from('social_participacion').upsert({ id_evento: q.idEvento, clave: c, liga_id: liga, amigo: false, respondido_en: new Date().toISOString() }, { onConflict: 'id_evento,clave' });
+    }
+  }
+  if (comida === 'quitar' || comida === 'enviar') {
+    const { data: cats } = await db.from('social_comida_categorias').select('id').eq('id_evento', q.idEvento);
+    const ids = (cats ?? []).map((c: any) => c.id);
+    if (ids.length) {
+      if (comida === 'quitar') await db.from('social_comida_aportes').delete().in('categoria_id', ids).in('clave', claves);
+      else {
+        const { data: aps } = await db.from('social_comida_aportes').select('id, detalle').in('categoria_id', ids).in('clave', claves);
+        for (const a of aps ?? []) {
+          const d = String(a.detalle ?? '');
+          if (!d.includes('(lo envía)')) await db.from('social_comida_aportes').update({ detalle: `${d} (lo envía)`.trim() }).eq('id', a.id);
+        }
+      }
+    }
+  }
+  if (deps.push) {
+    for (const x of cambiados) {
+      const [tipo, u] = x.split(':');
+      await deps.push({
+        tipo: 'social', include_external_user_ids: [u], personal: true,
+        headings: { es: 'Amigo secreto' },
+        contents: { es: tipo === 'despues'
+          ? 'La persona a la que le regalas no podrá ir a la fiesta. Sigue en el amigo secreto: entrégale tu regalo después.'
+          : tipo === 'nuevo' ? 'Tu amigo secreto cambió porque alguien ya no va. Abre el evento para descubrir a quién le regalas ahora.'
+          : 'Tu amigo secreto ya no va y te quedaste sin a quién regalar. Quien organiza puede rehacer el sorteo.' },
+        url: _url(deps, q.idEvento), evento: { idEvento: q.idEvento },
+      }).catch(() => {});
+    }
+  }
+  return { exito: true };
 }
 
 async function socialParticipar(params: Record<string, any>, deps: DepsSocial): Promise<Record<string, any>> {

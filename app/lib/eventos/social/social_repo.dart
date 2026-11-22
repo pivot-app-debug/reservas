@@ -33,6 +33,10 @@ class SocialRepo {
   /// Cuánto come y toma cada persona en promedio (cambia las secciones de comida y bebida).
   Future<void> editarConsumo({num? porciones, num? litros}) => _post('socialComidaEditar', {'accion': 'consumo', 'porciones': ?porciones, 'litros': ?litros});
 
+  /// Deja de ir a la fiesta (Victor, 2026-11-22). amigo: 'sigue' | 'sale';
+  /// comida: 'quitar' | 'enviar'.
+  Future<void> dejaDeIr({String? amigo, String? comida}) => _post('socialDejaDeIr', {'amigo': ?amigo, 'comida': ?comida});
+
   /// ¿Participa del amigo secreto y del regalo robado? (Victor, 2026-11-20).
   Future<void> participar({bool? amigo, bool? robado}) => _post('socialParticipar', {'amigo': ?amigo, 'robado': ?robado});
 
@@ -248,6 +252,9 @@ class EstadoSocial {
   List<Map<String, dynamic>> get misInvitados => [for (final x in (raw['misInvitados'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
   PerfilSocial get perfil => PerfilSocial.desde(raw['perfil']);
   String get estadoAmigo => '${(raw['amigo'] as Map?)?['estado'] ?? ''}';
+
+  /// A quien le regalas no va a la fiesta: le entregas el regalo después.
+  bool get amigoEntregaDespues => (raw['amigo'] as Map?)?['entregaDespues'] == true;
   FichaAmigo? get ficha => (raw['amigo'] as Map?)?['ficha'] is Map ? FichaAmigo(Map<String, dynamic>.from((raw['amigo'] as Map)['ficha'] as Map)) : null;
   List<CategoriaComida> get comida => [for (final x in (raw['comida'] as List? ?? const [])) CategoriaComida(Map<String, dynamic>.from(x as Map))];
 }

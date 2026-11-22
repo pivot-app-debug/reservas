@@ -210,6 +210,16 @@ class EquipoRepo extends ChangeNotifier {
     return r;
   }
 
+  /// Estado de la cuota por mes ('AAAA-MM' → 'pagado' | 'no_paga' | 'en_revision' | '').
+  Future<Map<String, String>> mesesCuota(Integrante p) async {
+    final r = await _api.get('adminMesesCuota', {'adminToken': sesion.adminToken, 'nombre': p.username});
+    if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar.'}');
+    return {
+      for (final x in (r['meses'] as List? ?? const []))
+        if (x is Map) '${x['mes']}': '${x['estado'] ?? ''}',
+    };
+  }
+
   /// tipo: 'mensual' (mes), 'clase' (idEvento) o 'saldo' (todo queda a favor).
   Future<void> registrarPago(
     Integrante p, {

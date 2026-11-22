@@ -170,6 +170,26 @@ class _ReservaScreenState extends State<ReservaScreen> {
       _adelante = delta > 0;
       _paso = _Paso.values[i];
     });
+    // Llegó al pago: si cierra la app sin terminar, se le pregunta después.
+    if (_paso == _Paso.pago && !_avisadoEnCurso) {
+      _avisadoEnCurso = true;
+      final clases = _clases?.where((c) => _clasesSel.contains(c.id)).toList() ?? const <FechaClase>[];
+      _r.enCurso(
+        detalle: _esMes
+            ? (_mesesSel.length == 1 ? 'la cuota de ${ReglaAnticipada.nombreMes(_mesesSel.first)}' : 'tu cuota')
+            : (clases.length == 1 ? 'la clase del ${ReservasRepo.etiquetaClase(clases.first)}' : 'tus clases'),
+        clases: [for (final c in clases) c.id],
+      );
+    }
+  }
+
+  /// Si salió a propósito (volver o cerrar), no se le pregunta después.
+  bool _avisadoEnCurso = false;
+
+  @override
+  void dispose() {
+    if (_avisadoEnCurso) _r.finEnCurso();
+    super.dispose();
   }
 
   @override

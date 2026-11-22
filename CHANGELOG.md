@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-22 (meses pagados, reservas a medias y dejar de ir a una fiesta)
+- No paga un mes muestra qué meses están pagados o ya no pagan; esos no se pueden elegir.
+- Si alguien llega al pago de una reserva y cierra la app sin terminar, a los 30 minutos se le pregunta una vez si quiere terminarla (si salió con volver, no).
+- En una fiesta, quien pasa a No asistiré elige si sigue en el amigo secreto (entrega y recibe su regalo después) o sale (solo cambia la persona que le regalaba, y se le avisa). También elige si quita lo que iba a llevar o igual lo envía.
+
 ## 2026-11-21 (fiesta más ordenada, con subsecciones)
 - Arriba del evento, un aviso con lo que te falta (amigo secreto, lista de deseos, lo que llevas) y un botón para completarlo. También llega como notificación una vez, y otra 2 días antes del cierre si sigue pendiente.
 - "Faltan N días" y Dudas y preguntas pasaron a la barra del evento.

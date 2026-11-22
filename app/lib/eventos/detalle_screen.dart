@@ -24,7 +24,7 @@ import 'rectificacion.dart';
 import 'social/social_evento.dart';
 import 'social/social_vista.dart';
 import 'social/que_lleva_calculo.dart';
-import 'social/social_repo.dart' show EstadoSocial;
+import 'social/social_repo.dart' show EstadoSocial, SocialRepo;
 import 'tipos_evento.dart';
 import 'modelos.dart';
 import 'widgets_comunes.dart';
@@ -544,6 +544,46 @@ class _DetalleScreenState extends State<DetalleScreen> {
     );
   }
 
+  /// Fiesta: quien pasa a "No asistiré" elige si sigue en el amigo secreto
+  /// (entrega y recibe después) y qué hace con lo que iba a llevar.
+  Future<({bool cancelar, String? amigo, String? comida})?> _preguntarDejarDeIr(Evento ev) async {
+    final e = estadosSociales[ev.id];
+    if (e == null || !e.asiste) return null;
+    final enSorteo = e.sorteado && (e.estadoAmigo == 'por_revelar' || e.estadoAmigo == 'revelado');
+    final lleva = e.comida.any((c) => c.aportes.any((a) => a['mio'] == true));
+    if (!enSorteo && !lleva) return null;
+    String? amigo, comida;
+    if (enSorteo) {
+      amigo = await showDialog<String>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('¿Sigues en el amigo secreto?'),
+          content: const Text('Puedes seguir y entregar y recibir tu regalo después. Si sales, quien te regalaba pasa a regalarle a quien tenías tú.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, 'sale'), child: const Text('Salir')),
+            FilledButton(onPressed: () => Navigator.pop(d, 'sigue'), child: const Text('Sigo')),
+          ],
+        ),
+      );
+      if (amigo == null) return (cancelar: true, amigo: null, comida: null);
+    }
+    if (lleva && mounted) {
+      comida = await showDialog<String>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('Lo que ibas a llevar'),
+          content: const Text('¿Lo quitas de la lista o igual lo envías al lugar del evento?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, 'quitar'), child: const Text('Quitarlo')),
+            FilledButton(onPressed: () => Navigator.pop(d, 'enviar'), child: const Text('Igual lo envío')),
+          ],
+        ),
+      );
+      if (comida == null) return (cancelar: true, amigo: null, comida: null);
+    }
+    return (cancelar: false, amigo: amigo, comida: comida);
+  }
+
   /// Clase de gracia usada y el mes sin pagar: ofrece ir a pagar.
   Future<void> _pagarCuota(CuotaPendiente e) async {
     // Con saldo a favor se le dice que puede usarlo (Victor, 2026-11-21).
@@ -680,8 +720,19 @@ class _DetalleScreenState extends State<DetalleScreen> {
                   ? null
                   : (sel) async {
                       if (sel.isEmpty) return;
+                      // Fiesta: antes de dejar de ir, qué pasa con el amigo secreto y lo que llevaba (Victor, 2026-11-22).
+                      final dejar = sel.first == EstadoRsvp.noAsistire && ev.tipo == kTipoSocial ? await _preguntarDejarDeIr(ev) : null;
+                      if (dejar != null && dejar.cancelar) return;
                       try {
                         final sinSenal = await repo.marcar(ev, sel.first);
+                        if (dejar != null && (dejar.amigo != null || dejar.comida != null)) {
+                          await SocialRepo.miembro(
+                            repo.sesion.api,
+                            idEvento: ev.id,
+                            adminToken: repo.sesion.adminToken,
+                          ).dejaDeIr(amigo: dejar.amigo, comida: dejar.comida);
+                          _kSocial.currentState?.recargar();
+                        }
                         if (sinSenal) _avisar('Sin señal: tu respuesta quedó guardada y se sube sola cuando vuelva la conexión.');
                       } on CuotaPendiente catch (e) {
                         if (mounted) await _pagarCuota(e);
