@@ -513,6 +513,16 @@ function _asistenciaEFPorEvento(data: any[]): Record<string, any[]> {
   return porEvento;
 }
 
+/** Suscripción a una clase confirmada → la persona queda en "Asistiré". */
+async function _asistireAlConfirmar(idEvento: string, nombre: string): Promise<void> {
+  // Una clase que ya pasó (pago registrado después) no cambia su respuesta.
+  const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
+  if (!ev || String(ev.fecha).slice(0, 10) < _hoyEcuadorISO()) return;
+  await supabase.from('log_asistencias').delete()
+    .eq('id_evento', idEvento).eq('nombre_usuario', nombre)
+    .in('origen', ['Usuario', 'AsistenciaAnticipada']);
+  await _agregarFilaLogAsistencia(idEvento, nombre, 'Usuario', 'Asistiré');
+}
 async function _agregarFilaLogAsistencia(idEvento: string, nombre: string, origen: string, estado: string): Promise<{ error: string | null }> {
   const { data: ev } = await supabase.from('asistencias').select('fecha').eq('id_evento', idEvento).maybeSingle();
   const { error } = await supabase.from('log_asistencias').insert({
@@ -7488,6 +7498,7 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
         nombre_usuario: nombre, id_evento: idEvento, tipo: 'clase', estado: 'Confirmada', monto: _num2(paga), fecha_pago: _hoyEcuadorISO(),
         medio_pago: String(datos.formaPago ?? '').toLowerCase().includes('deuna') ? 'deuna' : String(datos.formaPago ?? '').toLowerCase().includes('efectivo') ? 'efectivo' : 'transferencia',
       });
+      await _asistireAlConfirmar(idEvento, nombre);
       extraClase = _num2(montoTotal - paga);
     }
     await aFavor(extraClase, `${que}: pagó de más`);
@@ -13110,14 +13121,10 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
   // (`Usuario`/`AsistenciaAnticipada`) e inserta la fila nueva
   // `origen:'Usuario'` -- indistinguible de un RSVP manual para el resto de
   // la app (`getEventosRango()`, el termómetro de racha, etc.).
+  // Verificado 2026-11-22 (Victor): vale para cualquier equipo de cualquier
+  // liga, no solo "Mirlxs" (era un nombre fijo).
   if (estado === 'Confirmada' && reservaAntes?.tipo === 'clase' && reservaAntes?.id_evento) {
-    const { data: persona } = await supabase.from('equipo').select('categoria').eq('username', reservaAntes.nombre_usuario).maybeSingle();
-    if (persona?.categoria === 'Mirlxs') {
-      await supabase.from('log_asistencias').delete()
-        .eq('id_evento', reservaAntes.id_evento).eq('nombre_usuario', reservaAntes.nombre_usuario)
-        .in('origen', ['Usuario', 'AsistenciaAnticipada']);
-      await _agregarFilaLogAsistencia(reservaAntes.id_evento, reservaAntes.nombre_usuario, 'Usuario', 'Asistiré');
-    }
+    await _asistireAlConfirmar(reservaAntes.id_evento, reservaAntes.nombre_usuario);
   }
 
     // "Clase a favor" (Mi Liga, 2026-11-07): avisar a la persona que su
