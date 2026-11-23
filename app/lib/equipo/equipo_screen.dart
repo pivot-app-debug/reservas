@@ -78,11 +78,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   static String _nombreLiga(PestanaLiga x) => switch (x) {
     // Más corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
-    PestanaLiga.comunidad => 'Gente',
+    PestanaLiga.comunidad => 'Equipos',
     PestanaLiga.redes => 'Redes',
     PestanaLiga.inventario => 'Inventario',
     PestanaLiga.finanzas => 'Finanzas',
-    PestanaLiga.miLiga => 'Mi Liga',
+    PestanaLiga.miLiga => 'Ajustes de Liga',
   };
 
   static IconData _iconoLiga(PestanaLiga x) => switch (x) {

@@ -2,6 +2,17 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-23 (Ronda de mejoras QA, Liga, Coach y Fiestas)
+- Liga: pestañas renombradas a "Equipos" y "Ajustes de Liga".
+- Inventario: el botón flotante FAB se reemplazó por la tarjeta fija "Nueva lista" al estilo de crear tarea/evento/curso.
+- Coach: agregada tarjeta "Agregar nuevo coach" en la portada al lado de Pruebas (disponible para coaches y Pivots con permisos).
+- Fiestas (Qué llevar): la pill "Tu parte" ya no se corta en pantallas pequeñas. Ahora cualquier aporte (vasos, platos, adornos, hielo) suma al porcentaje de "Tu parte". Se detecta déficit si nadie lleva comida o bebida.
+- Sugerencias contextuales: Qué llevar propone sugerencias automáticas inteligentes según la festividad (arroz navideño/pavo en Navidad, vino espumante/uvas en Año Nuevo, etc.).
+- Deslizamiento con mouse en PC: añadido `PivotScrollBehavior` global con soporte para mouse, trackpad y touch en todas las listas y carousels deslizables.
+- Wizard Crear equipo (Android): eliminado crash/bucle de apertura/cierre de teclado al cambiar autofocus a foco diferido por frame estable con `FocusNode`.
+- Tutoriales: corregido el tour de Liga para que no se dispare desalineado cuando la pantalla está embebida; actualizados textos obsoletos de "casita" a "bandeja" en el tour de Calendario; y el visor de tours ahora ignora elementos fuera de pantalla.
+- Avatares en timeline: añadido margen y `clipBehavior: Clip.none` en `PilaAvatares` para evitar recortes en las tarjetas de eventos.
+
 ## 2026-11-22 (Qué llevar e invitadxs)
 - El resto lleva: más grande y claro. Arriba, a quién le falta completar su parte y cuánto ("Le falta 40 %", con barra); después cada sección en su recuadro con quién lleva qué. Sin "para todxs".
 - Falta: todo lo que falta a la vista, sin desplegables y sin las completadas.

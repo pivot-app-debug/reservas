@@ -1,6 +1,7 @@
 import 'cursos/cursos_screen.dart' show CursosAbiertosScreen;
 
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,19 @@ Future<void> main() async {
   await Push.arrancarSeguro();
 }
 
+class PivotScrollBehavior extends MaterialScrollBehavior {
+  const PivotScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+  };
+}
+
 class PivotApp extends StatelessWidget {
   const PivotApp({super.key, required this.sesion});
   final Sesion sesion;
@@ -53,6 +67,7 @@ class PivotApp extends StatelessWidget {
       title: 'Pivot',
       navigatorKey: _navegador,
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const PivotScrollBehavior(),
       theme: construirTema(Brightness.light),
       darkTheme: construirTema(Brightness.dark),
       themeMode: ThemeMode.system,
@@ -85,6 +100,7 @@ class PivotInvitadoApp extends StatelessWidget {
     return MaterialApp(
       title: 'Pivot',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const PivotScrollBehavior(),
       theme: construirTema(Brightness.light),
       darkTheme: construirTema(Brightness.dark),
       themeMode: ThemeMode.system,

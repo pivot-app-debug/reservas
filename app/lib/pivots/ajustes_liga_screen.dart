@@ -129,9 +129,9 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   void initState() {
     super.initState();
     _cargarInicio();
-    // Tour de Mi Liga (Victor, 2026-11-15).
+    // Tour de Mi Liga (Victor, 2026-11-15); solo si no está embebida en pestañas de Liga.
     Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted || !widget.pestana || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      if (!mounted || !widget.pestana || widget.embebida || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
       Tour.mostrarSiCorresponde(
         context,
         preferencia: 'tour.miliga.v1',

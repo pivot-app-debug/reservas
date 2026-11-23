@@ -306,11 +306,33 @@ class _InventarioScreenState extends State<InventarioScreen> {
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  _pivot ? 'Todavía no hay listas. Crea la primera con el botón +.' : 'Todavía no hay equipamiento registrado.',
+                  _pivot ? 'Todavía no hay listas. Crea la primera.' : 'Todavía no hay equipamiento registrado.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: p.textoSecundario),
                 ),
               ),
+            // Card "Nueva lista" al estilo crear-tarea/evento (Victor, fix 2026-11-23).
+            if (_pivot) ...{
+              const SizedBox(height: 4),
+              Material(
+                color: p.tarjeta,
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _guardando ? null : () => _abrir(NuevaListaAsistente(repo: repo), 'Lista creada'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Icon(Icons.playlist_add_rounded, color: p.marcaTexto),
+                        const SizedBox(width: 12),
+                        Text('Nueva lista', style: TextStyle(fontWeight: FontWeight.w700, color: p.texto)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            },
             if (activos.isNotEmpty || misPendientes.isNotEmpty) ...[
               const SizedBox(height: 8),
               seccion('QUIÉN TIENE COSAS DEL EQUIPO'),
@@ -393,14 +415,8 @@ class _InventarioScreenState extends State<InventarioScreen> {
                 ),
               ),
             ),
-      // Pivots: "Nueva lista" con texto; lo demás son atajos en la portada (Victor, 2026-11-17).
-      floatingActionButton: !_cargado || !_pivot
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _guardando ? null : () => _abrir(NuevaListaAsistente(repo: repo), 'Lista creada'),
-              icon: const Icon(Icons.playlist_add_rounded),
-              label: const Text('Nueva lista'),
-            ),
+      // Pivots: "Nueva lista" como card al estilo crear-tarea/crear-evento (fix 2026-11-23).
+      floatingActionButton: null,
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: cuerpo),
     );
   }

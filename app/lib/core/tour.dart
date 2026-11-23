@@ -66,10 +66,17 @@ class Tour {
   }
 
   static Rect? _rect(PasoTour p) {
-    final ro = p.clave.currentContext?.findRenderObject();
+    final ctx = p.clave.currentContext;
+    final ro = ctx?.findRenderObject();
     if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
     final r = ro.localToGlobal(Offset.zero) & ro.size;
     if (r.isEmpty) return null;
+    // Si el elemento está completamente fuera de la pantalla (p. ej. en otra pestaña), no es visible para el tour.
+    if (ctx != null && ctx.mounted) {
+      final pantalla = MediaQuery.sizeOf(ctx);
+      final bounds = Offset.zero & pantalla;
+      if (!bounds.overlaps(r)) return null;
+    }
     return p.ajuste?.call(r) ?? r;
   }
 }

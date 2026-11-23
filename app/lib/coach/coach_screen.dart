@@ -180,12 +180,15 @@ class _CoachScreenState extends State<CoachScreen> {
   Widget _atajos(BuildContext context) {
     final p = context.pivot;
     final n = _cursos?.length;
+    final puedeNombrar = s.esCoach || (_pivot && (s.tieneArea('coach') || s.tieneArea('equipo') || s.esAdmin));
     final l = <(IconData, String, String, VoidCallback)>[
       (Icons.checklist_rounded, 'Habilidades', 'Básicas y avanzadas: crear, editar y marcar', () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true))),
       (Icons.tune_rounded, 'Ajustes de coach', 'Avisos de novedades a las personas', _ajustes),
       (Icons.school_outlined, 'Cursos en curso', n == null ? 'Cursos y clínicas' : (n == 1 ? '1 curso abierto' : '$n cursos abiertos'), _abrirCursos),
       if (_pivot) (Icons.auto_awesome_motion_outlined, 'Pre-armados', 'Plantillas para crear cursos', _abrirCursos),
       (Icons.timer_outlined, 'Pruebas', 'Medir el progreso, como vueltas en 5 minutos', () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs))),
+      if (puedeNombrar)
+        (Icons.person_add_outlined, 'Agregar nuevo coach', 'Nombrar o gestionar coaches del equipo', () => _abrir(CoachesScreen(sesion: s))),
     ];
     Widget atajo((IconData, String, String, VoidCallback) a) => Material(
       color: p.tarjeta,

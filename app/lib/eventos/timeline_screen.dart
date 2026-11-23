@@ -1480,10 +1480,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       pasos: [
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Tu inicio',
+          titulo: 'Tu bandeja',
           texto: crea
-              ? 'En la casita ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Ahí también creas eventos. Si tiene un punto rojo, hay novedades.'
-              : 'En la casita ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Si tiene un punto rojo, hay novedades.',
+              ? 'En la bandeja ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Ahí también creas eventos. Si tiene un punto rojo, hay novedades.'
+              : 'En la bandeja ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Si tiene un punto rojo, hay novedades.',
         ),
         PasoTour(
           clave: _kFiltros,
@@ -1492,7 +1492,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         ),
         PasoTour(clave: _kBuscar, titulo: 'Busca', texto: 'Encuentra eventos, tareas, cumpleaños o lugares escribiendo una palabra.'),
         if (_acciones.isNotEmpty)
-          PasoTour(clave: _kMas, titulo: 'Reserva o paga', texto: 'Toca aquí para $lista. Tus pagos y recibos están en la casita, en Pagos y suscripciones.'),
+          PasoTour(clave: _kMas, titulo: 'Reserva o paga', texto: 'Toca aquí para $lista. Tus pagos y recibos están en la bandeja, en Pagos y suscripciones.'),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, responder si vas y ver cómo llegar.'),
         PasoTour(

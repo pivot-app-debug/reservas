@@ -12,15 +12,19 @@ extension ParteSocial on EstadoSocial {
 
   /// Cuánto le toca a una persona en esta sección, en su unidad.
   num refDe(CategoriaComida c) {
-    if (c.porCosa) return 0;
     if (c.modo == 'total') return _personas > 0 ? (c.total ?? c.meta) / _personas : 0;
-    return c.porPersona;
+    if (c.porCosa) {
+      if (c.limite > 0 && _personas > 0) return (c.limite / _personas).clamp(0.1, 10);
+      if (c.meta > 0 && _personas > 0) return (c.meta / _personas).clamp(0.1, 10);
+      return 1;
+    }
+    return c.porPersona > 0 ? c.porPersona : 1;
   }
 
-  /// Secciones que cuentan para tu parte.
+  /// Secciones que cuentan para tu parte (comida, bebida y cosas que se llevan como vasos o adornos).
   List<CategoriaComida> get seccionesParte => [
     for (final c in comida)
-      if ((c.enPorciones || c.liquida) && refDe(c) > 0) c,
+      if (refDe(c) > 0) c,
   ];
 
   bool cuentaParaParte(CategoriaComida c) => seccionesParte.any((s) => s.id == c.id);
@@ -29,8 +33,19 @@ extension ParteSocial on EstadoSocial {
   double parteDe(CategoriaComida c, num cantidad) {
     final n = seccionesParte.length;
     if (n == 0 || !cuentaParaParte(c)) return 0;
-    return cantidad / refDe(c) / n;
+    final ref = refDe(c);
+    if (ref <= 0) return 0;
+    return cantidad / ref / n;
   }
+
+  /// Secciones de comida y bebida específicamente.
+  List<CategoriaComida> get seccionesComidaBebida => [
+    for (final c in comida)
+      if (c.enPorciones || c.liquida) c,
+  ];
+
+  /// Si falta cubrir comida o bebida en el evento (para alertar si todxs llevan solo cosas).
+  bool get faltaComidaGeneral => seccionesComidaBebida.any((c) => !c.cerrada && (c.falta || (c.meta > 0 && c.aportado < c.meta)));
 
   /// Qué lleva una persona (Asistencia, Victor 2026-11-21).
   List<String> llevaDe(String usuario) {

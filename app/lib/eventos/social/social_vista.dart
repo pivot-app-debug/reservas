@@ -189,8 +189,7 @@ class QueLlevaResumen extends StatelessWidget {
                       Flexible(
                         child: Etiqueta(texto: 'Tu parte: ${(parte * 100).round()} %', apagada: parte >= 1),
                       ),
-                    const Spacer(),
-                    Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+                    const Spacer(),                    Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                   ],
                 ),
                 if (faltan.isNotEmpty)

@@ -1561,6 +1561,7 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
     ..clases = 2
     ..logica = 'Y';
   final _nombreCtl = TextEditingController();
+  final _focoNombre = FocusNode();
   _Paso _paso = _Paso.nombre;
   bool _adelante = true, _ocupado = false;
 
@@ -1583,8 +1584,21 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // En Android, pedir el foco justo al abrir el asistente hace que el
+    // teclado intente abrirse mientras la animación de entrada todavía está
+    // corriendo, lo que provoca un crash/bucle de cierre. Se espera al
+    // primer frame estable para pedirlo (fix 2026-11-23).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focoNombre.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
     _nombreCtl.dispose();
+    _focoNombre.dispose();
     super.dispose();
   }
 
@@ -1678,7 +1692,12 @@ class _NuevoEquipoAsistenteState extends State<_NuevoEquipoAsistente> {
           children: [
             TextField(
               controller: _nombreCtl,
-              autofocus: true,
+              focusNode: _focoNombre,
+              // autofocus en Android causa crash al abrir el asistente porque
+              // el teclado intenta abrirse mientras la pantalla todavía está
+              // animando. Se desactiva y el foco se pide en el primer frame
+              // estable via initState/addPostFrameCallback (fix 2026-11-23).
+              autofocus: false,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(hintText: 'Ej. Halcones'),
               onChanged: (_) => setState(() {}),

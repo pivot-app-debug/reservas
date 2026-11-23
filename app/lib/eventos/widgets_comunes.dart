@@ -61,17 +61,21 @@ class PilaAvatares extends StatelessWidget {
     final resto = personas.length - visibles.length;
     // Sin encimarse con el "+2" ni con el texto de al lado (Victor, 2026-11-22).
     const solape = 8.0;
+    // Margen extra para que el borde del avatar no quede recortado (fix 2026-11-23).
+    const margenExtra = 2.0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: visibles.isEmpty ? 0 : tamano + (visibles.length - 1) * (tamano - solape),
-          height: tamano,
+          width: visibles.isEmpty ? 0 : tamano + (visibles.length - 1) * (tamano - solape) + margenExtra,
+          height: tamano + margenExtra,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               for (final (i, per) in visibles.indexed)
                 Positioned(
                   left: i * (tamano - solape),
+                  top: 0,
                   child: AvatarPersona(nombre: per.nombreMostrar, foto: per.fotoPerfil, tamano: tamano, borde: p.tarjeta),
                 ),
             ],

@@ -13,6 +13,17 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Sin pronombres femeninos ni en la app ni en los chats: todo neutro, de preferencia sin pronombres (por ejemplo "admins", no "las admins").
 - Español neutro (sin voseo); se corrigieron textos con "debés", "podés", "tenés", "querés", "dejalo", "Escribilo", "elegí".
 
+## Ronda 2026-11-23 (Ronda QA: Liga, Coach, Fiestas y fixes)
+- **Liga:** Pestañas renombradas a "Equipos" y "Ajustes de Liga".
+- **Inventario:** El botón flotante FAB se reemplazó por la tarjeta fija "Nueva lista" al estilo de crear tarea/evento/curso.
+- **Coach:** Agregada tarjeta "Agregar nuevo coach" en la portada al lado de Pruebas (disponible para coaches y Pivots con permisos).
+- **Fiestas (Qué llevar):** La pill "Tu parte" ya no se corta en pantallas pequeñas. Ahora cualquier aporte (vasos, platos, adornos, hielo) suma al porcentaje de "Tu parte". Se detecta déficit si nadie lleva comida o bebida (`faltaComidaGeneral`).
+- **Sugerencias contextuales:** Qué llevar propone sugerencias automáticas inteligentes según la festividad (arroz navideño/pavo en Navidad, vino espumante/uvas en Año Nuevo, etc.).
+- **Deslizamiento con mouse en PC:** Añadido `PivotScrollBehavior` global con soporte para mouse, trackpad y touch en todas las listas y carousels deslizables.
+- **Wizard Crear equipo (Android):** Eliminado crash/bucle de apertura/cierre de teclado al cambiar autofocus a foco diferido por frame estable con `FocusNode`.
+- **Tutoriales:** Corregido el tour de Liga para que no se dispare desalineado cuando la pantalla está embebida; actualizados textos obsoletos de "casita" a "bandeja" en el tour de Calendario; y el visor de tours ahora ignora elementos fuera de pantalla.
+- **Avatares en timeline:** Añadido margen y `clipBehavior: Clip.none` en `PilaAvatares` para evitar recortes en las tarjetas de eventos.
+
 ## Ronda 2026-11-13 (tarde)
 - **Pestaña Mi Liga (2026-11-13, noche):** solo Pivots (`inicio_shell.dart`, ícono estadio). `AjustesLigaScreen(pestana: true)` con barra de vidrio y lupa: `pivots/buscador_liga.dart` (`entradasLiga` con sinónimos, `dentro` = subsección a abrir; `Resaltable` lleva la fila a la vista y parpadea). La pantalla usa `SingleChildScrollView + Column` (no ListView perezoso) para que el buscador encuentre cualquier fila. Tesorería, Equipos y puntos y Pivots y permisos salieron de Mi perfil.
 - **Historial de ajustes:** `adminHistorialAjustes` (desde/hasta, `por` con nombre y foto, incluye Pivots que ya no lo son, `desdeAnio`); `HistorialAjustesScreen` en categorias_screen.dart.
