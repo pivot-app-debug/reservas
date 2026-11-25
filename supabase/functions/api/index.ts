@@ -1996,10 +1996,15 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
             if (cumple) row.categoria = t.nombre;
       // Si no cumple, entra al equipo inicial y se le dice por qué (Victor, 2026-11-15).
       else {
-        const nombres = faltan.map((l) => l.nombre.toLowerCase());
-        const falta = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0];
-                const { data: ini } = await supabase.from('config_tiers').select('nombre').eq('es_default', true).maybeSingle();
-        avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}: ${t.nombre} pide tener propio: ${falta}. Cuando tengas tu equipamiento, cámbialo en tu perfil y tu equipo se revisará en el próximo corte.`;
+        const { data: ini } = await supabase.from('config_tiers').select('nombre').eq('es_default', true).maybeSingle();
+        if (t.requisitos?.cursoId) {
+          const cNom = t.requisitos.cursoNombre || 'el curso requerido';
+          avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}: ${t.nombre} pide tener aprobado ${cNom}. Puedes inscribirte al curso desde la app para calificar a ${t.nombre}.`;
+        } else {
+          const nombres = faltan.map((l) => l.nombre.toLowerCase());
+          const falta = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0];
+          avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}: ${t.nombre} pide tener propio: ${falta}. Cuando tengas tu equipamiento, cámbialo en tu perfil y tu equipo se revisará en el próximo corte.`;
+        }
       }
     }
   }
@@ -10272,7 +10277,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
   const idxHoy = y * 12 + mo;
   const inicio = new Date(Date.UTC(y, mo - 12, 1)).toISOString().slice(0, 10);
     const reglas = await _reglasLiga();
-  const [{ data: gente }, asis, { data: ext }, { data: pts }] = await Promise.all([
+  const [{ data: gente }, asis, { data: ext }, { data: pts }, { data: cursosAprobadosData }] = await Promise.all([
         supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, tier_modo, estado_miembro, necesita_patines, necesita_protecciones, equipo_liga, meses_consecutivos_cumplidos')
       .is('eliminado_en', null),
     _paginado((a, b) => supabase.from('asistencias').select('fecha, a_horario, tarde, tipo_evento')
@@ -10281,6 +10286,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
     supabase.from('log_asistencias').select('nombre_usuario, fecha_entrenamiento').eq('origen', 'Externa')
       .gte('fecha_entrenamiento', inicio).lt('fecha_entrenamiento', hoyISO).limit(100000),
     supabase.from('puntos_mensuales').select('nombre_usuario, anio, mes, puntos_total, puntos_tareas').gte('anio', y - 1),
+    supabase.from('curso_inscripciones').select('username, curso_id').eq('resultado', 'aprobado'),
   ]);
   const idxDe = (f: string) => idxHoy - (Number(f.slice(0, 4)) * 12 + Number(f.slice(5, 7)) - 1);
     const tareas: Record<string, number[]> = {}, total: Record<string, number[]> = {};
@@ -10311,6 +10317,10 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
     (tareas[r.nombre_usuario] ??= Array(13).fill(0))[i] += Number(r.puntos_tareas) || 0;
     (total[r.nombre_usuario] ??= Array(13).fill(0))[i] += Number(r.puntos_total) || 0;
   }
+  const cursosAprobadosMap: Record<string, string[]> = {};
+  for (const ci of (cursosAprobadosData ?? [])) {
+    (cursosAprobadosMap[String(ci.username ?? '').trim().toUpperCase()] ??= []).push(String(ci.curso_id));
+  }
   const usa = (v: unknown) => { const t = String(v ?? '').trim().toLowerCase(); return t !== '' && t !== 'no'; };
   const r1 = (l: number[]) => l.map((x) => Math.round(x * 10) / 10);
   const personas = (gente ?? []).filter((p: any) => p.username).map((p: any) => ({
@@ -10322,6 +10332,7 @@ async function adminDatosCategorias(params: Record<string, any>): Promise<Record
     clasesEquipos: Object.fromEntries(Object.entries(clasesEquipos).map(([eq, c]) => [eq, c[String(p.username).trim().toUpperCase()] ?? Array(13).fill(0)])),
     tareasMes: r1(tareas[p.username] ?? Array(13).fill(0)),
     puntosMes: r1(total[p.username] ?? Array(13).fill(0)),
+    cursosAprobados: cursosAprobadosMap[String(p.username).trim().toUpperCase()] ?? [],
   }));
   return { exito: true, personas, corte: await _corteEquipos() };
 }

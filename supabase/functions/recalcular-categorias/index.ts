@@ -329,6 +329,17 @@ async function _manejar(req: Request): Promise<Response> {
       .gte('anio', anioDesde);
     if (puntosError) return json({ ok: false, error: puntosError.message }, 500);
 
+    // Cursos aprobados por persona (requisito de equipo "tener aprobado tal curso", Victor 2026-11-23).
+    const { data: cursosAprobadosData } = await supabase
+      .from('curso_inscripciones')
+      .select('username, curso_id')
+      .eq('resultado', 'aprobado');
+    const cursosAprobados: Record<string, Set<string>> = {};
+    for (const ci of cursosAprobadosData ?? []) {
+      const u = String(ci.username ?? '').trim().toUpperCase();
+      (cursosAprobados[u] ??= new Set()).add(String(ci.curso_id));
+    }
+
     const hoy = new Date();
     const idxActual = hoy.getUTCFullYear() * 12 + hoy.getUTCMonth();
 
@@ -440,11 +451,18 @@ async function _manejar(req: Request): Promise<Response> {
     // existía) para reusarlo tanto contra el tier ACTUAL de la persona
     // (riesgo de demotion) como contra el tier SUPERIOR (re-ascenso).
     function evaluarCumpleTier(username: string, tier: any): boolean {
-            const clases = contarClases(username, tier);
+      const clases = contarClases(username, tier);
       const puntos = sumarPuntos(username, tier);
       const cumpleClases = clases >= (Number(tier.min_clases) || 0);
       const cumplePuntos = puntos >= (Number(tier.min_puntos) || 0);
-      return tier.logica === 'Y' ? (cumpleClases && cumplePuntos) : (cumpleClases || cumplePuntos);
+      const cumple = tier.logica === 'Y' ? (cumpleClases && cumplePuntos) : (cumpleClases || cumplePuntos);
+      if (!cumple) return false;
+      let req: any = tier.requisitos;
+      if (typeof req === 'string') { try { req = JSON.parse(req); } catch { req = {}; } }
+      if (req?.cursoId && !cursosAprobados[String(username).trim().toUpperCase()]?.has(String(req.cursoId))) {
+        return false;
+      }
+      return true;
     }
     // Comportamiento ORIGINAL (pre-Fase 2): el mejor tier que las clases/
     // puntos ACTUALES de la persona alcanzan, recorriendo `tiersNoDefault`
