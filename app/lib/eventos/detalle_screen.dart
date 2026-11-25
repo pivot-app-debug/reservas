@@ -146,6 +146,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
               ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Editar evento'), onTap: () => Navigator.pop(c, 'editar')),
             if (!ev.cancelado)
               ListTile(leading: const Icon(Icons.event_busy_outlined), title: const Text('Cancelar evento'), onTap: () => Navigator.pop(c, 'cancelar')),
+            if (ev.cancelado)
+              ListTile(leading: const Icon(Icons.restore_outlined), title: const Text('Reactivar evento'), onTap: () => Navigator.pop(c, 'reactivar')),
             ListTile(
               leading: Icon(Icons.delete_outline_rounded, color: c.pivot.marcaTexto),
               title: Text('Eliminar evento', style: TextStyle(color: c.pivot.marcaTexto)),
@@ -174,6 +176,8 @@ class _DetalleScreenState extends State<DetalleScreen> {
         if (guardado == true) _avisar('Cambios guardados. Se avisó al equipo.');
       case 'cancelar':
         await _confirmarCancelar(ev);
+      case 'reactivar':
+        await _confirmarReactivar(ev);
       case 'eliminar':
         await _confirmarEliminar(ev);
     }
@@ -215,6 +219,22 @@ class _DetalleScreenState extends State<DetalleScreen> {
       return;
     }
     if (planes > 0 && mounted) await _moverPlanes(ev, planes);
+  }
+
+  /// Reactiva (descancela) un evento: quita la cancelación y avisa al equipo.
+  Future<void> _confirmarReactivar(Evento ev) async {
+    final ok = await _confirmar(
+      titulo: '¿Reactivar el ${ev.tipo.toLowerCase()}?',
+      texto: '${Fechas.encabezado(ev.fecha)} · ${ev.rangoHorario}\nSe quitará la cancelación y la gente podrá volver a responder.',
+      si: 'Sí, reactivar',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await repo.reactivar(ev);
+      _avisar('Evento reactivado.');
+    } catch (e) {
+      _avisar(e.toString());
+    }
   }
 
   /// El evento cancelado tenía planes de coach: a dónde pasan (Victor,

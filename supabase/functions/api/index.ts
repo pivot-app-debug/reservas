@@ -2277,6 +2277,20 @@ async function adminCancelarEvento(params: Record<string, any>): Promise<Record<
   return { exito: true };
 }
 
+// Reactivar (descancelar) un evento: revierte es_excepcion y estado en
+// las asistencias para que la gente pueda volver a responder.
+// No restaura marcas de log_asistencias borradas al cancelar (se pierden).
+async function adminReactivarEvento(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(params.adminToken);
+  if (!email) return { exito: false, error: 'Sesión admin inválida.' };
+  if (!params.idEvento) return { exito: false, error: 'Falta el evento.' };
+  const { error } = await supabase.from('asistencias')
+    .update({ es_excepcion: false, estado: null })
+    .eq('id_evento', params.idEvento);
+  if (error) return { exito: false, error: error.message };
+  return { exito: true };
+}
+
 // Cambiar las protecciones del club de una reserva de clase (antes iba a
 // Apps Script, obsoleto, 2026-11-07). Solo la propia persona.
 async function actualizarProtecReserva(params: Record<string, any>): Promise<Record<string, any>> {
@@ -13496,6 +13510,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'getFechasDisponibles':            return json(await getFechasDisponibles(params));
                   case 'guardarReserva':                  return json(await guardarReserva(params));
       case 'adminCancelarEvento':             return json(await adminCancelarEvento(params));
+      case 'adminReactivarEvento':            return json(await adminReactivarEvento(params));
       case 'actualizarProtecReserva':         return json(await actualizarProtecReserva(params));
       case 'avisarPagoPendiente':             return json(await avisarPagoPendiente(params));
       case 'getReservasPersona':              return json(await getReservasPersona(params));

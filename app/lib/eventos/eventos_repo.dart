@@ -835,6 +835,15 @@ class EventosRepo extends ChangeNotifier {
     await cargar(forzar: true);
   }
 
+  /// Reactiva (descancela) un evento: revierte es_excepcion y estado en
+  /// las asistencias para que la gente pueda volver a responder.
+  Future<void> reactivar(Evento ev) async {
+    final token = _adminToken;
+    final res = await _api.get('adminReactivarEvento', {'adminToken': token, 'idEvento': ev.id});
+    if (res['exito'] == false) throw ApiException((res['error'] ?? 'No se pudo reactivar el evento.').toString());
+    await cargar(forzar: true);
+  }
+
   /// Quienes suelen venir ese día de la semana (3 de las últimas 4 semanas).
   /// Sin señal o con error, vacío: es solo una ayuda.
   Future<Set<String>> sugeridosAsistencia(Evento ev) async {
