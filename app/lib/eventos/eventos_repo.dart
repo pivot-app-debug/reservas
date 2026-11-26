@@ -399,7 +399,7 @@ class EventosRepo extends ChangeNotifier {
     if (c == null) return null;
     if (d['exenta_cuota'] == true || d['exenta_cuota'] == 'true') return null;
     if (d['estado_miembro'] == 'Técnico') return null;
-    if (c.alDia || c.mesPagado(ev.fecha.month, ev.fecha.year)) return null;
+    if (c.mesPagado(ev.fecha.month, ev.fecha.year)) return null;
     final yo = (sesion.nombre ?? '').trim().toUpperCase();
     final delMes = eventos.where((e) => e.id != ev.id && e.tipo == 'Entrenamiento' && e.fecha.year == ev.fecha.year && e.fecha.month == ev.fecha.month);
     final confirmadas = delMes.where((e) => e.asistentes.any((a) => a.persona.username.trim().toUpperCase() == yo)).length;

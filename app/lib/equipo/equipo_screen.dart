@@ -420,7 +420,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                       children: [
                         if (g == 'Quindes') _bannerEquipo(p, 'Quindes', 'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.', alDetalles: () => _entrar('Quindes')),
                         if (g == 'Mirlxs') _bannerEquipo(p, 'Mirlxs', 'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.', alDetalles: () => _entrar('Mirlxs')),
-                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no han asistido a ningún entrenamiento en 30 días (o nunca asistieron), salvo que estén de viaje, lesionadxs o con un motivo válido. Al tocar "Sin actividad" ves las personas archivadas y podés sugerir quién archivar por inactividad. El botón "Archivar" de cada persona la saca de la vista del equipo: su historial se conserva y, si vuelve, sale de archivo y queda activx.'),
+                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no han asistido a ningún entrenamiento en 30 días (o nunca asistieron), salvo que estén de viaje, lesionadxs o con un motivo válido. Al tocar "Sin actividad" ves las personas archivadas y podés sugerir quién archivar por inactividad. El botón "Archivar" de cada persona la saca de la vista del equipo: su historial se conserva y, si vuelve, sale de archivo y queda activx.', alDetalles: () => _entrar('Inactivxs')),
                         if (g == 'Coaches') _bannerEquipo(p, 'Coaches', 'Entrenadorxs del equipo. Pueden tomar asistencia y crear pruebas. Los nombra un Pivot y un coach puede sacarse a síx mismx tocando los 3 puntos de su fila.', alDetalles: () => _entrar('Coaches')),
                         if (g == 'Pivots') _bannerEquipo(p, 'Pivots', 'Administradorxs de la liga con acceso total: pueden editar equipos, cobros, archivar personas, invitar al equipo y cambiar reglas sensibles. Los nombra el dueño de la liga o otro Pivot con permisos.', alDetalles: () => _entrar('Pivots')),
                         for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy),
@@ -461,6 +461,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     if (titulo == 'Coaches') {
       SubAjustes.abrir(context, s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s));
     } else if (titulo == 'Inactivxs') {
+      // Solo Pivots pueden ver personas archivadas
+      if (!s.esAdmin) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solo Pivots pueden ver personas archivadas.')));
+        return;
+      }
       Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => ArchivadasScreen(repo: repo)));
     } else if (titulo == 'Pivots') {
       SubAjustes.abrir(context, PivotsScreen(sesion: s));
