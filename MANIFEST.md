@@ -470,6 +470,17 @@ Decisión (pedido explícito, ver el doc "Pivot Android nativa: plan de transici
 - **Compilación:** `.github/workflows/app-android.yml` en cada push que toque `app/`: `flutter analyze` + `.aab` firmado (para Play) + `.apk` (pruebas, release `app-android` del repo). Versión = número de corrida + 1. Firma con los secretos `FIRMA_JKS_B64`/`FIRMA_CLAVE` (alias `pivot`); sin ellos firma con la llave de depuración y no publica. Requisitos de Android: desugaring (`desugar_jdk_libs`), plugin `com.google.gms.google-services`, ícono de notificación `res/drawable/ic_notificacion.xml`.
 - **Calidad de código (2026-11-26):** el CI trata warnings de `flutter analyze` como errores (exit code 1). **Antes de cada push a `main` que toque `app/`**, correr localmente `flutter analyze` y corregir TODOS los lints (incluyendo `prefer_typing_uninitialized_variables`, `strict_top_level_inference`, `use_build_context_synchronously`). Solo push si `flutter analyze` sale limpio (0 issues, solo `info` preexistentes de deprecación de `material.dart`).
 
+## 📋 TODO — pendientes para próximo batch (2026-11-26)
+- [x] Bug #1: "Tu parte" pill se trunca → FIXED (social_vista.dart)
+- [x] Bug #2: Coach (agregar coach roto / FAB / "Quitar coach") → FIXED (coach_screen.dart)
+- [x] Bug #3: Personas archivadas — acceso si entra archivado → FIXED (equipo_screen.dart: solo Pivots)
+- [x] Bug #4: Equipo banners colapsables + botón "Ver detalles" → FIXED (equipo_screen.dart)
+- [x] Bug #5: Buscador dentro de equipos → analizado (buscador_equipo.dart OK, _buscador OK)
+- [x] Bug #6: Liga UI solo toggle → analizado (herramientas_liga.dart tiene toggles OK)
+- [x] Bug #7: Pechugas debe y pone "Asistiré" → FIXED (eventos_repo.dart: solo mesPagado)
+- [ ] Rebuild web + deploy Firebase Hosting (con todos los fixes)
+- [ ] Esperar workflow Android Actions → release app-android/v1.0.247+ → auto-update
+
 
 ```
 reservas/
