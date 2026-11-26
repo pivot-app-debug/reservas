@@ -1520,9 +1520,12 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
         if (v != null) ...[
           Row(
             children: [
-              Text(
-                'Tu parte',
-                style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+              Expanded(
+                child: Text(
+                  'Tu parte',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -2270,6 +2273,7 @@ class _TuParte extends StatelessWidget {
                     child: Text(
                       'Tu parte',
                       style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (lista)

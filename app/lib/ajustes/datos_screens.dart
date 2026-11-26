@@ -54,7 +54,7 @@ class MiPerfilEditable extends StatelessWidget {
                   alTocar: () => cambiarFoto(context, s),
                 ),
                 FilaAjuste(
-                  icono: Icons.sports_rounded,
+                  icono: Icons.badge_outlined,
                   seccion: 'nombre',
                   titulo: Deporte.apodo,
                   valor: valorDe(s, 'nombreDerby'),

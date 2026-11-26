@@ -73,6 +73,9 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   /// Fila que el buscador pidió resaltar.
   final _resaltado = ValueNotifier<String?>(null);
 
+  /// Solo Pivots pueden tocar ajustes sensibles como invitar al equipo.
+  bool get _pivot => sesion.esAdmin && sesion.adminToken != null;
+
   @override
   void dispose() {
     _resaltado.dispose();
@@ -358,7 +361,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                 // Liga recién creada: lo que conviene hacer primero.
                 PrimerosPasos(
                   pasos: [
-                    ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
+                    if (_pivot) ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
                     ('reglas', Icons.rule_rounded, 'Revisa las reglas de la liga: cuota, asistencia y estados', () => _abrir(ReglasScreen(sesion: sesion))),
                     ('pivots', Icons.group_add_rounded, 'Suma otro Pivot y reparte las áreas', () => _abrir(PivotsScreen(sesion: sesion))),
                   ],

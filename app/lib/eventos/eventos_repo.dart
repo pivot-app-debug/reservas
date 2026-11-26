@@ -416,6 +416,7 @@ class EventosRepo extends ChangeNotifier {
     final anterior = ev.miEstado;
     if (anterior == estado) return false;
     if (estado == EstadoRsvp.asistire) {
+      await _cargarCuota(); // Asegura que la cuota esté cargada antes de validar clase de gracia (bug: Pechugas)
       final m = motivoSinAsistire(ev);
       if (m != null) throw CuotaPendiente(m, ev.fecha);
     }

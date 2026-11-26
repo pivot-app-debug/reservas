@@ -170,154 +170,123 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   }
 
   Future<void> _cuenta([Map<String, dynamic>? c]) async {
-    final nombre = TextEditingController(text: c?['nombre'] as String? ?? '');
-    final resp = TextEditingController(text: c?['responsable'] as String? ?? '');
-    final saldo = TextEditingController(text: c == null ? '' : '${c['saldoInicial']}');
-    var tipo = c?['tipo'] as String? ?? 'efectivo';
-    var fecha = DateTime.tryParse('${c?['fechaInicial'] ?? ''}') ?? Fechas.hoy();
-    var activa = c?['activa'] != false;
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CuentaEdicionScreen(repo: repo, cuenta: c)),
+    );
+    if (ok != true) return;
+    await _cargar();
+  }
+
+  /// Subsección para conciliar una cuenta: compara el saldo de la app con el saldo real.
+  /// Reemplaza el showDialog con campo de texto para evitar cierres accidentales al escribir.
+  class ConciliarCuentaScreen extends StatefulWidget {
+    const ConciliarCuentaScreen({super.key, required this.repo, required this.cuenta});
+    final TesoreriaRepo repo;
+    final Map<String, dynamic> cuenta;
+
+    @override
+    State<ConciliarCuentaScreen> createState() => _ConciliarCuentaScreenState();
+  }
+
+  class _ConciliarCuentaScreenState extends State<ConciliarCuentaScreen> {
+    late final ctl = TextEditingController();
+    var ocupado = false;
+
+    @override
+    void initState() {
+      super.initState();
+      ctl.text = '${widget.cuenta['saldo'] ?? ''}';
+    }
+
+    @override
+    void dispose() {
+      ctl.dispose();
+      super.dispose();
+    }
+
+    Future<void> _comparar() async {
+      final n = num.tryParse(ctl.text.replaceAll(',', '.'));
+      if (n == null) {
+        _aviso(context, 'Escribe el saldo real.');
+        return;
+      }
+      setState(() => ocupado = true);
+      try {
+        final r = await widget.repo.accion('conciliar', {'cuentaId': widget.cuenta['id'], 'saldoReal': n});
+        final dif = (r['diferencia'] as num?) ?? 0;
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: Text(dif == 0 ? 'Cuadra' : 'Hay una diferencia'),
+            content: Text(
+              dif == 0
+                  ? 'El saldo real y el de la app coinciden.'
+                  : dif > 0
+                      ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
+                      : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
+            ),
+            actions: [FilledButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
+          ),
+        );
+        if (!mounted) return;
+        Navigator.of(context).pop(true);
+      } catch (e) {
+        if (mounted) _aviso(context, _error(e));
+      } finally {
+        if (mounted) setState(() => ocupado = false);
+      }
+    }
+
+    @override
+    Widget build(BuildContext context) {
+      final p = context.pivot;
+      return Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          flexibleSpace: const Vidrio(child: SizedBox.expand()),
+          title: const Text('Conciliar cuenta', style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+        body: SafeArea(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(c == null ? 'Nueva cuenta' : 'Editar cuenta', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final e in tiposCuenta.entries)
-                      ChoiceChip(
-                        showCheckmark: false,
-                        avatar: Icon(_iconoCuenta(e.key), size: 18),
-                        label: Text(e.value),
-                        selected: tipo == e.key,
-                        onSelected: (_) => set(() {
-                          tipo = e.key;
-                          if (nombre.text.trim().isEmpty || tiposCuenta.values.contains(nombre.text.trim())) nombre.text = e.value;
-                        }),
-                      ),
-                  ],
-                ),
+                Text('Según la app: ${plata(widget.cuenta['saldo'] as num? ?? 0)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).', style: TextStyle(color: p.textoSecundario)),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: nombre,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Nombre'),
-                ),
-                if (tipo == 'efectivo') ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: resp,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: '¿Quién tiene la caja?'),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: saldo,
+                  controller: ctl,
+                  autofocus: true,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]'))],
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,-]'))],
                   decoration: InputDecoration(
-                    labelText: 'Saldo inicial',
+                    labelText: 'Saldo real',
                     prefixText: '${Moneda.s} ',
-                    helperText: 'Lo que la liga ya tenía en esta cuenta antes de usar Pivot.',
-                    helperMaxLines: 3,
                   ),
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('Desde el ${Fechas.corta(fecha)}'),
-                  subtitle: const Text('Los movimientos se cuentan desde esa fecha.'),
-                  trailing: const Icon(Icons.edit_calendar_outlined),
-                  onTap: () async {
-                    final f = await showDatePicker(context: h, firstDate: DateTime(2020), lastDate: Fechas.hoy(), initialDate: fecha);
-                    if (f != null) set(() => fecha = f);
-                  },
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: ocupado ? null : _comparar,
+                  child: const Text('Comparar'),
                 ),
-                if (c != null)
-                  SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Activa'), value: activa, onChanged: (v) => set(() => activa = v)),
-                const SizedBox(height: 12),
-                FilledButton(onPressed: () => Navigator.of(h).pop(true), child: const Text('Guardar')),
               ],
             ),
           ),
         ),
-      ),
-    );
-    if (ok != true) return;
-    await _hacer(
-      () => repo.accion('guardarCuenta', {
-        'id': ?c?['id'],
-        'nombre': nombre.text.trim(),
-        'tipo': tipo,
-        'responsable': resp.text.trim(),
-        'saldoInicial': num.tryParse(saldo.text.replaceAll(',', '.')) ?? 0,
-        'fechaInicial': isoFecha(fecha),
-        'activa': activa,
-      }),
-      'Cuenta guardada',
-    );
+      );
+    }
   }
 
   Future<void> _conciliar(Map<String, dynamic> c) async {
-    final ctl = TextEditingController();
-    final v = await showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        scrollable: true,
-        title: Text('Conciliar ${c['nombre']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Según la app: ${plata(c['saldo'] as num)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctl,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-              decoration: InputDecoration(prefixText: '${Moneda.s} '),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(d).pop(ctl.text.replaceAll(',', '.')), child: const Text('Comparar')),
-        ],
-      ),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ConciliarCuentaScreen(repo: repo, cuenta: c)),
     );
-    final n = num.tryParse(v ?? '');
-    if (n == null || !mounted) return;
-    try {
-      final r = await repo.accion('conciliar', {'cuentaId': c['id'], 'saldoReal': n});
-      final dif = (r['diferencia'] as num?) ?? 0;
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (d) => AlertDialog(
-          title: Text(dif == 0 ? 'Cuadra' : 'Hay una diferencia'),
-          content: Text(
-            dif == 0
-                ? 'El saldo real y el de la app coinciden.'
-                : dif > 0
-                ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
-                : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
-          ),
-          actions: [FilledButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
-        ),
-      );
-      await _cargar();
-    } catch (e) {
-      if (mounted) _aviso(context, _error(e));
-    }
+    if (ok == true) await _cargar();
   }
 
   Future<void> _opcionesCuenta(Map<String, dynamic> c) async {
@@ -443,118 +412,13 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   /// cuenta del equipo, o lo devuelve. Sale (o entra) de la cuenta y queda
   /// como deuda (o abono) de cada persona; entre varias se divide en partes iguales.
   Future<void> _plataDelEquipo({required bool devolver}) async {
-    final p = context.pivot;
-    final gente = <Integrante>[];
-    String? cuenta = _cuentas.isEmpty ? null : '${_cuentas.first['id']}';
-    final monto = TextEditingController(), concepto = TextEditingController(text: devolver ? 'Devolución' : '');
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final total = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    devolver ? 'Devolví plata al equipo' : 'Usé plata del equipo',
-                    style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    devolver
-                        ? 'Entra a la cuenta y baja lo que debe cada persona.'
-                        : 'Sale de la cuenta del equipo y queda como deuda de cada persona. Si eliges a varias, se divide en partes iguales.',
-                    style: TextStyle(color: p.textoSecundario),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final x in gente) InputChip(label: Text(x.nombreMostrar), onDeleted: () => set(() => gente.remove(x))),
-                      ActionChip(
-                        avatar: const Icon(Icons.person_add_alt_rounded, size: 18),
-                        label: Text(gente.isEmpty ? '¿Quién?' : 'Agregar'),
-                        onPressed: () async {
-                          final x = await elegirPersona(h, repo.sesion);
-                          if (x != null && !gente.any((g) => g.username == x.username)) set(() => gente.add(x));
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: monto,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                    onChanged: (_) => set(() {}),
-                    decoration: InputDecoration(
-                      labelText: 'Monto total',
-                      prefixText: '${Moneda.s} ',
-                      helperText: gente.length > 1 && total > 0 ? '${plata(total / gente.length)} cada persona' : null,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: concepto,
-                    decoration: const InputDecoration(labelText: '¿Para qué fue?'),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(devolver ? '¿A qué cuenta entra?' : '¿De qué cuenta salió?', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final c in _cuentas)
-                        ChoiceChip(
-                          showCheckmark: false,
-                          label: Text('${c['nombre']}'),
-                          selected: cuenta == '${c['id']}',
-                          onSelected: (_) => set(() => cuenta = '${c['id']}'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: gente.isEmpty || total <= 0 || cuenta == null || concepto.text.trim().isEmpty ? null : () => Navigator.of(h).pop(true),
-                    child: const Text('Registrar'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => PlataDelEquipoScreen(repo: repo, cuentas: _cuentas, devolver: devolver)),
     );
-    if (ok != true || !mounted) return;
-    final total = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
-    // Partes iguales al centavo; el último se lleva el redondeo.
-    final parte = (total / gente.length * 100).floorToDouble() / 100;
-    try {
-      for (var i = 0; i < gente.length; i++) {
-        final m = i == gente.length - 1 ? double.parse((total - parte * (gente.length - 1)).toStringAsFixed(2)) : parte;
-        await repo.accion('registrarSaldo', {
-          'username': gente[i].username,
-          'tipo': devolver ? 'abono' : 'prestamo',
-          'monto': m,
-          'concepto': concepto.text.trim(),
-          'cuentaId': cuenta,
-          'aplicar': 'aparte',
-        });
-      }
+    if (ok == true) {
       if (mounted) _aviso(context, devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
-    } catch (e) {
-      if (mounted) _aviso(context, _error(e));
+      await _cargar();
     }
-    await _cargar();
   }
 
   /// Ingreso/Egreso y los dos registros rápidos, debajo de la tarjeta roja.
@@ -1105,6 +969,213 @@ Future<void> detalleMovimiento(
 }
 
 /// Ingreso, gasto o transferencia (también para corregir uno existente).
+/// Subsección para registrar, corregir o transferir un movimiento de tesorería.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class MovimientoScreen extends StatefulWidget {
+  const MovimientoScreen({super.key, required this.repo, required this.cuentas, required this.tipo, this.corregir, this.desdeCuenta});
+  final TesoreriaRepo repo;
+  final List<Map<String, dynamic>> cuentas;
+  final String tipo;
+  final Map<String, dynamic>? corregir;
+  final String? desdeCuenta;
+
+  @override
+  State<MovimientoScreen> createState() => _MovimientoScreenState();
+}
+
+class _MovimientoScreenState extends State<MovimientoScreen> {
+  late final activas = widget.cuentas.where((c) => c['activa'] != false).toList();
+  late final _monto = TextEditingController(text: widget.corregir == null ? '' : '${widget.corregir!['monto']}');
+  late final _desc = TextEditingController(text: widget.corregir?['descripcion'] as String? ?? '');
+  String? _cuenta = widget.corregir?['cuentaId'] as String? ?? widget.desdeCuenta ?? (activas.isEmpty ? null : activas.first['id'] as String);
+  String? _destino;
+  String _categoria = widget.corregir?['categoria'] as String? ?? (widget.tipo == 'ingreso' ? 'cuota' : 'otro');
+  DateTime _fecha = DateTime.tryParse('${widget.corregir?['fecha'] ?? ''}') ?? Fechas.hoy();
+  String? _persona = widget.corregir?['persona'] as String?;
+  String? _personaNombre = widget.corregir?['personaNombre'] as String?;
+  var _ocupado = false;
+
+  String get _titulo {
+    switch (widget.tipo) {
+      case 'ingreso':
+        return widget.corregir == null ? 'Ingreso' : 'Corregir ingreso';
+      case 'egreso':
+        return widget.corregir == null ? 'Gasto' : 'Corregir gasto';
+      default:
+        return 'Transferencia entre cuentas';
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _monto.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final n = num.tryParse(_monto.text.replaceAll(',', '.'));
+    if (n == null || n <= 0) {
+      _aviso(context, 'Escribe el monto.');
+      return;
+    }
+    setState(() => _ocupado = true);
+    final datos = <String, Object?>{
+      'tipo': widget.tipo,
+      'monto': n,
+      'cuentaId': _cuenta,
+      'cuentaDestinoId': _destino,
+      'categoria': _categoria,
+      'descripcion': _desc.text.trim(),
+      'fecha': isoFecha(_fecha),
+      'persona': _persona,
+    };
+    try {
+      if (widget.corregir != null) {
+        await widget.repo.accion('corregir', {'id': widget.corregir!['id'], 'motivo': 'Corrección', 'nuevo': datos});
+      } else {
+        await widget.repo.accion('registrar', datos);
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      setState(() => _ocupado = false);
+      if (mounted) _aviso(context, _error(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    Widget etiqueta(String t) => Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 6),
+      child: Text(t, style: TextStyle(fontWeight: FontWeight.w700, color: p.texto)),
+    );
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(_titulo, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_titulo, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _monto,
+                autofocus: widget.corregir == null,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                decoration: InputDecoration(prefixText: '${Moneda.s} ', hintText: '0,00'),
+              ),
+              etiqueta(widget.tipo == 'transferencia' ? 'Desde' : (widget.tipo == 'ingreso' ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?')),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in activas)
+                    ChoiceChip(
+                      showCheckmark: false,
+                      avatar: Icon(_iconoCuenta('${c['tipo']}'), size: 18),
+                      label: Text('${c['nombre']}'),
+                      selected: _cuenta == c['id'],
+                      onSelected: (_) => setState(() => _cuenta = c['id'] as String),
+                    ),
+                ],
+              ),
+              if (widget.tipo == 'transferencia') ...[
+                etiqueta('Hacia'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in activas)
+                      if (c['id'] != _cuenta)
+                        ChoiceChip(
+                          showCheckmark: false,
+                          avatar: Icon(_iconoCuenta('${c['tipo']}'), size: 18),
+                          label: Text('${c['nombre']}'),
+                          selected: _destino == c['id'],
+                          onSelected: (_) => setState(() => _destino = c['id'] as String),
+                        ),
+                  ],
+                ),
+              ] else ...[
+                etiqueta('Categoría'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final e in categoriasTesoreria.entries)
+                      ChoiceChip(label: Text(e.value), selected: _categoria == e.key, onSelected: (_) => setState(() => _categoria = e.key)),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _desc,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_rounded),
+                title: Text(Fechas.corta(_fecha)),
+                onTap: () async {
+                  final f = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: Fechas.hoy(), initialDate: _fecha);
+                  if (f != null) setState(() => _fecha = f);
+                },
+              ),
+              if (widget.tipo != 'transferencia')
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person_outline_rounded),
+                  title: Text(_personaNombre ?? 'Persona (opcional)'),
+                  trailing: _persona == null
+                      ? null
+                      : IconButton(
+                          tooltip: 'Quitar',
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => setState(() {
+                            _persona = null;
+                            _personaNombre = null;
+                          }),
+                        ),
+                  onTap: () async {
+                    final x = await elegirPersona(context, widget.repo.sesion);
+                    if (x != null) {
+                      setState(() {
+                        _persona = x.username;
+                        _personaNombre = x.nombreMostrar;
+                      });
+                    }
+                  },
+                ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _ocupado || _cuenta == null || (widget.tipo == 'transferencia' && _destino == null) ? null : _guardar,
+                child: Text(widget.corregir != null ? 'Corregir' : 'Registrar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 Future<bool?> abrirFormularioMovimiento(
   BuildContext context, {
   required TesoreriaRepo repo,
@@ -1113,176 +1184,8 @@ Future<bool?> abrirFormularioMovimiento(
   Map<String, dynamic>? corregir,
   String? desdeCuenta,
 }) {
-  final activas = cuentas.where((c) => c['activa'] != false).toList();
-  final monto = TextEditingController(text: corregir == null ? '' : '${corregir['monto']}');
-  final desc = TextEditingController(text: corregir?['descripcion'] as String? ?? '');
-  String? cuenta = corregir?['cuentaId'] as String? ?? desdeCuenta ?? (activas.isEmpty ? null : activas.first['id'] as String);
-  String? destino;
-  var categoria = corregir?['categoria'] as String? ?? (tipo == 'ingreso' ? 'cuota' : 'otro');
-  var fecha = DateTime.tryParse('${corregir?['fecha'] ?? ''}') ?? Fechas.hoy();
-  String? persona = corregir?['persona'] as String?;
-  String? personaNombre = corregir?['personaNombre'] as String?;
-  var ocupado = false;
-  final titulo = switch (tipo) {
-    'ingreso' => corregir == null ? 'Ingreso' : 'Corregir ingreso',
-    'egreso' => corregir == null ? 'Gasto' : 'Corregir gasto',
-    _ => 'Transferencia entre cuentas',
-  };
-  return showModalBottomSheet<bool>(
-    useRootNavigator: true,
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (h) => StatefulBuilder(
-      builder: (h, set) {
-        final p = h.pivot;
-        Widget etiqueta(String t) => Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 6),
-          child: Text(
-            t,
-            style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-          ),
-        );
-        Future<void> guardar() async {
-          final n = num.tryParse(monto.text.replaceAll(',', '.'));
-          if (n == null || n <= 0) {
-            _aviso(h, 'Escribe el monto.');
-            return;
-          }
-          set(() => ocupado = true);
-          final datos = <String, Object?>{
-            'tipo': tipo,
-            'monto': n,
-            'cuentaId': cuenta,
-            'cuentaDestinoId': destino,
-            'categoria': categoria,
-            'descripcion': desc.text.trim(),
-            'fecha': isoFecha(fecha),
-            'persona': persona,
-          };
-          try {
-            if (corregir != null) {
-              await repo.accion('corregir', {'id': corregir['id'], 'motivo': 'Corrección', 'nuevo': datos});
-            } else {
-              await repo.accion('registrar', datos);
-            }
-            if (h.mounted) Navigator.of(h).pop(true);
-          } catch (e) {
-            set(() => ocupado = false);
-            if (h.mounted) _aviso(h, _error(e));
-          }
-        }
-
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(titulo, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: monto,
-                  autofocus: corregir == null,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-                  decoration: InputDecoration(prefixText: '${Moneda.s} ', hintText: '0,00'),
-                ),
-                etiqueta(tipo == 'transferencia' ? 'Desde' : (tipo == 'ingreso' ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?')),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final c in activas)
-                      ChoiceChip(
-                        showCheckmark: false,
-                        avatar: Icon(_iconoCuenta('${c['tipo']}'), size: 18),
-                        label: Text('${c['nombre']}'),
-                        selected: cuenta == c['id'],
-                        onSelected: (_) => set(() => cuenta = c['id'] as String),
-                      ),
-                  ],
-                ),
-                if (tipo == 'transferencia') ...[
-                  etiqueta('Hacia'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final c in activas)
-                        if (c['id'] != cuenta)
-                          ChoiceChip(
-                            showCheckmark: false,
-                            avatar: Icon(_iconoCuenta('${c['tipo']}'), size: 18),
-                            label: Text('${c['nombre']}'),
-                            selected: destino == c['id'],
-                            onSelected: (_) => set(() => destino = c['id'] as String),
-                          ),
-                    ],
-                  ),
-                ] else ...[
-                  etiqueta('Categoría'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final e in categoriasTesoreria.entries)
-                        ChoiceChip(label: Text(e.value), selected: categoria == e.key, onSelected: (_) => set(() => categoria = e.key)),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: desc,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event_rounded),
-                  title: Text(Fechas.corta(fecha)),
-                  onTap: () async {
-                    final f = await showDatePicker(context: h, firstDate: DateTime(2020), lastDate: Fechas.hoy(), initialDate: fecha);
-                    if (f != null) set(() => fecha = f);
-                  },
-                ),
-                if (tipo != 'transferencia')
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.person_outline_rounded),
-                    title: Text(personaNombre ?? 'Persona (opcional)'),
-                    trailing: persona == null
-                        ? null
-                        : IconButton(
-                            tooltip: 'Quitar',
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () => set(() {
-                              persona = null;
-                              personaNombre = null;
-                            }),
-                          ),
-                    onTap: () async {
-                      final x = await elegirPersona(h, repo.sesion);
-                      if (x != null) {
-                        set(() {
-                          persona = x.username;
-                          personaNombre = x.nombreMostrar;
-                        });
-                      }
-                    },
-                  ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: ocupado || cuenta == null || (tipo == 'transferencia' && destino == null) ? null : guardar,
-                  child: Text(corregir != null ? 'Corregir' : 'Registrar'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    ),
+  return Navigator.of(context).push<bool>(
+    MaterialPageRoute(builder: (_) => MovimientoScreen(repo: repo, cuentas: cuentas, tipo: tipo, corregir: corregir, desdeCuenta: desdeCuenta)),
   );
 }
 
@@ -1735,115 +1638,10 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
   };
 
   Future<void> _registrar() async {
-    var tipo = 'cargo';
-    final monto = TextEditingController(), concepto = TextEditingController(), porCuota = TextEditingController();
-    String? cuenta;
-    var aplicar = 'aparte';
-    final activas = widget.cuentas.where((c) => c['activa'] != false).toList();
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final mueveDinero = tipo == 'prestamo' || tipo == 'abono' || tipo == 'devolucion';
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(widget.nombre, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  for (final e in _tipos.entries)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      selected: tipo == e.key,
-                      onTap: () => set(() => tipo = e.key),
-                      title: Text(e.value.$1),
-                      subtitle: Text(e.value.$2),
-                      leading: Icon(e.value.$3),
-                      trailing: tipo == e.key ? const Icon(Icons.check_rounded) : null,
-                    ),
-                  TextField(
-                    controller: monto,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: concepto,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(labelText: tipo == 'devolucion' ? 'Motivo' : 'Concepto'),
-                  ),
-                  if (mueveDinero || tipo == 'a_favor') ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      tipo == 'prestamo' || tipo == 'devolucion'
-                          ? '¿De qué cuenta salió?'
-                          : (tipo == 'a_favor' ? '¿Entró dinero a una cuenta? (opcional)' : '¿A qué cuenta entró?'),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final c in activas)
-                          ChoiceChip(
-                            label: Text('${c['nombre']}'),
-                            selected: cuenta == c['id'],
-                            onSelected: (v) => set(() => cuenta = v ? c['id'] as String : null),
-                          ),
-                      ],
-                    ),
-                  ],
-                  if (tipo != 'abono' && tipo != 'devolucion') ...[
-                    const SizedBox(height: 12),
-                    const Text('¿Cómo se aplica?', style: TextStyle(fontWeight: FontWeight.w700)),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        ChoiceChip(label: const Text('Aparte'), selected: aplicar == 'aparte', onSelected: (_) => set(() => aplicar = 'aparte')),
-                        ChoiceChip(
-                          label: const Text('Junto con la cuota'),
-                          selected: aplicar == 'con_cuota',
-                          onSelected: (_) => set(() => aplicar = 'con_cuota'),
-                        ),
-                        ChoiceChip(label: const Text('En cuotas'), selected: aplicar == 'cuotas', onSelected: (_) => set(() => aplicar = 'cuotas')),
-                      ],
-                    ),
-                    if (aplicar == 'cuotas')
-                      TextField(
-                        controller: porCuota,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: 'Monto por mes', prefixText: '${Moneda.s} '),
-                      ),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton(onPressed: mueveDinero && cuenta == null ? null : () => Navigator.of(h).pop(true), child: const Text('Registrar')),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => RegistrarSaldoScreen(repo: widget.repo, username: widget.username, nombre: widget.nombre, cuentas: widget.cuentas, alGuardar: _cargar)),
     );
-    if (ok != true) return;
-    try {
-      await widget.repo.accion('registrarSaldo', {
-        'username': widget.username,
-        'tipo': tipo,
-        'monto': num.tryParse(monto.text.replaceAll(',', '.')) ?? 0,
-        'concepto': concepto.text.trim(),
-        'cuentaId': cuenta,
-        'aplicar': aplicar,
-        'montoPorCuota': num.tryParse(porCuota.text.replaceAll(',', '.')),
-      });
-      if (mounted) _aviso(context, 'Registrado');
-      await _cargar();
-    } catch (e) {
-      if (mounted) _aviso(context, _error(e));
-    }
+    if (ok == true && mounted) _aviso(context, 'Registrado');
   }
 
   @override
@@ -2650,6 +2448,440 @@ class _RepartoViajeScreenState extends State<RepartoViajeScreen> {
           const SizedBox(height: 20),
           FilledButton(onPressed: _guardando || suma > 100 ? null : _guardar, child: Text(_guardando ? 'Guardando…' : 'Guardar')),
         ],
+      ),
+    );
+  }
+}
+
+/// Subsección para editar o crear una cuenta de tesorería.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class CuentaEdicionScreen extends StatefulWidget {
+  const CuentaEdicionScreen({super.key, required this.repo, required this.cuenta});
+  final TesoreriaRepo repo;
+  final Map<String, dynamic>? cuenta;
+
+  @override
+  State<CuentaEdicionScreen> createState() => _CuentaEdicionScreenState();
+}
+
+class _CuentaEdicionScreenState extends State<CuentaEdicionScreen> {
+  late final nombre = TextEditingController();
+  late final resp = TextEditingController();
+  late final saldo = TextEditingController();
+  late var tipo;
+  late var fecha;
+  late var activa;
+
+  @override
+  void initState() {
+    super.initState();
+    nombre.text = widget.cuenta?['nombre'] as String? ?? '';
+    resp.text = widget.cuenta?['responsable'] as String? ?? '';
+    saldo.text = widget.cuenta == null ? '' : '${widget.cuenta!['saldoInicial']}';
+    tipo = widget.cuenta?['tipo'] as String? ?? 'efectivo';
+    fecha = DateTime.tryParse('${widget.cuenta?['fechaInicial'] ?? ''}') ?? Fechas.hoy();
+    activa = widget.cuenta?['activa'] != false;
+  }
+
+  @override
+  void dispose() {
+    nombre.dispose();
+    resp.dispose();
+    saldo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    await widget.repo.accion('guardarCuenta', {
+      'id': widget.cuenta?['id'],
+      'nombre': nombre.text.trim(),
+      'tipo': tipo,
+      'responsable': resp.text.trim(),
+      'saldoInicial': num.tryParse(saldo.text.replaceAll(',', '.')) ?? 0,
+      'fechaInicial': isoFecha(fecha),
+      'activa': activa,
+    });
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.cuenta == null ? 'Nueva cuenta' : 'Editar cuenta', style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final e in tiposCuenta.entries)
+                    ChoiceChip(
+                      showCheckmark: false,
+                      avatar: Icon(_iconoCuenta(e.key), size: 18),
+                      label: Text(e.value),
+                      selected: tipo == e.key,
+                      onSelected: (_) {
+                        setState(() {
+                          tipo = e.key;
+                          if (nombre.text.trim().isEmpty || tiposCuenta.values.contains(nombre.text.trim())) nombre.text = e.value;
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nombre,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              if (tipo == 'efectivo') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: resp,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(labelText: '¿Quién tiene la caja?'),
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: saldo,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]'))],
+                decoration: InputDecoration(
+                  labelText: 'Saldo inicial',
+                  prefixText: '${Moneda.s} ',
+                  helperText: 'Lo que la liga ya tenía en esta cuenta antes de usar Pivot.',
+                  helperMaxLines: 3,
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Desde el ${Fechas.corta(fecha)}'),
+                subtitle: const Text('Los movimientos se cuentan desde esa fecha.'),
+                trailing: const Icon(Icons.edit_calendar_outlined),
+                onTap: () async {
+                  final f = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: Fechas.hoy(), initialDate: fecha);
+                  if (f != null) setState(() => fecha = f);
+                },
+              ),
+              if (widget.cuenta != null)
+                SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Activa'), value: activa, onChanged: (v) => setState(() => activa = v)),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para registro rápido: alguien usó/devolvió plata del equipo.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class PlataDelEquipoScreen extends StatefulWidget {
+  const PlataDelEquipoScreen({super.key, required this.repo, required this.cuentas, required this.devolver});
+  final TesoreriaRepo repo;
+  final List<Map<String, dynamic>> cuentas;
+  final bool devolver;
+
+  @override
+  State<PlataDelEquipoScreen> createState() => _PlataDelEquipoScreenState();
+}
+
+class _PlataDelEquipoScreenState extends State<PlataDelEquipoScreen> {
+  final gente = <Integrante>[];
+  String? cuenta;
+  late final monto = TextEditingController();
+  late final concepto = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    cuenta = widget.cuentas.isEmpty ? null : '${widget.cuentas.first['id']}';
+    concepto.text = widget.devolver ? 'Devolución' : '';
+  }
+
+  @override
+  void dispose() {
+    monto.dispose();
+    concepto.dispose();
+    super.dispose();
+  }
+
+  Future<void> _registrar() async {
+    final total = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
+    if (gente.isEmpty || total <= 0 || cuenta == null || concepto.text.trim().isEmpty) return;
+    // Partes iguales al centavo; el último se lleva el redondeo.
+    final parte = (total / gente.length * 100).floorToDouble() / 100;
+    try {
+      for (var i = 0; i < gente.length; i++) {
+        final m = i == gente.length - 1 ? double.parse((total - parte * (gente.length - 1)).toStringAsFixed(2)) : parte;
+        await widget.repo.accion('registrarSaldo', {
+          'username': gente[i].username,
+          'tipo': widget.devolver ? 'abono' : 'prestamo',
+          'monto': m,
+          'concepto': concepto.text.trim(),
+          'cuentaId': cuenta,
+          'aplicar': 'aparte',
+        });
+      }
+      _aviso(context, widget.devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) _aviso(context, _error(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final total = double.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.devolver ? 'Devolví plata al equipo' : 'Usé plata del equipo', style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.devolver
+                    ? 'Entra a la cuenta y baja lo que debe cada persona.'
+                    : 'Sale de la cuenta del equipo y queda como deuda de cada persona. Si eliges a varias, se divide en partes iguales.',
+                style: TextStyle(color: p.textoSecundario),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final x in gente) InputChip(label: Text(x.nombreMostrar), onDeleted: () => setState(() => gente.remove(x))),
+                  ActionChip(
+                    avatar: const Icon(Icons.person_add_alt_rounded, size: 18),
+                    label: Text(gente.isEmpty ? '¿Quién?' : 'Agregar'),
+                    onPressed: () async {
+                      final x = await elegirPersona(context, widget.repo.sesion);
+                      if (x != null && !gente.any((g) => g.username == x.username)) setState(() => gente.add(x));
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: monto,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Monto total',
+                  prefixText: '${Moneda.s} ',
+                  helperText: gente.length > 1 && total > 0 ? '${plata(total / gente.length)} cada persona' : null,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: concepto,
+                decoration: const InputDecoration(labelText: '¿Para qué fue?'),
+              ),
+              const SizedBox(height: 14),
+              Text(widget.devolver ? '¿A qué cuenta entra?' : '¿De qué cuenta salió?', style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in widget.cuentas)
+                    ChoiceChip(
+                      showCheckmark: false,
+                      label: Text('${c['nombre']}'),
+                      selected: cuenta == '${c['id']}',
+                      onSelected: (_) => setState(() => cuenta = '${c['id']}'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: gente.isEmpty || total <= 0 || cuenta == null || concepto.text.trim().isEmpty ? null : _registrar,
+                child: const Text('Registrar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para registrar un saldo (ingreso/egreso) de una persona.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class RegistrarSaldoScreen extends StatefulWidget {
+  const RegistrarSaldoScreen({super.key, required this.repo, required this.username, required this.nombre, required this.cuentas, required this.alGuardar});
+  final TesoreriaRepo repo;
+  final String username;
+  final String nombre;
+  final List<Map<String, dynamic>> cuentas;
+  final VoidCallback alGuardar;
+
+  @override
+  State<RegistrarSaldoScreen> createState() => _RegistrarSaldoScreenState();
+}
+
+class _RegistrarSaldoScreenState extends State<RegistrarSaldoScreen> {
+  late final monto = TextEditingController();
+  late final concepto = TextEditingController();
+  late final porCuota = TextEditingController();
+  var tipo = 'cargo';
+  String? cuenta;
+  var aplicar = 'aparte';
+
+  @override
+  void dispose() {
+    monto.dispose();
+    concepto.dispose();
+    porCuota.dispose();
+    super.dispose();
+  }
+
+  final _tipos = {
+    'cargo': ('Cargo', 'Queda como deuda', Icons.add_circle_outline),
+    'abono': ('Abono', 'Baja lo que debe', Icons.remove_circle_outline),
+    'prestamo': ('Préstamo', 'Sale de una cuenta del equipo', Icons.payment_rounded),
+    'devolucion': ('Devolución', 'Entra a una cuenta del equipo', Icons.undo_rounded),
+    'a_favor': ('A favor', 'Crédito a favor de la persona', Icons.card_giftcard_rounded),
+  };
+
+  bool get mueveDinero => tipo == 'prestamo' || tipo == 'abono' || tipo == 'devolucion';
+
+  Future<void> _registrar() async {
+    final total = num.tryParse(monto.text.replaceAll(',', '.')) ?? 0;
+    if (total <= 0 || cuenta == null && mueveDinero) return;
+    if (concepto.text.trim().isEmpty) return;
+    final mpc = num.tryParse(porCuota.text.replaceAll(',', '.'));
+    try {
+      await widget.repo.accion('registrarSaldo', {
+        'username': widget.username,
+        'tipo': tipo,
+        'monto': total,
+        'concepto': concepto.text.trim(),
+        'cuentaId': cuenta,
+        'aplicar': aplicar,
+        'montoPorCuota': mpc,
+      });
+      if (!mounted) return;
+      widget.alGuardar();
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) _aviso(context, _error(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activas = widget.cuentas.where((c) => c['archivada'] != true).toList();
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text('Registro para ${widget.nombre}', style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final e in _tipos.entries)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  selected: tipo == e.key,
+                  onTap: () => setState(() => tipo = e.key),
+                  title: Text(e.value.$1),
+                  subtitle: Text(e.value.$2),
+                  leading: Icon(e.value.$3),
+                  trailing: tipo == e.key ? const Icon(Icons.check_rounded) : null,
+                ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: monto,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: 'Monto', prefixText: '${Moneda.s} '),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: concepto,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(labelText: tipo == 'devolucion' ? 'Motivo' : 'Concepto'),
+              ),
+              if (mueveDinero || tipo == 'a_favor') ...[
+                const SizedBox(height: 12),
+                Text(
+                  tipo == 'prestamo' || tipo == 'devolucion'
+                      ? '¿De qué cuenta salió?'
+                      : (tipo == 'a_favor' ? '¿Entró dinero a una cuenta? (opcional)' : '¿A qué cuenta entró?'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final c in activas)
+                      ChoiceChip(
+                        label: Text('${c['nombre']}'),
+                        selected: cuenta == c['id'],
+                        onSelected: (v) => setState(() => cuenta = v ? c['id'] as String : null),
+                      ),
+                  ],
+                ),
+              ],
+              if (tipo != 'abono' && tipo != 'devolucion') ...[
+                const SizedBox(height: 12),
+                const Text('¿Cómo se aplica?', style: TextStyle(fontWeight: FontWeight.w700)),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(label: const Text('Aparte'), selected: aplicar == 'aparte', onSelected: (_) => setState(() => aplicar = 'aparte')),
+                    ChoiceChip(label: const Text('Junto con la cuota'), selected: aplicar == 'con_cuota', onSelected: (_) => setState(() => aplicar = 'con_cuota')),
+                    ChoiceChip(label: const Text('En cuotas'), selected: aplicar == 'cuotas', onSelected: (_) => setState(() => aplicar = 'cuotas')),
+                  ],
+                ),
+                if (aplicar == 'cuotas')
+                  TextField(
+                    controller: porCuota,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: 'Monto por mes', prefixText: '${Moneda.s} '),
+                  ),
+              ],
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: mueveDinero && cuenta == null ? null : _registrar,
+                child: const Text('Registrar'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -39,47 +39,20 @@ class _RolesScreenState extends State<RolesScreen> {
     }
   }
 
-  Future<String?> _pedirNombre({String? actual}) {
-    final c = TextEditingController(text: actual ?? '');
-    return showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        scrollable: true,
-        title: Text(actual == null ? 'Nuevo rol' : 'Renombrar rol'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: c,
-              autofocus: true,
-              maxLength: 30,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(hintText: 'Ej. Capitán'),
-              onSubmitted: (v) => Navigator.of(d).pop(v.trim()),
-            ),
-            if (actual != null && (repo.rolesEnUso[actual] ?? 0) > 0)
-              Text('Cambiará en la ficha de ${_personas(repo.rolesEnUso[actual]!)}.', style: TextStyle(fontSize: 13, color: d.pivot.textoSecundario)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(d).pop(c.text.trim()), child: const Text('Guardar')),
-        ],
-      ),
-    );
-  }
-
   static String _personas(int n) => n == 1 ? '1 persona' : '$n personas';
 
   Future<void> _crear() async {
-    final n = await _pedirNombre();
+    final n = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EditarRolScreen(repo: repo)),
+    );
     if (n == null || n.isEmpty || !mounted) return;
     await _hacer('crear', nombre: n, ok: 'Rol creado');
   }
 
   Future<void> _renombrar(String r) async {
-    final n = await _pedirNombre(actual: r);
+    final n = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EditarRolScreen(repo: repo, actual: r)),
+    );
     if (n == null || n.isEmpty || n == r || !mounted) return;
     await _hacer('renombrar', nombre: r, nuevo: n, ok: 'Rol renombrado');
   }
@@ -169,6 +142,76 @@ class _RolesScreenState extends State<RolesScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+/// Subsección para crear o renombrar un rol. Reemplaza el showDialog de un campo
+/// para evitar cierres accidentales al escribir con el teclado abierto.
+class EditarRolScreen extends StatefulWidget {
+  const EditarRolScreen({super.key, required this.repo, this.actual});
+  final EquipoRepo repo;
+  final String? actual;
+
+  @override
+  State<EditarRolScreen> createState() => _EditarRolScreenState();
+}
+
+class _EditarRolScreenState extends State<EditarRolScreen> {
+  late final ctl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    ctl.text = widget.actual ?? '';
+  }
+
+  @override
+  void dispose() {
+    ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final enUso = widget.actual != null ? (widget.repo.rolesEnUso[widget.actual!] ?? 0) : 0;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.actual == null ? 'Nuevo rol' : 'Renombrar rol', style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (enUso > 0)
+                Text('Cambiará en la ficha de ${enUso == 1 ? '1 persona' : '$enUso personas'}.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctl,
+                autofocus: true,
+                maxLength: 30,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(hintText: 'Ej. Capitán'),
+                onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(ctl.text.trim()),
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

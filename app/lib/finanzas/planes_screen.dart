@@ -194,58 +194,10 @@ class _EditorPlanState extends State<_EditorPlan> {
 
   /// Elegir personas con buscador (Victor, 2026-11-17).
   Future<void> _elegirPersonas() async {
-    final sel = {..._personas};
-    var q = '';
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) {
-          final l = widget.gente.entries.where((e) => '${e.value} ${e.key}'.toLowerCase().contains(q.toLowerCase())).toList()
-            ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
-          return SizedBox(
-            height: MediaQuery.sizeOf(c).height * 0.8,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: TextField(
-                    onChanged: (v) => set(() => q = v),
-                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar persona'),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      for (final e in l)
-                        CheckboxListTile(
-                          value: sel.contains(e.key),
-                          title: Text(e.value),
-                          subtitle: e.value == e.key ? null : Text('@${e.key}'),
-                          onChanged: (v) => set(() => v == true ? sel.add(e.key) : sel.remove(e.key)),
-                        ),
-                    ],
-                  ),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(sel.isEmpty ? 'Sin personas' : 'Listo (${sel.length})')),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    final sel = await Navigator.of(context).push<Set<String>>(
+      MaterialPageRoute(builder: (_) => ElegirPersonasScreen(gente: widget.gente, seleccionadas: _personas, alGuardar: (s) => Navigator.of(context).pop(s))),
     );
-    if (ok == true) {
+    if (sel != null) {
       setState(() {
         _personas
           ..clear()
@@ -396,6 +348,84 @@ class _EditorPlanState extends State<_EditorPlan> {
             child: const Text('Guardar'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Subsección para elegir personas con buscador.
+/// Reemplaza el bottom sheet con campo de búsqueda para evitar cierres accidentales al escribir.
+class ElegirPersonasScreen extends StatefulWidget {
+  const ElegirPersonasScreen({super.key, required this.gente, required this.seleccionadas, required this.alGuardar});
+  final Map<String, String> gente;
+  final Set<String> seleccionadas;
+  final void Function(Set<String>) alGuardar;
+
+  @override
+  State<ElegirPersonasScreen> createState() => _ElegirPersonasScreenState();
+}
+
+class _ElegirPersonasScreenState extends State<ElegirPersonasScreen> {
+  final sel = <String>{};
+  var q = '';
+
+  @override
+  void initState() {
+    super.initState();
+    sel.addAll(widget.seleccionadas);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = widget.gente.entries.where((e) => '${e.value} ${e.key}'.toLowerCase().contains(q.toLowerCase())).toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('Elegir personas', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: TextField(
+                onChanged: (v) => setState(() => q = v),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar persona'),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  for (final e in l)
+                    CheckboxListTile(
+                      value: sel.contains(e.key),
+                      title: Text(e.value),
+                      subtitle: e.value == e.key ? null : Text('@${e.key}'),
+                      onChanged: (v) => setState(() => v == true ? sel.add(e.key) : sel.remove(e.key)),
+                    ),
+                ],
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => widget.alGuardar(sel),
+                    child: Text(sel.isEmpty ? 'Sin personas' : 'Listo (${sel.length})'),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

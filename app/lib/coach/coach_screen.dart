@@ -422,63 +422,15 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
 
   Future<void> _bloque([int? i]) async {
     final b = i == null ? null : _bloques[i];
-    final titulo = TextEditingController(text: '${b?['titulo'] ?? ''}');
-    final detalle = TextEditingController(text: '${b?['detalle'] ?? ''}');
-    var minutos = (b?['minutos'] as num?)?.toInt() ?? 15;
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(i == null ? 'Nuevo bloque' : 'Editar bloque', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: titulo,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Qué se hace', hintText: 'Ej. Calentamiento, técnica, juego'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: detalle,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Detalle (opcional)'),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Expanded(child: Text('Duración')),
-                  IconButton(onPressed: minutos <= 5 ? null : () => set(() => minutos -= 5), icon: const Icon(Icons.remove_rounded)),
-                  Text('$minutos min', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  IconButton(onPressed: minutos >= 240 ? null : () => set(() => minutos += 5), icon: const Icon(Icons.add_rounded)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Listo')),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final r = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => BloqueCoachScreen(bloque: b)),
     );
-    if (ok != true || titulo.text.trim().isEmpty) return;
+    if (r == null) return;
     setState(() {
-      final n = {'titulo': titulo.text.trim(), 'detalle': detalle.text.trim(), 'minutos': minutos};
       if (i == null) {
-        _bloques.add(n);
+        _bloques.add(r);
       } else {
-        _bloques[i] = n;
+        _bloques[i] = r;
       }
     });
   }
@@ -960,49 +912,13 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
   }
 
   Future<void> _nuevaMarca(Map<String, dynamic> pr) async {
-    final c = TextEditingController();
-    final v = await showModalBottomSheet<String>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${pr['nombre']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: c,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: 'Resultado de hoy', suffixText: '${pr['unidad']}'),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(onPressed: () => Navigator.of(h).pop(c.text.trim()), child: const Text('Guardar')),
-            ),
-          ],
-        ),
-      ),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => NuevaMarcaScreen(sesion: widget.sesion, pr: pr, username: _d?['username'] ?? '', alGuardar: (v) async {
+        await _guardar({'accion': 'marca', 'pruebaId': pr['id'], 'username': _d?['username'], 'valor': v, 'fecha': Fechas.iso(Fechas.hoy())});
+        await _cargar();
+      })),
     );
-    if (v == null || v.isEmpty) return;
-    try {
-      final r = await s.api.post('coachPruebas', {
-        'accion': 'marca',
-        'pruebaId': pr['id'],
-        'username': _d?['username'],
-        'valor': v,
-        'fecha': Fechas.iso(Fechas.hoy()),
-      });
-      if (r['exito'] == false) throw ApiException('${r['error']}');
-      await _cargar();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
-    }
+    if (ok == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marca guardada')));
   }
 
   Future<void> _nuevaNota() async {
@@ -2540,6 +2456,180 @@ class _BotonDictarState extends State<BotonDictar> {
           height: _escuchando ? 48 : 40,
           decoration: BoxDecoration(color: _escuchando ? p.marca : p.suave, shape: BoxShape.circle),
           child: Icon(Icons.mic_rounded, color: _escuchando ? p.sobreMarca : p.sobreSuave),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para editar o crear un bloque de plan de coach.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class BloqueCoachScreen extends StatefulWidget {
+  const BloqueCoachScreen({super.key, required this.bloque});
+  final Map<String, dynamic>? bloque;
+
+  @override
+  State<BloqueCoachScreen> createState() => _BloqueCoachScreenState();
+}
+
+class _BloqueCoachScreenState extends State<BloqueCoachScreen> {
+  late final titulo = TextEditingController();
+  late final detalle = TextEditingController();
+  late var minutos;
+
+  @override
+  void initState() {
+    super.initState();
+    titulo.text = widget.bloque?['titulo'] ?? '';
+    detalle.text = widget.bloque?['detalle'] ?? '';
+    minutos = (widget.bloque?['minutos'] as num?)?.toInt() ?? 15;
+  }
+
+  @override
+  void dispose() {
+    titulo.dispose();
+    detalle.dispose();
+    super.dispose();
+  }
+
+  void _guardar() {
+    if (titulo.text.trim().isEmpty) return;
+    Navigator.of(context).pop({
+      'titulo': titulo.text.trim(),
+      'detalle': detalle.text.trim(),
+      'minutos': minutos,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.bloque == null ? 'Nuevo bloque' : 'Editar bloque', style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              TextField(
+                controller: titulo,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Qué se hace', hintText: 'Ej. Calentamiento, técnica, juego'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: detalle,
+                minLines: 1,
+                maxLines: 4,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Detalle (opcional)'),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Expanded(child: Text('Duración')),
+                  IconButton(onPressed: minutos <= 5 ? null : () => setState(() => minutos -= 5), icon: const Icon(Icons.remove_rounded)),
+                  Text('$minutos min', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  IconButton(onPressed: minutos >= 240 ? null : () => setState(() => minutos += 5), icon: const Icon(Icons.add_rounded)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: _guardar, child: const Text('Listo')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para registrar una nueva marca/resultado de prueba.
+/// Reemplaza el bottom sheet con campo de texto para evitar cierres accidentales al escribir.
+class NuevaMarcaScreen extends StatefulWidget {
+  const NuevaMarcaScreen({super.key, required this.sesion, required this.pr, required this.username, required this.alGuardar});
+  final Sesion sesion;
+  final Map<String, dynamic> pr;
+  final String username;
+  final void Function(String valor) alGuardar;
+
+  @override
+  State<NuevaMarcaScreen> createState() => _NuevaMarcaScreenState();
+}
+
+class _NuevaMarcaScreenState extends State<NuevaMarcaScreen> {
+  late final c = TextEditingController();
+
+  @override
+  void dispose() {
+    c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final v = c.text.trim();
+    if (v.isEmpty) return;
+    try {
+      final r = await widget.sesion.api.post('coachPruebas', {
+        'accion': 'marca',
+        'pruebaId': widget.pr['id'],
+        'username': widget.username,
+        'valor': v,
+        'fecha': Fechas.iso(Fechas.hoy()),
+      });
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      widget.alGuardar(v);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text('${widget.pr['nombre']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              TextField(
+                controller: c,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: 'Resultado de hoy', suffixText: '${widget.pr['unidad']}'),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+              ),
+            ],
+          ),
         ),
       ),
     );

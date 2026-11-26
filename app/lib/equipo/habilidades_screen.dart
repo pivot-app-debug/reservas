@@ -131,82 +131,27 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
 
   /// Nueva o editar. [nivelInicial] = desplegable desde el que se agrega.
   Future<void> editar([Map<String, dynamic>? h, String? categoria, String? nivelInicial]) async {
-    final nombre = TextEditingController(text: '${h?['nombre'] ?? ''}');
-    final cat = TextEditingController(text: '${h?['categoria'] ?? categoria ?? ''}');
-    var activa = h?['activa'] != false;
-    var nivel = '${h?['nivel'] ?? nivelInicial ?? 'basica'}';
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(h == null ? 'Nueva habilidad' : 'Editar habilidad', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nombre,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Habilidad'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: cat,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Grupo', hintText: 'Ej. Frenos'),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'basica', label: Text('Básica')),
-                    ButtonSegment(value: 'avanzada', label: Text('Avanzada')),
-                  ],
-                  selected: {nivel},
-                  onSelectionChanged: (v) => set(() => nivel = v.first),
-                ),
-              ),
-              if (h != null)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('En uso'),
-                  subtitle: const Text('Apagada, deja de aparecer en las fichas (no se borra su historial).'),
-                  value: activa,
-                  onChanged: (v) => set(() => activa = v),
-                ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Guardar')),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditarHabilidadScreen(
+        sesion: widget.sesion,
+        habilidad: h,
+        categoria: categoria,
+        nivelInicial: nivelInicial,
+        alGuardar: (resultado) async {
+          await widget.sesion.api.post('coachGuardar', {
+            'accion': 'habilidad',
+            'id': h?['id'],
+            'nombre': resultado['nombre'],
+            'categoria': resultado['categoria'],
+            'activa': resultado['activa'],
+            'nivel': resultado['nivel'],
+          });
+          setState(() => _abiertos.add(resultado['nivel']));
+          _cargar();
+        },
+      )),
     );
-    if (ok != true || nombre.text.trim().isEmpty || cat.text.trim().isEmpty) return;
-    try {
-      final r = await widget.sesion.api.post('coachGuardar', {
-        'accion': 'habilidad',
-        'id': h?['id'],
-        'nombre': nombre.text.trim(),
-        'categoria': cat.text.trim(),
-        'activa': activa,
-        'nivel': nivel,
-      });
-      if (r['exito'] == false) throw ApiException('${r['error']}');
-      setState(() => _abiertos.add(nivel));
-      _cargar();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
-    }
+    if (ok == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardado')));
   }
 
   @override
@@ -934,6 +879,131 @@ class _ComentariosScreenState extends State<_ComentariosScreen> {
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
             onPressed: _guardando || !hay ? null : _guardar,
             child: _guardando ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Guardar comentarios'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para crear o editar una habilidad.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class EditarHabilidadScreen extends StatefulWidget {
+  const EditarHabilidadScreen({super.key, required this.sesion, required this.habilidad, required this.categoria, required this.nivelInicial, required this.alGuardar});
+  final Sesion sesion;
+  final Map<String, dynamic>? habilidad;
+  final String? categoria;
+  final String? nivelInicial;
+  final Future<void> Function(Map<String, dynamic> resultado) alGuardar;
+
+  @override
+  State<EditarHabilidadScreen> createState() => _EditarHabilidadScreenState();
+}
+
+class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
+  late final nombre = TextEditingController();
+  late final cat = TextEditingController();
+  late var activa;
+  late var nivel;
+
+  @override
+  void initState() {
+    super.initState();
+    nombre.text = widget.habilidad?['nombre'] ?? '';
+    cat.text = '${widget.habilidad?['categoria'] ?? widget.categoria ?? ''}';
+    activa = widget.habilidad?['activa'] != false;
+    nivel = '${widget.habilidad?['nivel'] ?? widget.nivelInicial ?? 'basica'}';
+  }
+
+  @override
+  void dispose() {
+    nombre.dispose();
+    cat.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    if (nombre.text.trim().isEmpty || cat.text.trim().isEmpty) return;
+    try {
+      final r = await widget.sesion.api.post('coachGuardar', {
+        'accion': 'habilidad',
+        'id': widget.habilidad?['id'],
+        'nombre': nombre.text.trim(),
+        'categoria': cat.text.trim(),
+        'activa': activa,
+        'nivel': nivel,
+      });
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      if (!mounted) return;
+      widget.alGuardar({
+        'nombre': nombre.text.trim(),
+        'categoria': cat.text.trim(),
+        'activa': activa,
+        'nivel': nivel,
+      });
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: Text(widget.habilidad == null ? 'Nueva habilidad' : 'Editar habilidad', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              TextField(
+                controller: nombre,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Habilidad'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: cat,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Grupo', hintText: 'Ej. Frenos'),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'basica', label: Text('Básica')),
+                    ButtonSegment(value: 'avanzada', label: Text('Avanzada')),
+                  ],
+                  selected: {nivel},
+                  onSelectionChanged: (v) => setState(() => nivel = v.first),
+                ),
+              ),
+              if (widget.habilidad != null)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('En uso'),
+                  subtitle: const Text('Apagada, deja de aparecer en las fichas (no se borra su historial).'),
+                  value: activa,
+                  onChanged: (v) => setState(() => activa = v),
+                ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+              ),
+            ],
           ),
         ),
       ),

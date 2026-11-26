@@ -101,6 +101,20 @@ class _PagosScreenState extends State<PagosScreen> {
               ? null
               : FilledButton.icon(onPressed: () => _pagarOReservar(context), icon: const Icon(Icons.add_card_rounded), label: const Text('Pagar o reservar')),
         ),
+        // Cuánto se cobra por mes (info preliminar para no-pivots que no entran al wizard).
+        if (c.pagaCuotaMensual && c.datos['precioMensual'] != null) ...[
+          const SizedBox(height: 16),
+          GrupoAjustes(
+            filas: [
+              FilaAjuste(
+                icono: Icons.calendar_month_outlined,
+                seccion: 'precio',
+                titulo: 'Cuota mensual',
+                valor: '${Moneda.s}${double.tryParse('${c.datos['precioMensual']}')?.toStringAsFixed(2) ?? '0,00'}',
+              ),
+            ],
+          ),
+        ],
         _Estado(cuota: c, enRevision: enRevision, cantidadRevision: pendientes.length, alPagar: () => _pagarCuota(context)),
         if (activas.isNotEmpty) ...[
           const SizedBox(height: 22),

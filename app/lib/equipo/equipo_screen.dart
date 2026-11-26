@@ -9,6 +9,7 @@ import '../core/sincroniza.dart';
 
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/banner_ayuda.dart';
 import '../core/vidrio.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/componentes.dart';
@@ -18,6 +19,8 @@ import '../eventos/eventos_repo.dart';
 import '../finanzas/tesoreria_screen.dart';
 import '../pivots/categorias_screen.dart' show VerEquipoScreen, NuevoEquipoScreen;
 import '../pivots/ajustes_liga_screen.dart' show AjustesLigaScreen;
+import '../pivots/archivadas_screen.dart' show ArchivadasScreen;
+import '../pivots/pivots_screen.dart' show PivotsScreen;
 import 'buscador_equipo.dart';
 import 'avisos_liga.dart';
 import 'cosas_para_llevar.dart';
@@ -230,6 +233,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     child: TextField(
       controller: _busqueda,
       focusNode: _focoBusqueda,
+      autofocus: _busqueda.text.isEmpty,
       textInputAction: TextInputAction.search,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
@@ -331,7 +335,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final hoy = Fechas.hoy();
     List<Integrante> grupo(String g) {
       // Coaches (Victor, 2026-11-22): quienes son coach, estén en un equipo o inactivxs.
-      final l = personas.where((x) => (g == 'Coaches' ? x.esCoach : x.grupo == g) && repo.pasaRoles(x)).toList()
+      final l = personas.where((x) {
+        final matchesGroup = g == 'Coaches' ? x.esCoach : (g == 'Pivots' ? x.esAdminMiembro : x.grupo == g);
+        return matchesGroup && repo.pasaRoles(x);
+      }).toList()
         ..sort((a, b) {
           // Tu fila primero; después por nombre.
           if (repo.esYo(a) != repo.esYo(b)) return repo.esYo(a) ? -1 : 1;
@@ -347,6 +354,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final secciones = [
       ...(mio == 'Mirlxs' ? const ['Mirlxs', 'Quindes', 'Inactivxs'] : const ['Quindes', 'Mirlxs', 'Inactivxs']),
       if (coaches) 'Coaches',
+      if (_pivot) 'Pivots',
     ];
     final grupos = {for (final g in secciones) g: grupo(g)};
     final conGente = [
@@ -408,7 +416,16 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                 SliverToBoxAdapter(
                   child: _Plegable(
                     abierto: g == abierto,
-                    child: Column(children: [for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy)]),
+                    child: Column(
+                      children: [
+                        if (g == 'Quindes') _bannerEquipo(p, 'Quindes', 'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.', alDetalles: () => _entrar('Quindes')),
+                        if (g == 'Mirlxs') _bannerEquipo(p, 'Mirlxs', 'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.', alDetalles: () => _entrar('Mirlxs')),
+                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no han asistido a ningún entrenamiento en 30 días (o nunca asistieron), salvo que estén de viaje, lesionadxs o con un motivo válido. Al tocar "Sin actividad" ves las personas archivadas y podés sugerir quién archivar por inactividad. El botón "Archivar" de cada persona la saca de la vista del equipo: su historial se conserva y, si vuelve, sale de archivo y queda activx.'),
+                        if (g == 'Coaches') _bannerEquipo(p, 'Coaches', 'Entrenadorxs del equipo. Pueden tomar asistencia y crear pruebas. Los nombra un Pivot y un coach puede sacarse a síx mismx tocando los 3 puntos de su fila.', alDetalles: () => _entrar('Coaches')),
+                        if (g == 'Pivots') _bannerEquipo(p, 'Pivots', 'Administradorxs de la liga con acceso total: pueden editar equipos, cobros, archivar personas, invitar al equipo y cambiar reglas sensibles. Los nombra el dueño de la liga o otro Pivot con permisos.', alDetalles: () => _entrar('Pivots')),
+                        for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -437,10 +454,16 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     return true;
   }
 
+  String _label(String grupo) => grupo == 'Inactivxs' ? 'Sin actividad' : grupo;
+
   void _entrar(String titulo) {
     final s = repo.sesion;
     if (titulo == 'Coaches') {
       SubAjustes.abrir(context, s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s));
+    } else if (titulo == 'Inactivxs') {
+      Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => ArchivadasScreen(repo: repo)));
+    } else if (titulo == 'Pivots') {
+      SubAjustes.abrir(context, PivotsScreen(sesion: s));
     } else {
       SubAjustes.abrir(context, VerEquipoScreen(sesion: s, nombre: titulo));
     }
@@ -518,16 +541,16 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                     _entrar(titulo);
                   }
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Row(
-                    children: [
-                      AnimatedDefaultTextStyle(
-                        duration: dur,
-                        style: Theme.of(context).textTheme.titleMedium!
-                            .copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: abierta ? p.texto : p.textoSecundario),
-                        child: Text(titulo),
-                      ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Row(
+                            children: [
+                              AnimatedDefaultTextStyle(
+                                duration: dur,
+                                style: Theme.of(context).textTheme.titleMedium!
+                                    .copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: abierta ? p.texto : p.textoSecundario),
+                                child: Text(_label(titulo)),
+                              ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -580,6 +603,19 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     );
     return SliverPersistentHeader(pinned: true, delegate: _Encabezado(contenido));
   }
+
+  Widget _bannerEquipo(PivotPaleta p, String titulo, String texto, {VoidCallback? alDetalles}) => BannerAyuda(
+    clave: 'equipo_$titulo',
+    titulo: titulo,
+    texto: texto,
+    boton: alDetalles != null
+        ? OutlinedButton.icon(
+            onPressed: alDetalles,
+            icon: const Icon(Icons.info_outline_rounded, size: 18),
+            label: const Text('Ver detalles del equipo'),
+          )
+        : null,
+  );
 
   Widget _fila(BuildContext context, Integrante x, DateTime hoy, {List<String>? motivos}) {
     final datos = datosRelevantes(x, hoy);

@@ -423,70 +423,10 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
 
   /// Motivo del rechazo y mensaje que recibe la persona. null si se cancela.
   Future<Map<String, Object?>?> _motivoRechazo(Pedido p) async {
-    String? motivo;
-    final razon = TextEditingController(), mensaje = TextEditingController();
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) {
-          final pal = h.pivot;
-          final otro = motivo == 'otro';
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('¿Por qué se rechaza?', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text('${p.nombreMostrar} recibe el aviso al momento y la reserva se cancela.', style: TextStyle(color: pal.textoSecundario)),
-                  const SizedBox(height: 8),
-                  for (final e in [..._motivos.keys, 'otro'])
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        motivo == e ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                        color: motivo == e ? pal.marcaTexto : pal.textoSecundario,
-                      ),
-                      title: Text(e == 'otro' ? 'Otro motivo' : e),
-                      subtitle: e == 'otro' || motivo != e ? null : Text(_motivos[e]!),
-                      onTap: () => set(() => motivo = e),
-                    ),
-                  if (otro) ...[
-                    TextField(
-                      controller: razon,
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(labelText: 'Motivo'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: mensaje,
-                      minLines: 2,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(labelText: 'Mensaje para la persona'),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton(onPressed: motivo == null ? null : () => Navigator.of(h).pop(true), child: const Text('Rechazar y avisar')),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    final r = await Navigator.of(context).push<Map<String, Object?>>(
+      MaterialPageRoute(builder: (_) => MotivoRechazoScreen(p: p, motivos: _motivos, alGuardar: (resultado) => Navigator.of(context).pop(resultado))),
     );
-    if (ok != true || motivo == null) return null;
-    if (motivo == 'otro') {
-      final r = razon.text.trim();
-      if (r.isEmpty) return null;
-      return {'motivo': r, 'mensaje': mensaje.text.trim().isEmpty ? 'Motivo: $r' : mensaje.text.trim()};
-    }
-    return {'motivo': motivo, 'mensaje': _motivos[motivo]};
+    return r;
   }
 
   Future<String?> _pedirNota(Pedido p) {
@@ -1459,4 +1399,96 @@ String nombreMedio(Map<String, dynamic> m) {
     '' => '',
     final otro => otro,
   };
+}
+
+/// Subsección para rechazar un pedido con motivo y mensaje.
+/// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
+class MotivoRechazoScreen extends StatefulWidget {
+  const MotivoRechazoScreen({super.key, required this.p, required this.motivos, required this.alGuardar});
+  final Pedido p;
+  final Map<String, String> motivos;
+  final void Function(Map<String, Object?> resultado) alGuardar;
+
+  @override
+  State<MotivoRechazoScreen> createState() => _MotivoRechazoScreenState();
+}
+
+class _MotivoRechazoScreenState extends State<MotivoRechazoScreen> {
+  String? motivo;
+  late final razon = TextEditingController();
+  late final mensaje = TextEditingController();
+
+  @override
+  void dispose() {
+    razon.dispose();
+    mensaje.dispose();
+    super.dispose();
+  }
+
+  bool get otro => motivo == 'otro';
+
+  void _rechazar() {
+    if (motivo == null) return;
+    if (otro && razon.text.trim().isEmpty) return;
+    final r = razon.text.trim();
+    widget.alGuardar({
+      'motivo': otro ? r : motivo!,
+      'mensaje': otro ? (mensaje.text.trim().isEmpty ? 'Motivo: $r' : mensaje.text.trim()) : widget.motivos[motivo!],
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = context.pivot;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('¿Por qué se rechaza?', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('${widget.p.nombreMostrar} recibe el aviso al momento y la reserva se cancela.', style: TextStyle(color: pal.textoSecundario)),
+              const SizedBox(height: 8),
+              for (final e in [...widget.motivos.keys, 'otro'])
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(motivo == e ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: motivo == e ? pal.marcaTexto : pal.textoSecundario),
+                  title: Text(e == 'otro' ? 'Otro motivo' : e),
+                  subtitle: e == 'otro' || motivo != e ? null : Text(widget.motivos[e]!),
+                  onTap: () => setState(() => motivo = e),
+                ),
+              if (otro) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: razon,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Motivo'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: mensaje,
+                  minLines: 2,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(labelText: 'Mensaje para la persona'),
+                ),
+              ],
+              const SizedBox(height: 20),
+              FilledButton(onPressed: _rechazar, child: const Text('Rechazar y avisar')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
