@@ -942,6 +942,7 @@ Future<void> detalleMovimiento(
   if (a == 'a') {
     final ctl = TextEditingController();
     final motivo = await showDialog<String>(
+      barrierDismissible: false,
       context: context,
       builder: (d) => AlertDialog(
         scrollable: true,
