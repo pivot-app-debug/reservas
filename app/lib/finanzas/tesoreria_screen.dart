@@ -177,111 +177,6 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     await _cargar();
   }
 
-  /// Subsección para conciliar una cuenta: compara el saldo de la app con el saldo real.
-  /// Reemplaza el showDialog con campo de texto para evitar cierres accidentales al escribir.
-  class ConciliarCuentaScreen extends StatefulWidget {
-    const ConciliarCuentaScreen({super.key, required this.repo, required this.cuenta});
-    final TesoreriaRepo repo;
-    final Map<String, dynamic> cuenta;
-
-    @override
-    State<ConciliarCuentaScreen> createState() => _ConciliarCuentaScreenState();
-  }
-
-  class _ConciliarCuentaScreenState extends State<ConciliarCuentaScreen> {
-    late final ctl = TextEditingController();
-    var ocupado = false;
-
-    @override
-    void initState() {
-      super.initState();
-      ctl.text = '${widget.cuenta['saldo'] ?? ''}';
-    }
-
-    @override
-    void dispose() {
-      ctl.dispose();
-      super.dispose();
-    }
-
-    Future<void> _comparar() async {
-      final n = num.tryParse(ctl.text.replaceAll(',', '.'));
-      if (n == null) {
-        _aviso(context, 'Escribe el saldo real.');
-        return;
-      }
-      setState(() => ocupado = true);
-      try {
-        final r = await widget.repo.accion('conciliar', {'cuentaId': widget.cuenta['id'], 'saldoReal': n});
-        final dif = (r['diferencia'] as num?) ?? 0;
-        if (!mounted) return;
-        await showDialog<void>(
-          context: context,
-          builder: (d) => AlertDialog(
-            title: Text(dif == 0 ? 'Cuadra' : 'Hay una diferencia'),
-            content: Text(
-              dif == 0
-                  ? 'El saldo real y el de la app coinciden.'
-                  : dif > 0
-                      ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
-                      : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
-            ),
-            actions: [FilledButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
-          ),
-        );
-        if (!mounted) return;
-        Navigator.of(context).pop(true);
-      } catch (e) {
-        if (mounted) _aviso(context, _error(e));
-      } finally {
-        if (mounted) setState(() => ocupado = false);
-      }
-    }
-
-    @override
-    Widget build(BuildContext context) {
-      final p = context.pivot;
-      return Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          scrolledUnderElevation: 0,
-          flexibleSpace: const Vidrio(child: SizedBox.expand()),
-          title: const Text('Conciliar cuenta', style: TextStyle(fontWeight: FontWeight.w800)),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Según la app: ${plata(widget.cuenta['saldo'] as num? ?? 0)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).', style: TextStyle(color: p.textoSecundario)),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: ctl,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,-]'))],
-                  decoration: InputDecoration(
-                    labelText: 'Saldo real',
-                    prefixText: '${Moneda.s} ',
-                  ),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: ocupado ? null : _comparar,
-                  child: const Text('Comparar'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
   Future<void> _conciliar(Map<String, dynamic> c) async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => ConciliarCuentaScreen(repo: repo, cuenta: c)),
@@ -985,15 +880,15 @@ class MovimientoScreen extends StatefulWidget {
 }
 
 class _MovimientoScreenState extends State<MovimientoScreen> {
-  late final activas = widget.cuentas.where((c) => c['activa'] != false).toList();
-  late final _monto = TextEditingController(text: widget.corregir == null ? '' : '${widget.corregir!['monto']}');
-  late final _desc = TextEditingController(text: widget.corregir?['descripcion'] as String? ?? '');
-  String? _cuenta = widget.corregir?['cuentaId'] as String? ?? widget.desdeCuenta ?? (activas.isEmpty ? null : activas.first['id'] as String);
+  late List<Map<String, dynamic>> activas;
+  late final _monto = TextEditingController();
+  late final _desc = TextEditingController();
+  String? _cuenta;
   String? _destino;
-  String _categoria = widget.corregir?['categoria'] as String? ?? (widget.tipo == 'ingreso' ? 'cuota' : 'otro');
-  DateTime _fecha = DateTime.tryParse('${widget.corregir?['fecha'] ?? ''}') ?? Fechas.hoy();
-  String? _persona = widget.corregir?['persona'] as String?;
-  String? _personaNombre = widget.corregir?['personaNombre'] as String?;
+  String _categoria = 'otro';
+  late DateTime _fecha;
+  String? _persona;
+  String? _personaNombre;
   var _ocupado = false;
 
   String get _titulo {
@@ -1010,6 +905,14 @@ class _MovimientoScreenState extends State<MovimientoScreen> {
   @override
   void initState() {
     super.initState();
+    activas = widget.cuentas.where((c) => c['activa'] != false).toList();
+    _monto.text = widget.corregir == null ? '' : '${widget.corregir!['monto']}';
+    _desc.text = widget.corregir?['descripcion'] as String? ?? '';
+    _cuenta = widget.corregir?['cuentaId'] as String? ?? widget.desdeCuenta ?? (activas.isEmpty ? null : activas.first['id'] as String);
+    _categoria = widget.corregir?['categoria'] as String? ?? (widget.tipo == 'ingreso' ? 'cuota' : 'otro');
+    _fecha = DateTime.tryParse('${widget.corregir?['fecha'] ?? ''}') ?? Fechas.hoy();
+    _persona = widget.corregir?['persona'] as String?;
+    _personaNombre = widget.corregir?['personaNombre'] as String?;
   }
 
   @override
@@ -2879,6 +2782,111 @@ class _RegistrarSaldoScreenState extends State<RegistrarSaldoScreen> {
               FilledButton(
                 onPressed: mueveDinero && cuenta == null ? null : _registrar,
                 child: const Text('Registrar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para conciliar una cuenta: compara el saldo de la app con el saldo real.
+/// Reemplaza el showDialog con campo de texto para evitar cierres accidentales al escribir.
+class ConciliarCuentaScreen extends StatefulWidget {
+  const ConciliarCuentaScreen({super.key, required this.repo, required this.cuenta});
+  final TesoreriaRepo repo;
+  final Map<String, dynamic> cuenta;
+
+  @override
+  State<ConciliarCuentaScreen> createState() => _ConciliarCuentaScreenState();
+}
+
+class _ConciliarCuentaScreenState extends State<ConciliarCuentaScreen> {
+  late final ctl = TextEditingController();
+  var ocupado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ctl.text = '${widget.cuenta['saldo'] ?? ''}';
+  }
+
+  @override
+  void dispose() {
+    ctl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _comparar() async {
+    final n = num.tryParse(ctl.text.replaceAll(',', '.'));
+    if (n == null) {
+      _aviso(context, 'Escribe el saldo real.');
+      return;
+    }
+    setState(() => ocupado = true);
+    try {
+      final r = await widget.repo.accion('conciliar', {'cuentaId': widget.cuenta['id'], 'saldoReal': n});
+      final dif = (r['diferencia'] as num?) ?? 0;
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text(dif == 0 ? 'Cuadra' : 'Hay una diferencia'),
+          content: Text(
+            dif == 0
+                ? 'El saldo real y el de la app coinciden.'
+                : dif > 0
+                    ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
+                    : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
+          ),
+          actions: [FilledButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) _aviso(context, _error(e));
+    } finally {
+      if (mounted) setState(() => ocupado = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('Conciliar cuenta', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Según la app: ${plata(widget.cuenta['saldo'] as num? ?? 0)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).', style: TextStyle(color: p.textoSecundario)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,-]'))],
+                decoration: InputDecoration(
+                  labelText: 'Saldo real',
+                  prefixText: '${Moneda.s} ',
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: ocupado ? null : _comparar,
+                child: const Text('Comparar'),
               ),
             ],
           ),
