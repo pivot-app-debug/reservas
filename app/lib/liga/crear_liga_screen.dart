@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../ajustes/componentes.dart' show abrirFormulario;
+
 import '../liga/directorio_screen.dart';
 import '../core/monedas_mundo.dart';
 import '../core/tema.dart';
@@ -619,7 +621,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Moneda: $_monedaCodigo ($_monedaSimbolo) · Hora: ${_paises[_pais]?.$3.split('/').last.replaceAll('_', ' ')}. Puedes cambiarlas después en Mi Liga.',
+            'Moneda: $_monedaCodigo ($_monedaSimbolo) · Hora: ${_paises[_pais]?.$3.split('/').last.replaceAll('_', ' ')}. Puedes cambiarlas después en Liga → Ajustes.',
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           ),
         ];
@@ -667,7 +669,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
             false,
             Icons.bolt_rounded,
             'Rápido',
-            'Tu liga queda lista con valores por defecto. Después, desde Mi Liga, ajustas equipos, cuotas y reglas cuando quieras.',
+            'Tu liga queda lista con valores por defecto. Después, desde Liga → Ajustes, ajustas equipos, cuotas y reglas cuando quieras.',
           ),
           opcion(
             true,
@@ -830,7 +832,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
               'Cada mes se revisa y un Pivot aprueba los cambios.',
             )
           else
-            Text('Con un solo equipo no hay cambios de equipo. Si agregas más, lo activas en Mi Liga.', style: TextStyle(color: p.textoSecundario)),
+            Text('Con un solo equipo no hay cambios de equipo. Si agregas más, lo activas en Liga → Ajustes.', style: TextStyle(color: p.textoSecundario)),
         ];
       case _Paso.roles:
         return [
@@ -964,12 +966,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
   Future<void> _nuevoMedio(String tipo, String etiqueta) async {
     final nombre = TextEditingController(text: tipo == 'efectivo' ? 'Efectivo' : '');
     final enlace = TextEditingController();
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => Padding(
+    final ok = await abrirFormulario<bool>(context, builder: (c) => Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1007,12 +1004,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
     var finaliza = const TimeOfDay(hour: 21, minute: 0);
     final lugar = TextEditingController();
     String h(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(context, builder: (c) => StatefulBuilder(
         builder: (c, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
           child: Column(
@@ -1128,14 +1120,14 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
       (Icons.celebration_rounded, '¡${widget.liga} ya está en Pivot!', 'Eres su Pivot: quien organiza la liga en la app, con todos los permisos.'),
       (
         Icons.settings_rounded,
-        'Todo se cambia en Mi Liga',
-        'En Liga, con el ícono del estadio, están los equipos, las cuotas, las reglas, los entrenamientos y los permisos.',
+        'Todo se cambia en Liga → Ajustes',
+        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos, coaches y Pivots están en Liga → Equipos.',
       ),
-      (Icons.qr_code_2_rounded, 'Invita a tu gente', 'En Mi Liga → Equipos tienes el enlace y el código QR de inscripción de cada equipo para compartirlo.'),
+      (Icons.qr_code_2_rounded, 'Invita a tu gente', 'En Liga → Equipos, con «Gestionar» en cada equipo, tienes el enlace y el código QR de inscripción de cada equipo para compartirlo.'),
       (
         Icons.group_add_rounded,
         'No lo hagas sin ayuda',
-        'Suma más Pivots en Mi Liga → Pivots y permisos, y reparte las áreas: finanzas, asistencia, equipamiento…',
+        'Suma más Pivots en Liga → Equipos → Pivots, y reparte las áreas: finanzas, asistencia, equipamiento…',
       ),
     ];
     final ultima = _i == tarjetas.length - 1;

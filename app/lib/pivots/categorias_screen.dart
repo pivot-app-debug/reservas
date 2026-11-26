@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/banner_ayuda.dart';
+
 import '../core/sincroniza.dart';
 
 import 'package:share_plus/share_plus.dart';
@@ -903,7 +905,7 @@ class _HistorialAjustesScreenState extends State<HistorialAjustesScreen> {
 /// Resumen de un equipo: cada fila se cambia por separado en una hoja corta
 /// que muestra a quién afecta (Victor, 2026-11-13).
 class _EquipoScreen extends StatefulWidget {
-  const _EquipoScreen({required this.sesion, required this.tiers, required this.indice, required this.gente, this.soloLectura = false});
+  const _EquipoScreen({required this.sesion, required this.tiers, required this.indice, required this.gente, this.soloLectura = false, this.buscar});
   final Sesion sesion;
   final List<Map<String, dynamic>> tiers;
   final int indice;
@@ -912,6 +914,9 @@ class _EquipoScreen extends StatefulWidget {
   /// Quien no es Pivot ve las reglas de su equipo sin poder cambiarlas
   /// (Victor, 2026-11-22: así sabe qué le afecta).
   final bool soloLectura;
+
+  /// Búsqueda con la que abre (buscador de la liga → un ajuste del equipo).
+  final String? buscar;
 
   @override
   State<_EquipoScreen> createState() => _EquipoScreenState();
@@ -968,8 +973,32 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       if (mounted) setState(() {});
     }
 
+    // Desplegable de cómo se paga en este equipo, con sus valores (Victor, QA 2026-11-26).
+    final dia = porMes ? ConfigEquipo(c, _nombre).diaFechaLimite : 0;
     return [
       const SizedBox(height: 8),
+      BannerAyuda(
+        clave: 'equipo_pagos_$_nombre',
+        titulo: 'Cómo se paga en $_nombre',
+        texto: textoCobroEquipo(c, _nombre),
+        pasos: [
+          if (porMes) ...[
+            (
+              Icons.redeem_outlined,
+              g == null
+                  ? 'Clase de gracia: este equipo no la usa.'
+                  : g == 0
+                  ? 'Clase de gracia: no hay. Hay que pagar la cuota del mes antes de marcar Asistiré.'
+                  : 'Clase de gracia: puedes venir a $g ${g == 1 ? 'entrenamiento' : 'entrenamientos'} del mes sin haber pagado. Después, para marcar Asistiré hay que pagar la cuota.',
+            ),
+            (
+              Icons.event_busy_outlined,
+              dia > 0 ? 'Fecha límite: la cuota del mes se paga hasta el día $dia.' : 'Fecha límite: la cuota no tiene una fecha límite fija.',
+            ),
+          ],
+          (Icons.receipt_long_outlined, 'Cada pago queda registrado. Puedes verlo en Calendario → Actividad → Pagos y suscripciones.'),
+        ],
+      ),
       const _Seccion('PAGOS'),
       _Fila(
         icono: Icons.payments_outlined,
@@ -1312,7 +1341,14 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   }
 
   /// Texto del buscador; null = cerrado.
-  String? _q;
+  late String? _q = widget.buscar;
+  late final _ctlQ = TextEditingController(text: widget.buscar ?? '');
+
+  @override
+  void dispose() {
+    _ctlQ.dispose();
+    super.dispose();
+  }
 
   static String _plano(String x) => x
       .toLowerCase()
@@ -1327,11 +1363,33 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     final q = _plano(_q?.trim() ?? '');
     if (q.isEmpty) return hijos;
     final palabras = q.split(RegExp(r'\s+'));
-    final l = [
-      for (final h in hijos)
-        if (h is _Fila && palabras.every(_plano('${h.titulo} ${h.texto}').contains)) h,
+    // Bug del QA (2026-11-26): solo miraba las filas sueltas, así que en la
+    // vista de solo lectura (todo dentro de _SoloLectura/Column) nunca
+    // encontraba nada. Ahora busca también dentro de esos contenedores.
+    final filas = <_Fila>[];
+    void juntar(Widget w) {
+      if (w is _Fila) {
+        filas.add(w);
+      } else if (w is _SoloLectura) {
+        juntar(w.child);
+      } else if (w is Column) {
+        w.children.forEach(juntar);
+      } else if (w is Padding && w.child != null) {
+        juntar(w.child!);
+      } else if (w is Resaltable) {
+        juntar(w.child);
+      }
+    }
+    hijos.forEach(juntar);
+    final l = <Widget>[
+      for (final h in filas)
+        if (palabras.every(_plano('${h.titulo} ${h.texto}').contains)) h,
     ];
-    if (l.isNotEmpty) return l;
+    if (l.isNotEmpty) {
+      return widget.soloLectura
+          ? [_SoloLectura(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: l))]
+          : l;
+    }
     return [
       Padding(
         padding: const EdgeInsets.only(top: 40),
@@ -1370,7 +1428,8 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                 )
               : TextField(
                   key: const ValueKey('b'),
-                  autofocus: true,
+                  controller: _ctlQ,
+                  autofocus: widget.buscar == null,
                   onChanged: (v) => setState(() => _q = v),
                   decoration: InputDecoration(hintText: 'Buscar en $_nombre', border: InputBorder.none, filled: false),
                 ),
@@ -1379,7 +1438,10 @@ class _EquipoScreenState extends State<_EquipoScreen> {
           IconButton(
             tooltip: _q == null ? 'Buscar' : 'Cerrar búsqueda',
             icon: Icon(_q == null ? Icons.search_rounded : Icons.close_rounded),
-            onPressed: () => setState(() => _q = _q == null ? '' : null),
+            onPressed: () => setState(() {
+              _q = _q == null ? '' : null;
+              _ctlQ.clear();
+            }),
           ),
         ],
         bottom: _ocupado ? const PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2)) : null,
@@ -2118,9 +2180,12 @@ class _Impacto extends StatelessWidget {
 /// Ajustes de un equipo por su nombre (Mi Liga → tarjetas de equipos):
 /// carga los equipos y la gente, y muestra la misma pantalla de Equipos y puntos.
 class AjustesEquipoScreen extends StatefulWidget {
-  const AjustesEquipoScreen({super.key, required this.sesion, required this.nombre});
+  const AjustesEquipoScreen({super.key, required this.sesion, required this.nombre, this.buscar});
   final Sesion sesion;
   final String nombre;
+
+  /// Abre con el buscador del equipo ya filtrado (buscador de la liga).
+  final String? buscar;
 
   @override
   State<AjustesEquipoScreen> createState() => _AjustesEquipoScreenState();
@@ -2166,7 +2231,7 @@ class _AjustesEquipoScreenState extends State<AjustesEquipoScreen> {
         ),
       );
     }
-    return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: _gente);
+    return _EquipoScreen(sesion: widget.sesion, tiers: l, indice: i, gente: _gente, buscar: widget.buscar);
   }
 }
 

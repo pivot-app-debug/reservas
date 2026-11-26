@@ -487,3 +487,45 @@ class AvisoPrivado extends StatelessWidget {
     );
   }
 }
+
+/// Formularios con teclado (regla de Victor, 2026-11-26): nunca en una hoja
+/// de abajo, porque al tocar fuera o cerrar el teclado se cerraba y se perdía
+/// lo escrito. Abre el mismo contenido como subsección de pantalla completa,
+/// con la transición común; se sale solo con atrás o con su botón. El
+/// contenido sigue cerrando con `Navigator.of(c).pop(valor)`.
+Future<T?> abrirFormulario<T>(BuildContext context, {required WidgetBuilder builder}) {
+  return Navigator.of(context, rootNavigator: true).push<T>(
+    PageRouteBuilder<T>(
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, _, _) => _Formulario(builder: builder),
+      transitionsBuilder: (_, a, _, child) {
+        final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
+        return FadeTransition(
+          opacity: c,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, 0.04), end: Offset.zero).animate(c),
+            child: child,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _Formulario extends StatelessWidget {
+  const _Formulario({required this.builder});
+  final WidgetBuilder builder;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(leading: const CloseButton(), surfaceTintColor: Colors.transparent),
+    body: SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(top: 4),
+        child: Builder(builder: builder),
+      ),
+    ),
+  );
+}

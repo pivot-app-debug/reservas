@@ -380,7 +380,7 @@ class SugerenciaReglas {
               const Text('¿Armamos tus equipos y reglas?', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
               Text(
-                'Tu liga está con valores por defecto. En Mi Liga ajustas equipos, cuota, entrenamientos y reglas en unos minutos.',
+                'Tu liga está con valores por defecto. En Liga → Ajustes ajustas equipos, cuota, entrenamientos y reglas en unos minutos.',
                 style: TextStyle(height: 1.4, color: c.pivot.textoSecundario),
               ),
               const SizedBox(height: 16),

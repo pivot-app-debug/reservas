@@ -146,7 +146,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
           padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 40 + MediaQuery.paddingOf(context).bottom),
           children: [
             Text(
-              'Las reglas de toda la liga. Lo de cada equipo (cobros, clases de gracia, equipamiento, puntos y requisitos) está dentro de cada equipo en Mi Liga. Un cambio rige desde que lo guardas; lo anterior no cambia.',
+              'Las reglas de toda la liga. Lo de cada equipo (cobros, clases de gracia, equipamiento, puntos y requisitos) está dentro de cada equipo, en Liga → Equipos. Un cambio rige desde que lo guardas; lo anterior no cambia.',
               style: TextStyle(fontSize: 14, height: 1.4, color: p.texto),
             ),
             const SizedBox(height: 12),

@@ -1,5 +1,3 @@
-import '../eventos/eventos_repo.dart' show EventosRepo;
-import '../ajustes/ajustes_screen.dart' show AjustesScreen;
 import '../core/navegacion.dart';
 import '../ajustes/componentes.dart';
 
@@ -238,13 +236,11 @@ class _FichaState extends State<_Ficha> {
                       titulo: 'Editar mi perfil',
                       valor: 'Foto, nombre, número, roles y más',
                       // Se abre como una subsección, deslizando (Victor, 2026-11-17).
+                      // Bug del QA (2026-11-26): abría Ajustes encima de Liga y te
+                      // dejaba ahí. Ahora cierra tu ficha y va a la pestaña Mi perfil.
                       alTocar: () {
-                        final ev = EventosRepo.actual;
-                        if (ev == null) {
-                          Navegacion.ir.value = Pestana.perfil;
-                        } else {
-                          SubAjustes.abrir(context, AjustesScreen(sesion: repo.sesion, eventos: ev));
-                        }
+                        Navigator.of(context).maybePop();
+                        Navegacion.ir.value = Pestana.perfil;
                       },
                     ),
                 ],

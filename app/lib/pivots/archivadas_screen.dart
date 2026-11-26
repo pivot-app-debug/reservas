@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/api.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
+import '../equipo/equipo_modelos.dart';
 import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../core/esqueleto.dart';
@@ -56,6 +57,31 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
       await _cargar();
     } catch (e) {
       m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo restaurar.')));
+    }
+  }
+
+  /// Sugeridas (Victor, QA 2026-11-26): quienes están sin actividad y se
+  /// pueden archivar desde aquí mismo.
+  Future<void> _archivar(Integrante x) async {
+    final m = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text('¿Archivar a ${x.nombreMostrar}?'),
+        content: const Text('Deja de aparecer en Liga. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. No se puede archivar si tiene reservas activas o cuotas pendientes.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Archivar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await widget.repo.archivar(x);
+      m.showSnackBar(SnackBar(content: Text('${x.nombreMostrar} quedó archivadx')));
+      await _cargar();
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo archivar.')));
     }
   }
 
@@ -138,6 +164,43 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                     style: TextStyle(color: p.textoSecundario),
                   ),
                   const SizedBox(height: 8),
+                  ListenableBuilder(
+                    listenable: widget.repo,
+                    builder: (context, _) {
+                      final sugeridas = [
+                        for (final x in widget.repo.personas ?? const <Integrante>[])
+                          if (x.inactivx && !widget.repo.esYo(x)) x,
+                      ];
+                      if (sugeridas.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+                            child: Text(
+                              'SUGERIDAS PARA ARCHIVAR · SIN ACTIVIDAD',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                            ),
+                          ),
+                          for (final x in sugeridas)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: 40),
+                              title: Text(x.nombreMostrar),
+                              subtitle: const Text('Sin actividad reciente'),
+                              trailing: TextButton(onPressed: () => _archivar(x), child: const Text('Archivar')),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 16, 0, 4),
+                            child: Text(
+                              'ARCHIVADAS',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                   if (l.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 24),

@@ -19,6 +19,7 @@ import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
 import 'cobros_screen.dart';
+import 'revision_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
@@ -658,6 +659,17 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           'Cuotas del mes',
           'Quién pagó, cuánto, cuándo y con qué medio',
           () => _abrir(CuotasMesScreen(repo: repo)),
+        ),
+      ),
+      Resaltable(
+        id: 'revisionTesoreria',
+        resaltado: _resaltado,
+        child: _fila(
+          context,
+          Icons.fact_check_outlined,
+          'Revisar cuentas',
+          'Pagos sin registrar, duplicados y deudas con Asistiré',
+          () => _abrir(RevisionTesoreriaScreen(repo: repo)),
         ),
       ),
       if (_todas.any((c) => c['archivada'] == true))

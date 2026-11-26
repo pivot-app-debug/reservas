@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ajustes/componentes.dart' show abrirFormulario;
+
 import '../core/api.dart';
 import '../core/config_liga.dart';
 import '../core/tema.dart';
@@ -41,12 +43,7 @@ class _SaludLigaScreenState extends State<SaludLigaScreen> {
     final nombre = TextEditingController(text: actual ?? '');
     final tel = TextEditingController(text: actual == null ? '' : (_tels[actual] ?? ''));
     final fija = actual == _fija;
-    final r = await showModalBottomSheet<String>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => SafeArea(
+    final r = await abrirFormulario<String>(context, builder: (h) => SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
           child: Column(

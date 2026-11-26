@@ -25,78 +25,79 @@ class EntradaAjuste {
 }
 
 const entradasLiga = [
-  EntradaAjuste('equipos', 'Equipos', 'Mi Liga', 'categorías quindes mirlxs equipo ajustes de un equipo'),
+  EntradaAjuste('equipos', 'Equipos', 'Liga › Equipos', 'categorías quindes mirlxs equipo ajustes de un equipo crear equipo nuevo', dentro: 'liga'),
   EntradaAjuste('tesoreria', 'Finanzas', 'Barra de abajo', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
-  EntradaAjuste('pivots', 'Pivots y permisos', 'Mi Liga › Administrar', 'administradores admins áreas acceso permisos roles'),
-  EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Mi Liga › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
+  EntradaAjuste('pivots', 'Pivots y permisos', 'Liga › Equipos › Pivots', 'administradores admins áreas acceso permisos roles', dentro: 'pivots'),
+  EntradaAjuste('coaches', 'Coaches', 'Liga › Equipos › Coaches', 'entrenadores entrenadorxs coach nombrar quitar', dentro: 'coaches'),
+  EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Ajustes › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
   EntradaAjuste(
     'reglas',
     'Reglas de la liga',
-    'Mi Liga › Equipos › De toda la liga',
+    'Ajustes › Equipos › De toda la liga',
     'reglas cobros asistencia puntos equipamiento privacidad',
     dentro: 'reglas',
   ),
-  EntradaAjuste('avisos', 'Avisos al equipo', 'Mi Liga › Administrar', 'notificaciones mensaje enviar programar push anuncio quién recibe'),
-  EntradaAjuste('archivadas', 'Personas archivadas', 'Mi Liga › Administrar', 'usuarios eliminadas restaurar volver archivo bajas'),
-  EntradaAjuste('salud', 'Salud y seguros', 'Mi Liga › Datos de la liga', 'seguro médico privado salud pública emergencia atención iess msp'),
-  EntradaAjuste('pais', 'País', 'Mi Liga › Datos de la liga', 'país teléfono prefijo'),
-  EntradaAjuste('zona', 'Zona horaria', 'Mi Liga › Datos de la liga', 'hora horario reloj'),
-  EntradaAjuste('moneda', 'Moneda', 'Mi Liga › Datos de la liga', 'dinero símbolo dólar sol euro peso divisa'),
+  EntradaAjuste('avisos', 'Avisos al equipo', 'Liga › Comunicación', 'notificaciones mensaje enviar programar push anuncio quién recibe', dentro: 'avisos'),
+  EntradaAjuste('archivadas', 'Personas archivadas', 'Liga › Equipos › Sin actividad', 'usuarios eliminadas restaurar volver archivo bajas inactivos', dentro: 'archivadas'),
+  EntradaAjuste('salud', 'Salud y seguros', 'Ajustes › Datos de la liga', 'seguro médico privado salud pública emergencia atención iess msp'),
+  EntradaAjuste('pais', 'País', 'Ajustes › Datos de la liga', 'país teléfono prefijo'),
+  EntradaAjuste('zona', 'Zona horaria', 'Ajustes › Datos de la liga', 'hora horario reloj'),
+  EntradaAjuste('moneda', 'Moneda', 'Ajustes › Datos de la liga', 'dinero símbolo dólar sol euro peso divisa'),
   // Dentro de Reglas.
   EntradaAjuste(
     'vencimiento',
     'Fecha límite de pago',
-    'Mi Liga › Reglas',
+    'Ajustes › Reglas',
     'vence vencimiento día gracia recargo multa tarde atraso pagar mora',
     dentro: 'reglas',
   ),
   EntradaAjuste(
     'tolerancia',
     'Tolerancia para llegadas tarde',
-    'Mi Liga › Reglas',
+    'Ajustes › Reglas',
     'tarde minutos llegar atraso lista tolerancia de llegada',
     dentro: 'reglas',
   ),
   EntradaAjuste(
     'puntoExtra',
     'Recompensas por pagar a tiempo',
-    'Mi Liga › Reglas',
+    'Ajustes › Reglas',
     'punto extra premio bono descuento clase gratis saldo a favor pronto pago recompensa racha asistencia perfecta mensualidad gratis',
     dentro: 'reglas',
   ),
-  EntradaAjuste('rectificaciones', 'Rectificaciones', 'Mi Liga › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),
-  EntradaAjuste('minimo', 'Pocas personas en un evento', 'Mi Liga › Reglas', 'cancelar mínimo personas evento', dentro: 'reglas'),
+  EntradaAjuste('rectificaciones', 'Rectificaciones', 'Ajustes › Reglas', 'corregir asistencia mal tomada días revisar pedido', dentro: 'reglas'),
+  EntradaAjuste('minimo', 'Pocas personas en un evento', 'Ajustes › Reglas', 'cancelar mínimo personas evento', dentro: 'reglas'),
   EntradaAjuste(
     'estados',
     'Estados',
-    'Mi Liga › Reglas',
+    'Ajustes › Reglas',
     'lesionadx lesión viaje enfermedad situación personal otro inactividad inactivos pausado aprobar',
     dentro: 'reglas',
   ),
-  EntradaAjuste('reservas', 'Reservas por clase', 'Mi Liga › Reglas', 'reservar clases cierre sin aprobar próximas', dentro: 'reglas'),
-  EntradaAjuste('cupon', 'Clase gratis de bienvenida', 'Mi Liga › Reglas', 'cupón primera clase gratis nueva persona cancelar', dentro: 'reglas'),
+  EntradaAjuste('reservas', 'Reservas por clase', 'Ajustes › Reglas', 'reservar clases cierre sin aprobar próximas', dentro: 'reglas'),
+  EntradaAjuste('cupon', 'Clase gratis de bienvenida', 'Ajustes › Reglas', 'cupón primera clase gratis nueva persona cancelar', dentro: 'reglas'),
   EntradaAjuste(
     'sinCobro',
     'Meses y periodos sin cobro',
-    'Mi Liga › Reglas',
+    'Ajustes › Reglas',
     'no se cobra gratis vacaciones diciembre descuento porcentaje periodo fechas cuota clases',
     dentro: 'reglas',
   ),
-  EntradaAjuste('equipos', 'Clases de gracia', 'Mi Liga › Equipos › cada equipo', 'gracia gratis sin pagar primera clase cuota equipo'),
-  EntradaAjuste('ranking', 'Puntos de otras personas', 'Mi Liga › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
-  EntradaAjuste('equipos', 'Préstamo de equipamiento', 'Mi Liga › Equipos › cada equipo', 'prestar patines protecciones excepcional emergencia'),
-  EntradaAjuste('equipos', 'Cobros de un equipo', 'Mi Liga › Equipos › cada equipo', 'cómo paga mensualidad por clase precio propio exentos no pagan cuota'),
+  EntradaAjuste('equipos', 'Clases de gracia', 'Ajustes › Equipos › cada equipo', 'gracia gratis sin pagar primera clase cuota equipo'),
+  EntradaAjuste('ranking', 'Puntos de otras personas', 'Ajustes › Reglas', 'ranking tabla privacidad ver puntos ocultar', dentro: 'reglas'),
+  EntradaAjuste('equipos', 'Préstamo de equipamiento', 'Ajustes › Equipos › cada equipo', 'prestar patines protecciones excepcional emergencia'),
+  EntradaAjuste('equipos', 'Cobros de un equipo', 'Ajustes › Equipos › cada equipo', 'cómo paga mensualidad por clase precio propio exentos no pagan cuota'),
   // Dentro de Equipos: se abren directo (Victor, 2026-11-16).
-  EntradaAjuste('corte', 'Cuándo se aplican los cambios', 'Mi Liga › Equipos', 'corte revisar antes automático día cambio de equipo', dentro: 'equipos'),
-  EntradaAjuste('equipos', 'Puntos por asistencia', 'Mi Liga › Equipos › cada equipo', 'valor a tiempo tarde puntos fecha'),
-  EntradaAjuste('equipos', 'Qué cuenta como clase', 'Mi Liga › Equipos › cada equipo', 'clase tipos de evento partido llegadas tarde suman'),
-  EntradaAjuste('historial', 'Historial de cambios', 'Mi Liga › Equipos', 'quién cambió registro auditoría', dentro: 'equipos'),
-  EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Mi Liga › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
+  EntradaAjuste('corte', 'Cuándo se aplican los cambios', 'Ajustes › Equipos', 'corte revisar antes automático día cambio de equipo', dentro: 'equipos'),
+  EntradaAjuste('equipos', 'Puntos por asistencia', 'Ajustes › Equipos › cada equipo', 'valor a tiempo tarde puntos fecha'),
+  EntradaAjuste('equipos', 'Qué cuenta como clase', 'Ajustes › Equipos › cada equipo', 'clase tipos de evento partido llegadas tarde suman'),
+  EntradaAjuste('historial', 'Historial de cambios', 'Ajustes › Equipos', 'quién cambió registro auditoría', dentro: 'equipos'),
+  EntradaAjuste('nuevoEquipo', 'Crear un equipo', 'Ajustes › Equipos', 'nuevo equipo agregar', dentro: 'equipos'),
   // Dentro de Tesorería → Cobros.
   EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
   EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
 
-  EntradaAjuste('coaches', 'Coaches', 'Mi Liga', 'coach entrenador entrenadora seguimiento jugadorxs ficha deportiva habilidades'),
+  EntradaAjuste('coaches', 'Coaches', 'Ajustes', 'coach entrenador entrenadora seguimiento jugadorxs ficha deportiva habilidades'),
   EntradaAjuste('planes', 'Planes de pago', 'Finanzas › Cobros', 'paquete pack trimestral semestral meses clases descuento', dentro: 'cobros'),
   EntradaAjuste(
     'formas',
@@ -108,7 +109,7 @@ const entradasLiga = [
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
-  EntradaAjuste('viajes', 'Fondos de viaje', 'Mi Liga › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
+  EntradaAjuste('viajes', 'Fondos de viaje', 'Ajustes › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
   EntradaAjuste('movimientos', 'Ver movimientos', 'Finanzas', 'todos los movimientos ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
   EntradaAjuste('transparencia', 'Transparencia', 'Finanzas', 'equipo ve totales público', dentro: 'tesoreria'),
 ];
@@ -149,6 +150,29 @@ const entradasPerfil = [
   EntradaAjuste('comentarios', 'Enviar comentarios', 'Mi perfil', 'error idea duda sugerencia ayuda soporte'),
 ];
 
+/// Ajustes de cada equipo (Victor, QA 2026-11-26: buscar "gracia" o
+/// "cobro" debe llevar al ajuste dentro del equipo). `dentro` = 'equipo:'
+/// (`equipo:` + nombre) y el título es lo que se escribe en el buscador del equipo.
+List<EntradaAjuste> entradasEquipos(Iterable<String> equipos) => [
+  for (final e in equipos)
+    for (final (t, palabras) in const [
+      ('Cobros', 'precio mensualidad pago por clase cuota cobrar'),
+      ('Clases de gracia', 'gracia sin pagar asistiré deuda'),
+      ('Fecha límite de pago', 'vence vencimiento día recargo multa mora'),
+      ('Recompensa por pagar a tiempo', 'punto extra premio pronto pago'),
+      ('Mantenerse en el equipo', 'requisitos mínimo clases puntos quedarse'),
+      ('Ascenso al equipo', 'subir ascender pasar'),
+      ('Descenso del equipo', 'bajar descender perder'),
+      ('Nombre del equipo', 'renombrar cambiar nombre'),
+      ('Equipamiento propio', 'patines protecciones propios'),
+      ('Préstamo de equipamiento', 'prestar patines protecciones inventario'),
+      ('Puntos por asistencia', 'puntos asistir'),
+      ('Qué cuenta como clase', 'entrenamiento cuenta clase tipo evento'),
+      ('Fondos de viaje', 'viaje torneo fondo'),
+    ])
+      EntradaAjuste(t, '$t de $e', 'Liga › Equipos › $e', '$palabras $e equipo', dentro: 'equipo:$e'),
+];
+
 List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo, List<EntradaAjuste> entradas = entradasLiga}) {
   final palabras = _sinTildes(q).split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (palabras.isEmpty) return const [];
@@ -167,7 +191,7 @@ List<EntradaAjuste> buscarAjustes(String q, {bool tesoreria = true, String? solo
 
 /// Pantalla del buscador. Devuelve la entrada elegida.
 class BuscadorLigaScreen extends StatefulWidget {
-  const BuscadorLigaScreen({super.key, this.tesoreria = true, this.solo, this.donde = 'Mi Liga', this.entradas = entradasLiga, this.ejemplo});
+  const BuscadorLigaScreen({super.key, this.tesoreria = true, this.solo, this.donde = 'Ajustes', this.entradas = entradasLiga, this.ejemplo});
   final bool tesoreria;
   final List<EntradaAjuste> entradas;
   final String? ejemplo;

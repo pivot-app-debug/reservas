@@ -37,7 +37,8 @@ void main() {
   });
 
   test('Tu parte: lo que llevas para todxs compensa entre secciones', () {
-    // 10 personas; salado y postre a 2 porciones, bebida a 1 litro; hielo no cuenta.
+    // 10 personas; salado y postre a 2 porciones, bebida a 1 litro. Desde la
+    // ronda del 2026-11-23 cualquier aporte suma a Tu parte, también el hielo.
     EstadoSocial con(List<Map<String, dynamic>> bebida) => EstadoSocial({
       'yo': {'asiste': true},
       'conteo': {'total': 10},
@@ -49,7 +50,7 @@ void main() {
       ],
     });
     final e = con([]);
-    expect(e.seccionesParte.length, 3);
+    expect(e.seccionesParte.length, 4);
     expect(e.miParte, 0);
     // 4 litros = 4 personas en una sección: más que las 3 que te tocan.
     expect(
@@ -65,9 +66,9 @@ void main() {
       ]).miParte,
       0,
     );
-    // Un pollo (4 personas = 8 porciones) en salado.
+    // Un pollo (4 personas = 8 porciones) en salado: 4 personas de 4 secciones.
     final s = e.seccionesParte.first;
-    expect(e.parteDe(s, 8), closeTo(4 / 3, 0.001));
+    expect(e.parteDe(s, 8), closeTo(4 / 4, 0.001));
   });
 
   testWidgets('Anotarse en comida: cada quien dice cuánto rinde y se puede llevar de más', (t) async {

@@ -26,9 +26,6 @@ import '../equipo/equipo_repo.dart';
 import 'salud_liga_screen.dart';
 import 'categorias_screen.dart';
 import 'pivots_screen.dart';
-import '../core/esqueleto.dart';
-import '../core/fondo_logo.dart';
-import 'cobro_equipo_screen.dart' show modosCobro;
 
 /// Mi perfil → Ajustes de la liga (solo Pivots, Victor 2026-11-13): un solo
 /// lugar para lo que configura la liga. Los roles se editan desde la hoja de
@@ -86,14 +83,36 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   /// hace parpadear.
   Future<void> _buscar() async {
     final e = await Navigator.of(context)
-        .push<EntradaAjuste>(MaterialPageRoute(builder: (_) => BuscadorLigaScreen(tesoreria: sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(sesion))));
+        .push<EntradaAjuste>(
+          MaterialPageRoute(
+            builder: (_) => BuscadorLigaScreen(
+              tesoreria: sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(sesion),
+              donde: 'la liga',
+              // También los ajustes de cada equipo (QA 2026-11-26).
+              entradas: [...entradasLiga, ...entradasEquipos([for (final t in _equipos ?? const <Map<String, dynamic>>[]) '${t['nombre']}'])],
+            ),
+          ),
+        );
     if (e == null || !mounted) return;
     // Finanzas está en Ajustes → Herramientas de la liga (Victor, 2026-11-19).
     if (e.id == 'tesoreria') {
       SubAjustes.abrir(context, TesoreriaScreen(sesion: sesion));
       return;
     }
-    switch (e.dentro) {
+    final dentro = e.dentro ?? '';
+    if (dentro.startsWith('equipo:')) {
+      SubAjustes.abrir(context, AjustesEquipoScreen(sesion: sesion, nombre: dentro.substring(7), buscar: e.id));
+      return;
+    }
+    switch (dentro) {
+      case 'liga':
+        SubAjustes.abrir(context, CategoriasScreen(sesion: sesion));
+      case 'coaches':
+        SubAjustes.abrir(context, CoachesScreen(sesion: sesion));
+      case 'avisos':
+        SubAjustes.abrir(context, AvisosScreen(sesion: sesion));
+      case 'archivadas':
+        SubAjustes.abrir(context, ArchivadasScreen(repo: EquipoRepo.de(sesion)));
       case 'equipos':
         // Sin pasar por la pantalla vieja de Equipos y puntos (Victor, 2026-11-16).
         if (e.id == 'corte') {
@@ -139,19 +158,11 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
         context,
         preferencia: 'tour.miliga.v1',
         pasos: [
-          PasoTour(
-            clave: _kEquipos,
-            titulo: 'Tus equipos',
-            texto: 'Toca un equipo para ver y cambiar todo lo suyo: requisitos, cobro, clases de gracia y fondos. Con "+" creas otro.',
-          ),
-
           PasoTour(clave: _kLupa, titulo: 'Busca un ajuste', texto: 'Escribe lo que quieres cambiar (por ejemplo "tarde" o "precio") y te lleva directo.'),
         ],
       );
     });
   }
-
-  final _kEquipos = GlobalKey(debugLabel: 'tour-liga-equipos');
 
   final _kLupa = GlobalKey(debugLabel: 'tour-liga-lupa');
 
@@ -185,121 +196,6 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
     ),
   );
 
-  Widget _tarjetasEquipos(BuildContext context) {
-    final p = context.pivot;
-    final l = _equipos;
-    final gente = EquipoRepo.de(sesion);
-    Widget tarjeta({required Widget child, required VoidCallback alTocar, double ancho = 168, bool borde = false, String? logo}) => Material(
-      color: borde ? Colors.transparent : p.tarjeta,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(PivotRadios.grande),
-        side: borde ? BorderSide(color: p.bordeSuave, width: 1.5) : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(PivotRadios.grande),
-        onTap: alTocar,
-        child: FondoLogo(
-          url: logo,
-          opacidad: 0.5,
-          ancho: 0.85,
-          child: Container(width: ancho, padding: const EdgeInsets.all(14), child: child),
-        ),
-      ),
-    );
-    Widget etiqueta(String t) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.chip)),
-      child: Text(
-        t,
-        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: p.sobreSuave),
-      ),
-    );
-    return SizedBox(
-      height: 184,
-      child: l == null
-          ? Brillo(
-              child: Row(
-                children: [
-                  for (var i = 0; i < 2; i++)
-                    Container(
-                      width: 168,
-                      margin: const EdgeInsets.only(right: 10),
-                      decoration: BoxDecoration(color: p.esqueleto, borderRadius: BorderRadius.circular(PivotRadios.grande)),
-                    ),
-                ],
-              ),
-            )
-          : ListenableBuilder(
-              listenable: gente,
-              builder: (context, _) => ListView.separated(
-                scrollDirection: Axis.horizontal,
-                // Las tarjetas llegan al borde de la pantalla al deslizar (Victor, 2026-11-16).
-                clipBehavior: Clip.none,
-                itemCount: l.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (_, i) {
-                  if (i == l.length) {
-                    // Como "Agregar" en Comunidad (Victor, 2026-11-15).
-                    final (degradado, sobre) = PivotPaleta.seccion('salud', Theme.of(context).brightness);
-                    return tarjeta(
-                      ancho: 132,
-                      alTocar: () => _abrir(NuevoEquipoScreen(sesion: sesion)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(12)),
-                            child: Icon(Icons.add_rounded, color: sobre),
-                          ),
-                          const Spacer(),
-                          Text(
-                            'Nuevo equipo',
-                            style: TextStyle(fontWeight: FontWeight.w700, height: 1.2, color: p.texto),
-                          ),
-                          Text('Con sus propias reglas', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
-                        ],
-                      ),
-                    );
-                  }
-                  final t = l[i];
-                  final nombre = '${t['nombre']}';
-                  final cuantas = gente.personas?.where((x) => x.categoria == nombre).length;
-                  final propio = (t['propioNombres'] as List? ?? const []).isNotEmpty;
-                  final logo = '${t['logo'] ?? ''}';
-                  final cobro = modosCobro['${ConfigLiga.de(sesion).cobroEquipo(nombre)['modo']}']?.$1;
-                  // Con logo, va de fondo y no hace falta el avatar (Victor, 2026-11-16).
-                  return tarjeta(
-                    logo: logo.isEmpty ? null : logo,
-                    alTocar: () => _abrir(AjustesEquipoScreen(sesion: sesion, nombre: nombre)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (logo.isEmpty) LogoEquipo(nombre: nombre, url: null, tamano: 44),
-                        const Spacer(),
-                        Text(
-                          nombre,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
-                        ),
-                        Text(
-                          cuantas == null ? ' ' : '$cuantas ${cuantas == 1 ? 'persona' : 'personas'}',
-                          style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(spacing: 4, runSpacing: 4, children: [if (cobro != null) etiqueta(cobro), if (propio) etiqueta('Equipo propio')]),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = ConfigLiga.de(sesion);
@@ -318,7 +214,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
               title: Row(
                 children: [
                   if (pestana && c.logo.isNotEmpty) ...[LogoEquipo(nombre: 'Liga', url: c.logo, tamano: 32), const SizedBox(width: 10)],
-                  Text(pestana ? 'Mi Liga' : 'Ajustes de la liga', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const Text('Ajustes', style: TextStyle(fontWeight: FontWeight.w700)),
                 ],
               ),
               actions: [IconButton(key: _kLupa, tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
@@ -351,7 +247,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                             children: [
                               Icon(Icons.search_rounded, color: context.pivot.textoSecundario),
                               const SizedBox(width: 10),
-                              Text('Buscar un ajuste', style: TextStyle(color: context.pivot.textoSecundario)),
+                              Text('Buscar un ajuste, también de cada equipo', style: TextStyle(color: context.pivot.textoSecundario)),
                             ],
                           ),
                         ),
@@ -366,66 +262,9 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                     ('pivots', Icons.group_add_rounded, 'Suma otro Pivot y reparte las áreas', () => _abrir(PivotsScreen(sesion: sesion))),
                   ],
                 ),
-                _titulo(context, 'EQUIPOS'),
-                Resaltable(
-                  id: 'equipos',
-                  resaltado: _resaltado,
-                  child: KeyedSubtree(key: _kEquipos, child: _tarjetasEquipos(context)),
-                ),
-
-                _titulo(context, 'ADMINISTRAR'),
-                GrupoAjustes(
-                  filas: [
-                    Resaltable(
-                      id: 'pivots',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        icono: Icons.admin_panel_settings_outlined,
-                        seccion: 'roles',
-                        titulo: 'Pivots y permisos',
-                        valor: 'Quién es Pivot, qué áreas gestiona y cómo se aprueban sus pedidos',
-                        alTocar: () => _abrir(PivotsScreen(sesion: sesion)),
-                      ),
-                    ),
-                    // Coaches (Victor, 2026-11-16).
-                    Resaltable(
-                      id: 'coaches',
-                      resaltado: _resaltado,
-                      child: FilaAjuste(
-                        icono: Icons.sports_rounded,
-                        seccion: 'entrenamientos',
-                        titulo: 'Coaches',
-                        valor: 'Quién es coach y qué equipos lleva',
-                        alTocar: () => _abrir(CoachesScreen(sesion: sesion)),
-                      ),
-                    ),
-
-                    if (sesion.tieneArea('liga'))
-                      Resaltable(
-                        id: 'avisos',
-                        resaltado: _resaltado,
-                        child: FilaAjuste(
-                          icono: Icons.campaign_outlined,
-                          seccion: 'telefono',
-                          titulo: 'Avisos al equipo',
-                          valor: 'Enviar un mensaje ahora o programado',
-                          alTocar: () => _abrir(AvisosScreen(sesion: sesion)),
-                        ),
-                      ),
-                    if (sesion.tieneArea('equipo'))
-                      Resaltable(
-                        id: 'archivadas',
-                        resaltado: _resaltado,
-                        child: FilaAjuste(
-                          icono: Icons.inventory_outlined,
-                          seccion: 'roles',
-                          titulo: 'Personas archivadas',
-                          valor: 'Quitadas del equipo por inactividad o por un Pivot',
-                          alTocar: () => _abrir(ArchivadasScreen(repo: EquipoRepo.de(sesion))),
-                        ),
-                      ),
-                  ],
-                ),
+                // Equipos, Pivots, Coaches, Personas archivadas y Avisos viven en
+                // Liga → Equipos y Comunicación (Victor, QA 2026-11-26); el
+                // buscador de arriba sigue llevando a cada uno.
                 _titulo(context, 'FUNCIONES DE LA LIGA'),
                 GrupoHerramientasLiga(sesion: sesion),
                 _titulo(context, 'DATOS DE LA LIGA'),

@@ -26,7 +26,7 @@ const areasPivot = {
   'salud': ('Salud y emergencias', 'Ficha de emergencia y lesiones. Información confidencial.', Icons.health_and_safety_outlined),
   'inventario': ('Inventario', 'Listas, préstamos, botiquín y reglas de préstamo.', Icons.inventory_2_outlined),
   'tareas': ('Tareas', 'Crear, validar y repartir tareas.', Icons.task_alt_outlined),
-  'liga': ('Liga y Pivots', 'Ajustes de la liga, comunidad, avisos a todo el equipo y quién es Pivot.', Icons.shield_outlined),
+  'liga': ('Liga y Pivots', 'Ajustes de la liga, comunicación, avisos a todo el equipo y quién es Pivot.', Icons.shield_outlined),
   // Victor, 2026-11-20. Con solo esta área no ve las demás herramientas de Pivot.
   'sociales': (
     'Fiestas y eventos sociales',
@@ -202,7 +202,7 @@ class _PivotsScreenState extends State<PivotsScreen> {
           context: context,
           builder: (d) => AlertDialog(
             title: Text('¿Quitar a ${x.nombre} como Pivot?'),
-            content: const Text('Deja de ver Mi Liga, las notificaciones de Pivots y los avisos de Pivot. Sus datos no cambian.'),
+            content: const Text('Deja de ver los Ajustes de la liga, las notificaciones de Pivots y los avisos de Pivot. Sus datos no cambian.'),
             actions: [
               TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
               FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Quitar')),

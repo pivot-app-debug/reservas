@@ -13,6 +13,25 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Sin pronombres femeninos ni en la app ni en los chats: todo neutro, de preferencia sin pronombres (por ejemplo "admins", no "las admins").
 - Español neutro (sin voseo); se corrigieron textos con "debés", "podés", "tenés", "querés", "dejalo", "Escribilo", "elegí".
 
+## Ronda 2026-11-26 (auditoría de Finanzas y QA pendiente)
+- **Finanzas, auditoría:** informe en el proyecto de Claude (`claude/auditoria_finanzas_2026-11-26.md`) y resumen en el doc QA → Preguntas. Datos corregidos en la base con OK de Victor: Banco Pichincha `fecha_inicial` → 2026-01-01; anulados (con motivo, `anulado_por = claude-auditoria`) el movimiento duplicado de Darah abril y sus 2 filas duplicadas en `pagos`, y la fila de `pagos` del $5 de Vic (su movimiento ya estaba anulado).
+- **Migración `20261126120000_finanzas_blindaje.sql` (aplicada):** `pagos.anulado/anulado_por/anulado_en/motivo_anulacion/reserva_id/saldo_movimiento_id`; `tesoreria_movimientos.periodo_mes/periodo_anio` (+ índice parcial de cuotas activas) y relleno del periodo de las cuotas existentes. Todas las lecturas de `pagos` filtran `anulado = false`.
+- **Anular en cascada:** `adminTesoreria` → `anular` llama `_anularOrigenMovimiento`: origen 'pago' anula la fila de `pagos`, cancela su `reserva_id` y anula su `saldo_movimiento_id`; origen 'reserva' cancela la reserva ('Pago anulado en Tesorería'); origen 'saldo' anula el saldo. `corregir` no toca el origen (el reemplazo se crea al instante).
+- **Sin cuotas duplicadas:** `_registrarMovimiento` calcula el periodo (`_periodoDeMovimiento`: columnas, "Cuota m/aaaa" o "Mensualidad <mes>") y no crea una segunda cuota activa de la misma persona y mes. `adminRegistrarPago` rechaza una mensualidad ya registrada. Los movimientos de pagos y de reservas mensuales guardan `periodo_mes/periodo_anio`.
+- **Fecha inicial de cuentas:** `guardarCuenta` ya no pasa la fecha a hoy al editar; una cuenta nueva sin saldo inicial usa 2000-01-01 (cuenta todo).
+- **Revisar cuentas:** `adminTesoreria` acción `salud` (solo lee): reservas confirmadas y pagos sin movimiento, anulados con origen vivo, cuotas duplicadas, cuentas con movimientos antes de su fecha inicial y deudores con Asistiré a futuro. App: `finanzas/revision_screen.dart` (`RevisionTesoreriaScreen`), fila "Revisar cuentas" en Finanzas → Administrar.
+- **Clase de gracia en el servidor:** `_motivoSinAsistireServidor` (misma regla que `motivoSinAsistire` de la app) en `marcarAsistenciaUsuario`: con `origenAuto` (Asistencia anticipada) omite en silencio; a mano responde el motivo. Pivots y exentxs, libres.
+- **Liga → Equipos:** cada sección termina con `_accionesSeccion`: "Gestionar <equipo>" + "Crear equipo" (Pivots) o "Ver <equipo>"; "Gestionar coaches"/"Ver coaches"; "Gestionar Pivots"; "Personas archivadas" en Sin actividad (y tocar el título abierto lleva ahí, solo Pivots). Se quitó el botón suelto "Crear un equipo". Banners con texto en español neutro (sin "podés").
+- **Personas archivadas:** sección "Sugeridas para archivar · sin actividad" con botón Archivar.
+- **Liga → Ajustes** (antes "Ajustes de Liga", ícono engranaje): sin EQUIPOS ni ADMINISTRAR (viven en Equipos y Comunicación). Funciones de la liga solo dice Activada/Desactivada. El buscador incluye los ajustes de cada equipo (`entradasEquipos`, `dentro: 'equipo:<nombre>'`) y abre `AjustesEquipoScreen(buscar:)` ya filtrado; también 'coaches', 'avisos', 'archivadas' y 'liga'.
+- **Buscador dentro de un equipo:** `_filtrar` busca dentro de `_SoloLectura`/`Column`/`Padding`/`Resaltable` (antes no encontraba nada en la vista de solo lectura). Banner "Cómo se paga en <equipo>" con cobro, clase de gracia y fecha límite.
+- **Liga → Comunicación** (antes "Redes"): botón "Avisos al equipo" debajo del canal (Pivots con área liga).
+- **Inventario:** banner "Cómo pedir equipamiento" según la regla del equipo de la persona; para Pivots, "Cómo funciona Inventario".
+- **Mi perfil desde tu ficha:** "Editar mi perfil" cierra la ficha y va a la pestaña Mi perfil (`Navegacion.ir`).
+- **Coaches:** "Nombrar coach" debajo del último coach y siempre visible; "Quitarme de coaches" en tu fila. Acción nueva `dejarDeSerCoach` (token) y fila "Quitarme de coaches" en Mi perfil para coaches aprobados.
+- **Formularios con teclado:** `abrirFormulario<T>(context, builder:)` en `ajustes/componentes.dart` abre el contenido como subsección. Pasaron de hoja de abajo a subsección: comentarios, pedir ser coach, nota de coach, enlace de Comunicación, medio y entrenamiento en Crear liga, aviso nuevo y opciones de Salud. Quedan como hoja los selectores con búsqueda (persona, zona horaria, moneda): solo eligen.
+- **Test:** `tu_parte_test.dart` actualizado a la regla del 2026-11-23 (el hielo cuenta para Tu parte).
+
 ## Ronda 2026-11-23 (Ronda QA: Liga, Coach, Fiestas y fixes)
 - **Liga:** Pestañas renombradas a "Equipos" y "Ajustes de Liga".
 - **Inventario:** El botón flotante FAB se reemplazó por la tarjeta fija "Nueva lista" al estilo de crear tarea/evento/curso.

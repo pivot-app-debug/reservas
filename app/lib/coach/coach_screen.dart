@@ -1289,7 +1289,10 @@ Future<void> _nombrar() async {
               ListTile(leading: const Icon(Icons.groups_rounded), title: const Text('Cambiar equipos'), onTap: () => Navigator.of(h).pop('equipos')),
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
-              title: Text(c['estado'] == 'pendiente' ? 'Rechazar solicitud' : 'Quitar coach', style: TextStyle(color: h.pivot.marcaTexto)),
+              title: Text(
+                c['estado'] == 'pendiente' ? 'Rechazar solicitud' : ('${c['username']}' == s.nombre ? 'Quitarme de coaches' : 'Quitar de coaches'),
+                style: TextStyle(color: h.pivot.marcaTexto),
+              ),
               onTap: () => Navigator.of(h).pop(c['estado'] == 'pendiente' ? 'rechazar' : 'quitar'),
             ),
             const SizedBox(height: 8),
@@ -1330,16 +1333,6 @@ Future<void> _nombrar() async {
                     child: Center(
                       child: Text('Todavía no hay coaches.', style: TextStyle(color: p.textoSecundario)),
                     ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: FilledButton.icon(
-                      onPressed: _nombrar,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Nombrar coach'),
-                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                    ),
                   ),
                 for (final c in l)
                   ListTile(
@@ -1354,6 +1347,17 @@ Future<void> _nombrar() async {
                     trailing: const Icon(Icons.more_horiz_rounded),
                     onTap: () => _opciones(c),
                   ),
+                // Debajo del último coach, siempre visible (QA 2026-11-26: antes
+                // estaba arriba y desaparecía cuando no había coaches).
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: OutlinedButton.icon(
+                    onPressed: _nombrar,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Nombrar coach'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  ),
+                ),
               ],
             ),
     );
@@ -1367,12 +1371,7 @@ class FilaSerCoach extends StatelessWidget {
 
   Future<void> _pedir(BuildContext context) async {
     final mensaje = TextEditingController();
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => Padding(
+    final ok = await abrirFormulario<bool>(context, builder: (c) => Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1412,12 +1411,43 @@ class FilaSerCoach extends StatelessWidget {
     }
   }
 
+  Future<void> _dejar(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('¿Quitarte de coaches?'),
+        content: const Text('Dejas de ver la sección Coach. Las evaluaciones y notas que hiciste se conservan. Puedes volver a pedirlo cuando quieras.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Quitarme')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final r = await sesion.api.post('dejarDeSerCoach', {});
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      await sesion.cargarCoach();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya no eres coach.')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: sesion,
     builder: (context, _) {
       final e = sesion.coachEstado;
-      if (e == 'aprobado') return const SizedBox.shrink();
+      if (e == 'aprobado') {
+        return FilaAjuste(
+          icono: Icons.sports_rounded,
+          seccion: 'coach',
+          titulo: 'Quitarme de coaches',
+          valor: 'Dejas de ser coach; tus evaluaciones se conservan',
+          alTocar: () => _dejar(context),
+        );
+      }
       return FilaAjuste(
         icono: Icons.sports_rounded,
         seccion: 'coach',
@@ -1649,12 +1679,7 @@ class _PruebasCoachState extends State<_PruebasCoach> {
     final personas = <String>{
       ...[for (final u in (x?['personas'] as List? ?? const [])) '$u'],
     };
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(context, builder: (c) => StatefulBuilder(
         builder: (c, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
           child: SingleChildScrollView(

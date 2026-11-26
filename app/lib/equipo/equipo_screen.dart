@@ -82,10 +82,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   static String _nombreLiga(PestanaLiga x) => switch (x) {
     // Más corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
     PestanaLiga.comunidad => 'Equipos',
-    PestanaLiga.redes => 'Redes',
+    PestanaLiga.redes => 'Comunicación',
     PestanaLiga.inventario => 'Inventario',
     PestanaLiga.finanzas => 'Finanzas',
-    PestanaLiga.miLiga => 'Ajustes de Liga',
+    PestanaLiga.miLiga => 'Ajustes',
   };
 
   static IconData _iconoLiga(PestanaLiga x) => switch (x) {
@@ -93,7 +93,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     PestanaLiga.redes => Icons.forum_rounded,
     PestanaLiga.inventario => Icons.content_paste_rounded,
     PestanaLiga.finanzas => Icons.account_balance_wallet_rounded,
-    PestanaLiga.miLiga => Icons.stadium_rounded,
+    PestanaLiga.miLiga => Icons.settings_rounded,
   };
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
@@ -420,17 +420,17 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                       children: [
                         if (g == 'Quindes') _bannerEquipo(p, 'Quindes', 'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.', alDetalles: () => _entrar('Quindes')),
                         if (g == 'Mirlxs') _bannerEquipo(p, 'Mirlxs', 'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.', alDetalles: () => _entrar('Mirlxs')),
-                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no han asistido a ningún entrenamiento en 30 días (o nunca asistieron), salvo que estén de viaje, lesionadxs o con un motivo válido. Al tocar "Sin actividad" ves las personas archivadas y podés sugerir quién archivar por inactividad. El botón "Archivar" de cada persona la saca de la vista del equipo: su historial se conserva y, si vuelve, sale de archivo y queda activx.', alDetalles: () => _entrar('Inactivxs')),
-                        if (g == 'Coaches') _bannerEquipo(p, 'Coaches', 'Entrenadorxs del equipo. Pueden tomar asistencia y crear pruebas. Los nombra un Pivot y un coach puede sacarse a síx mismx tocando los 3 puntos de su fila.', alDetalles: () => _entrar('Coaches')),
-                        if (g == 'Pivots') _bannerEquipo(p, 'Pivots', 'Administradorxs de la liga con acceso total: pueden editar equipos, cobros, archivar personas, invitar al equipo y cambiar reglas sensibles. Los nombra el dueño de la liga o otro Pivot con permisos.', alDetalles: () => _entrar('Pivots')),
+                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no vinieron a ningún entrenamiento en los últimos 30 días (o nunca vinieron), salvo que estén de viaje, lesionadxs o con otro motivo válido. Salen de aquí en cuanto vuelven a entrenar. El botón "Archivar" de cada persona la quita de la vista del equipo: su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. Con "Personas archivadas" ves a quién se archivó y a quién conviene archivar.', alDetalles: () => _entrar('Inactivxs')),
+                        if (g == 'Coaches') _bannerEquipo(p, 'Coaches', 'Entrenadorxs del equipo. Pueden tomar asistencia, evaluar y crear pruebas. Los nombra un Pivot, y cada coach puede quitarse de la lista desde los 3 puntos de su fila en Gestionar coaches.', alDetalles: () => _entrar('Coaches')),
+                        if (g == 'Pivots') _bannerEquipo(p, 'Pivots', 'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.', alDetalles: () => _entrar('Pivots')),
                         for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy),
+                        _accionesSeccion(g),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-          if (!repo.hayFiltros) SliverToBoxAdapter(child: _extras(context, p)),
           if (conGente.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -449,7 +449,8 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   bool _seEntra(String titulo) {
-    if (titulo == 'Inactivxs') return false;
+    // Sin actividad lleva a Personas archivadas, solo para Pivots (QA 2026-11-26).
+    if (titulo == 'Inactivxs') return _pivot;
     if (titulo == 'Coaches') return FuncionesLiga.usaCoach(repo.sesion) || _pivot;
     return true;
   }
@@ -488,30 +489,46 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     onTap: () => _abrir(x),
   );
 
-  /// Debajo de los equipos (Victor, 2026-11-22): un Pivot puede crear un
-  /// equipo nuevo.
-  Widget _extras(BuildContext context, PivotPaleta p) {
+  /// Botones al final de cada sección (Victor, QA 2026-11-26): tocar el
+  /// título se veía poco, así que cada lista termina con "Gestionar …" y, en
+  /// los equipos, "Crear equipo" al lado (solo Pivots).
+  Widget _accionesSeccion(String g) {
     final s = repo.sesion;
-    if (!_pivot) return const SizedBox.shrink();
+    final esEquipo = g != 'Inactivxs' && g != 'Coaches' && g != 'Pivots';
+    final String? texto = switch (g) {
+      'Inactivxs' => _pivot ? 'Personas archivadas' : null,
+      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar coaches' : 'Ver coaches') : null,
+      'Pivots' => _pivot ? 'Gestionar Pivots' : null,
+      _ => _pivot ? 'Gestionar $g' : 'Ver $g',
+    };
+    if (texto == null) return const SizedBox(height: 8);
+    final gestionar = OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+      onPressed: () => _entrar(g),
+      icon: Icon(esEquipo && _pivot ? Icons.tune_rounded : (g == 'Inactivxs' ? Icons.inventory_outlined : Icons.chevron_right_rounded), size: 20),
+      label: Text(texto, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 5, 12, 5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_pivot) ...[
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              onPressed: () async {
-                await SubAjustes.abrir<void>(context, NuevoEquipoScreen(sesion: s));
-                if (mounted) repo.cargar(forzar: true);
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Crear un equipo'),
-            ),
-          ],
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: esEquipo && _pivot
+          ? Row(
+              children: [
+                Expanded(child: gestionar),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                    onPressed: () async {
+                      await SubAjustes.abrir<void>(context, NuevoEquipoScreen(sesion: s));
+                      if (mounted) repo.cargar(forzar: true);
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: const Text('Crear equipo', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+            )
+          : gestionar,
     );
   }
 

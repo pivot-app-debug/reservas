@@ -6,6 +6,8 @@ import '../core/vidrio.dart' show altoBarra;
 
 import '../core/config_liga.dart';
 import '../pivots/editores_liga.dart';
+import '../pivots/avisos_screen.dart';
+import '../ajustes/componentes.dart' show SubAjustes, abrirFormulario;
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -286,6 +288,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
                     if (repo.esPivot) ...[
                       const SizedBox(height: 16),
                       FilledButton.icon(onPressed: _guardando ? null : () => _editar(), icon: const Icon(Icons.add_rounded), label: const Text('Agregar')),
+                      if (repo.sesion.tieneArea('liga')) ...[const SizedBox(height: 8), _BotonAvisos(sesion: repo.sesion)],
                     ],
                   ],
                 ),
@@ -333,6 +336,7 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
                 // Canal de comunicación de la liga, debajo de las tarjetas
                 // (Victor, 2026-11-16; antes en la barra). Solo Pivots.
                 if (repo.esPivot) ...[const SizedBox(height: 16), _BotonCanal(sesion: repo.sesion)],
+                if (repo.esPivot && repo.sesion.tieneArea('liga')) ...[const SizedBox(height: 8), _BotonAvisos(sesion: repo.sesion)],
               ],
             );
           }
@@ -341,6 +345,21 @@ class _ComunidadScreenState extends State<ComunidadScreen> {
       ),
     );
   }
+}
+
+/// Avisos al equipo (Victor, QA 2026-11-26): vive en Comunicación, junto al
+/// canal, en vez de en los ajustes de la liga.
+class _BotonAvisos extends StatelessWidget {
+  const _BotonAvisos({required this.sesion});
+  final Sesion sesion;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+    onPressed: () => SubAjustes.abrir<void>(context, AvisosScreen(sesion: sesion)),
+    icon: const Icon(Icons.campaign_outlined),
+    label: const Text('Avisos al equipo: enviar ahora o programar'),
+  );
 }
 
 /// Canal con el que se escribe a las personas desde su ficha (Pivots).
@@ -430,12 +449,7 @@ Future<EnlaceComunidad?> mostrarHojaEnlace(BuildContext context, {EnlaceComunida
   final nombre = TextEditingController(text: actual?.nombre ?? '');
   var red = actual?.red ?? 'otro';
   var nombreTocado = actual != null;
-  return showModalBottomSheet<EnlaceComunidad>(
-    useRootNavigator: true,
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (hoja) => StatefulBuilder(
+  return abrirFormulario<EnlaceComunidad>(context, builder: (hoja) => StatefulBuilder(
       builder: (hoja, refrescar) {
         final p = hoja.pivot;
         void alCambiarEnlace(String v) {

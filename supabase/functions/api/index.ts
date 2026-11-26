@@ -4526,6 +4526,55 @@ const ESTADOS_RSVP = ['Asistiré', 'No asistiré', 'No jugador'];
 // una baja real desde 'Asistiré'.
 const ESTADOS_RSVP_BAJA = ['No asistiré', 'No jugador'];
 
+/** Clase de gracia en el servidor (auditoría de Finanzas, 2026-11-26): la app
+ *  ya bloqueaba el botón (`motivoSinAsistire` en eventos_repo.dart), pero
+ *  Asistencia anticipada (`origenAuto`) seguía creando "Asistiré" a quien
+ *  debe la cuota (caso Pechugas: 15 filas hasta 2027). Misma regla que la
+ *  app: equipo con clases de gracia, mes sin pagar, y ya usó (o reservó con
+ *  "Asistiré") todas sus clases de gracia del mes. Pivots y exentxs, libres.
+ *  Devuelve el motivo o null si puede marcar. */
+async function _motivoSinAsistireServidor(nombre: string, idEvento: string): Promise<string | null> {
+  const { data: ev } = await supabase.from('asistencias').select('fecha, tipo_evento').eq('id_evento', idEvento).maybeSingle();
+  if (!ev?.fecha || ev.tipo_evento !== 'Entrenamiento') return null;
+  const { data: p } = await supabase.from('equipo').select('categoria, exenta_cuota, estado_miembro, roles').eq('username', nombre).maybeSingle();
+  if (!p || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return null;
+  if (Array.isArray(p.roles) && p.roles.includes('Pivot')) return null;
+  const reglas = await _reglasLiga();
+  const eq = String(p.categoria ?? '');
+  const g = (reglas.graciaClases ?? {})[eq];
+  if (g === undefined || g === null || _cobroEquipo(reglas, eq).modo !== 'mes') return null;
+  const n = Math.max(0, Number(g) || 0);
+  const fecha = String(ev.fecha).slice(0, 10);
+  const mes = fecha.slice(0, 7);
+  if ((await _estadosCuotaMes([nombre], mes))[nombre] !== 'debe') return null;
+  const [y, m] = mes.split('-').map(Number);
+  const nombreMes = _MESES_ES[m - 1];
+  if (n === 0) return `Para marcar Asistiré, paga primero tu cuota de ${nombreMes}.`;
+  const ultimo = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const { data: evs } = await supabase.from('asistencias').select('id_evento, fecha, a_horario, tarde')
+    .eq('tipo_evento', 'Entrenamiento').not('estado', 'in', '("Evento Cancelado","No se entrena","Eliminado")')
+    .gte('fecha', `${mes}-01`).lte('fecha', ultimo).neq('id_evento', idEvento);
+  const yo = nombre.trim().toUpperCase();
+  const nombres = (v: unknown) => String(v ?? '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
+  const vino = new Set((evs ?? []).filter((e: any) => nombres(e.a_horario).includes(yo) || nombres(e.tarde).includes(yo)).map((e: any) => e.id_evento));
+  const hoy = _hoyEcuadorISO();
+  const futuros = (evs ?? []).filter((e: any) => String(e.fecha).slice(0, 10) >= hoy && !vino.has(e.id_evento)).map((e: any) => e.id_evento);
+  let porVenir = 0;
+  if (futuros.length) {
+    const { data: logs } = await supabase.from('log_asistencias').select('id_evento, estado, marca_temporal')
+      .eq('nombre_usuario', nombre).in('id_evento', futuros).in('origen', ['Usuario', 'AsistenciaAnticipada'])
+      .order('marca_temporal', { ascending: false });
+    const visto = new Set<string>();
+    for (const l of logs ?? []) {
+      if (visto.has(l.id_evento)) continue;
+      visto.add(l.id_evento);
+      if (l.estado === 'Asistiré') porVenir++;
+    }
+  }
+  if (vino.size + porVenir < n) return null;
+  return `Ya usaste ${n === 1 ? 'tu clase' : `tus ${n} clases`} de gracia de ${nombreMes}. Paga tu cuota para marcar Asistiré.`;
+}
+
 async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Record<string, any>> {
   // Seguridad (2026-11-06, pedido explícito): la identidad sale SIEMPRE del
   // token de sesión. Antes se usaba `params.nombre` sin validar, así que
@@ -4538,6 +4587,11 @@ async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Rec
   if (!ESTADOS_RSVP.includes(estado)) return { exito: false, error: 'Estado inválido.' };
 
   const esAuto = params.origenAuto === true || params.origenAuto === 'true';
+  if (estado === 'Asistiré') {
+    const motivo = await _motivoSinAsistireServidor(nombre, String(idEvento).trim());
+    // Anticipada: se omite en silencio (la regla vuelve a intentar cuando pague).
+    if (motivo) return esAuto ? { exito: true, omitido: 'cuota' } : { exito: false, error: motivo, cuotaPendiente: true };
+  }
 
   // Auto-persist de reglas de asistencia anticipada (`origenAuto`, ver
   // _evAntReconciliarConReglas() en js/eventos.js): esa función solo debe
@@ -4966,6 +5020,16 @@ async function pedirCoach(params: Record<string, any>): Promise<Record<string, a
     await sendPush({ tipo: 'nueva_solicitud', include_external_user_ids: admins, headings: { es: 'Pedido para ser coach' }, contents: { es: `${yo} pidió ser coach. Revísalo en Notificaciones.` }, url: APP_URL + '/' }).catch(() => {});
   }
   return { exito: true, estado: 'pendiente' };
+}
+
+/** Un coach deja de serlo por su cuenta (Victor, QA 2026-11-26: "Quitarme de coaches"). */
+async function dejarDeSerCoach(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  await supabase.from('coaches').update({ estado: 'rechazado', resuelto_por: yo, resuelto_en: new Date().toISOString() }).eq('username', yo);
+  const { data: f } = await supabase.from('equipo').select('roles').eq('username', yo).maybeSingle();
+  if (Array.isArray(f?.roles) && f!.roles.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: f!.roles.filter((r: string) => r !== ROL_COACH) }).eq('username', yo);
+  return { exito: true, estado: null };
 }
 
 async function getMiCoach(params: Record<string, any>): Promise<Record<string, any>> {
@@ -6613,6 +6677,36 @@ async function _nombrePersona(username: string | null | undefined): Promise<stri
   return data?.nombre_derby || username;
 }
 
+/** Anular en Tesorería anula también lo que lo originó (auditoría de Finanzas,
+ *  2026-11-26): antes la fila de `pagos`, la reserva o el saldo seguían vivos y
+ *  "Cuotas del mes" daba por pagado algo que la caja ya no contaba. */
+async function _anularOrigenMovimiento(m: any, por: string, motivo: string): Promise<void> {
+  if (!m?.origen_id && m?.origen !== 'saldo') return;
+  if (m.origen === 'pago') {
+    const { data: p } = await supabase.from('pagos').update({ anulado: true, anulado_por: por, anulado_en: new Date().toISOString(), motivo_anulacion: motivo })
+      .eq('id', m.origen_id).select('reserva_id, saldo_movimiento_id').maybeSingle();
+    if (p?.reserva_id) await supabase.from('reservas').update({ estado: 'Cancelada', motivo_rechazo: 'Pago anulado en Tesorería' }).eq('id', p.reserva_id).eq('estado', 'Confirmada');
+    if (p?.saldo_movimiento_id) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: por }).eq('id', p.saldo_movimiento_id);
+  } else if (m.origen === 'reserva') {
+    const { data: r } = await supabase.from('reservas').update({ estado: 'Cancelada', motivo_rechazo: 'Pago anulado en Tesorería' })
+      .eq('id', m.origen_id).eq('estado', 'Confirmada').select('saldo_movimiento_id').maybeSingle();
+    if (r?.saldo_movimiento_id) await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: por }).eq('id', r.saldo_movimiento_id);
+  } else if (m.origen === 'saldo') {
+    await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: por }).eq('movimiento_id', m.id).eq('anulado', false);
+  }
+}
+
+/** "Mensualidad abril", "Cuota 4/2026", "Mensualidad Octubre" → {mes, anio}. */
+function _periodoDeMovimiento(m: Record<string, any>): { mes: number; anio: number } | null {
+  if (m.periodo_mes && m.periodo_anio) return { mes: Number(m.periodo_mes), anio: Number(m.periodo_anio) };
+  const t = String(m.descripcion ?? '').toLowerCase();
+  const num = t.match(/cuota\s+(\d{1,2})\/(\d{4})/);
+  if (num) return { mes: Number(num[1]), anio: Number(num[2]) };
+  const i = _MESES_ES.findIndex((x) => t.includes(`mensualidad ${x}`));
+  if (i >= 0) return { mes: i + 1, anio: Number(String(m.fecha ?? _hoyEcuadorISO()).slice(0, 4)) };
+  return null;
+}
+
 /** Registra un movimiento (solo si hay cuentas creadas, para no ensuciar antes de empezar). */
 async function _registrarMovimiento(m: Record<string, any>): Promise<string | null> {
   const { count } = await supabase.from('tesoreria_cuentas').select('id', { count: 'exact', head: true });
@@ -6620,6 +6714,17 @@ async function _registrarMovimiento(m: Record<string, any>): Promise<string | nu
   if (m.origen && m.origen_id) {
     const { data: ya } = await supabase.from('tesoreria_movimientos').select('id').eq('origen', m.origen).eq('origen_id', String(m.origen_id)).eq('anulado', false).maybeSingle();
     if (ya) return ya.id;
+  }
+  // Una sola cuota activa por persona y mes (auditoría 2026-11-26: Ale junio
+  // y Darah abril quedaron dos veces). El periodo se guarda en columnas.
+  if (m.categoria === 'cuota' && m.persona && m.tipo === 'ingreso' && !m.reemplaza_id) {
+    const per = _periodoDeMovimiento(m);
+    if (per) {
+      m.periodo_mes = per.mes; m.periodo_anio = per.anio;
+      const { data: ya } = await supabase.from('tesoreria_movimientos').select('id').eq('persona', m.persona).eq('categoria', 'cuota')
+        .eq('periodo_mes', per.mes).eq('periodo_anio', per.anio).eq('anulado', false).limit(1).maybeSingle();
+      if (ya) { console.warn('[tesoreria] cuota duplicada evitada', m.persona, per); return ya.id; }
+    }
   }
   const fila = { ...m, persona_nombre: m.persona_nombre ?? await _nombrePersona(m.persona) };
   const { data, error } = await supabase.from('tesoreria_movimientos').insert(fila).select('id').single();
@@ -7112,13 +7217,16 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
       tipo: ['efectivo', 'deuna', 'banco', 'otro'].includes(String(d.tipo)) ? String(d.tipo) : 'otro',
       responsable: String(d.responsable ?? '').trim().slice(0, 60) || null,
       saldo_inicial: Number(d.saldoInicial) || 0,
-      fecha_inicial: fechaOk(d.fechaInicial) ?? hoy,
       activa: d.activa !== false,
     };
     if (!fila.nombre) return { exito: false, error: 'Falta el nombre de la cuenta.' };
     let antes: any = null;
+    if (d.id) ({ data: antes } = await supabase.from('tesoreria_cuentas').select('*').eq('id', d.id).maybeSingle());
+    // Fecha inicial (auditoría 2026-11-26): editar una cuenta ya no la pasa a
+    // hoy (así Banco Pichincha quedó en $0 y dejó fuera sus movimientos), y
+    // una cuenta nueva sin saldo inicial cuenta todos sus movimientos.
+    fila.fecha_inicial = fechaOk(d.fechaInicial) ?? antes?.fecha_inicial ?? (fila.saldo_inicial ? hoy : '2000-01-01');
     if (d.id) {
-      ({ data: antes } = await supabase.from('tesoreria_cuentas').select('*').eq('id', d.id).maybeSingle());
       const { error } = await supabase.from('tesoreria_cuentas').update(fila).eq('id', d.id);
       if (error) return { exito: false, error: error.message };
     } else {
@@ -7170,12 +7278,71 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     return { exito: true, id };
   }
 
+  // Revisión de Tesorería (auditoría 2026-11-26): lo que no cuadra, para
+  // corregirlo antes de que se acumule. Solo lee; no cambia nada.
+  if (accion === 'salud') {
+    const [cuentas, movs, { data: pags }, { data: res }] = await Promise.all([
+      _saldosCuentas(),
+      _paginado((a, b) => supabase.from('tesoreria_movimientos').select('id, fecha, tipo, monto, cuenta_id, cuenta_destino_id, categoria, descripcion, persona, persona_nombre, origen, origen_id, anulado, reemplaza_id, periodo_mes, periodo_anio').range(a, b)),
+      supabase.from('pagos').select('id, nombre_usuario, mes, anio, monto, exoneradx, tipo, id_evento, fecha, reserva_id, anulado'),
+      supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, id_evento, estado, monto, fecha_pago, uso_cupon, validez_hasta'),
+    ]);
+    const activos = movs.filter((m: any) => !m.anulado);
+    const porOrigen = new Set(activos.filter((m: any) => m.origen_id).map((m: any) => `${m.origen}:${m.origen_id}`));
+    const cuotaDe = new Set(activos.filter((m: any) => m.categoria === 'cuota' && m.periodo_mes).map((m: any) => `${m.persona}:${m.periodo_anio}-${m.periodo_mes}`));
+    const pagosVivos = (pags ?? []).filter((p: any) => !p.anulado);
+    const reservaDePago = new Set(pagosVivos.filter((p: any) => p.reserva_id).map((p: any) => p.reserva_id));
+    const clasePagada = new Set(pagosVivos.filter((p: any) => p.tipo === 'clase').map((p: any) => `${p.nombre_usuario}:${p.id_evento}`));
+    const nombres: Record<string, string> = {}; cuentas.forEach((c) => { nombres[c.id] = c.nombre; });
+    const sinMovReserva = (res ?? []).filter((r: any) => r.estado === 'Confirmada' && Number(r.monto) > 0 && !r.uso_cupon && !porOrigen.has(`reserva:${r.id}`)
+      && !reservaDePago.has(r.id) && !clasePagada.has(`${r.nombre_usuario}:${r.id_evento}`)
+      && !(r.tipo === 'mensual' && cuotaDe.has(`${r.nombre_usuario}:${_mesDeReserva(r).slice(0, 4)}-${Number(_mesDeReserva(r).slice(5, 7))}`)))
+      .map((r: any) => ({ id: r.id, persona: r.nombre_usuario, tipo: r.tipo, que: r.tipo === 'mensual' ? `Mensualidad ${r.mes_texto ?? ''}`.trim() : 'Clase', fecha: r.fecha_pago, monto: Number(r.monto) }));
+    const sinMovPago = pagosVivos.filter((p: any) => Number(p.monto) > 0 && !p.exoneradx && !porOrigen.has(`pago:${p.id}`) && !(p.tipo !== 'clase' && cuotaDe.has(`${p.nombre_usuario}:${p.anio}-${p.mes}`)))
+      .map((p: any) => ({ id: p.id, persona: p.nombre_usuario, que: p.tipo === 'clase' ? 'Clase' : `Cuota ${p.mes}/${p.anio}`, fecha: p.fecha, monto: Number(p.monto) }));
+    const reemplazados = new Set(activos.filter((m: any) => m.reemplaza_id).map((m: any) => m.reemplaza_id));
+    const pagoVivo = new Set(pagosVivos.map((p: any) => p.id));
+    const reservaViva = new Set((res ?? []).filter((r: any) => r.estado === 'Confirmada').map((r: any) => r.id));
+    const anuladosConOrigen = movs.filter((m: any) => m.anulado && m.origen_id && !reemplazados.has(m.id) && !porOrigen.has(`${m.origen}:${m.origen_id}`)
+      && ((m.origen === 'pago' && pagoVivo.has(m.origen_id)) || (m.origen === 'reserva' && reservaViva.has(m.origen_id))))
+      .map((m: any) => _filaMovimiento(m, nombres));
+    const grupos: Record<string, any[]> = {};
+    for (const m of activos) if (m.categoria === 'cuota' && m.persona && m.periodo_mes) (grupos[`${m.persona}:${m.periodo_anio}-${m.periodo_mes}`] ??= []).push(m);
+    const duplicados = Object.values(grupos).filter((g) => g.length > 1).map((g) => ({ persona: g[0].persona_nombre || g[0].persona, mes: g[0].periodo_mes, anio: g[0].periodo_anio, movimientos: g.map((m: any) => _filaMovimiento(m, nombres)) }));
+    const cuentasFuera = cuentas.map((c) => ({ c, n: activos.filter((m: any) => (m.cuenta_id === c.id || m.cuenta_destino_id === c.id) && m.fecha < c.fechaInicial) }))
+      .filter((x) => x.n.length).map((x) => ({ cuenta: x.c.nombre, fechaInicial: x.c.fechaInicial, movimientos: x.n.length, monto: _num2(x.n.reduce((t: number, m: any) => t + Number(m.monto), 0)) }));
+    // Deudores del mes con "Asistiré" a futuro.
+    const mes = hoy.slice(0, 7);
+    const { data: gente } = await supabase.from('equipo').select('username, nombre_derby, categoria, exenta_cuota, roles').is('eliminado_en', null);
+    const pagan = (gente ?? []).filter((p: any) => p.exenta_cuota !== true);
+    const debeMes = await _debeCuotaMes(pagan, mes);
+    const estados = await _estadosCuotaMes(Object.keys(debeMes), mes);
+    const deudores = Object.keys(debeMes).filter((u) => debeMes[u].debe && estados[u] === 'debe');
+    let conAsistire: any[] = [];
+    if (deudores.length) {
+      const { data: logs } = await supabase.from('log_asistencias').select('nombre_usuario, id_evento, estado, origen, marca_temporal, fecha_entrenamiento')
+        .in('nombre_usuario', deudores).gte('fecha_entrenamiento', hoy).in('origen', ['Usuario', 'AsistenciaAnticipada']).order('marca_temporal', { ascending: false });
+      const ultimo: Record<string, any> = {};
+      for (const l of logs ?? []) ultimo[`${l.nombre_usuario}:${l.id_evento}`] ??= l;
+      const cuenta: Record<string, { total: number; anticipada: number }> = {};
+      for (const l of Object.values(ultimo)) if (l.estado === 'Asistiré') { const c = cuenta[l.nombre_usuario] ??= { total: 0, anticipada: 0 }; c.total++; if (l.origen === 'AsistenciaAnticipada') c.anticipada++; }
+      conAsistire = Object.entries(cuenta).map(([u, c]) => ({ persona: u, nombre: (gente ?? []).find((g: any) => g.username === u)?.nombre_derby || u, asistire: c.total, anticipada: c.anticipada, debe: debeMes[u].monto }));
+    }
+    const total = sinMovReserva.length + sinMovPago.length + anuladosConOrigen.length + duplicados.length + cuentasFuera.length + conAsistire.length;
+    return {
+      exito: true, total, sinMovimientoReservas: sinMovReserva, sinMovimientoPagos: sinMovPago, anuladosConOrigenVivo: anuladosConOrigen,
+      duplicados, cuentasConMovimientosAntes: cuentasFuera, deudoresConAsistire: conAsistire,
+    };
+  }
+
   if (accion === 'anular' || accion === 'corregir') {
     const { data: m } = await supabase.from('tesoreria_movimientos').select('*').eq('id', d.id).maybeSingle();
     if (!m) return { exito: false, error: 'No se encontró el movimiento.' };
     if (m.anulado) return { exito: false, error: 'Ya estaba anulado.' };
     const motivo = String(d.motivo ?? '').trim().slice(0, 200) || (accion === 'corregir' ? 'Corrección' : 'Anulado');
     await supabase.from('tesoreria_movimientos').update({ anulado: true, anulado_por: email, anulado_en: new Date().toISOString(), motivo_anulacion: motivo }).eq('id', m.id);
+    // Corregir crea el reemplazo enseguida, así que el origen sigue vivo; anular lo cancela.
+    if (accion === 'anular') await _anularOrigenMovimiento(m, email, motivo);
     if (accion === 'corregir') {
       const n = leer(d.nuevo);
       return adminTesoreria({ ...params, accion: 'registrar', datos: { ...n, reemplazaId: m.id } });
@@ -7217,7 +7384,7 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     const [{ data: gente }, { data: res }, { data: pag }, { data: exc }] = await Promise.all([
       supabase.from('equipo').select('username, nombre_derby, foto_perfil, categoria, paga_cuota, exenta_cuota, estado_miembro').is('eliminado_en', null),
       supabase.from('reservas').select('nombre_usuario, estado, monto, fecha_pago, medio_nombre, medio_pago').eq('tipo', 'mensual').in('estado', ['Confirmada', 'Pendiente']).gte('validez_hasta', desde).lt('validez_hasta', hasta),
-      supabase.from('pagos').select('nombre_usuario, monto, fecha, forma_pago, exoneradx').eq('mes', m).eq('anio', y),
+      supabase.from('pagos').select('nombre_usuario, monto, fecha, forma_pago, exoneradx').eq('mes', m).eq('anio', y).eq('anulado', false),
       supabase.from('cuota_excepcion').select('id_miembro, tipo, notas').eq('mes', mes),
     ]);
     const filas: Record<string, any> = {};
@@ -7492,6 +7659,13 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
   // Pago de una clase: salda la deuda si vino sin reserva o pasó a deuda; si no,
   // queda su reserva confirmada (así no se le cobra al tomar asistencia).
   let extraClase = 0;
+  // Vínculos para que anular el pago en Tesorería deshaga también esto (2026-11-26).
+  let reservaId: string | null = null, saldoId: string | null = null;
+  if (datos.tipo !== 'clase' && nombre && datos.mes && datos.anio) {
+    const { data: ya } = await supabase.from('pagos').select('id, monto, exoneradx').eq('nombre_usuario', nombre).eq('mes', datos.mes).eq('anio', datos.anio)
+      .eq('tipo', 'mensual').eq('anulado', false);
+    if ((ya ?? []).some((r: any) => r.exoneradx || Number(r.monto) > 0)) return { exito: false, error: 'Esa mensualidad ya está registrada. Si hay un error, anula el pago anterior en Tesorería.' };
+  }
   if (datos.tipo === 'clase') {
     const idEvento = String(datos.idEvento ?? '');
     if (!nombre || !idEvento) return { exito: false, error: 'Elige la clase.' };
@@ -7505,18 +7679,20 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
     if (deuda) {
       const debe = _num2(Number(deuda.monto) || 0);
       const paga = Math.min(montoTotal, debe);
-      await supabase.from('saldos_movimientos').insert({
+      const { data: ab } = await supabase.from('saldos_movimientos').insert({
         username: nombre, persona_nombre: await _nombrePersona(nombre), fecha: _hoyEcuadorISO(), monto: _num2(paga), tipo: 'abono', aplicar: 'con_cuota',
         concepto: `${que}: pagada`, por: adminEmail,
-      });
+      }).select('id').single();
+      saldoId = ab?.id ?? null;
       extraClase = _num2(montoTotal - paga);
     } else {
       const precio = Number((await getPreciosClases({}, (await supabase.from('equipo').select('categoria').eq('username', nombre).maybeSingle()).data?.categoria ?? null)).precioPorClase) || montoTotal;
       const paga = Math.min(montoTotal, precio);
-      await supabase.from('reservas').insert({
+      const { data: rv } = await supabase.from('reservas').insert({
         nombre_usuario: nombre, id_evento: idEvento, tipo: 'clase', estado: 'Confirmada', monto: _num2(paga), fecha_pago: _hoyEcuadorISO(),
         medio_pago: String(datos.formaPago ?? '').toLowerCase().includes('deuna') ? 'deuna' : String(datos.formaPago ?? '').toLowerCase().includes('efectivo') ? 'efectivo' : 'transferencia',
-      });
+      }).select('id').single();
+      reservaId = rv?.id ?? null;
       await _asistireAlConfirmar(idEvento, nombre);
       extraClase = _num2(montoTotal - paga);
     }
@@ -7539,6 +7715,7 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
     tipo: datos.tipo === 'clase' ? 'clase' : 'mensual',
     es_manual: datos.esManual !== false,
         id_evento: datos.tipo === 'clase' ? (datos.idEvento ?? null) : null,
+    reserva_id: reservaId, saldo_movimiento_id: saldoId,
   }).select();
     if (error) return { exito: false, error: error.message };
   const pago = data?.[0];
@@ -7548,6 +7725,7 @@ async function adminRegistrarPago(params: Record<string, any>): Promise<any> {
             // Entra a la cuenta todo lo que pagó (también lo que quedó a favor).
       fecha: _hoyEcuadorISO(), tipo: 'ingreso', monto: montoTotal || Number(pago.monto), cuenta_id: cuenta, categoria: pago.tipo === 'clase' ? 'clase' : 'cuota',
       descripcion: pago.tipo === 'clase' ? 'Clase' : `Cuota ${pago.mes}/${pago.anio}`, persona: pago.nombre_usuario, origen: 'pago', origen_id: String(pago.id), registrado_por: adminEmail,
+      ...(pago.tipo === 'clase' ? {} : { periodo_mes: pago.mes, periodo_anio: pago.anio }),
     });
   }
   return { exito: true, pago: pago ?? null };
@@ -7599,7 +7777,7 @@ async function adminGetEstadoPagosMes(params: Record<string, any>): Promise<any[
   const { data: quindes } = await supabase.from('equipo').select('username').eq('categoria', 'Quindes').is('eliminado_en', null);
   const personas = (quindes ?? []).map((n: any) => n.username);
   const [{ data: pagosDelMes }, { data: solicitudesAprobadas }] = await Promise.all([
-    supabase.from('pagos').select('nombre_usuario, exoneradx, monto').eq('mes', mes).eq('anio', anio),
+    supabase.from('pagos').select('nombre_usuario, exoneradx, monto').eq('mes', mes).eq('anio', anio).eq('anulado', false),
     supabase.from('solicitudes_pago').select('nombre_usuario, tipo').eq('estado', 'aprobada').eq('mes', mes).eq('anio', anio),
   ]);
   return personas.map((nombre: string) => ({ nombre, estado: _estadoPagoPersonaMes(nombre, mes, anio, pagosDelMes ?? [], solicitudesAprobadas ?? [], hoy) }));
@@ -7612,7 +7790,7 @@ async function adminGetPagosAnual(params: Record<string, any>): Promise<Record<s
   const { data: quindes } = await supabase.from('equipo').select('username').eq('categoria', 'Quindes').is('eliminado_en', null);
   const personas = (quindes ?? []).map((n: any) => n.username);
   const [{ data: pagosDelAnio }, { data: solicitudesDelAnio }] = await Promise.all([
-    supabase.from('pagos').select('nombre_usuario, mes, exoneradx, monto').eq('anio', anio),
+    supabase.from('pagos').select('nombre_usuario, mes, exoneradx, monto').eq('anio', anio).eq('anulado', false),
     supabase.from('solicitudes_pago').select('nombre_usuario, tipo, mes').eq('estado', 'aprobada').eq('anio', anio),
   ]);
   const resultado: Record<string, string[]> = {};
@@ -12723,7 +12901,7 @@ async function _estadosCuotaMes(usernames: string[], mes: string): Promise<Recor
     supabase.from('reservas').select('nombre_usuario, estado, mes_texto, validez_hasta').eq('tipo', 'mensual').in('estado', ['Confirmada', 'Pendiente'])
       .in('nombre_usuario', usernames).gte('validez_hasta', desde).lt('validez_hasta', hastaHolgura),
     supabase.from('cuota_excepcion').select('id_miembro').eq('mes', mes).in('id_miembro', usernames),
-    supabase.from('pagos').select('nombre_usuario, monto, exoneradx').eq('mes', m).eq('anio', y).in('nombre_usuario', usernames),
+    supabase.from('pagos').select('nombre_usuario, monto, exoneradx').eq('mes', m).eq('anio', y).eq('anulado', false).in('nombre_usuario', usernames),
   ]);
     const res = (resTodas ?? []).filter((r: any) => _mesDeReserva(r) === mes);
   usernames.forEach((u) => { out[u] = 'debe'; });
@@ -13060,6 +13238,7 @@ async function adminSetEstadoReserva(params: Record<string, any>): Promise<Recor
                 tipo: 'ingreso', monto: Number(reservaAntes.monto), cuenta_id: cuenta, categoria: reservaAntes.tipo === 'mensual' ? 'cuota' : 'clase',
         descripcion: reservaAntes.tipo === 'mensual' ? `Mensualidad ${reservaAntes.mes_texto ?? ''}`.trim() : (reservaAntes.tipo === 'plan' ? `Plan ${reservaAntes.mes_texto ?? ''}`.trim() : reservaAntes.tipo === 'curso' ? `Curso ${reservaAntes.mes_texto ?? ''}`.trim() : 'Clase'), persona: reservaAntes.nombre_usuario,
                 origen: 'reserva', origen_id: String(id), registrado_por: adminEmail, medio_nombre: reservaAntes.medio_nombre ?? null,
+        ...(() => { const mm = reservaAntes.tipo === 'mensual' ? _mesDeReserva(reservaAntes) : ''; return /^\d{4}-\d{2}$/.test(mm) ? { periodo_mes: Number(mm.slice(5, 7)), periodo_anio: Number(mm.slice(0, 4)) } : {}; })(),
       });
     }
     } else if (estado === 'Cancelada') {
@@ -13475,6 +13654,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'adminCambiarRespuesta':           return json(await adminCambiarRespuesta(params));
             case 'adminMarcarAsistencia':           return json(await adminMarcarAsistencia(params));
             case 'pedirCoach':                      return json(await pedirCoach(params));
+      case 'dejarDeSerCoach':                 return json(await dejarDeSerCoach(params));
       case 'verificarNombreLiga':             return json(await verificarNombreLiga(params));
       case 'crearLiga':                       return json(await crearLiga(params));
       case 'getDirectorioLigas':              return json(await getDirectorioLigas(params));

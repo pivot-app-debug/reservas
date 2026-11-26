@@ -4,6 +4,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../ajustes/componentes.dart' show abrirFormulario;
+
 import '../core/sincroniza.dart';
 
 import '../core/api.dart';
@@ -72,12 +74,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
     DateTime? cuando;
     DateTime? vence; // null = 3 días en Notificaciones
 
-    final ok = await showModalBottomSheet<bool>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(context, builder: (h) => StatefulBuilder(
         builder: (h, set) {
           final p = h.pivot;
           final listo = titulo.text.trim().isNotEmpty && mensaje.text.trim().isNotEmpty;

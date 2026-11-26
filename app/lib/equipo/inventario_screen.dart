@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/banner_ayuda.dart';
+
 import '../core/sincroniza.dart';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -98,6 +100,41 @@ class _InventarioScreenState extends State<InventarioScreen> {
   });
 
   /// Atajos de la portada: lo que antes estaba en el "+".
+  /// Qué es Inventario y cómo pedir equipamiento según la regla del equipo
+  /// de la persona; para Pivots, cómo se gestiona.
+  Widget _ayuda() {
+    final equipo = '${widget.sesion.datos['categoria'] ?? ''}'.trim();
+    if (_pivot) {
+      return const BannerAyuda(
+        clave: 'inventario_pivot',
+        titulo: 'Cómo funciona Inventario',
+        texto: 'Aquí está todo lo que es de la liga: equipamiento para prestar, botiquín e insumos, cada uno en su lista.',
+        pasos: [
+          (Icons.rule_rounded, 'En "Reglas" decides, por equipo, si el equipamiento se presta, solo en casos excepcionales o no se presta. Sin reglas, se presta solo en casos excepcionales.'),
+          (Icons.notifications_active_outlined, 'Los pedidos excepcionales te llegan para aprobar o rechazar; los préstamos activos aparecen abajo.'),
+          (Icons.assignment_ind_outlined, 'Con "Retenido" registras que alguien se llevó algo. La app le pregunta cada cierto tiempo si ya lo devolvió.'),
+          (Icons.medical_services_outlined, 'En el botiquín, "Se usó" descuenta lo que se gastó para saber qué reponer.'),
+        ],
+      );
+    }
+    final (titulo, como) = switch (repo.reglaPrestamo) {
+      'si' => ('Se presta', 'Pídelo en "Pedir equipamiento" y úsalo ese mismo día, sin esperar aprobación.'),
+      'no' => ('No se presta', 'Por ahora tu equipo no puede pedir equipamiento de la liga.'),
+      _ => ('Solo en casos excepcionales', 'Por ejemplo, si olvidaste el casco o tus rodilleras están mojadas. Pídelo en "Pedir equipamiento" y un Pivot lo aprueba.'),
+    };
+    return BannerAyuda(
+      clave: 'inventario_persona',
+      titulo: 'Cómo pedir equipamiento',
+      texto: '${equipo.isEmpty ? 'En tu equipo' : 'En $equipo'}: $titulo. $como',
+      pasos: const [
+        (Icons.back_hand_outlined, '"Me llevé algo": avisa si te llevaste algo de la liga, así queda registrado y nadie lo busca.'),
+        (Icons.inventory_2_outlined, '"Pedir equipamiento" aparece cuando tienes equipamiento propio registrado y tu equipo presta.'),
+        (Icons.payments_outlined, 'El pago de la clase ya incluye el equipamiento: no se cobra aparte.'),
+        (Icons.replay_rounded, 'Si tienes algo prestado, la app te pregunta cada cierto tiempo si ya lo devolviste.'),
+      ],
+    );
+  }
+
   Widget _atajos(BuildContext context) {
     final p = context.pivot;
     final l = <(IconData, String, VoidCallback, String?)>[
@@ -255,6 +292,8 @@ class _InventarioScreenState extends State<InventarioScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
+            // Desplegable informativo (Victor, QA 2026-11-26).
+            _ayuda(),
             // Atajos en la portada en vez del "+" (Victor, 2026-11-17).
             _atajos(context),
             // Cosas para llevar hoy o mañana, también aquí (Victor, 2026-11-22).
