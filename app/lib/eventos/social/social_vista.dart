@@ -180,16 +180,21 @@ class QueLlevaResumen extends StatelessWidget {
                   children: [
                     const IconoTarjetaSocial(icono: Icons.restaurant_rounded),
                     const SizedBox(width: 10),
-                    Text(
-                      'Qué llevar',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+                    Flexible(
+                      child: Text(
+                        'Qué llevar',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.texto),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     if (cuenta)
                       Flexible(
                         child: Etiqueta(texto: 'Tu parte: ${(parte * 100).round()} %', apagada: parte >= 1),
                       ),
-                    const Spacer(),                    Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+                    const Spacer(),
+                    Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                   ],
                 ),
                 if (faltan.isNotEmpty)
