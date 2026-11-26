@@ -5272,7 +5272,12 @@ async function adminPagoCoaches(params: Record<string, any>): Promise<Record<str
   const total: Record<string, { nombre: string; monto: number }> = {};
   for (const x of meses) for (const c of x.coaches) { const t = total[c.username] ??= { nombre: c.nombre, monto: 0 }; t.monto = _num2(t.monto + c.monto); }
   const { data: tiers } = await supabase.from('config_tiers').select('nombre').order('orden');
-  return { exito: true, anio, regla, equipos: (tiers ?? []).map((t: any) => t.nombre), meses, totales: Object.entries(total).map(([u, t]) => ({ username: u, ...t })) };
+  // Lo que hoy se le debe a cada coach (todo su saldo a favor) y las cuentas para pagarle.
+  const usuarios = [...new Set([...Object.keys(total), ...Object.keys(regla.coaches)])];
+  const deuda: any[] = [];
+  for (const u of usuarios) deuda.push({ username: u, nombre: total[u]?.nombre ?? (await _nombrePersona(u)) ?? u, seLeDebe: _num2(Math.max(0, await _saldoDisponible(u))) });
+  const cuentas = (await _saldosCuentas()).filter((c) => c.activa).map((c) => ({ id: c.id, nombre: c.nombre, saldo: c.saldo }));
+  return { exito: true, anio, regla, equipos: (tiers ?? []).map((t: any) => t.nombre), meses, totales: Object.entries(total).map(([u, t]) => ({ username: u, ...t })), deuda, cuentas };
 }
 
 /** Coach: lo que le corresponde (solo lo suyo). */
@@ -6917,7 +6922,7 @@ async function usarCreditos(params: Record<string, any>): Promise<Record<string,
 // Cuentas con saldo inicial; cada ingreso o gasto dice de qué cuenta; nada se
 // borra (corregir = anular y volver a registrar); conciliación; saldos de
 // personas; fondos de viaje; transparencia opcional.
-const CATEGORIAS_TESORERIA = ['cuota', 'clase', 'merch', 'evento', 'equipamiento', 'alquiler', 'viaje', 'prestamo', 'abono', 'donacion', 'otro'];
+const CATEGORIAS_TESORERIA = ['cuota', 'clase', 'merch', 'evento', 'equipamiento', 'alquiler', 'viaje', 'prestamo', 'abono', 'donacion', 'coaches', 'otro'];
 
 function _num2(n: number): number { return Math.round(n * 100) / 100; }
 
@@ -7714,7 +7719,9 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
       const sale = tipo === 'prestamo' || tipo === 'devolucion';
       movimientoId = await _registrarMovimiento({
         fecha: fechaOk(d.fecha) ?? hoy, tipo: sale ? 'egreso' : 'ingreso', monto, cuenta_id: d.cuentaId,
-        categoria: tipo === 'prestamo' ? 'prestamo' : tipo === 'devolucion' ? 'otro' : 'abono', descripcion: tipo === 'devolucion' ? `Devolución de saldo: ${concepto}` : concepto, persona: u, origen: 'saldo', registrado_por: email,
+        // Pago a un coach de lo que el equipo le debe (Victor, 2026-11-26): categoría propia.
+        categoria: tipo === 'prestamo' ? 'prestamo' : tipo === 'devolucion' ? (d.pagoCoach ? 'coaches' : 'otro') : 'abono',
+        descripcion: tipo === 'devolucion' ? (d.pagoCoach ? `Pago a coach: ${concepto}` : `Devolución de saldo: ${concepto}`) : concepto, persona: u, origen: 'saldo', registrado_por: email,
       });
     }
     const { error } = await supabase.from('saldos_movimientos').insert({

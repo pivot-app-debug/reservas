@@ -143,6 +143,79 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
     await _llamar('guardarRegla', regla);
   }
 
+  /// Pagarle a un coach lo que se le debe, todo o una parte (Victor, 2026-11-26):
+  /// sale de una cuenta y baja lo que el equipo le debe.
+  Future<void> _pagar(Map<String, dynamic> d) async {
+    final cuentas = [for (final c in (_r?['cuentas'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+    if (cuentas.isEmpty) {
+      _aviso('Primero crea una cuenta en Finanzas.');
+      return;
+    }
+    final debe = (d['seLeDebe'] as num?) ?? 0;
+    final monto = TextEditingController(text: debe.toStringAsFixed(2));
+    final nota = TextEditingController(text: 'Pago a coaches');
+    String cuenta = '${cuentas.first['id']}';
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Pagarle a ${d['nombre']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text(
+                'Hoy el equipo le debe ${plata(debe)}. Puedes pagarle todo o una parte; lo que quede se sigue acumulando.',
+                style: TextStyle(color: c.pivot.textoSecundario),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: monto,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Monto que se le paga'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: cuenta,
+                decoration: const InputDecoration(labelText: 'Sale de la cuenta'),
+                items: [for (final x in cuentas) DropdownMenuItem(value: '${x['id']}', child: Text('${x['nombre']} · ${plata((x['saldo'] as num?) ?? 0)}'))],
+                onChanged: (v) => set(() => cuenta = v ?? cuenta),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: nota, decoration: const InputDecoration(labelText: 'Concepto')),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Registrar el pago')),
+            ],
+          ),
+        ),
+      ),
+    );
+    final m = num.tryParse(monto.text.trim().replaceAll(',', '.')) ?? 0, concepto = nota.text.trim();
+    monto.dispose();
+    nota.dispose();
+    if (ok != true) return;
+    if (!(m > 0) || m > debe + 0.001) {
+      _aviso(m > debe ? 'No puede ser más de lo que se le debe (${plata(debe)}).' : 'Indica el monto.');
+      return;
+    }
+    setState(() => _ocupado = true);
+    try {
+      final r = await s.api.post('adminTesoreria', {
+        'adminToken': s.adminToken,
+        'accion': 'registrarSaldo',
+        'datos': jsonEncode({'username': d['username'], 'tipo': 'devolucion', 'monto': m, 'cuentaId': cuenta, 'concepto': concepto.isEmpty ? 'Pago a coaches' : concepto, 'pagoCoach': true}),
+      });
+      if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo registrar.'}');
+      if (mounted) _aviso('Pago registrado');
+    } catch (e) {
+      if (mounted) _aviso(e is ApiException ? e.message : 'No se pudo completar. Revisa tu conexión.');
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+    await _llamar('ver');
+  }
+
   Future<void> _cambiar(void Function(Map<String, dynamic> r) f) async {
     final r = _regla;
     f(r);
@@ -265,6 +338,19 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                           ),
                       ],
                     ),
+                  if ((r['deuda'] as List? ?? const []).isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('SE LES DEBE HOY', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario)),
+                    const SizedBox(height: 4),
+                    for (final d in [for (final x in (r['deuda'] as List)) Map<String, dynamic>.from(x as Map)])
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.account_balance_wallet_outlined, color: p.marcaTexto),
+                        title: Text('${d['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text('Todo lo que el equipo le debe: ${plata((d['seLeDebe'] as num?) ?? 0)}'),
+                        trailing: TextButton(onPressed: ((d['seLeDebe'] as num?) ?? 0) > 0 ? () => _pagar(d) : null, child: const Text('Pagarle')),
+                      ),
+                  ],
                   const SizedBox(height: 8),
                   Text('${r['anio']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario)),
                   const SizedBox(height: 8),
