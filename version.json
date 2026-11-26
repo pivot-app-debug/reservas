@@ -1,5 +1,1 @@
-{
-  "versionCode": 1,
-  "versionName": "1.0.0",
-  "novedades": "Bottom sheets → subsecciones (Tesorería y Equipo); blindado dialog anulación; Gradle 9.4.1 + AGP 9.2.0; build web y APK release; deploy Firebase Hosting"
-}
+{"app_name":"coach","version":"1.0.0","build_number":"1","package_name":"coach"}
