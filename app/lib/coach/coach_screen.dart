@@ -2475,7 +2475,7 @@ class BloqueCoachScreen extends StatefulWidget {
 class _BloqueCoachScreenState extends State<BloqueCoachScreen> {
   late final titulo = TextEditingController();
   late final detalle = TextEditingController();
-  late var minutos;
+  late int minutos = 0;
 
   @override
   void initState() {

@@ -903,8 +903,8 @@ class EditarHabilidadScreen extends StatefulWidget {
 class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
   late final nombre = TextEditingController();
   late final cat = TextEditingController();
-  late var activa;
-  late var nivel;
+  late bool activa = true;
+  late String nivel = 'basica';
 
   @override
   void initState() {

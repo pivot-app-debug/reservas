@@ -2372,9 +2372,9 @@ class _CuentaEdicionScreenState extends State<CuentaEdicionScreen> {
   late final nombre = TextEditingController();
   late final resp = TextEditingController();
   late final saldo = TextEditingController();
-  late var tipo;
-  late var fecha;
-  late var activa;
+  late String tipo = 'efectivo';
+  late DateTime fecha = DateTime.now();
+  late bool activa = true;
 
   @override
   void initState() {
@@ -2532,18 +2532,19 @@ class _PlataDelEquipoScreenState extends State<PlataDelEquipoScreen> {
     try {
       for (var i = 0; i < gente.length; i++) {
         final m = i == gente.length - 1 ? double.parse((total - parte * (gente.length - 1)).toStringAsFixed(2)) : parte;
-        await widget.repo.accion('registrarSaldo', {
-          'username': gente[i].username,
-          'tipo': widget.devolver ? 'abono' : 'prestamo',
-          'monto': m,
-          'concepto': concepto.text.trim(),
-          'cuentaId': cuenta,
-          'aplicar': 'aparte',
-        });
-      }
-      _aviso(context, widget.devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
-      Navigator.of(context).pop(true);
-    } catch (e) {
+await widget.repo.accion('registrarSaldo', {
+        'username': gente[i].username,
+        'tipo': widget.devolver ? 'abono' : 'prestamo',
+        'monto': m,
+        'concepto': concepto.text.trim(),
+        'cuentaId': cuenta,
+        'aplicar': 'aparte',
+      });
+    }
+    if (!mounted) return;
+    _aviso(context, widget.devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
+    Navigator.of(context).pop(true);
+  } catch (e) {
       if (mounted) _aviso(context, _error(e));
     }
   }
