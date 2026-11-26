@@ -126,6 +126,42 @@ class _ReglasScreenState extends State<ReglasScreen> {
     );
   }
 
+  /// Qué pasa si alguien debe (Victor, 2026-11-26). Solo elegir: hoja de abajo.
+  Future<void> _elegirDeuda(ConfigLiga c) async {
+    const opciones = [
+      ('asistire', 'Aviso al marcar Asistiré', 'Puede usar la app; al marcar Asistiré ve lo que debe y el botón para pagar.'),
+      ('bloqueo', 'Pantalla de pago al abrir la app', 'Al abrir la app ve lo que debe y no puede usarla hasta pagar o mandar su comprobante.'),
+      ('no', 'No se le avisa', 'Solo se aplica la clase de gracia de cada equipo.'),
+    ];
+    final v = await showModalBottomSheet<String>(
+      useRootNavigator: true,
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Si alguien debe', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            ),
+            for (final (k, t, d) in opciones)
+              ListTile(
+                leading: Icon(c.deudaModo == k ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: h.pivot.marcaTexto),
+                title: Text(t),
+                subtitle: Text(d),
+                onTap: () => Navigator.of(h).pop(k),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (v == null || v == c.deudaModo || !mounted) return;
+    await guardarReglaLiga(context, c, {'deudaModo': v});
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -284,6 +320,25 @@ class _ReglasScreenState extends State<ReglasScreen> {
                   c.eventosMinPersonas == 0 ? 'No se sugiere cancelar' : 'Con menos de ${c.eventosMinPersonas}, se sugiere cancelar',
                   seccion: 'entrenamientos',
                   editar: () => numeroLiga(context, c, 'Sugerir cancelar con menos de', 'eventosMinPersonas', c.eventosMinPersonas, 0, 200, 'personas'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GrupoAjustes(
+              titulo: 'Deudas',
+              pie: 'Solo cuenta lo que la app tiene registrado. Pivots, coaches y personas exentas nunca se bloquean, y quien ya mandó su comprobante puede seguir usando la app.',
+              filas: [
+                _regla(
+                  'deuda',
+                  Icons.lock_clock_outlined,
+                  'Si alguien debe',
+                  switch (c.deudaModo) {
+                    'bloqueo' => 'Pantalla de pago al abrir la app',
+                    'no' => 'No se le avisa',
+                    _ => 'Aviso al marcar Asistiré',
+                  },
+                  seccion: 'recaudacion',
+                  editar: () => _elegirDeuda(c),
                 ),
               ],
             ),

@@ -24,6 +24,7 @@ import 'sesion/sesion.dart';
 import 'core/navegacion.dart';
 import 'core/aviso_cambio_equipo.dart';
 import 'push/avisos_obligatorios.dart';
+import 'finanzas/deuda_screen.dart';
 
 /// Estructura principal con la barra de navegación inferior. En esta
 /// primera versión solo Eventos es nativo; el resto abre la web mientras se
@@ -105,6 +106,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     // eventos (Victor, 2026-11-20), así que no se le pide activarlos.
     final estado = '${widget.sesion.datos['estado_miembro'] ?? ''}'.trim();
     if (estado.isEmpty || estado == 'Activx') await PantallaAvisos.siCorresponde(context, widget.sesion.api);
+    if (!mounted) return;
+    // Pantalla de pago si la liga bloquea a quien debe (Victor, 2026-11-26).
+    await PantallaDeuda.siCorresponde(context, widget.repo);
     if (!mounted) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);

@@ -1236,6 +1236,8 @@ const REGLAS_LIGA_BASE: Record<string, any> = {
   sinAprobarHoras: 2,         // reserva sin aprobar: se cierra N horas después de la clase
     // Privacidad: si las demás personas (no Pivots) ven los puntos de otras.
   rankingVisible: true,
+  // Si alguien debe (Victor, 2026-11-26): 'asistire' | 'bloqueo' | 'no'.
+  deudaModo: 'asistire',
   // Clases de gracia por equipo (Victor, 2026-11-14): cuántas clases puede
   // venir sin haber pagado el mes. Equipo ausente = no aplica (sigue su
   // propia regla); 0 = paga antes de marcar Asistiré.
@@ -1457,6 +1459,8 @@ async function adminReglasLiga(params: Record<string, any>): Promise<Record<stri
       };
     }
     if (reglasNuevas.rankingVisible !== undefined) r.rankingVisible = reglasNuevas.rankingVisible !== false && reglasNuevas.rankingVisible !== 'false';
+    // Qué pasa si alguien debe (Victor, 2026-11-26): 'asistire' (aviso al marcar Asistiré), 'bloqueo' (pantalla de pago al abrir la app) o 'no'.
+    if (reglasNuevas.deudaModo !== undefined) r.deudaModo = ['asistire', 'bloqueo', 'no'].includes(String(reglasNuevas.deudaModo)) ? String(reglasNuevas.deudaModo) : 'asistire';
     if (reglasNuevas.tardeCuentaClase !== undefined) r.tardeCuentaClase = reglasNuevas.tardeCuentaClase !== false && reglasNuevas.tardeCuentaClase !== 'false';
         if (reglasNuevas.tiposCuentan !== undefined) {
       r.tiposCuentan = Array.isArray(reglasNuevas.tiposCuentan) && reglasNuevas.tiposCuentan.length ? reglasNuevas.tiposCuentan.map(String).slice(0, 20) : null;
@@ -4575,6 +4579,43 @@ async function _motivoSinAsistireServidor(nombre: string, idEvento: string): Pro
   return `Ya usaste ${n === 1 ? 'tu clase' : `tus ${n} clases`} de gracia de ${nombreMes}. Paga tu cuota para marcar Asistiré.`;
 }
 
+/** Lo que una persona le debe al equipo (Victor, 2026-11-26). Solo lo que la
+ *  app tiene registrado: cuotas desde noviembre de 2026 (la regla de gracia)
+ *  que figuran como "debe" y saldos en contra (clases sin reserva, deudas
+ *  anotadas). Un comprobante enviado ya cuenta como pagado. Pivots, coaches y
+ *  exentxs no deben nada aquí. */
+async function _deudaPersona(username: string): Promise<{ items: any[]; total: number }> {
+  const { data: p } = await supabase.from('equipo').select('username, categoria, exenta_cuota, estado_miembro, roles, eliminado_en').eq('username', username).maybeSingle();
+  if (!p || p.eliminado_en || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return { items: [], total: 0 };
+  if (Array.isArray(p.roles) && p.roles.includes('Pivot')) return { items: [], total: 0 };
+  const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
+  if (c?.estado === 'aprobado') return { items: [], total: 0 };
+  const items: any[] = [];
+  const hoyMes = _hoyEcuadorISO().slice(0, 7);
+  for (let mes = CUOTA_POR_ASISTENCIA_DESDE; mes <= hoyMes; ) {
+    const debe = (await _debeCuotaMes([p], mes))[username];
+    if (debe?.debe && (await _estadosCuotaMes([username], mes))[username] === 'debe') {
+      const m = Number(mes.slice(5, 7));
+      items.push({ tipo: 'cuota', mes, que: `Cuota de ${_MESES_ES[m - 1]}`, monto: debe.monto, motivo: debe.motivo });
+    }
+    const [y, mm] = mes.split('-').map(Number);
+    mes = mm === 12 ? `${y + 1}-01` : `${y}-${String(mm + 1).padStart(2, '0')}`;
+  }
+  const saldo = await _saldoDisponible(username);
+  if (saldo < 0) items.push({ tipo: 'saldo', que: 'Deuda con el equipo', monto: _num2(-saldo), motivo: 'Clases sin reserva u otras deudas anotadas' });
+  return { items, total: _num2(items.reduce((t, x) => t + Number(x.monto), 0)) };
+}
+
+/** La persona: qué debe y si la liga bloquea la app hasta pagar. */
+async function getMiDeuda(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const modo = String((await _reglasLiga()).deudaModo ?? 'asistire');
+  if (modo === 'no') return { exito: true, modo, items: [], total: 0, bloquea: false };
+  const d = await _deudaPersona(yo);
+  return { exito: true, modo, ...d, bloquea: modo === 'bloqueo' && d.total > 0 };
+}
+
 async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Record<string, any>> {
   // Seguridad (2026-11-06, pedido explícito): la identidad sale SIEMPRE del
   // token de sesión. Antes se usaba `params.nombre` sin validar, así que
@@ -4591,6 +4632,15 @@ async function marcarAsistenciaUsuario(params: Record<string, any>): Promise<Rec
     const motivo = await _motivoSinAsistireServidor(nombre, String(idEvento).trim());
     // Anticipada: se omite en silencio (la regla vuelve a intentar cuando pague).
     if (motivo) return esAuto ? { exito: true, omitido: 'cuota' } : { exito: false, error: motivo, cuotaPendiente: true };
+    // Otras deudas registradas (clases sin reserva…): tampoco deja marcar Asistiré, salvo que la liga lo desactive.
+    if (String((await _reglasLiga()).deudaModo ?? 'asistire') !== 'no') {
+      const { data: evT } = await supabase.from('asistencias').select('tipo_evento').eq('id_evento', String(idEvento).trim()).maybeSingle();
+      const deuda = evT?.tipo_evento === 'Entrenamiento' ? (await _deudaPersona(nombre)).items.filter((x) => x.tipo === 'saldo') : [];
+      if (deuda.length) {
+        const m = `Tienes una deuda de ${_monedaLiga}${deuda[0].monto} con el equipo. Págala para marcar Asistiré.`;
+        return esAuto ? { exito: true, omitido: 'deuda' } : { exito: false, error: m, deudaPendiente: true };
+      }
+    }
   }
 
   // Auto-persist de reglas de asistencia anticipada (`origenAuto`, ver
@@ -13824,6 +13874,7 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
                         case 'adminTesoreria':                  return json(await adminTesoreria(params));
       case 'adminPagoCoaches':                return json(await adminPagoCoaches(params));
       case 'getMiPagoCoach':                  return json(await getMiPagoCoach(params));
+      case 'getMiDeuda':                      return json(await getMiDeuda(params));
             case 'getOpcionesLogin':                return json(await getOpcionesLogin());
                                                                         case 'getMiSaldo':                      return json(await getMiSaldo(params));
       case 'reservaEnCurso':                  return json(await reservaEnCurso(params));

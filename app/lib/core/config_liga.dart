@@ -74,6 +74,10 @@ class ConfigLiga extends ChangeNotifier {
 
   bool get rankingVisible => reglas['rankingVisible'] != false;
 
+  /// Si alguien debe (Victor, 2026-11-26): 'asistire' (aviso al marcar
+  /// Asistiré), 'bloqueo' (pantalla de pago al abrir la app) o 'no'.
+  String get deudaModo => const {'asistire', 'bloqueo', 'no'}.contains(reglas['deudaModo']) ? '${reglas['deudaModo']}' : 'asistire';
+
   /// Tipos de evento que agregó la liga (Mi Liga → Reglas → Tipos de evento).
   List<String> get tiposEventoExtra => [for (final x in (reglas['tiposEventoExtra'] as List? ?? const [])) '$x'];
 
