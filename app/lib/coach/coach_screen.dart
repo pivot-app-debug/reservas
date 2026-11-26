@@ -1260,59 +1260,9 @@ class _CoachesScreenState extends State<CoachesScreen> {
     }
   }
 
-  Future<void> _nombrar() async {
-    List<Map<String, dynamic>> personas;
-    try {
-      final r = await s.api.get('adminGetRosterEquipo', {'adminToken': s.adminToken});
-      personas = [for (final x in (r['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
-      return;
-    }
-    final ya = {
-      for (final c in _l ?? const <Map<String, dynamic>>[])
-        if (c['estado'] == 'aprobado') c['username'],
-    };
-    if (!mounted) return;
-    var q = '';
-    final elegida = await showModalBottomSheet<Map<String, dynamic>>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) {
-          final l = personas.where((x) => !ya.contains(x['nombre']) && '${x['nombreDerby']} ${x['nombre']}'.toLowerCase().contains(q.toLowerCase())).toList();
-          return SizedBox(
-            height: MediaQuery.sizeOf(c).height * 0.75,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: TextField(
-                    autofocus: true,
-                    onChanged: (v) => set(() => q = v),
-                    decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién será coach?'),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      for (final x in l)
-                        ListTile(
-                          leading: AvatarPersona(nombre: '${x['nombreDerby'] ?? x['nombre']}', foto: '${x['fotoPerfil'] ?? ''}', tamano: 40),
-                          title: Text('${(x['nombreDerby'] ?? '').toString().isEmpty ? x['nombre'] : x['nombreDerby']}'),
-                          subtitle: Text('@${x['nombre']}'),
-                          onTap: () => Navigator.of(c).pop(x),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+Future<void> _nombrar() async {
+    final elegida = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => NombrarCoachScreen(sesion: s, coaches: _l ?? const [])),
     );
     if (elegida == null || !mounted) return;
     final eq = await elegirEquiposCoach(context, s, const []);
@@ -1339,7 +1289,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
               ListTile(leading: const Icon(Icons.groups_rounded), title: const Text('Cambiar equipos'), onTap: () => Navigator.of(h).pop('equipos')),
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
-              title: Text(c['estado'] == 'pendiente' ? 'Rechazar' : 'Quitar de coaches', style: TextStyle(color: h.pivot.marcaTexto)),
+              title: Text(c['estado'] == 'pendiente' ? 'Rechazar solicitud' : 'Quitar coach', style: TextStyle(color: h.pivot.marcaTexto)),
               onTap: () => Navigator.of(h).pop(c['estado'] == 'pendiente' ? 'rechazar' : 'quitar'),
             ),
             const SizedBox(height: 8),
@@ -1364,9 +1314,6 @@ class _CoachesScreenState extends State<CoachesScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: barraCoach('Coaches'),
-      floatingActionButton: l == null
-          ? null
-          : FloatingActionButton.extended(onPressed: _nombrar, icon: const Icon(Icons.add_rounded), label: const Text('Nombrar coach')),
       body: l == null
           ? const Esqueleto()
           : ListView(
@@ -1382,6 +1329,16 @@ class _CoachesScreenState extends State<CoachesScreen> {
                     padding: const EdgeInsets.only(top: 20),
                     child: Center(
                       child: Text('Todavía no hay coaches.', style: TextStyle(color: p.textoSecundario)),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: FilledButton.icon(
+                      onPressed: _nombrar,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Nombrar coach'),
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     ),
                   ),
                 for (final c in l)
@@ -2630,6 +2587,93 @@ class _NuevaMarcaScreenState extends State<NuevaMarcaScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subsección para nombrar un nuevo coach. Reemplaza el bottom sheet con buscador
+/// para evitar cierres accidentales al escribir con el teclado abierto.
+class NombrarCoachScreen extends StatefulWidget {
+  const NombrarCoachScreen({super.key, required this.sesion, required this.coaches});
+  final Sesion sesion;
+  final List<Map<String, dynamic>> coaches;
+
+  @override
+  State<NombrarCoachScreen> createState() => _NombrarCoachScreenState();
+}
+
+class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
+  late List<Map<String, dynamic>> _personas;
+  final _q = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarPersonas();
+  }
+
+  Future<void> _cargarPersonas() async {
+    try {
+      final r = await widget.sesion.api.get('adminGetRosterEquipo', {'adminToken': widget.sesion.adminToken});
+      if (mounted) setState(() => _personas = [for (final x in (r['personas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)]);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+    }
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ya = {
+      for (final c in widget.coaches)
+      if (c['estado'] == 'aprobado') c['username'],
+    };
+    final filtrados = _personas.where((x) => !ya.contains(x['nombre']) && '${x['nombreDerby']} ${x['nombre']}'.toLowerCase().contains(_query.toLowerCase())).toList();
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        flexibleSpace: const Vidrio(child: SizedBox.expand()),
+        title: const Text('Nombrar coach', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: TextField(
+                controller: _q,
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién será coach?'),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  for (final x in filtrados)
+                    ListTile(
+                      leading: AvatarPersona(nombre: '${x['nombreDerby'] ?? x['nombre']}', foto: '${x['fotoPerfil'] ?? ''}', tamano: 40),
+                      title: Text('${(x['nombreDerby'] ?? '').toString().isEmpty ? x['nombre'] : x['nombreDerby']}'),
+                      subtitle: Text('@${x['nombre']}'),
+                      onTap: () => Navigator.of(context).pop(x),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
