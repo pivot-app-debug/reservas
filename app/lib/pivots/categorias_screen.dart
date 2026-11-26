@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../finanzas/pago_coaches_screen.dart';
+
 import '../core/banner_ayuda.dart';
 
 import '../core/sincroniza.dart';
@@ -1017,6 +1019,14 @@ class _EquipoScreenState extends State<_EquipoScreen> {
             await editarGracia(context, s, c, soloEquipo: _nombre);
             if (mounted) setState(() {});
           },
+        ),
+      // Pago a coaches por equipo (Victor, 2026-11-26).
+      if (!widget.soloLectura && s.tieneArea('finanzas'))
+        _Fila(
+          icono: Icons.sports_rounded,
+          titulo: 'Pago a coaches',
+          texto: 'Cuánto de lo que paga $_nombre va a lxs coaches, o un monto por entrenamiento',
+          alTocar: () => abrir(PagoCoachesScreen(sesion: s, equipo: _nombre)),
         ),
       // Reglas propias del equipo (Victor, 2026-11-17): fecha límite y recompensa.
       if (porMes) ...[

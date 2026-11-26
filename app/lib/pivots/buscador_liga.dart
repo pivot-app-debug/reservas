@@ -109,6 +109,8 @@ const entradasLiga = [
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
+  EntradaAjuste('pagoCoaches', 'Pago a coaches', 'Finanzas', 'coach entrenador porcentaje 25 pagar sueldo le debe', dentro: 'tesoreria'),
+  EntradaAjuste('revisionTesoreria', 'Revisar cuentas', 'Finanzas', 'auditoría cuadrar duplicados sin registrar errores descuadre', dentro: 'tesoreria'),
   EntradaAjuste('viajes', 'Fondos de viaje', 'Ajustes › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
   EntradaAjuste('movimientos', 'Ver movimientos', 'Finanzas', 'todos los movimientos ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
   EntradaAjuste('transparencia', 'Transparencia', 'Finanzas', 'equipo ve totales público', dentro: 'tesoreria'),
@@ -169,6 +171,7 @@ List<EntradaAjuste> entradasEquipos(Iterable<String> equipos) => [
       ('Puntos por asistencia', 'puntos asistir'),
       ('Qué cuenta como clase', 'entrenamiento cuenta clase tipo evento'),
       ('Fondos de viaje', 'viaje torneo fondo'),
+      ('Pago a coaches', 'coach entrenador porcentaje pagar sueldo 25'),
     ])
       EntradaAjuste(t, '$t de $e', 'Liga › Equipos › $e', '$palabras $e equipo', dentro: 'equipo:$e'),
 ];

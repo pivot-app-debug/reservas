@@ -315,7 +315,7 @@ const AREA_DE_ACCION: Record<string, string> = {};
 for (const [area, acciones] of Object.entries({
   finanzas: ['adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminRegistrarEgreso', 'adminRegistrarIngreso', 'adminRegistrarPago',
     'adminResolverSolicitudPago', 'adminGetSolicitudesPago', 'adminClasesParaPago', 'adminMesesCuota', 'adminSetExentaCuota', 'adminCuponDescuento', 'adminPlanes', 'adminSetPreciosClases', 'adminSetFondosViajeConfig', 'adminToggleCupon',
-    'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria'],
+    'adminGetExcepciones', 'adminGetExcepcionesVigentes', 'adminSetEstadoExcepcion', 'adminCancelarExcepcion', 'adminSetEstadoReserva', 'adminTesoreria', 'adminPagoCoaches'],
   asistencia: ['adminMarcarAsistencia', 'adminCambiarRespuesta', 'adminGetRectificaciones', 'adminSetEstadoRectificacion', 'adminSugeridosAsistencia',
     'adminRegistrarAsistenciaExterna', 'adminEliminarAsistenciaExterna', 'adminGetAsistenciasExternas', 'adminRecalcularPuntosAsistencia', 'adminBorrarEvento',
     'adminCancelarEvento', 'adminRegenerarVentanaAsistencias', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue', 'adminCursos'],
@@ -5020,6 +5020,271 @@ async function pedirCoach(params: Record<string, any>): Promise<Record<string, a
     await sendPush({ tipo: 'nueva_solicitud', include_external_user_ids: admins, headings: { es: 'Pedido para ser coach' }, contents: { es: `${yo} pidió ser coach. Revísalo en Notificaciones.` }, url: APP_URL + '/' }).catch(() => {});
   }
   return { exito: true, estado: 'pendiente' };
+}
+
+// ─── Pago a coaches (Victor, 2026-11-26) ─────────────────────────────────────
+// Regla editable de la liga y por equipo (`config_app.pago_coaches`):
+//   { activa, desde: 'aaaa-mm', incluye: { cuotas, clases }, tarde: 0.5,
+//     liga: { modo: 'porcentaje' | 'fijo', porcentaje, monto },
+//     porEquipo: { <equipo>: { modo, porcentaje, monto } },
+//     coaches: { <username>: { desde: 'aaaa-mm-dd' } } }
+// Cada mes: lo cobrado a las personas de cada equipo (cuotas del mes que
+// cubren + clases pagadas ese mes, según Tesorería) × su porcentaje forma la
+// bolsa de ese equipo, que se reparte por entrenamiento dado (los que valen
+// para ese equipo: de toda la liga o marcados con ese equipo). Cada
+// entrenamiento se divide entre los coaches que estuvieron: a horario cobran
+// su parte entera, tarde la mitad (`tarde`). En modo 'fijo', cada coach cobra
+// `monto` por entrenamiento (tarde, la mitad). Cancelados o sin coaches: esa
+// parte queda para el equipo. Un entrenamiento sin ninguna asistencia
+// registrada (datos viejos) cuenta como dado por todos los coaches activos.
+// Un coach cobra desde su fecha (`coaches[u].desde` o el día que lo
+// aprobaron). El resultado queda en saldos_movimientos como "El equipo le
+// debe" (`por = 'regla_coaches'`, `fecha` = primer día del mes), uno por coach
+// y mes cerrado; se recalcula a diario y solo cambia si cambió el monto.
+const PAGO_COACHES_DEF = {
+  activa: true, desde: '2026-01', incluye: { cuotas: true, clases: true }, tarde: 0.5,
+  liga: { modo: 'porcentaje', porcentaje: 25, monto: 0 }, porEquipo: {} as Record<string, any>,
+  coaches: { Sant: { desde: '2026-01-01' }, Vic: { desde: '2026-01-01' } } as Record<string, any>,
+  // Meses sin lista completa (del 10/06 al 2/08 no quedó asistencia guardada):
+  // la bolsa del mes se reparte en partes iguales entre los coaches activos.
+  mesesIguales: ['2026-06', '2026-07'] as string[],
+};
+
+async function _reglaPagoCoaches(): Promise<typeof PAGO_COACHES_DEF> {
+  const { data } = await supabase.from('config_app').select('value').eq('key', 'pago_coaches').maybeSingle();
+  let r: any = {};
+  try { r = data?.value ? JSON.parse(data.value) : {}; } catch { r = {}; }
+  return {
+    ...PAGO_COACHES_DEF, ...r,
+    incluye: { ...PAGO_COACHES_DEF.incluye, ...(r.incluye ?? {}) },
+    liga: { ...PAGO_COACHES_DEF.liga, ...(r.liga ?? {}) },
+    porEquipo: r.porEquipo ?? {}, coaches: r.coaches ?? PAGO_COACHES_DEF.coaches,
+    mesesIguales: Array.isArray(r.mesesIguales) ? r.mesesIguales : PAGO_COACHES_DEF.mesesIguales,
+  };
+}
+
+function _limpiarReglaCoaches(x: any): Record<string, any> {
+  const modo = (v: any) => (v?.modo === 'fijo' ? 'fijo' : 'porcentaje');
+  const regla = (v: any) => ({ modo: modo(v), porcentaje: Math.min(100, Math.max(0, Number(v?.porcentaje) || 0)), monto: Math.min(10000, Math.max(0, _num2(Number(v?.monto) || 0))) });
+  const porEquipo: Record<string, any> = {};
+  for (const [k, v] of Object.entries(x?.porEquipo ?? {})) if (k && v) porEquipo[String(k).slice(0, 60)] = regla(v);
+  const coaches: Record<string, any> = {};
+  for (const [k, v] of Object.entries(x?.coaches ?? {})) if (/^\d{4}-\d{2}-\d{2}$/.test(String((v as any)?.desde ?? ''))) coaches[String(k).slice(0, 60)] = { desde: String((v as any).desde) };
+  return {
+    activa: x?.activa !== false,
+    desde: /^\d{4}-\d{2}$/.test(String(x?.desde ?? '')) ? String(x.desde) : PAGO_COACHES_DEF.desde,
+    incluye: { cuotas: x?.incluye?.cuotas !== false, clases: x?.incluye?.clases !== false },
+    tarde: Math.min(1, Math.max(0, Number(x?.tarde ?? 0.5))),
+    liga: regla(x?.liga ?? PAGO_COACHES_DEF.liga), porEquipo, coaches,
+    mesesIguales: (Array.isArray(x?.mesesIguales) ? x.mesesIguales : PAGO_COACHES_DEF.mesesIguales).filter((m: any) => /^\d{4}-\d{2}$/.test(String(m))).slice(0, 24),
+  };
+}
+
+/** Entrenamientos de un mes con quién estuvo a horario y tarde (asistencias,
+ *  lista tomada en log_asistencias para eventos viejos y la hoja de enero a junio). */
+async function _entrenamientosDelMes(mes: string): Promise<{ id: string; fecha: string; dado: boolean; equipos: string[]; horario: string[]; tarde: string[]; conLista: boolean }[]> {
+  const [y, m] = mes.split('-').map(Number);
+  const desde = `${mes}-01`, hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const nombres = (v: unknown) => String(v ?? '').split(',').map((n) => n.trim()).filter(Boolean);
+  const cancelado = (e: string) => ['Evento Cancelado', 'No se entrena', 'Eliminado'].includes(e);
+  const out = new Map<string, any>();
+  const { data: ev } = await supabase.from('asistencias').select('id_evento, fecha, estado, a_horario, tarde, equipos')
+    .eq('tipo_evento', 'Entrenamiento').gte('fecha', desde).lte('fecha', hasta);
+  for (const e of ev ?? []) {
+    const h = nombres(e.a_horario), t = nombres(e.tarde);
+    out.set(e.id_evento, { id: e.id_evento, fecha: String(e.fecha).slice(0, 10), dado: !cancelado(String(e.estado ?? '')), equipos: Array.isArray(e.equipos) ? e.equipos : [], horario: h, tarde: t, conLista: h.length + t.length > 0 });
+  }
+  // Listas tomadas de eventos que ya no están en asistencias (julio y agosto).
+  const { data: logs } = await supabase.from('log_asistencias').select('id_evento, fecha_entrenamiento, nombre_usuario, estado, marca_temporal')
+    .gte('fecha_entrenamiento', desde).lte('fecha_entrenamiento', `${hasta}T23:59:59Z`).not('origen', 'in', '("Usuario","AsistenciaAnticipada")')
+    .order('marca_temporal', { ascending: false });
+  const ultimo = new Map<string, any>();
+  // Las asistencias externas (`ext_…`, entrenamientos por fuera de la liga) no cuentan.
+  for (const l of logs ?? []) if (!out.has(l.id_evento) && !String(l.id_evento).startsWith('ext_')) { const k = `${l.id_evento}|${l.nombre_usuario}`; if (!ultimo.has(k)) ultimo.set(k, l); }
+  for (const l of ultimo.values()) {
+    const e = out.get(l.id_evento) ?? { id: l.id_evento, fecha: String(l.fecha_entrenamiento).slice(0, 10), dado: true, equipos: [], horario: [], tarde: [], conLista: true };
+    if (l.estado === 'A tiempo') e.horario.push(l.nombre_usuario);
+    else if (String(l.estado).toLowerCase().startsWith('tarde')) e.tarde.push(l.nombre_usuario);
+    out.set(l.id_evento, e);
+  }
+  // Hoja vieja (tabla puede no existir todavía: se ignora).
+  try {
+    const { data: lg, error } = await supabase.from('entrenamientos_legado').select('id_evento, fecha, estado, a_horario, tarde').gte('fecha', desde).lte('fecha', hasta);
+    if (!error) for (const e of lg ?? []) if (!out.has(e.id_evento)) {
+      const h = nombres(e.a_horario), t = nombres(e.tarde);
+      out.set(e.id_evento, { id: e.id_evento, fecha: String(e.fecha).slice(0, 10), dado: !cancelado(String(e.estado ?? '')), equipos: [], horario: h, tarde: t, conLista: h.length + t.length > 0 });
+    }
+  } catch { /* sin tabla */ }
+  return [...out.values()].filter((e) => e.fecha <= _hoyEcuadorISO()).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+/** Cálculo de un mes (no guarda nada). */
+async function _pagoCoachesMes(mes: string, regla?: Awaited<ReturnType<typeof _reglaPagoCoaches>>): Promise<Record<string, any>> {
+  const r = regla ?? await _reglaPagoCoaches();
+  const [y, m] = mes.split('-').map(Number);
+  const desde = `${mes}-01`, hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const [{ data: gente }, { data: coachesT }, cuotas, clases, ents] = await Promise.all([
+    supabase.from('equipo').select('username, categoria'),
+    supabase.from('coaches').select('username, estado, equipos, resuelto_en'),
+    r.incluye.cuotas ? _paginado((a, b) => supabase.from('tesoreria_movimientos').select('persona, monto').eq('anulado', false).eq('tipo', 'ingreso').eq('categoria', 'cuota').eq('periodo_anio', y).eq('periodo_mes', m).range(a, b)) : Promise.resolve([]),
+    r.incluye.clases ? _paginado((a, b) => supabase.from('tesoreria_movimientos').select('persona, monto').eq('anulado', false).eq('tipo', 'ingreso').eq('categoria', 'clase').gte('fecha', desde).lte('fecha', hasta).range(a, b)) : Promise.resolve([]),
+    _entrenamientosDelMes(mes),
+  ]);
+  const equipoDe: Record<string, string> = {};
+  for (const p of gente ?? []) equipoDe[String(p.username).trim().toUpperCase()] = String(p.categoria ?? '');
+  // Lo cobrado por equipo ('' = sin equipo: usa la regla de la liga).
+  const cobrado: Record<string, number> = {};
+  for (const x of [...cuotas, ...clases]) { const e = equipoDe[String(x.persona ?? '').trim().toUpperCase()] ?? ''; cobrado[e] = _num2((cobrado[e] ?? 0) + Number(x.monto)); }
+  // Coaches que cobran y desde cuándo.
+  const coaches: { u: string; desde: string; equipos: string[] }[] = [];
+  const vistos = new Set<string>();
+  for (const c of coachesT ?? []) if (c.estado === 'aprobado') { vistos.add(c.username); coaches.push({ u: c.username, desde: r.coaches[c.username]?.desde ?? String(c.resuelto_en ?? desde).slice(0, 10), equipos: c.equipos ?? [] }); }
+  for (const [u, v] of Object.entries(r.coaches)) if (!vistos.has(u)) coaches.push({ u, desde: (v as any).desde, equipos: [] });
+  const reglaDe = (e: string) => r.porEquipo[e] ?? r.liga;
+  const por: Record<string, { monto: number; horario: number; tarde: number; sinLista: number }> = {};
+  const sumar = (u: string, v: number, k: 'horario' | 'tarde' | 'sinLista') => { const x = por[u] ??= { monto: 0, horario: 0, tarde: 0, sinLista: 0 }; x.monto += v; x[k]++; };
+  // Regla de cada entrenamiento: la de su equipo si tiene una propia; si es de toda la liga, la de la liga.
+  const reglaEnt = (e: { equipos: string[] }) => { const x = e.equipos.find((q) => r.porEquipo[q]); return x ? r.porEquipo[x] : r.liga; };
+  const en = (l: string[], u: string) => l.some((n) => n.toUpperCase() === u.toUpperCase());
+  const quienes = (e: any) => {
+    const activos = coaches.filter((c) => c.desde <= e.fecha && (!c.equipos.length || !e.equipos.length || e.equipos.some((x: string) => c.equipos.includes(x))));
+    // Sin lista tomada no se le paga a nadie (Victor: sin estar a horario no se cobra).
+    if (!e.conLista) return { h: [] as typeof activos, t: [] as typeof activos, k: 'horario' as const };
+    return { h: activos.filter((c) => en(e.horario, c.u)), t: activos.filter((c) => !en(e.horario, c.u) && en(e.tarde, c.u)), k: 'horario' as const };
+  };
+  const detalle: any[] = [];
+  let paraCoaches = 0, quedaEquipo = 0;
+  // 1) Monto fijo por entrenamiento (no depende de lo cobrado).
+  const fijos = ents.filter((e) => e.dado && reglaEnt(e).modo === 'fijo');
+  if (fijos.length) {
+    let rep = 0;
+    for (const e of fijos) {
+      const { h, t, k } = quienes(e), monto = Number(reglaEnt(e).monto) || 0;
+      for (const c of h) { sumar(c.u, monto, k); rep += monto; }
+      for (const c of t) { sumar(c.u, monto * r.tarde, 'tarde'); rep += monto * r.tarde; }
+    }
+    paraCoaches += rep;
+    detalle.push({ equipo: 'Monto fijo', modo: 'fijo', entrenamientos: fijos.length, repartido: _num2(rep) });
+  }
+  // 2) Porcentaje de lo cobrado a cada equipo, repartido en los entrenamientos que valen para ese equipo.
+  for (const g of Object.keys(cobrado)) {
+    const rg = g === '' ? r.liga : (r.porEquipo[g] ?? r.liga);
+    if (rg.modo === 'fijo') continue;
+    const valen = ents.filter((e) => (!e.equipos.length || e.equipos.includes(g)) && reglaEnt(e).modo !== 'fijo');
+    const dados = valen.filter((e) => e.dado);
+    const bolsa = _num2(cobrado[g] * (Number(rg.porcentaje) || 0) / 100);
+    let rep = 0;
+    if (r.mesesIguales.includes(mes) && bolsa > 0) {
+      const activos = coaches.filter((c) => c.desde <= hasta);
+      for (const c of activos) { sumar(c.u, bolsa / activos.length, 'sinLista'); rep += bolsa / activos.length; }
+    } else if (dados.length) {
+      const porEnt = bolsa / dados.length;
+      for (const e of dados) {
+        const { h, t, k } = quienes(e), n = h.length + t.length;
+        if (!n) continue;
+        for (const c of h) { sumar(c.u, porEnt / n, k); rep += porEnt / n; }
+        for (const c of t) { sumar(c.u, (porEnt / n) * r.tarde, 'tarde'); rep += (porEnt / n) * r.tarde; }
+      }
+    } else if (bolsa > 0 && !valen.length) {
+      // Mes con lo cobrado pero sin ningún entrenamiento registrado: en partes iguales (Victor, 2026-11-26).
+      const activos = coaches.filter((c) => c.desde <= hasta);
+      for (const c of activos) { sumar(c.u, bolsa / activos.length, 'sinLista'); rep += bolsa / activos.length; }
+    }
+    paraCoaches += rep;
+    quedaEquipo += Math.max(0, bolsa - rep);
+    detalle.push({ equipo: g || 'Sin equipo', modo: 'porcentaje', porcentaje: rg.porcentaje, cobrado: cobrado[g], bolsa, entrenamientos: dados.length, cancelados: valen.length - dados.length, repartido: _num2(rep) });
+  }
+  const quien = await _mapaEquipoPorNombre();
+  return {
+    mes, cerrado: mes < _hoyEcuadorISO().slice(0, 7), detalle, paraCoaches: _num2(paraCoaches), quedaEquipo: _num2(quedaEquipo),
+    entrenamientos: ents.filter((e) => e.dado).length, cancelados: ents.filter((e) => !e.dado).length,
+    coaches: Object.entries(por).map(([u, x]) => ({ username: u, nombre: quien[u.toUpperCase()]?.nombreDerby || u, monto: _num2(x.monto), horario: x.horario, tarde: x.tarde, sinLista: x.sinLista })),
+  };
+}
+
+/** Guarda los meses cerrados del año como "El equipo le debe" a cada coach. */
+async function _guardarPagoCoaches(anio: number, por = 'automático'): Promise<Record<string, any>> {
+  const r = await _reglaPagoCoaches();
+  if (!r.activa) return { exito: true, activa: false };
+  // Los $238,25 del 25 % que se cargaron a mano el 25/11 pasan a calcularse
+  // con la regla (Victor eligió recalcular 2026): se separan de los egresos.
+  const { data: manual } = await supabase.from('saldos_movimientos').select('*').eq('por', 'importacion_csv_egresos_coach').eq('anulado', false);
+  for (const s of manual ?? []) {
+    const eg = String(s.concepto ?? '').match(/egresos CSV \(\$([\d.,]+)\)/);
+    if (!eg) continue;
+    const egresos = Number(eg[1].replace(/\./g, '').replace(',', '.'));
+    await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: 'regla_coaches' }).eq('id', s.id);
+    await supabase.from('saldos_movimientos').insert({ username: s.username, persona_nombre: s.persona_nombre, fecha: s.fecha, monto: _num2(egresos), tipo: 'a_favor', aplicar: 'aparte', concepto: 'Deuda del equipo: egresos de la hoja Quindes', por: 'importacion_csv_egresos' });
+  }
+  const hoyMes = _hoyEcuadorISO().slice(0, 7);
+  const cambios: any[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const mes = `${anio}-${String(m).padStart(2, '0')}`;
+    if (mes >= hoyMes || mes < r.desde) continue;
+    const res = await _pagoCoachesMes(mes, r);
+    const fecha = `${mes}-01`;
+    const { data: ya } = await supabase.from('saldos_movimientos').select('id, username, monto').eq('por', 'regla_coaches').eq('fecha', fecha).eq('anulado', false);
+    const nombreMes = _MESES_ES[m - 1];
+    const montoDe: Record<string, number> = {};
+    for (const c of res.coaches) montoDe[c.username] = c.monto;
+    for (const s of ya ?? []) if (_num2(Number(s.monto)) !== _num2(montoDe[s.username] ?? 0)) {
+      await supabase.from('saldos_movimientos').update({ anulado: true, anulado_por: 'regla_coaches' }).eq('id', s.id);
+    } else delete montoDe[s.username];
+    for (const c of res.coaches) {
+      if (!(c.username in montoDe) || !(c.monto > 0)) continue;
+      const partes = [`${c.horario} a horario`, ...(c.tarde ? [`${c.tarde} tarde`] : []), ...(c.sinLista ? [`${c.sinLista} sin lista`] : [])];
+      await supabase.from('saldos_movimientos').insert({
+        username: c.username, persona_nombre: c.nombre, fecha, monto: c.monto, tipo: 'a_favor', aplicar: 'aparte',
+        concepto: `Pago a coaches de ${nombreMes} ${anio}: ${partes.join(', ')}`.slice(0, 200), por: 'regla_coaches',
+      });
+      cambios.push({ mes, username: c.username, monto: c.monto });
+    }
+  }
+  return { exito: true, cambios, por };
+}
+
+/** Pivots de finanzas: ver el cálculo del año, editar la regla y recalcular. */
+async function adminPagoCoaches(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const accion = String(params.accion ?? 'ver');
+  const anio = Number(params.anio) || Number(_hoyEcuadorISO().slice(0, 4));
+  if (accion === 'guardarRegla') {
+    let x: any = params.regla;
+    if (typeof x === 'string') { try { x = JSON.parse(x); } catch { x = null; } }
+    if (!x || typeof x !== 'object') return { exito: false, error: 'Regla inválida.' };
+    const antes = await _reglaPagoCoaches();
+    const nueva = _limpiarReglaCoaches(x);
+    await supabase.from('config_app').upsert({ key: 'pago_coaches', value: JSON.stringify(nueva) }, { onConflict: 'liga_id,key' });
+    await _registrarAjuste('pago_coaches', antes, nueva, email);
+    await _guardarPagoCoaches(anio, email);
+  } else if (accion === 'recalcular') {
+    await _guardarPagoCoaches(anio, email);
+  }
+  const regla = await _reglaPagoCoaches();
+  const hoyMes = _hoyEcuadorISO().slice(0, 7);
+  const meses: any[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const mes = `${anio}-${String(m).padStart(2, '0')}`;
+    if (mes > hoyMes || mes < regla.desde) continue;
+    meses.push(await _pagoCoachesMes(mes, regla));
+  }
+  const total: Record<string, { nombre: string; monto: number }> = {};
+  for (const x of meses) for (const c of x.coaches) { const t = total[c.username] ??= { nombre: c.nombre, monto: 0 }; t.monto = _num2(t.monto + c.monto); }
+  const { data: tiers } = await supabase.from('config_tiers').select('nombre').order('orden');
+  return { exito: true, anio, regla, equipos: (tiers ?? []).map((t: any) => t.nombre), meses, totales: Object.entries(total).map(([u, t]) => ({ username: u, ...t })) };
+}
+
+/** Coach: lo que le corresponde (solo lo suyo). */
+async function getMiPagoCoach(params: Record<string, any>): Promise<Record<string, any>> {
+  const yo = await _validarToken(String(params.token ?? ''));
+  if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  const regla = await _reglaPagoCoaches();
+  if (!regla.activa) return { exito: true, activa: false };
+  const mes = _hoyEcuadorISO().slice(0, 7);
+  const x = await _pagoCoachesMes(mes, regla);
+  const mio = x.coaches.find((c: any) => c.username === yo) ?? null;
+  return { exito: true, activa: true, mes, estimado: mio };
 }
 
 /** Un coach deja de serlo por su cuenta (Victor, QA 2026-11-26: "Quitarme de coaches"). */
@@ -12569,6 +12834,12 @@ async function cronDiario(): Promise<Record<string, any>> {
     await recalcularPuntosAsistencia(m, a);
   } catch (e) { console.error('[puntos] cron:', e); }
         try { await _avisarPrestamosLargos(); } catch (e) { console.error('[inventario] avisos:', e); }
+  // Pago a coaches de los meses cerrados (Victor, 2026-11-26); en enero también el año anterior.
+  try {
+    const h = _hoyEcuadorISO(), a = Number(h.slice(0, 4));
+    if (h.slice(5, 7) === '01') await _guardarPagoCoaches(a - 1);
+    await _guardarPagoCoaches(a);
+  } catch (e) { console.error('[coaches] pago:', e); }
     try { await _cronCorteEquipos(); } catch (e) { console.error('[equipos] corte:', e); }
   // Avisos del equipo ya enviados o cancelados: se borran a los 30 días para
   // no ocupar la base (Victor, 2026-11-16). Los programados no se tocan.
@@ -13544,6 +13815,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));
                         case 'adminTesoreria':                  return json(await adminTesoreria(params));
+      case 'adminPagoCoaches':                return json(await adminPagoCoaches(params));
+      case 'getMiPagoCoach':                  return json(await getMiPagoCoach(params));
             case 'getOpcionesLogin':                return json(await getOpcionesLogin());
                                                                         case 'getMiSaldo':                      return json(await getMiSaldo(params));
       case 'reservaEnCurso':                  return json(await reservaEnCurso(params));

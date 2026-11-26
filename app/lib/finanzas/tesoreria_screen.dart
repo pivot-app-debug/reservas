@@ -20,6 +20,7 @@ import '../sesion/sesion.dart';
 import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
 import 'cobros_screen.dart';
 import 'revision_screen.dart';
+import 'pago_coaches_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
 import '../core/moneda.dart';
@@ -659,6 +660,17 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           'Cuotas del mes',
           'Quién pagó, cuánto, cuándo y con qué medio',
           () => _abrir(CuotasMesScreen(repo: repo)),
+        ),
+      ),
+      Resaltable(
+        id: 'pagoCoaches',
+        resaltado: _resaltado,
+        child: _fila(
+          context,
+          Icons.sports_rounded,
+          'Pago a coaches',
+          'Regla de la liga y de cada equipo, y lo que se le debe a cada coach',
+          () => _abrir(PagoCoachesScreen(sesion: widget.sesion)),
         ),
       ),
       Resaltable(
