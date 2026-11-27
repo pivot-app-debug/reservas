@@ -4,7 +4,7 @@
 - Desarrolla la app Pivot junto con asistentes de IA (Claude, Antigravity).
 - Trabaja por chat: describe tareas, bugs o nuevas funciones y el agente ejecuta todo.
 - Nunca ejecuta comandos en la terminal por su cuenta — el agente hace push, commit, etc.
-- Trabaja en paralelo desde Claude (web/móvil) y desde Antigravity (PC). El punto de sincronización entre ambos es GitHub (`quindesvolcanicosrd-sys/reservas`, rama `main`).
+- Trabaja en paralelo desde Claude (web/móvil) y desde Antigravity (PC). El punto de sincronización entre ambos es GitHub (`pivot-app-debug/reservas`, rama `main`).
 
 ---
 
@@ -33,7 +33,7 @@
 ## Arquitectura del proyecto
 
 ### Estructura general
-- **Repo:** `quindesvolcanicosrd-sys/reservas`
+- **Repo:** `pivot-app-debug/reservas`
 - **Clone local:** `C:\Users\Victor Del Bono\Documents\GitHub\reservas`
 - **App Flutter (Android nativa):** `app/` → estructura en `app/lib/` con módulos: `actividad/`, `ajustes/`, `coach/`, `core/`, `cursos/`, `equipo/`, `eventos/`, `finanzas/`, `liga/`, `pivots/`, `push/`, `reservas/`, `sesion/`, `tareas/`
 - **Web (PWA legacy, congelada):** archivos en la raíz (`index.html`, `js/`, `css/`)
@@ -71,8 +71,8 @@
 - **Ligas:** Pivot está pensado para cualquier liga de cualquier deporte del mundo (una sola base de datos Supabase compartida, con aislamiento por `liga_id`).
 - **App nativa Android:** Flutter, `com.pivotapp.coach`, Play Store (beta cerrada pendiente). iOS queda como web app por ahora.
 - **Login:** Google Sign-In. El PIN se está deprecando; se agregará email+contraseña pronto.
-- **Cuenta Pivot dedicada:** `pivot.app.suppor@gmail.com` (typo intencional, no cambiar).
-- **GitHub:** `quindesvolcanicosrd-sys/reservas` → migrar a la cuenta de Pivot pendiente.
+- **Cuenta Pivot dedicada:** `pivot.app.support@gmail.com` (antes `pivot.app.suppor`; se cambió el nombre en nov. 2026).
+- **GitHub:** `pivot-app-debug/reservas` (cuenta de Pivot, sin organización; transferido en nov. 2026).
 
 ---
 
@@ -97,7 +97,7 @@
 | `HOJA_DE_RUTA.md` | Roadmap de la app Android Flutter |
 | `NAVIQUINDE.md` | Especificación del evento Social/Fiesta |
 | `ux-decisions.md` | Decisiones de comportamiento/interacción de UX |
-| `MIGRACION_CUENTAS.md` | Guía de migración de cuentas a pivot.app.suppor@gmail.com |
+| `MIGRACION_CUENTAS.md` | Guía de migración de cuentas a pivot.app.support@gmail.com |
 
 ---
 

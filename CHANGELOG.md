@@ -2,6 +2,11 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (migración de cuentas)
+- El repositorio pasó a la cuenta de Pivot (`pivot-app-debug/reservas`) y la app de Android busca sus actualizaciones ahí.
+- El correo de Pivot ahora es pivot.app.support@gmail.com en toda la documentación.
+- MIGRACION_CUENTAS.md con el estado de cada servicio: GitHub, Supabase y el dominio listos; quedan OneSignal, quitar la cuenta vieja y el repo de backups.
+
 ## 2026-11-27 (web en Firebase)
 - La web se publica sola en Firebase Hosting con cada cambio (antes quedaba trabada en la versión 132).
 - Nuevo dominio de la web: pivot-d65f4.web.app. Los enlaces de invitación, cursos, avisos y páginas de inscripción usan el nuevo dominio; app.quindesvolcanicos.com redirige ahí.

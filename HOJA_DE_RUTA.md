@@ -110,7 +110,7 @@ Reglas de siempre:
 - [x] Bloque A completo (2026-11-16).
 - [x] Bloque B: edad 18, Finanzas en la barra, monedas, eliminar persona, avisos 30 días, recargo, exentos, mensualidad, Reservas por clase, Clase de bienvenida, Estados con aprobación, reglas dentro de cada equipo, puntos y qué cuenta como clase por equipo, logos en tarjetas, equipamiento por reserva (2026-11-16).
 - [x] Revisión 15:21 (sección T) y (15) flecha hacia hoy en el botón Calendario (2026-11-16).
-- [ ] Migración de cuentas a pivot.app.suppor@gmail.com: guía lista en `MIGRACION_CUENTAS.md`, empezando por GitHub; Victor hace los pasos.
+- [ ] Migración de cuentas a pivot.app.support@gmail.com: guía lista en `MIGRACION_CUENTAS.md`, empezando por GitHub; Victor hace los pasos.
 - Orden de Victor antes de la beta cerrada: todo lo pendiente de esta hoja (incluida la política revisada por abogado), luego dos versiones (prueba y producción), y recién ahí Play Store.
 
 ## Antes de publicar en Google Play

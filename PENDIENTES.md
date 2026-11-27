@@ -47,6 +47,6 @@ Cursos en la barra; cada pestaña recuerda dónde estabas; notificaciones casi o
 - [ ] Seguridad (permisos de Pivot, fugas de datos, advisors de Supabase, RLS en todas las tablas) y escalabilidad (consultas grandes, índices, prueba de carga).
 - [ ] Legal: aviso de Tesorería revisado por abogado.
 - [ ] Pruebas automáticas de totales en Tesorería.
-- [ ] Migración de cuentas a pivot.app.suppor@gmail.com.
+- [ ] Migración de cuentas a pivot.app.support@gmail.com.
 - [ ] Probar en teléfonos reales (también que cada notificación abra su pantalla).
 - [ ] Dos versiones (prueba y producción) y Play Store.

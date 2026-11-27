@@ -20,7 +20,7 @@ import 'tema.dart';
 ///   `app-android` y, si el número de versión es mayor, muestra una pantalla
 ///   que descarga e instala el APK nuevo (ota_update).
 class Actualizacion {
-  static const _base = 'https://github.com/quindesvolcanicosrd-sys/reservas/releases/download/app-android';
+  static const _base = 'https://github.com/pivot-app-debug/reservas/releases/download/app-android';
   static const urlVersion = '$_base/version.json';
   static const urlApk = '$_base/pivot.apk';
 
