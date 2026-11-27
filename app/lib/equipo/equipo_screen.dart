@@ -1,3 +1,6 @@
+import '../core/atajos_color.dart';
+import '../finanzas/tesoreria_repo.dart' show TesoreriaRepo, plata;
+import 'inventario_modelos.dart' show InventarioRepo;
 import '../core/navegacion.dart';
 import '../core/deporte.dart';
 
@@ -82,6 +85,53 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     PestanaLiga.miLiga => Icons.settings_outlined,
   };
 
+  // Lo que hay adentro de cada atajo, para verlo sin entrar.
+  int? _enlaces, _prestamos;
+  num? _totalCuentas;
+
+  Future<void> _cargarAtajos() async {
+    final s = repo.sesion;
+    final c = ComunidadRepo.de(s);
+    c.cargar().then((_) {
+      if (mounted) setState(() => _enlaces = c.enlaces.length);
+    }, onError: (_) {});
+    final inv = InventarioRepo(s);
+    inv.cargar().then((_) {
+      if (mounted) setState(() => _prestamos = inv.prestamos.where((x) => x.activo && (inv.esPivot || x.mio)).length);
+    }, onError: (_) {});
+    if (_atajos().contains(PestanaLiga.finanzas)) {
+      TesoreriaRepo(s).accion('resumen').then((r) {
+        if (mounted) setState(() => _totalCuentas = (r['total'] as num?) ?? 0);
+      }, onError: (_) {});
+    }
+  }
+
+  List<AtajoColor> _atajosColor() => [
+    for (final x in _atajos())
+      AtajoColor(
+        icono: _iconoLiga(x),
+        color: switch (x) {
+          PestanaLiga.redes => PivotPaleta.atajoAzul,
+          PestanaLiga.inventario => PivotPaleta.atajoNaranja,
+          PestanaLiga.finanzas => PivotPaleta.atajoVerde,
+          _ => PivotPaleta.atajoMorado,
+        },
+        titulo: x == PestanaLiga.miLiga ? 'Ajustes' : _nombreLiga(x),
+        punto: x == PestanaLiga.inventario && _avisos.inventario,
+        detalle: switch (x) {
+          PestanaLiga.redes =>
+            _enlaces == null ? null : (_enlaces == 0 ? 'Grupos y redes de la liga' : (_enlaces == 1 ? '1 grupo o red' : '$_enlaces grupos y redes')),
+          PestanaLiga.inventario =>
+            _prestamos == null
+                ? null
+                : (_prestamos == 0 ? 'Equipamiento de la liga' : '$_prestamos ${_prestamos == 1 ? 'préstamo activo' : 'préstamos activos'}'),
+          PestanaLiga.finanzas => _totalCuentas == null ? null : '${plata(_totalCuentas!)} en cuentas',
+          _ => 'Reglas, cuotas y equipos',
+        },
+        alTocar: () => _abrirAtajo(x),
+      ),
+  ];
+
   void _abrirAtajo(PestanaLiga x) {
     final s = repo.sesion;
     _focoBusqueda.unfocus();
@@ -91,6 +141,8 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
       PestanaLiga.finanzas => TesoreriaScreen(sesion: s),
       PestanaLiga.miLiga => AjustesLigaScreen(sesion: s, pestana: true),
       PestanaLiga.comunidad => const SizedBox.shrink(),
+    }).then((_) {
+      if (mounted) _cargarAtajos();
     });
   }
 
@@ -109,6 +161,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   void initState() {
     super.initState();
     repo.cargar(forzar: repo.personas != null); // al abrir, siempre al día
+    _cargarAtajos();
     _reloj = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_scrolleando && mounted) _tick.value++;
     });
@@ -145,24 +198,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
           flexibleSpace: const Vidrio(child: SizedBox.expand()),
-          title: const Text('Equipos', style: TextStyle(fontWeight: FontWeight.w800)),
-          actions: [
-            for (final x in _atajos())
-              ListenableBuilder(
-                listenable: _avisos,
-                builder: (context, _) => IconButton(
-                  tooltip: _nombreLiga(x),
-                  onPressed: () => _abrirAtajo(x),
-                  icon: Badge(
-                    isLabelVisible: x == PestanaLiga.inventario && _avisos.inventario,
-                    smallSize: 9,
-                    backgroundColor: p.marca,
-                    child: Icon(_iconoLiga(x)),
-                  ),
-                ),
-              ),
-            const SizedBox(width: 4),
-          ],
+          // Liga, opción B del mockup (Victor, 2026-11-27): el buscador con
+          // filtros va en la barra y los atajos en tarjetas debajo.
+          toolbarHeight: 64,
+          titleSpacing: 12,
+          title: _buscador(p),
         ),
         body: _comunidad(context, p),
       ),
@@ -199,10 +239,9 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
       return Stack(
         children: [
           MediaQuery(
-            data: mq.copyWith(padding: mq.padding.copyWith(top: arriba + _altoBuscador)),
+            data: mq.copyWith(padding: mq.padding.copyWith(top: arriba)),
             child: AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: cuerpo),
           ),
-          Positioned(top: arriba, left: 0, right: 0, child: _buscador(p)),
           Positioned(
             top: arriba,
             left: 0,
@@ -218,14 +257,9 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     },
   );
 
-  static const _altoBuscador = 60.0;
-
-  /// Buscar y filtrar dentro de Gente (Victor, 2026-11-22: en la barra
-  /// apretaban las pestañas y desaparecían de golpe).
-  Widget _buscador(PivotPaleta p) => Container(
-    height: _altoBuscador,
-    color: p.fondo,
-    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+  /// Buscar y filtrar en la barra de Liga.
+  Widget _buscador(PivotPaleta p) => SizedBox(
+    height: 48,
     child: TextField(
       controller: _busqueda,
       focusNode: _focoBusqueda,
@@ -299,6 +333,16 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).top)),
+          if (!repo.hayFiltros)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: ListenableBuilder(
+                  listenable: _avisos,
+                  builder: (context, _) => GrillaAtajos(atajos: _atajosColor()),
+                ),
+              ),
+            ),
           if (repo.hayFiltros) SliverToBoxAdapter(child: _filtrosActivos(p)),
           // Cosas para llevar hoy o mañana, para Pivots (Victor, 2026-11-22).
           if (!repo.hayFiltros && _pivot && EventosRepo.actual != null)

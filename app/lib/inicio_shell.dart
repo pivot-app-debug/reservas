@@ -254,7 +254,7 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
             valueListenable: Navegacion.puntoEntrenamiento,
             builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.sports)),
           ),
-          label: 'Entrenamiento',
+          label: 'Entreno',
         ),
         EntrenamientoScreen(sesion: widget.sesion, eventos: widget.repo),
       ),

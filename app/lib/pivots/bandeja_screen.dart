@@ -756,7 +756,7 @@ class _CuentaCorte extends StatelessWidget {
     case TipoPedido.coach:
       return (
         'Pidió ser entrenadorx',
-        v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de Entrenamiento.' : 'Mensaje: ${v('mensaje')}',
+        v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de entrenadorx en Entreno.' : 'Mensaje: ${v('mensaje')}',
       );
     case TipoPedido.social:
       final ev = x.evento;

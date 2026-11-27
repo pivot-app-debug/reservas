@@ -278,7 +278,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: const Text('Guardarlo sin fecha'),
-              subtitle: const Text('Queda en Entrenamiento → Planes sin fecha para asignarlo después'),
+              subtitle: const Text('Queda en Entreno → Planes sin fecha para asignarlo después'),
               onTap: () => Navigator.of(h).pop(''),
             ),
             const SizedBox(height: 8),

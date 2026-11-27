@@ -31,7 +31,12 @@ void main() {
     final s = Sesion(_ApiFalsa())
       ..esAdmin = true
       ..adminToken = 'x';
-    await t.pumpWidget(MaterialApp(theme: construirTema(Brightness.light), home: NuevoEquipoScreen(sesion: s)));
+    await t.pumpWidget(
+      MaterialApp(
+        theme: construirTema(Brightness.light),
+        home: NuevoEquipoScreen(sesion: s),
+      ),
+    );
     await t.pump(const Duration(milliseconds: 500));
     await t.pump(const Duration(milliseconds: 500));
     expect(t.takeException(), isNull);

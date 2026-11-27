@@ -23,6 +23,12 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Entrenamiento (entrenadorxs): sin «Llevas…», `MiEstimado` (getMiPagoCoach) arriba, «Habilidades», «Armar un plan» = `ArmarPlanScreen` (2 pasos: entrenamiento → para quién: toda la liga, equipo o nivel). Planes por nivel: `equipo = 'nivel:sin|basicas|avanzadas'` (`paraPlan()`); el servidor deja guardarlos a cualquier entrenadorx y los muestra compartidos a quien tiene ese nivel (`_nivelPersona`).
 - Notificaciones de entrenador (`coach/notificaciones_entrenador_screen.dart`): resumen de los lunes, por persona (`coaches.sin_avisos text[]`, `coachGuardar` accion `avisosPersona`), `EnviarAvisoEntrenadorScreen` (accion `enviarAviso`, tipo `aviso_entrenador`) y lo que te llega (`coach_por_evaluar`, `coach_pedido_plan`, `cambios_asistencia`). Catálogo: `aviso_entrenador`, `novedades_progreso` (antes el lunes usaba `solicitud_resuelta`), y `soloCoach` (ocultos en Mi perfil → Notificaciones). `_avisosEntrenadorxs()` en `cronDiario`.
 
+## Liga B, Tareas en el Calendario y Entreno (2026-11-27)
+- `core/atajos_color.dart`: `AtajoColor` + `GrillaAtajos` (2 columnas, ícono blanco en cuadrado de color, título y detalle). Colores `PivotPaleta.atajoAzul|Naranja|Verde|Morado|Rojo|Teal`.
+- Liga: el `TextField` de búsqueda es el título del AppBar; primer sliver = grilla (`_atajosColor`, datos de ComunidadRepo, InventarioRepo y `adminTesoreria resumen.total`).
+- Calendario: `IconButton` Tareas (`_kTareas`, número de disponibles) → `TareasScreen` por `SubAjustes`; el punto de la bandeja ya no cuenta tareas.
+- `EntrenamientoScreen` sin pestañas; label de la barra «Entreno». Entrenadorxs: `CoachScreen(embebida, atajosExtra:)` con la grilla arriba; resto: grilla + próximos entrenamientos. Vistas 'progreso' y 'cursos' de avisos abren esas subsecciones.
+
 ## Web: actualización antes de cargar (2026-11-27)
 - `app/web/index.html`: script que compara `__WEB_BUILD__` (lo cambia el CI por el número de la corrida) con `web_version.json` (no-store). Si hay una más nueva: borra CacheStorage, desregistra service workers salvo firebase-messaging-sw, pide `/` con cache:'reload' y va a `/?v=<n>`. Máximo 2 intentos por versión (`localStorage pivot.intentos`); después, aviso fijo con cómo borrar la caché.
 - `app/web/flutter_bootstrap.js` propio: `_flutter.loader.load()` sin `serviceWorkerSettings` (el SW de Flutter está obsoleto; el de limpieza recargaba los clientes).

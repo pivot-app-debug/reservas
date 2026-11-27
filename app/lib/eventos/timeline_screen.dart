@@ -173,6 +173,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   final _kTarjeta = GlobalKey(debugLabel: 'tour-tarjeta');
   final _kLista = GlobalKey(debugLabel: 'tour-lista');
   final _kBandeja = GlobalKey(debugLabel: 'tour-bandeja');
+  final _kTareas = GlobalKey(debugLabel: 'tour-tareas');
   final _kFiltros = GlobalKey(debugLabel: 'tour-filtros');
   final _kBuscar = GlobalKey(debugLabel: 'tour-buscar');
 
@@ -921,11 +922,23 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
               return const SizedBox.shrink();
             },
           ),
+          // Tareas junto a la bandeja, con cuántas hay para tomar (Victor, 2026-11-27).
+          IconButton(
+            key: _kTareas,
+            tooltip: _tareas.disponibles.isEmpty ? 'Tareas' : 'Tareas (${_tareas.disponibles.length} para tomar)',
+            icon: Badge(
+              isLabelVisible: _tareas.disponibles.isNotEmpty,
+              backgroundColor: p.marca,
+              label: Text('${_tareas.disponibles.length}'),
+              child: const Icon(Symbols.checklist, weight: 600),
+            ),
+            onPressed: _abrirTablero,
+          ),
           IconButton(
             key: _kBandeja,
-            tooltip: _bandeja.hayNovedades ? 'Avisos, tareas, cursos, eventos y pagos (hay novedades)' : 'Avisos, tareas, cursos, eventos y pagos',
+            tooltip: _bandeja.hayNovedades ? 'Novedades (hay algo nuevo)' : 'Novedades',
             icon: Badge(
-              isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos || _tareas.disponibles.isNotEmpty,
+              isLabelVisible: (_bandeja.esPivot && _bandeja.total > 0) || _bandeja.hayNovedades || _cursos.nuevos,
               smallSize: 9,
               backgroundColor: p.marca,
               label: _bandeja.esPivot && _bandeja.total > 0 ? Text('${_bandeja.total}') : null,
@@ -1335,7 +1348,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
 
   void _abrirTarea(Tarea t, {MiTarea? mia}) => SubAjustes.abrir(context, TareaScreen(repo: _tareas, tarea: t, mia: mia));
 
-  void _abrirTablero() => _abrirActividad(PestanaActividad.tareas);
+  void _abrirTablero() {
+    _cerrarCalendario();
+    SubAjustes.abrir<void>(context, TareasScreen(repo: _tareas));
+  }
 
   /// La campana abre Actividad: notificaciones, tareas, clases y fiestas.
   Future<void> _abrirActividad([PestanaActividad inicial = PestanaActividad.notificaciones]) async {
@@ -1486,9 +1502,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           clave: _kBandeja,
           titulo: 'Novedades',
           texto: crea
-              ? 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a Tareas y a Pagos. Aquí también creas eventos. Si tiene un punto rojo, hay novedades.'
-              : 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a Tareas y a Pagos. Si tiene un punto rojo, hay novedades.',
+              ? 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a tus Pagos. Aquí también creas eventos. Si tiene un punto rojo, hay novedades.'
+              : 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a tus Pagos. Si tiene un punto rojo, hay novedades.',
         ),
+        PasoTour(clave: _kTareas, titulo: 'Tareas', texto: 'Las tareas de la liga. El número dice cuántas hay para tomar.'),
         PasoTour(
           clave: _kFiltros,
           titulo: 'Filtra',
@@ -1508,7 +1525,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(
           clave: ClavesTour.navegacion,
           ajuste: ClavesTour.pestana(1),
-          titulo: 'Entrenamiento',
+          titulo: 'Entreno',
           texto: [
             if (FuncionesLiga.usaCoach(repo.sesion)) 'Tus herramientas de entrenadorx: el próximo entrenamiento, los planes y lo que falta evaluar.',
             if (FuncionesLiga.coach(repo.sesion)) 'Tu progreso: habilidades, pruebas y notas de tus entrenadorxs.',

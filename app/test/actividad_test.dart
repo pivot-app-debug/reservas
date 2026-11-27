@@ -28,11 +28,10 @@ void main() {
     // Novedades: primero los próximos eventos, después las notificaciones.
     // Novedades: una sola lista con pills a Tareas y Pagos (2026-11-26).
     expect(find.text('Novedades'), findsOneWidget);
-    expect(find.text('Tareas'), findsOneWidget);
     expect(find.text('Próximos 7 días'), findsOneWidget);
     expect(find.text('No hay eventos en los próximos 7 días.'), findsOneWidget);
     expect(find.text('Crear un evento'), findsNothing);
-    expect(find.text('Pagos'), findsOneWidget);
+    expect(find.text('Pagos'), findsWidgets);
     expect(s.puedeCrearSocial, isFalse);
     // Un Pivot solo de fiestas no ve las herramientas de Pivot.
     s

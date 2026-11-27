@@ -103,7 +103,12 @@ const entradasLiga = [
   EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
   EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
 
-  EntradaAjuste('coaches', 'Entrenamiento', 'Barra de abajo', 'coach entrenador entrenadorxs seguimiento jugadorxs progreso ficha deportiva habilidades'),
+  EntradaAjuste(
+    'coaches',
+    'Entreno',
+    'Barra de abajo',
+    'entrenamiento coach entrenador entrenadorxs seguimiento jugadorxs progreso ficha deportiva habilidades',
+  ),
   EntradaAjuste('planes', 'Planes de pago', 'Finanzas › Cobros', 'paquete pack trimestral semestral meses clases descuento', dentro: 'cobros'),
   EntradaAjuste(
     'formas',

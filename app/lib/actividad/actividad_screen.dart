@@ -117,7 +117,7 @@ class _ActividadScreenState extends State<ActividadScreen> {
       context,
       preferencia: 'tour.novedades.v1',
       pasos: [
-        PasoTour(clave: _kPills, titulo: 'Tareas y pagos', texto: 'Con estos botones entras a las tareas de la liga y a tus pagos y suscripciones.'),
+        PasoTour(clave: _kPills, titulo: 'Pagos', texto: 'Aquí entras a tus pagos y suscripciones.'),
         PasoTour(
           clave: _kCuerpo,
           ajuste: (r) => Rect.fromLTWH(r.left + 8, r.top + altoBarra(context) + 4, r.width - 16, r.height * 0.35),
@@ -186,13 +186,7 @@ class _ActividadScreenState extends State<ActividadScreen> {
     key: _kPills,
     child: ListenableBuilder(
       listenable: widget.tareas,
-      builder: (context, _) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _pill(p, Symbols.checklist, 'Tareas', _abrirTareas, numero: widget.tareas.disponibles.length),
-          if (widget.verPagos) _pill(p, Symbols.payments, 'Pagos', _abrirPagos),
-        ],
-      ),
+      builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [if (widget.verPagos) _pill(p, Symbols.payments, 'Pagos', _abrirPagos)]),
     ),
   );
 
@@ -231,7 +225,7 @@ class _ActividadScreenState extends State<ActividadScreen> {
                         c.$2,
                         style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
                       ),
-                      subtitle: Text('Nuevo · míralo en Entrenamiento → Cursos', style: TextStyle(color: p.textoSecundario)),
+                      subtitle: Text('Nuevo · míralo en Entreno → Cursos', style: TextStyle(color: p.textoSecundario)),
                       trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                       onTap: _irACursos,
                     ),

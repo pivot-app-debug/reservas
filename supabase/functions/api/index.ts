@@ -5420,7 +5420,7 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
     const { data: f } = await supabase.from('equipo').select('roles').eq('username', username).maybeSingle();
     const rs = Array.isArray(f?.roles) ? f!.roles : [];
     if (!rs.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: [...rs, ROL_COACH] }).eq('username', username);
-    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: '¡Ya eres entrenadorx!' }, contents: { es: 'Tienes la sección Entrenamiento en la barra de abajo para seguir el progreso de tus jugadorxs.' }, url: APP_URL + '/' }).catch(() => {});
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: '¡Ya eres entrenadorx!' }, contents: { es: 'Tienes la sección Entreno en la barra de abajo para seguir el progreso de tus jugadorxs.' }, url: APP_URL + '/' }).catch(() => {});
   } else if (accion === 'equipos') {
     await supabase.from('coaches').update({ equipos }).eq('username', username);
   } else if (accion === 'rechazar' || accion === 'quitar') {
@@ -5906,7 +5906,7 @@ async function _avisosEntrenadorxs(): Promise<void> {
         await sendPush({
           tipo: 'coach_pedido_plan', include_external_user_ids: [c.user], personal: true, pantalla: 'entrenamiento',
           headings: { es: 'El entrenamiento de mañana no tiene plan' },
-          contents: { es: `Mañana${e.inicia ? ' a las ' + String(e.inicia).slice(0, 5) : ''}. Puedes armarlo desde Entrenamiento.` }, url: APP_URL + '/',
+          contents: { es: `Mañana${e.inicia ? ' a las ' + String(e.inicia).slice(0, 5) : ''}. Puedes armarlo desde Entreno.` }, url: APP_URL + '/',
         });
       }
     } catch (e) { console.error('[coach] recordatorio', c.user, e); }

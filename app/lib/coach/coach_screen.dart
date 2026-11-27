@@ -18,6 +18,7 @@ import 'por_evaluar.dart';
 import 'armar_plan_screen.dart';
 import 'notificaciones_entrenador_screen.dart';
 import 'mi_estimado.dart';
+import '../core/atajos_color.dart';
 import 'prueba_en_vivo.dart';
 import '../equipo/habilidades_screen.dart';
 import '../ajustes/herramientas_liga.dart';
@@ -61,7 +62,10 @@ String errorCoach(Object e) => e is ApiException ? e.message : 'No se pudo carga
 /// de coach". Es la pestaña Entrenamiento de la bandeja ([embebida]) y lo que
 /// abre Liga → Coaches para quien es coach.
 class CoachScreen extends StatefulWidget {
-  const CoachScreen({super.key, required this.sesion, required this.eventos, this.embebida = false});
+  const CoachScreen({super.key, required this.sesion, required this.eventos, this.embebida = false, this.atajosExtra = const []});
+
+  /// Atajos que van primero en la grilla (Mi progreso y Cursos, desde Entreno).
+  final List<AtajoColor> atajosExtra;
   final Sesion sesion;
   final EventosRepo eventos;
   final bool embebida;
@@ -182,6 +186,9 @@ class _CoachScreenState extends State<CoachScreen> {
                   padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
                     MiEstimado(sesion: s),
+                    // Atajos de color como en Liga (Victor, 2026-11-27).
+                    const SizedBox(height: 8),
+                    _atajos(context),
                     ..._proximo(context),
                     // Lo que falta evaluar (antes en Próximos eventos).
                     TarjetasPorEvaluar(sesion: s),
@@ -193,15 +200,13 @@ class _CoachScreenState extends State<CoachScreen> {
                       label: const Text('Armar el plan de un entrenamiento'),
                     ),
                     ..._sinFecha(context),
-                    _titulo(context, 'HERRAMIENTAS'),
-                    _atajos(context),
                   ],
                 ),
               ),
             ),
     );
     if (widget.embebida) return cuerpo;
-    return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Entrenamiento'), body: cuerpo);
+    return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Entreno'), body: cuerpo);
   }
 
   /// Próximo entrenamiento: fecha, quién viene y su plan, ya cargado.
@@ -261,72 +266,49 @@ class _CoachScreenState extends State<CoachScreen> {
 
   /// Herramientas, con nombres que dicen qué hacen (Victor, 2026-11-26).
   Widget _atajos(BuildContext context) {
-    final p = context.pivot;
     final puedeNombrar = s.esCoach || (_pivot && (s.tieneArea('coach') || s.tieneArea('equipo') || s.esAdmin));
-    final l = <(IconData, String, String, VoidCallback)>[
-      (Icons.checklist_rounded, 'Habilidades', 'Básicas y avanzadas: crear, editar y marcar', () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true))),
-      (Icons.timer_outlined, 'Pruebas', 'Medir el progreso, como vueltas en 5 minutos', () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs))),
-      if (puedeNombrar) (Icons.person_add_outlined, 'Entrenadorxs', 'Nombrar o gestionar entrenadorxs del equipo', () => _abrir(CoachesScreen(sesion: s))),
-      // Notificaciones de entrenador (Victor, 2026-11-26), al lado de Entrenadorxs.
-      if (s.esCoach)
-        (
-          Icons.notifications_active_outlined,
-          'Notificaciones de entrenador',
-          'Qué avisos le llegan a cada persona, mandar avisos y los tuyos',
-          () => _abrir(
-            NotificacionesEntrenadorScreen(
-              sesion: s,
-              jugadorxs: _jugadorxs,
-              sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
-              avisarNovedades: _d?['avisarNovedades'] != false,
-            ),
-          ),
+    final pruebas = (_d?['pruebas'] as List?)?.length;
+    final pendientes = [for (final x in (_d?['pendientes'] as List? ?? const [])) x as Map]
+        .fold<int>(0, (a, x) => a + (((x['total'] as num?) ?? 0) - ((x['evaluados'] as num?) ?? 0)).toInt());
+    final callados = (_d?['sinAvisos'] as List? ?? const []).length;
+    return GrillaAtajos(
+      atajos: [
+        ...widget.atajosExtra,
+        AtajoColor(
+          icono: Icons.checklist_rounded,
+          color: PivotPaleta.atajoAzul,
+          titulo: 'Habilidades',
+          detalle: '${_d?['totalHabilidades'] ?? 0} en la lista de la liga',
+          alTocar: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
         ),
-    ];
-    Widget atajo((IconData, String, String, VoidCallback) a) => Material(
-      color: p.tarjeta,
-      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: a.$4,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(a.$1, color: p.marcaTexto),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      a.$2,
-                      style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(a.$3, style: TextStyle(fontSize: 12, height: 1.3, color: p.textoSecundario)),
-            ],
-          ),
+        AtajoColor(
+          icono: Icons.timer_outlined,
+          color: PivotPaleta.atajoNaranja,
+          titulo: 'Pruebas',
+          detalle: pruebas == null ? 'Medir el progreso' : (pendientes > 0 ? '$pendientes por evaluar' : 'Medir el progreso, en vivo'),
+          alTocar: () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs)),
         ),
-      ),
-    );
-    return Column(
-      children: [
-        for (var i = 0; i < l.length; i += 2)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            // Mismo alto aunque un subtítulo sea más largo (QA 2026-11-18).
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: atajo(l[i])),
-                  const SizedBox(width: 10),
-                  Expanded(child: i + 1 < l.length ? atajo(l[i + 1]) : const SizedBox.shrink()),
-                ],
+        if (puedeNombrar)
+          AtajoColor(
+            icono: Icons.person_add_outlined,
+            color: PivotPaleta.atajoMorado,
+            titulo: 'Entrenadorxs',
+            detalle: '${(_d?['coaches'] as List? ?? const []).length} en la liga',
+            alTocar: () => _abrir(CoachesScreen(sesion: s)),
+          ),
+        // Notificaciones de entrenador (Victor, 2026-11-26), al lado de Entrenadorxs.
+        if (s.esCoach)
+          AtajoColor(
+            icono: Icons.notifications_active_outlined,
+            color: PivotPaleta.atajoTeal,
+            titulo: 'Notificaciones',
+            detalle: callados == 0 ? 'Avisos a tus personas y los tuyos' : '$callados ${callados == 1 ? 'persona sin' : 'personas sin'} tus avisos',
+            alTocar: () => _abrir(
+              NotificacionesEntrenadorScreen(
+                sesion: s,
+                jugadorxs: _jugadorxs,
+                sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
+                avisarNovedades: _d?['avisarNovedades'] != false,
               ),
             ),
           ),
@@ -1490,7 +1472,7 @@ class FilaSerCoach extends StatelessWidget {
             const Text('Quiero ser entrenadorx', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas de Entrenamiento para seguir el progreso de tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas de entrenadorx en Entreno para seguir el progreso de tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),
