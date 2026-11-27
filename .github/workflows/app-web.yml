@@ -22,6 +22,8 @@ concurrency:
 jobs:
   publicar:
     runs-on: ubuntu-24.04
+    env:
+      FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PIVOT_D65F4 }}
     steps:
       - uses: actions/checkout@v5
 
@@ -45,6 +47,26 @@ jobs:
           # Número de esta publicación para la revisión de index.html (Victor, 2026-11-27).
           sed -i 's/__WEB_BUILD__/${{ github.run_number }}/' build/web/index.html
           grep -q 'main.dart.js?v=' build/web/flutter_bootstrap.js && grep -q 'flutter_bootstrap.js?v=' build/web/index.html && ! grep -q '__WEB_BUILD__' build/web/index.html
+
+      # Firebase Hosting (Victor, 2026-11-27): Cloudflare guardaba la web vieja
+      # sin hacer caso de las versiones. Aquí firebase.json dice qué nunca se
+      # guarda. Solo corre cuando existe el secreto de la cuenta de servicio.
+      - name: Preparar sitio para Firebase
+        if: ${{ env.FIREBASE_SA != '' }}
+        run: |
+          for d in inscripcion registro-express activar css js shared vieja nueva; do
+            [ -d "$d" ] && cp -r "$d" app/build/web/ || true
+          done
+          [ -f OneSignalSDKWorker.js ] && cp OneSignalSDKWorker.js app/build/web/ || true
+
+      - name: Publicar en Firebase Hosting
+        if: ${{ env.FIREBASE_SA != '' }}
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PIVOT_D65F4 }}
+          channelId: live
+          projectId: pivot-d65f4
 
       - name: Publicar en la raíz
         run: |
