@@ -460,10 +460,13 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
 // ─── Pivots: crear y seguir cursos ─────────────────────────────────────────
 
 class CursosScreen extends StatefulWidget {
-  const CursosScreen({super.key, required this.sesion, this.embebida = false});
+  const CursosScreen({super.key, required this.sesion, this.embebida = false, this.reanudar = false});
 
   /// Dentro de una pestaña de Actividad: sin barra propia.
   final bool embebida;
+
+  /// Desde Notificaciones: abre el curso a medio armar apenas carga.
+  final bool reanudar;
   final Sesion sesion;
   @override
   State<CursosScreen> createState() => _CursosScreenState();
@@ -476,6 +479,11 @@ class _CursosScreenState extends State<CursosScreen> {
   List<Map<String, dynamic>> _habilidades = const [];
   List<Map<String, dynamic>> _plantillas = const [];
   List<(String, String, String)> _personas = const [];
+  Map<String, String> _nivelPersonas = const {};
+
+  /// Curso a medio armar de este Pivot ({datos, actualizado}).
+  Map<String, dynamic>? _borrador;
+  bool _reanudado = false;
   String? _error;
   Sesion get s => widget.sesion;
 
@@ -504,7 +512,14 @@ class _CursosScreenState extends State<CursosScreen> {
           _cursos = [for (final c in (r['cursos'] as List? ?? const [])) Curso(Map<String, dynamic>.from(c as Map))];
           _habilidades = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)];
           _plantillas = [for (final x in (r['plantillas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+          if (r.containsKey('borrador')) _borrador = (r['borrador'] as Map?)?.cast<String, dynamic>();
+          if (r['nivelPersonas'] is Map) _nivelPersonas = {for (final e in (r['nivelPersonas'] as Map).entries) '${e.key}': '${e.value}'};
         });
+        // Desde Notificaciones: «Reanudar» abre el asistente donde quedó.
+        if (widget.reanudar && !_reanudado && _borrador != null) {
+          _reanudado = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _reanudar() : null);
+        }
       }
       return true;
     } catch (e) {
@@ -518,16 +533,66 @@ class _CursosScreenState extends State<CursosScreen> {
     }
   }
 
-  Future<void> _editar([Curso? c]) async {
+  Future<void> _editar([Curso? c, Map<String, dynamic>? borrador]) async {
+    // Nuevo curso con uno a medio armar: ¿seguir ese o empezar otro? (Victor, 2026-11-27).
+    if (c == null && borrador == null && _borrador != null) {
+      final r = await showDialog<String>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('Tienes un curso a medio armar'),
+          content: Text('«${_nombreBorrador ?? 'Sin nombre'}». Si empiezas uno nuevo, ese borrador se descarta.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(d).pop('nuevo'), child: const Text('Empezar uno nuevo')),
+            FilledButton(onPressed: () => Navigator.of(d).pop('reanudar'), child: const Text('Reanudar')),
+          ],
+        ),
+      );
+      if (r == null || !mounted) return;
+      if (r == 'reanudar') return _reanudar();
+      await _guardarBorrador(null);
+      if (!mounted) return;
+    }
     final ok = await Navigator.of(context).push<Map<String, Object?>>(
       MaterialPageRoute(
-        builder: (_) =>
-            _AsistenteCurso(curso: c, equipos: _equipos, lugares: _lugares, habilidades: _habilidades, plantillas: _plantillas, personas: _personas),
+        builder: (_) => _AsistenteCurso(
+          curso: c,
+          equipos: _equipos,
+          lugares: _lugares,
+          habilidades: _habilidades,
+          plantillas: _plantillas,
+          personas: _personas,
+          anteriores: _cursos ?? const [],
+          nivelPersonas: _nivelPersonas,
+          borrador: borrador,
+          alBorrador: c == null ? _guardarBorrador : null,
+        ),
       ),
     );
     if (ok == null) return;
     if (await _llamar({'accion': 'guardar', 'curso': ok}) && mounted) {
+      if (c == null) await _guardarBorrador(null);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Curso guardado. Sus fechas ya están en el calendario.')));
+    }
+  }
+
+  String? get _nombreBorrador {
+    final n = '${((_borrador?['datos'] as Map?)?['curso'] as Map?)?['nombre'] ?? ''}'.trim();
+    return n.isEmpty ? null : n;
+  }
+
+  Future<void> _reanudar() async {
+    final d = (_borrador?['datos'] as Map?)?.cast<String, dynamic>();
+    if (d != null) await _editar(null, d);
+  }
+
+  /// Guarda (o descarta, con null) el curso a medio armar en el servidor.
+  Future<void> _guardarBorrador(Map<String, dynamic>? datos) async {
+    if (mounted) setState(() => _borrador = datos == null ? null : {'datos': datos, 'actualizado': DateTime.now().toIso8601String()});
+    try {
+      await s.api.post('adminCursos', {'adminToken': s.adminToken, 'accion': 'borrador', 'datos': datos == null ? '' : jsonEncode(datos)});
+    } catch (_) {
+      // Sin conexión: el borrador queda en esta pantalla hasta el próximo paso.
     }
   }
 
@@ -567,6 +632,58 @@ class _CursosScreenState extends State<CursosScreen> {
                 children: [
                   const _QueEsUnCurso(),
                   const SizedBox(height: 14),
+                  // Curso a medio armar (Victor, 2026-11-27).
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _borrador == null
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Material(
+                              color: p.suave,
+                              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.edit_note_rounded, color: p.sobreSuave),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Curso a medio armar',
+                                                style: TextStyle(fontWeight: FontWeight.w800, color: p.sobreSuave),
+                                              ),
+                                              Text(
+                                                _nombreBorrador == null ? 'Sigue donde lo dejaste.' : '«$_nombreBorrador»: sigue donde lo dejaste.',
+                                                style: TextStyle(fontSize: 13, color: p.sobreSuave),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(onPressed: () => _guardarBorrador(null), child: const Text('Descartar')),
+                                        const SizedBox(width: 4),
+                                        FilledButton(onPressed: _reanudar, child: const Text('Reanudar')),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
                   // Como el recuadro de crear una tarea (Victor, 2026-11-22).
                   if (l.isEmpty)
                     TarjetaCrear(

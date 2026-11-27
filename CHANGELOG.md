@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (cursos y planes por persona)
+- Pre-armados: cada curso pre-armado se despliega con su precio, cupo, para quién, clases con sus temas y evaluación. «Usar este curso» lo copia y solo eliges las fechas. Nueva sección «Tus cursos anteriores» para reutilizar un curso que ya armaste.
+- Reanudar: un curso a medio armar se guarda solo. Arriba de Cursos y en Notificaciones aparece «Curso a medio armar» para seguirlo (también desde otro teléfono) o descartarlo.
+- Al elegir un curso «Por nivel» se ve quiénes están en ese nivel.
+- Planes de entrenamiento para personas puntuales (por ejemplo, una clase individual): se eligen con un buscador y, si se comparte, solo lo ven esas personas.
+
 ## 2026-11-27 (habilidades: logros por grupo)
 - Corregido: una habilidad nueva ya no se guarda dos veces.
 - Logros por grupo: cada grupo (Frenos, Elementos…) y cada nivel se completan al lograr todas sus habilidades. Un grupo completo aparece plegado como «Grupo completo» en el progreso y llega un aviso al teléfono. Si se agrega una habilidad a un grupo, ese logro vuelve a estar pendiente hasta completarla.

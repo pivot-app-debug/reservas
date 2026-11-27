@@ -4,6 +4,8 @@ import '../core/esqueleto.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart' show altoBarra;
+import '../equipo/equipo_repo.dart';
+import '../eventos/widgets_comunes.dart' show AvatarPersona;
 import 'niveles_coach.dart';
 import '../eventos/modelos.dart';
 import '../sesion/sesion.dart';
@@ -11,7 +13,7 @@ import 'coach_screen.dart';
 
 /// Armar el plan de un entrenamiento en pasos (Victor, 2026-11-26: antes era
 /// un bottom sheet enorme). 1) qué entrenamiento, 2) para quién (toda la
-/// liga, un equipo o un nivel) y después el editor del plan.
+/// liga, un equipo, un nivel o personas puntuales) y después el editor del plan.
 class ArmarPlanScreen extends StatefulWidget {
   const ArmarPlanScreen({super.key, required this.sesion, required this.entrenamientos});
   final Sesion sesion;
@@ -201,7 +203,133 @@ class _ArmarPlanScreenState extends State<ArmarPlanScreen> {
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
           child: Text('Un plan por nivel lo ven, si lo compartes, las personas de ese nivel.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
         ),
+        // Planes por persona (Victor, 2026-11-27): por ejemplo, una clase individual.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+          child: Text(
+            'PARA PERSONAS',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+          ),
+        ),
+        for (final x in hay.where((x) => x.startsWith('personas:'))) opcion(x, Icons.person_outline_rounded, paraPlan(x)),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Material(
+            color: p.tarjeta,
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: Icon(Icons.person_add_alt_1_outlined, color: p.marcaTexto),
+              title: const Text('Elegir personas', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Un plan solo para una o unas pocas personas.'),
+              trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+              onTap: () async {
+                final gente = await Navigator.of(context).push<List<String>>(
+                  MaterialPageRoute(
+                    builder: (_) => _ElegirPersonasPlan(sesion: widget.sesion, equipos: d['deTodaLaLiga'] == true ? null : equipos),
+                  ),
+                );
+                if (gente == null || gente.isEmpty || !mounted) return;
+                _elegirPara('personas:${(gente..sort()).join(',')}');
+              },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+          child: Text('Un plan para personas lo ven, si lo compartes, solo esas personas.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+        ),
       ],
+    );
+  }
+}
+
+/// Buscador de personas para un plan (con avatares; las elegidas arriba).
+/// [equipos] limita a los equipos de lx entrenadorx (null: toda la liga).
+class _ElegirPersonasPlan extends StatefulWidget {
+  const _ElegirPersonasPlan({required this.sesion, this.equipos});
+  final Sesion sesion;
+  final List<String>? equipos;
+  @override
+  State<_ElegirPersonasPlan> createState() => _ElegirPersonasPlanState();
+}
+
+class _ElegirPersonasPlanState extends State<_ElegirPersonasPlan> {
+  final _busca = TextEditingController();
+  final Set<String> _elegidas = {};
+  late final EquipoRepo _repo = EquipoRepo.de(widget.sesion);
+
+  @override
+  void initState() {
+    super.initState();
+    _repo.cargar().then((_) => mounted ? setState(() {}) : null, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _busca.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final todas = [
+      for (final x in _repo.personas ?? const [])
+        if (widget.equipos == null || widget.equipos!.contains(x.categoria)) x,
+    ];
+    final q = _busca.text.trim().toLowerCase();
+    final lista = [
+      for (final x in todas)
+        if (_elegidas.contains(x.username)) x,
+      for (final x in todas)
+        if (!_elegidas.contains(x.username) && (q.isEmpty || '${x.username} ${x.nombreMostrar}'.toLowerCase().contains(q))) x,
+    ];
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: barraCoach('¿Para quién es el plan?'),
+      body: _repo.personas == null
+          ? const Esqueleto(forma: FormaEsqueleto.lista)
+          : ListView(
+              padding: EdgeInsets.fromLTRB(16, 12 + altoBarra(context), 16, 120 + MediaQuery.paddingOf(context).bottom),
+              children: [
+                TextField(
+                  controller: _busca,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar persona'),
+                ),
+                const SizedBox(height: 8),
+                for (final x in lista)
+                  ListTile(
+                    key: ValueKey(x.username),
+                    contentPadding: EdgeInsets.zero,
+                    leading: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: 36),
+                    title: Text(x.nombreMostrar),
+                    subtitle: Text(x.categoria),
+                    trailing: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        _elegidas.contains(x.username) ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        key: ValueKey(_elegidas.contains(x.username)),
+                        color: _elegidas.contains(x.username) ? p.marcaTexto : p.textoSecundario,
+                      ),
+                    ),
+                    onTap: () => setState(() => _elegidas.contains(x.username) ? _elegidas.remove(x.username) : _elegidas.add(x.username)),
+                  ),
+              ],
+            ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            onPressed: _elegidas.isEmpty ? null : () => Navigator.of(context).pop(_elegidas.toList()),
+            child: Text(
+              _elegidas.isEmpty ? 'Elige al menos una persona' : (_elegidas.length == 1 ? 'Seguir con 1 persona' : 'Seguir con ${_elegidas.length} personas'),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

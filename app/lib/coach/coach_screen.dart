@@ -41,10 +41,14 @@ AppBar barraCoach(String titulo, {List<Widget>? acciones, PreferredSizeWidget? a
   bottom: abajo,
 );
 
-/// Para quién es un plan: '' toda la liga, 'nivel:x' un nivel, o un equipo
-/// (planes por nivel, Victor 2026-11-26).
+/// Para quién es un plan: '' toda la liga, 'nivel:x' un nivel, 'personas:a,b'
+/// personas puntuales (2026-11-27) o un equipo (planes por nivel, Victor 2026-11-26).
 String paraPlan(String equipo) {
   if (equipo.isEmpty) return 'Toda la liga';
+  if (equipo.startsWith('personas:')) {
+    final l = equipo.substring(9).split(',').where((x) => x.isNotEmpty).toList();
+    return l.length <= 2 ? l.join(' y ') : '${l.length} personas';
+  }
   if (equipo.startsWith('nivel:')) return nivelesCoach[equipo.substring(6)] ?? equipo.substring(6);
   return equipo;
 }

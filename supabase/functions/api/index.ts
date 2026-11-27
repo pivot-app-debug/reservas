@@ -5684,9 +5684,18 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     const fecha = String(params.fecha ?? '').slice(0, 10);
     if (!idEvento || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { exito: false, error: 'Falta el evento.' };
     // Un plan por equipo; '' = toda la liga, solo para coaches de toda la liga (Victor, 2026-11-17).
-    const equipo = String(params.equipo ?? '').trim().slice(0, 60);
-    // Plan por nivel ('nivel:basicas'…), para cualquier entrenadorx (Victor, 2026-11-26).
-    if (!equipo.startsWith('nivel:') && c.equipos.length && !c.equipos.includes(equipo)) return { exito: false, error: 'Solo puedes armar planes para tus equipos.' };
+    let equipo = String(params.equipo ?? '').trim();
+    if (equipo.startsWith('personas:')) {
+      // Plan para personas puntuales (Victor, 2026-11-27): 'personas:a,b' (ordenadas).
+      const gente = [...new Set(equipo.slice(9).split(',').map((x) => x.trim()).filter(Boolean))].sort().slice(0, 20);
+      if (!gente.length) return { exito: false, error: 'Elige al menos una persona.' };
+      for (const u of gente) if (!(await _puedeVer(c, u))) return { exito: false, error: 'Solo puedes armar planes para personas de tus equipos.' };
+      equipo = `personas:${gente.join(',')}`.slice(0, 1200);
+    } else {
+      equipo = equipo.slice(0, 60);
+      // Plan por nivel ('nivel:basicas'…), para cualquier entrenadorx (Victor, 2026-11-26).
+      if (!equipo.startsWith('nivel:') && c.equipos.length && !c.equipos.includes(equipo)) return { exito: false, error: 'Solo puedes armar planes para tus equipos.' };
+    }
     let da: string[] = [];
     try { da = JSON.parse(String(params.da ?? '[]')).map((x: any) => String(x)).slice(0, 10); } catch { da = []; }
     if (!bloques.length) await supabase.from('coach_planes').delete().eq('id_evento', idEvento).eq('equipo', equipo);
@@ -5825,11 +5834,16 @@ async function getPlanEvento(params: Record<string, any>): Promise<Record<string
   const { data: yoFila } = await supabase.from('equipo').select('categoria').eq('username', yo).maybeSingle();
   const quien = await _mapaEquipoPorNombre();
   const miNivel = !coach && (data ?? []).some((p: any) => String(p.equipo ?? '').startsWith('nivel:')) ? await _nivelPersona(yo) : null;
-  const ve = (p: any) => String(p.equipo ?? '').startsWith('nivel:')
+  // Plan para personas (2026-11-27): lo ven lxs entrenadorxs y, si se comparte, esas personas.
+  const deGente = (p: any) => String(p.equipo ?? '').slice(9).split(',').filter(Boolean);
+  const ve = (p: any) => String(p.equipo ?? '').startsWith('personas:')
+    ? (!!coach || (p.compartido && deGente(p).includes(yo)))
+    : String(p.equipo ?? '').startsWith('nivel:')
     ? (!!coach || (p.compartido && `nivel:${miNivel}` === `nivel:${_claveNivel(String(p.equipo).slice(6))}`))
     : coach ? (!coach.equipos.length || p.equipo === '' || coach.equipos.includes(p.equipo)) : (p.compartido && (p.equipo === '' || p.equipo === yoFila?.categoria));
   const planes = (data ?? []).filter(ve).sort((a: any, b: any) => String(a.equipo).localeCompare(String(b.equipo))).map((p: any) => ({
     id: p.id, equipo: p.equipo ?? '', bloques: p.bloques ?? [], compartido: p.compartido, coach: p.coach,
+    ...(String(p.equipo ?? '').startsWith('personas:') ? { personas: deGente(p).map((u: string) => ({ username: u, nombre: quien[String(u).toUpperCase()]?.nombreDerby || u })) } : {}),
     da: (p.da ?? []).map((u: string) => ({ username: u, nombre: quien[String(u).toUpperCase()]?.nombreDerby || u })),
   }));
   return {
@@ -9938,6 +9952,26 @@ async function _plantillasCursos(): Promise<any[]> {
   return out;
 }
 
+/// Nivel de cada persona del equipo (a mano o según lo logrado, como getCoach).
+async function _nivelesDePersonas(): Promise<Record<string, string>> {
+  const { data: gente } = await supabase.from('equipo').select('username, nivel_coach, estado_miembro').is('eliminado_en', null);
+  const users = (gente ?? []).map((p: any) => p.username);
+  if (!users.length) return {};
+  const { data: evs } = await supabase.from('coach_evaluaciones').select('username, habilidad_id, nivel, creado_en').in('username', users).order('creado_en', { ascending: false }).limit(20000);
+  const logradas: Record<string, Set<string>> = {};
+  const vistas = new Set<string>();
+  for (const e of evs ?? []) {
+    const k = `${e.username}|${e.habilidad_id}`;
+    if (vistas.has(k)) continue;
+    vistas.add(k);
+    if (e.nivel === 'logrado') (logradas[e.username] ??= new Set()).add(e.habilidad_id);
+  }
+  const habs = await _habilidades(), nivelesL = await _nivelesLiga();
+  const out: Record<string, string> = {};
+  for (const p of gente ?? []) out[p.username] = p.nivel_coach ? _claveNivel(p.nivel_coach) : _calcularNivel(habs, nivelesL, logradas[p.username] ?? new Set()).nivel;
+  return out;
+}
+
 /// Nivel de Coach calculado de una persona (mismo criterio que getCoach).
 async function _nivelDe(username: string): Promise<string> {
   return _calcularNivel(await _habilidades(), await _nivelesLiga(), await _logradasDe(username)).nivel;
@@ -10140,6 +10174,20 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     await supabase.from('curso_plantillas').insert({ nombre, tipo: pl?.tipo === 'clinica' ? 'clinica' : 'curso', descripcion: String(pl?.descripcion ?? '').trim().slice(0, 1000) || null, clases, evaluacion, creado_por: email });
   } else if (accion === 'borrarPlantilla') {
     await supabase.from('curso_plantillas').delete().eq('id', String(params.id ?? ''));
+  } else if (accion === 'borrador') {
+    // Curso a medio armar (Victor, 2026-11-27): uno por Pivot; sin datos se
+    // descarta. Se ofrece «Reanudar» en Cursos y en Notificaciones.
+    let datos: any = params.datos;
+    if (typeof datos === 'string') { try { datos = datos ? JSON.parse(datos) : null; } catch { datos = null; } }
+    if (!datos || typeof datos !== 'object') {
+      await supabase.from('curso_borradores').delete().eq('creado_por', email);
+    } else {
+      const txt = JSON.stringify(datos);
+      if (txt.length > 200000) return { exito: false, error: 'El borrador es demasiado grande.' };
+      const username = (await supabase.from('equipo').select('username').ilike('email', email).maybeSingle()).data?.username ?? null;
+      await supabase.from('curso_borradores').upsert({ creado_por: email, username, datos, actualizado_en: new Date().toISOString() }, { onConflict: 'liga_id,creado_por' });
+    }
+    return { exito: true };
   } else if (accion === 'evaluar') {
     // Evaluación por temas (Victor, 2026-11-17): aprueba si llega al mínimo
     // en cada tema. Cada tema queda en la ficha deportiva (logrado o en
@@ -10209,13 +10257,18 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
       contents: { es: aprobado ? (equipo ? `Desde ahora estás en ${equipo}. ¡Bienvenidx!` : '¡Felicitaciones!') : 'Esta vez no fue. Un Pivot te contará cómo seguir.' }, url: APP_URL + '/',
     }).catch(() => {});
   }
-  const [{ data: cursos }, { data: ins }] = await Promise.all([
+  const [{ data: cursos }, { data: ins }, { data: borr }] = await Promise.all([
     supabase.from('cursos').select('*').order('created_at', { ascending: false }),
     supabase.from('curso_inscripciones').select('*'),
+    supabase.from('curso_borradores').select('datos, actualizado_en').eq('creado_por', email).maybeSingle(),
   ]);
   const quien = await _mapaEquipoPorNombre();
   return {
     exito: true,
+    borrador: borr ? { datos: borr.datos, actualizado: borr.actualizado_en } : null,
+    // Nivel de cada persona activa (Victor, 2026-11-27): para ver quiénes
+    // están en un nivel al elegir a quién va dirigido un curso.
+    nivelPersonas: await _nivelesDePersonas(),
     cursos: (cursos ?? []).map((c: any) => ({
       ..._cursoJson(c, ins ?? []),
       personas: (ins ?? []).filter((i: any) => i.curso_id === c.id && i.estado !== 'cancelada').map((i: any) => {
@@ -11261,6 +11314,13 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     ...(!fila?.fecha_nacimiento ? [{ clave: 'identidad', titulo: 'Agrega tu fecha de nacimiento', texto: 'Para tu ficha y, si quieres, para saludarte en tu cumpleaños.' }] : []),
     ...(fila && fila.necesita_patines == null && fila.necesita_protecciones == null ? [{ clave: 'equipamiento', titulo: 'Cuéntanos tu equipamiento', texto: 'Si tienes el tuyo o necesitas el del equipo.' }] : []),
     ...(fila && fila.push_notificaciones_activas === false ? [{ clave: 'notificaciones', titulo: 'Activa las notificaciones', texto: 'Para enterarte de entrenamientos, cambios y respuestas a tus pedidos.' }] : []),
+    // Curso a medio armar (Victor, 2026-11-27).
+    ...(await (async () => {
+      const { data: b } = await supabase.from('curso_borradores').select('datos').eq('username', yo).maybeSingle();
+      if (!b) return [];
+      const n = String(b.datos?.curso?.nombre ?? '').trim();
+      return [{ clave: 'curso_borrador', titulo: 'Curso a medio armar', texto: n ? `«${n}»: toca para seguir armándolo.` : 'Toca para seguir armándolo donde lo dejaste.' }];
+    })().catch(() => [])),
   ];
     return { exito: true, solicitudes: visibles, recomendaciones, novedades };
 }

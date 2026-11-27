@@ -14,7 +14,23 @@ class _AsistenteCurso extends StatefulWidget {
     required this.habilidades,
     this.plantillas = const [],
     this.personas = const [],
+    this.anteriores = const [],
+    this.nivelPersonas = const {},
+    this.borrador,
+    this.alBorrador,
   });
+
+  /// Cursos que ya armó la liga, para reutilizarlos (Victor, 2026-11-27).
+  final List<Curso> anteriores;
+
+  /// Nivel de cada persona (username → clave), para ver quiénes están en un nivel.
+  final Map<String, String> nivelPersonas;
+
+  /// Curso a medio armar que se retoma (ver [_AsistenteCursoState._borrador]).
+  final Map<String, dynamic>? borrador;
+
+  /// Guarda el borrador en cada paso (solo cursos nuevos).
+  final void Function(Map<String, dynamic> datos)? alBorrador;
 
   /// Gente de la liga, para cursos individuales: (username, nombre, foto).
   final List<(String, String, String)> personas;
@@ -29,11 +45,17 @@ class _AsistenteCurso extends StatefulWidget {
 }
 
 class _AsistenteCursoState extends State<_AsistenteCurso> {
-  late final o = widget.curso;
-  late _PasoCurso _paso = o == null && widget.plantillas.isNotEmpty ? _PasoCurso.origen : _PasoCurso.tipo;
+  /// Un borrador se arma como un curso sin id; [_nuevo] dice si se edita uno guardado.
+  late final Map<String, dynamic>? _b = widget.curso == null ? widget.borrador : null;
+  late final Curso? o = widget.curso ?? (_b?['curso'] is Map ? Curso(Map<String, dynamic>.from(_b!['curso'] as Map)) : null);
+  bool get _nuevo => widget.curso == null;
+  late _PasoCurso _paso = _PasoCurso.values.where((x) => x.name == _b?['paso']).firstOrNull ?? (_nuevo && _hayOrigen ? _PasoCurso.origen : _PasoCurso.tipo);
+  bool get _hayOrigen => widget.plantillas.isNotEmpty || _anteriores.isNotEmpty;
 
   /// Clases de la plantilla elegida, sin fechas todavía.
-  List<Map<String, dynamic>>? _dePlantilla;
+  late List<Map<String, dynamic>>? _dePlantilla = _b?['dePlantilla'] is List
+      ? [for (final c in _b!['dePlantilla'] as List) Map<String, dynamic>.from(c as Map)]
+      : null;
   bool _adelante = true;
 
   late String _tipo = o?.tipo ?? 'curso';
@@ -68,8 +90,10 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   bool get _clinica => _tipo == 'clinica';
   late final _nombre = TextEditingController(text: o?.nombre ?? '');
   late final _descripcion = TextEditingController(text: o?.descripcion ?? '');
-  late final _precio = TextEditingController(text: o == null || o!.precio == 0 ? '' : '${o!.precio % 1 == 0 ? o!.precio.toInt() : o!.precio}');
-  late bool _cobrar = (o?.precio ?? 0) > 0;
+  late final _precio = TextEditingController(
+    text: _b?['precioTexto'] as String? ?? (o == null || o!.precio == 0 ? '' : '${o!.precio % 1 == 0 ? o!.precio.toInt() : o!.precio}'),
+  );
+  late bool _cobrar = _b?['cobrar'] as bool? ?? (o?.precio ?? 0) > 0;
   final _buscaPersona = TextEditingController();
   late bool _conCupo = o?.cupo != null;
   late int _cupo = o?.cupo ?? 20;
@@ -84,7 +108,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     for (var i = 0; i < (o?.fechas.length ?? 0); i++)
       if (Curso.tipoFecha(o!.fechas, i) == 'evaluacion') o!.fechas[i],
   ].firstOrNull;
-  late bool _conEvaluacion = o == null || _evalFecha != null || o!.temasEvaluacion.isNotEmpty;
+  late bool _conEvaluacion = _b?['conEvaluacion'] as bool? ?? (o == null || _evalFecha != null || o!.temasEvaluacion.isNotEmpty);
 
   // Temas de la evaluación con su mínimo; los quitados a mano no vuelven solos.
   late final List<Map<String, dynamic>> _evalTemas = [for (final t in o?.temasEvaluacion ?? const <Map<String, dynamic>>[]) Map<String, dynamic>.from(t)];
@@ -116,7 +140,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   }
 
   List<_PasoCurso> get _pasos => [
-    if (o == null && widget.plantillas.isNotEmpty) _PasoCurso.origen,
+    if (_nuevo && _hayOrigen) _PasoCurso.origen,
     _PasoCurso.tipo,
     _PasoCurso.nombre,
     _PasoCurso.para,
@@ -172,6 +196,25 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
       _paso = l[i];
       if (_paso == _PasoCurso.evaluacion) _sincronizarEvaluacion();
     });
+    _guardarBorrador();
+  }
+
+  /// Curso a medio armar (Victor, 2026-11-27): se guarda en el servidor en
+  /// cada paso para retomarlo con «Reanudar», desde cualquier teléfono.
+  Map<String, dynamic> get _borrador => {
+    'curso': _resultado,
+    'paso': _paso.name,
+    'conEvaluacion': _conEvaluacion,
+    'cobrar': _cobrar,
+    'precioTexto': _precio.text,
+    'dePlantilla': ?_dePlantilla,
+  };
+
+  void _guardarBorrador() {
+    if (!_nuevo || widget.alBorrador == null) return;
+    // Sin nada armado todavía no hace falta guardar.
+    if (_nombre.text.trim().isEmpty && _clases.isEmpty && _dePlantilla == null && _paso.index <= _PasoCurso.tipo.index) return;
+    widget.alBorrador!(_borrador);
   }
 
   // ── Fechas ──────────────────────────────────────────────────────────────
@@ -288,6 +331,27 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
               {'nombre': '${(t as Map)['nombre']}', 'minimo': (t['minimo'] as num?)?.toInt() ?? 5},
           ]);
         _conEvaluacion = _evalTemas.isNotEmpty;
+        // Un curso anterior trae también precio, cupo, para quién y equipo.
+        if (pl['precio'] is num) {
+          _cobrar = (pl['precio'] as num) > 0;
+          final pr = pl['precio'] as num;
+          _precio.text = pr == 0 ? '' : '${pr % 1 == 0 ? pr.toInt() : pr}';
+        }
+        if (pl.containsKey('cupo')) {
+          _conCupo = pl['cupo'] != null;
+          if (pl['cupo'] is num) _cupo = (pl['cupo'] as num).toInt();
+        }
+        if (pl['para'] is Map) {
+          _paraTipo = '${(pl['para'] as Map)['tipo'] ?? 'todos'}';
+          _paraValores
+            ..clear()
+            ..addAll([for (final v in ((pl['para'] as Map)['valores'] as List? ?? const [])) '$v']);
+        }
+        if (pl['cambiaEquipo'] is bool) {
+          _cambiaEquipo = pl['cambiaEquipo'] as bool;
+          _equipo = widget.equipos.contains(pl['equipoDestino']) ? '${pl['equipoDestino']}' : null;
+        }
+        _abierto = false;
       }
     });
     Future.delayed(const Duration(milliseconds: 180), () => mounted ? _ir(1) : null);
@@ -314,33 +378,59 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     });
   }
 
-  Widget _pasoOrigen(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      OpcionAsistente(
-        icono: Icons.edit_note_rounded,
-        titulo: 'Personalizado',
-        texto: 'Crea tus clases y los temas que quieras. Aparecerán en los eventos del calendario y podrás guardarlos como cursos pre-armados para usarlos cuando quieras.',
-        activa: _dePlantilla == null && _nombre.text.isEmpty,
-        alTocar: () => _usarPlantilla(null),
+  /// Cursos ya armados, en el mismo formato que una plantilla (Victor,
+  /// 2026-11-27: «si ya tenías otros cursos, desde acá los usas de nuevo»).
+  /// Los que se repiten cada semana no tienen clases fijas: no entran.
+  late final List<Map<String, dynamic>> _anteriores = [
+    for (final c in widget.anteriores)
+      if (!c.abierto && c.fechas.isNotEmpty)
+        {
+          'id': 'curso:${c.id}',
+          'nombre': c.nombre,
+          'tipo': c.tipo,
+          'descripcion': c.descripcion,
+          'clases': [
+            for (var i = 0; i < c.fechas.length; i++)
+              if (Curso.tipoFecha(c.fechas, i) != 'evaluacion') {'tipo': Curso.tipoFecha(c.fechas, i), 'temas': c.fechas[i]['temas'] ?? const []},
+          ],
+          'evaluacion': {'temas': c.temasEvaluacion},
+          'precio': c.precio,
+          'cupo': c.cupo,
+          'para': c.para,
+          'cambiaEquipo': c.cambiaEquipo,
+          'equipoDestino': c.equipoDestino,
+        },
+  ];
+
+  /// Pre-armados (Victor, 2026-11-18 y 27): no se crea nada nuevo aquí, son
+  /// lienzos ya hechos. Cada tarjeta se despliega con su precio, cupo, clases,
+  /// temas y evaluación; al usarla solo falta poner las fechas.
+  Widget _pasoOrigen(BuildContext context) {
+    Widget titulo(String t) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
       ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-        child: Text(
-          'PRE-ARMADOS',
-          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
-        ),
-      ),
-      for (final pl in widget.plantillas)
+    );
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
         OpcionAsistente(
-          icono: pl['sistema'] == true ? Icons.verified_outlined : Icons.bookmark_outline_rounded,
-          titulo: '${pl['nombre']}',
-          texto: [if ('${pl['descripcion'] ?? ''}'.isNotEmpty) '${pl['descripcion']}', '${(pl['clases'] as List? ?? const []).length} clases'].join(' · '),
-          activa: _nombre.text == '${pl['nombre']}',
-          alTocar: () => _usarPlantilla(pl),
+          icono: Icons.edit_note_rounded,
+          titulo: 'Personalizado',
+          texto: 'Crea tus clases y los temas que quieras. Aparecerán en los eventos del calendario y podrás guardarlos como cursos pre-armados para usarlos cuando quieras.',
+          activa: _dePlantilla == null && _nombre.text.isEmpty,
+          alTocar: () => _usarPlantilla(null),
         ),
-    ],
-  );
+        if (widget.plantillas.isNotEmpty) titulo('PRE-ARMADOS'),
+        for (final pl in widget.plantillas)
+          _TarjetaPreArmado(key: ValueKey('pl${pl['id']}'), pl: pl, equipos: widget.equipos, alUsar: () => _usarPlantilla(pl)),
+        if (_anteriores.isNotEmpty) titulo('TUS CURSOS ANTERIORES'),
+        for (final pl in _anteriores) _TarjetaPreArmado(key: ValueKey('${pl['id']}'), pl: pl, equipos: widget.equipos, alUsar: () => _usarPlantilla(pl)),
+      ],
+    );
+  }
 
   Widget _pasoTipo(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
@@ -488,12 +578,63 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
             }),
             child: switch (k) {
               'equipos' => _chipsPara([for (final e in widget.equipos) (e, e)]),
-              'nivel' => _chipsPara([for (final e in nivelesCoachElegibles.entries) (e.key, e.value)]),
+              'nivel' => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _chipsPara([for (final e in nivelesCoachElegibles.entries) (e.key, e.value)]),
+                  _personasDelNivel(context),
+                ],
+              ),
               'personas' => _elegirPersonas(context),
               _ => null,
             },
           ),
       ],
+    );
+  }
+
+  /// Quiénes están en los niveles elegidos (Victor, 2026-11-27), con su foto.
+  Widget _personasDelNivel(BuildContext context) {
+    final p = context.pivot;
+    String clave(String v) => switch (v) {
+      'basicas' => 'basica',
+      'avanzadas' => 'avanzada',
+      final x => x,
+    };
+    final elegidos = {for (final v in _paraValores) clave(v)};
+    final gente = [
+      for (final x in widget.personas)
+        if (elegidos.contains(clave(widget.nivelPersonas[x.$1] ?? 'sin'))) x,
+    ];
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: elegidos.isEmpty || widget.nivelPersonas.isEmpty
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    gente.isEmpty
+                        ? 'NADIE ESTÁ EN ESTE NIVEL TODAVÍA'
+                        : (gente.length == 1 ? '1 PERSONA EN ESTE NIVEL' : '${gente.length} PERSONAS EN ESTE NIVEL'),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  ),
+                  for (final x in gente)
+                    ListTile(
+                      key: ValueKey('n${x.$1}'),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: AvatarPersona(nombre: x.$2, foto: x.$3, tamano: 32),
+                      title: Text(x.$2),
+                      subtitle: Text(nivelesCoach[widget.nivelPersonas[x.$1]] ?? ''),
+                    ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -1014,7 +1155,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   }
 
   Map<String, Object?> get _resultado => {
-    'id': o?.id,
+    'id': _nuevo ? null : o?.id,
     'tipo': _tipo,
     'nombre': _nombre.text.trim(),
     'descripcion': _descripcion.text.trim(),
@@ -1049,7 +1190,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     final i = l.indexOf(_paso);
     final ultimo = _paso == l.last;
     return Asistente(
-      titulo: o == null ? (_clinica ? 'Nueva clínica' : 'Nuevo curso') : (_clinica ? 'Editar clínica' : 'Editar curso'),
+      titulo: _nuevo ? (_clinica ? 'Nueva clínica' : 'Nuevo curso') : (_clinica ? 'Editar clínica' : 'Editar curso'),
       indice: i,
       total: l.length,
       tituloPaso: switch (_paso) {
@@ -1086,7 +1227,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         _PasoCurso.precio => _pasoPrecio(context),
         _PasoCurso.resumen => _pasoResumen(context),
       },
-      textoBoton: _paso == _PasoCurso.origen || (_paso == _PasoCurso.tipo && o == null) ? null : (ultimo ? 'Guardar' : 'Siguiente'),
+      textoBoton: _paso == _PasoCurso.origen || (_paso == _PasoCurso.tipo && _nuevo) ? null : (ultimo ? 'Guardar' : 'Siguiente'),
       alContinuar: !_valido ? null : (ultimo ? () => Navigator.of(context).pop(_resultado) : () => _ir(1)),
     );
   }
@@ -1276,6 +1417,154 @@ class _HojaTemasState extends State<_HojaTemas> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un pre-armado o un curso anterior: se despliega con lo que trae
+/// (precio, cupo, para quién, clases con sus temas y evaluación) y se usa
+/// con «Usar este curso» (Victor, 2026-11-27).
+class _TarjetaPreArmado extends StatefulWidget {
+  const _TarjetaPreArmado({super.key, required this.pl, required this.equipos, required this.alUsar});
+  final Map<String, dynamic> pl;
+  final List<String> equipos;
+  final VoidCallback alUsar;
+  @override
+  State<_TarjetaPreArmado> createState() => _TarjetaPreArmadoState();
+}
+
+class _TarjetaPreArmadoState extends State<_TarjetaPreArmado> {
+  bool _abierta = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final pl = widget.pl;
+    final clases = [for (final c in (pl['clases'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+    final eval = [for (final t in ((pl['evaluacion'] as Map?)?['temas'] as List? ?? const [])) Map<String, dynamic>.from(t as Map)];
+    final precio = pl['precio'] as num?;
+    final cupo = pl['cupo'] as num?;
+    final para = pl['para'] as Map?;
+    final clinica = pl['tipo'] == 'clinica';
+    final datos = [
+      clinica ? 'Clínica' : (clases.length == 1 ? '1 clase' : '${clases.length} clases'),
+      if (eval.isNotEmpty) 'con evaluación',
+      if (precio != null) precio == 0 ? 'Gratis' : '${Moneda.s}${precio % 1 == 0 ? precio.toInt() : precio}',
+      if (cupo != null) 'cupo de $cupo',
+    ];
+    String textoPara() {
+      final v = [for (final x in (para?['valores'] as List? ?? const [])) '$x'];
+      return switch ('${para?['tipo']}') {
+        'equipos' => v.isEmpty ? 'Ciertos equipos' : v.join(', '),
+        'nivel' => v.isEmpty ? 'Por nivel' : v.map((x) => nivelesCoach[x] ?? x).join(', '),
+        'personas' => v.length == 1 ? '1 persona' : '${v.length} personas',
+        _ => 'Toda la liga',
+      };
+    }
+
+    TextStyle chica([Color? c]) => TextStyle(fontSize: 13, height: 1.35, color: c ?? p.textoSecundario);
+    Widget seccion(String t) => Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Text(
+        t,
+        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+      ),
+    );
+    final sistema = pl['sistema'] == true;
+    final anterior = '${pl['id']}'.startsWith('curso:');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: p.tarjeta,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: () => setState(() => _abierta = !_abierta),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+                child: Row(
+                  children: [
+                    IconoRecuadro(
+                      icono: sistema ? Icons.verified_outlined : (anterior ? Icons.history_rounded : Icons.bookmark_outline_rounded),
+                      seccion: 'entrenamientos',
+                      tamano: 40,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${pl['nombre']}',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(datos.join(' · '), style: chica()),
+                        ],
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _abierta ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: !_abierta
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if ('${pl['descripcion'] ?? ''}'.isNotEmpty) Text('${pl['descripcion']}', style: chica(p.texto)),
+                          if (para != null) ...[seccion('PARA'), Text(textoPara(), style: chica(p.texto))],
+                          if (pl['cambiaEquipo'] == true && '${pl['equipoDestino'] ?? ''}'.isNotEmpty) ...[
+                            seccion('AL APROBAR'),
+                            Text('Pasa a ${pl['equipoDestino']}', style: chica(p.texto)),
+                          ],
+                          if (clases.isNotEmpty) ...[
+                            seccion(clinica ? 'TEMAS' : 'CLASES Y TEMAS'),
+                            for (final (i, c) in clases.indexed)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  '${clinica ? '' : '${i + 1}. '}${(c['temas'] as List? ?? const []).isEmpty ? 'Sin temas todavía' : (c['temas'] as List).join(', ')}',
+                                  style: chica(p.texto),
+                                ),
+                              ),
+                          ],
+                          if (eval.isNotEmpty) ...[
+                            seccion('EVALUACIÓN'),
+                            Text(
+                              '${eval.length == 1 ? '1 tema' : '${eval.length} temas'}, mínimo para aprobar: ${{for (final t in eval) (t['minimo'] as num?)?.toInt() ?? 5}.join(' o ')} de 10.',
+                              style: chica(p.texto),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          FilledButton.icon(onPressed: widget.alUsar, icon: const Icon(Icons.check_rounded), label: const Text('Usar este curso')),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Después eliges las fechas y puedes cambiar lo que quieras.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: p.textoSecundario),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

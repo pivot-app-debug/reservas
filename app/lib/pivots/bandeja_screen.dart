@@ -6,6 +6,7 @@ import '../core/encabezado_seccion.dart';
 
 import '../coach/coach_screen.dart';
 import '../coach/por_evaluar.dart';
+import '../cursos/cursos_screen.dart' show CursosScreen;
 import '../core/sincroniza.dart';
 
 import '../core/config_liga.dart';
@@ -93,6 +94,9 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         SubAjustes.abrir(context, EquipamientoScreen(sesion: s));
       case 'notificaciones':
         SubAjustes.abrir(context, NotificacionesScreen(sesion: s));
+      case 'curso_borrador':
+        // Curso a medio armar (Victor, 2026-11-27): abre Cursos y el asistente.
+        if (s.adminToken != null) SubAjustes.abrir(context, CursosScreen(sesion: s, reanudar: true)).then((_) => repo.cargarMia());
     }
   }
 
