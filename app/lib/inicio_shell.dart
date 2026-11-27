@@ -248,11 +248,11 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
         NavigationDestination(
           icon: ValueListenableBuilder<bool>(
             valueListenable: Navegacion.puntoEntrenamiento,
-            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.sports_outlined)),
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.bolt_outlined)),
           ),
           selectedIcon: ValueListenableBuilder<bool>(
             valueListenable: Navegacion.puntoEntrenamiento,
-            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.sports)),
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.bolt)),
           ),
           label: 'Entreno',
         ),

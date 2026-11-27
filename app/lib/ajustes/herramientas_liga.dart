@@ -87,7 +87,7 @@ class GrupoHerramientasLiga extends StatelessWidget {
         final finanzas = FuncionesLiga.finanzas(sesion);
         final coach = FuncionesLiga.coach(sesion);
         const textoFinanzas = 'Tesorería, cuotas, cobros y comprobantes de la liga, para quienes gestionan finanzas.';
-        const textoCoach = 'Lxs entrenadorxs siguen las habilidades de cada persona, evalúan los entrenamientos y arman cursos.';
+        const textoCoach = 'El equipo técnico sigue las habilidades de cada persona, evalúa los entrenamientos y arma cursos.';
         return GrupoAjustes(
           pie: 'Si la liga no las usa, se ocultan para todo el mundo.',
           filas: [

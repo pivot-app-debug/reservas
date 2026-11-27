@@ -586,7 +586,7 @@ class SocialEnEventoState extends State<SocialEnEvento> {
           if (e.playlist != null) atajo(Icons.queue_music_rounded, 'Editar la playlist', editar.playlist),
           if (e.dress != null) atajo(Icons.checkroom_rounded, 'Editar el dress code', editar.dress),
         ],
-        if (areas.contains('invitados')) atajo(Icons.person_add_alt_1_outlined, 'Editar lxs invitadxs', editar.invitados),
+        if (areas.contains('invitados')) atajo(Icons.person_add_alt_1_outlined, 'Editar invitadxs', editar.invitados),
         if (areas.contains('fecha'))
           atajo(Icons.event_outlined, 'Cambiar fecha, hora o lugar', () async {
             await editarSocial(context, widget.repo, widget.evento);

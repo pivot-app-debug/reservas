@@ -85,7 +85,7 @@ class _NotificacionesEntrenadorScreenState extends State<NotificacionesEntrenado
     final p = context.pivot;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: barraCoach('Notificaciones de entrenador'),
+      appBar: barraCoach('Notificaciones del equipo técnico'),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
         children: [
@@ -96,7 +96,7 @@ class _NotificacionesEntrenadorScreenState extends State<NotificacionesEntrenado
               // Explicado con un ejemplo (Victor, 2026-11-27: no se entendía).
               title: const Text('Aviso semanal de su progreso'),
               subtitle: const Text(
-                'Si durante la semana evalúas una habilidad, anotas un resultado de prueba o dejas una nota a alguien, el lunes le llega: «Tu entrenadorx dejó notas o resultados esta semana. Míralos en Mi progreso». A quien no tiene nada nuevo no le llega nada.',
+                'Si durante la semana evalúas una habilidad, anotas un resultado de prueba o dejas una nota a alguien, el lunes le llega: «El equipo técnico dejó notas o resultados esta semana. Míralos en Mi progreso». A quien no tiene nada nuevo no le llega nada.',
               ),
               value: _novedades,
               onChanged: _resumen,

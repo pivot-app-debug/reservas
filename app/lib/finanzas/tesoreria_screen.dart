@@ -362,9 +362,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         const SizedBox(height: 8),
         Row(
           children: [
-            chico(Icons.shopping_bag_outlined, 'Usé plata del equipo', () => _plataDelEquipo(devolver: false)),
+            chico(Icons.shopping_bag_outlined, 'Usé del equipo', () => _plataDelEquipo(devolver: false)),
             const SizedBox(width: 10),
-            chico(Icons.undo_rounded, 'Devolví plata al equipo', () => _plataDelEquipo(devolver: true)),
+            chico(Icons.undo_rounded, 'Devolví al equipo', () => _plataDelEquipo(devolver: true)),
           ],
         ),
       ],
@@ -677,8 +677,8 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         child: _fila(
           context,
           Icons.sports_rounded,
-          'Pago a entrenadorxs',
-          'Regla de la liga y de cada equipo, y lo que se le debe a cada entrenadorx',
+          'Pago al equipo técnico',
+          'Regla de la liga y de cada equipo, y lo que se le debe a cada persona del equipo técnico',
           () => _abrir(PagoCoachesScreen(sesion: widget.sesion)),
         ),
       ),

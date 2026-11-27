@@ -2,6 +2,16 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (equipo técnico y ajustes de Liga)
+- «Equipo técnico» en lugar de «entrenadorxs» en toda la app, y textos generales sin «lxs» ni «unx».
+- Entreno: nueva sección «Equipo técnico» con cada persona, los equipos que entrena y, para Pivots, «+» para sumar y ⋮ para cambiar equipos o quitar. Lo que llevas este mes (si entrenas) pasó de Mi perfil a esta sección. El ícono de Entreno ahora es un rayo.
+- Liga: botones de cada equipo uno encima del otro; quien no ve Finanzas tiene Inventario en su lugar; «¿Qué son Pivots?»; personas archivadas con su explicación desplegable.
+- Vista de un equipo: «Cómo se sube o baja» arriba de todo, «Cómo se paga» dentro de Pagos, «Cómo se ganan puntos» incluye las tareas y ya no dice «Hoy lo cumplen».
+- Finanzas: «Usé del equipo» y «Devolví al equipo».
+- Calendario: el «+» vuelve a crear eventos para quien puede.
+- Mi progreso dice qué nivel sigue y cuántas habilidades faltan para completarlo.
+- Corregido: al volver de un viaje, una lesión o una ausencia con motivo, nadie pasa a «Sin actividad» de inmediato; los días se cuentan desde la vuelta.
+
 ## 2026-11-27 (cursos y planes por persona)
 - Pre-armados: cada curso pre-armado se despliega con su precio, cupo, para quién, clases con sus temas y evaluación. «Usar este curso» lo copia y solo eliges las fechas. Nueva sección «Tus cursos anteriores» para reutilizar un curso que ya armaste.
 - Reanudar: un curso a medio armar se guarda solo. Arriba de Cursos y en Notificaciones aparece «Curso a medio armar» para seguirlo (también desde otro teléfono) o descartarlo.

@@ -86,15 +86,16 @@ class MiProgresoHero extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Expanded(child: Text('$ok de $total · ${actual.nombre}', style: st(13, FontWeight.w700))),
+                          Expanded(child: Text('Siguiente: ${actual.nombre} · $ok de $total', style: st(13, FontWeight.w700))),
                           Text('${total == 0 ? 0 : (ok * 100 / total).round()} %', style: st(13, FontWeight.w700)),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         falta == 0
-                            ? 'Ya casi: falta que tu entrenadorx lo marque.'
-                            : 'Te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'} para completarlo.',
+                            ? 'Ya casi: falta que el equipo técnico lo marque.'
+                            // Con el nombre del nivel: antes parecía que faltaban básicas (QA 2026-11-27).
+                            : 'Te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'} para completar ${actual.nombre}.',
                         style: st(14),
                       ),
                     ] else if (d != null) ...[
@@ -118,7 +119,7 @@ class MiProgresoHero extends StatelessWidget {
                         children: [
                           if (ultima != null)
                             chip('${ultima['nombre']}: ${_num(ultima['mejor'])}${'${ultima['unidad'] ?? ''}'.isEmpty ? '' : ' ${ultima['unidad']}'}'),
-                          if (notas > 0) chip(notas == 1 ? '1 nota de tu entrenadorx' : '$notas notas de tus entrenadorxs'),
+                          if (notas > 0) chip(notas == 1 ? '1 nota del equipo técnico' : '$notas notas del equipo técnico'),
                           if (gruposLogrados > 0) chip(gruposLogrados == 1 ? '1 grupo completo' : '$gruposLogrados grupos completos'),
                         ],
                       ),

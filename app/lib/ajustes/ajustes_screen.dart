@@ -1,5 +1,3 @@
-import '../coach/mi_estimado.dart';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -154,7 +152,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
               BannerAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
               // Lo que llevas como entrenadorx este mes (Victor, 2026-11-27: antes en Entreno).
-              if (sesion.esCoach) MiEstimado(sesion: sesion),
               // Herramientas de la liga salió de Mi perfil (Victor, 2026-11-22):
               // todo está en Liga; los interruptores, en Mi Liga.
 

@@ -221,7 +221,7 @@ class _ExcepcionesPanelScreenState extends State<ExcepcionesPanelScreen> {
     icono: Icons.hourglass_top_rounded,
     seccion: 'cuota',
     titulo: s.tipo == 'ausencias' ? 'Ausencias justificadas' : 'Dificultades económicas',
-    valor: '${_mesTexto(s.mes)} · ${s.leen.isEmpty ? 'la revisan todxs lxs administradorxs' : 'la revisa ${s.leen.join(', ')}'}',
+    valor: '${_mesTexto(s.mes)} · ${s.leen.isEmpty ? 'la revisan todos los Pivots' : 'la revisa ${s.leen.join(', ')}'}',
   );
 
   Widget _filaExcepcion(_Excepcion e) => FilaAjuste(

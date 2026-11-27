@@ -103,8 +103,12 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     }
   }
 
+  /// Sin Finanzas (no Pivots de finanzas), Inventario ocupa su tarjeta y sale
+  /// de la barra (Victor, 2026-11-27).
+  bool get _conFinanzas => _atajos().contains(PestanaLiga.finanzas);
+
   List<AtajoColor> _atajosColor() => [
-    for (final x in _atajos().where((x) => x == PestanaLiga.redes || x == PestanaLiga.finanzas))
+    for (final x in _atajos().where((x) => x == PestanaLiga.redes || x == PestanaLiga.finanzas || (!_conFinanzas && x == PestanaLiga.inventario)))
       AtajoColor(
         icono: _iconoLiga(x),
         seccion: switch (x) {
@@ -119,6 +123,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           PestanaLiga.redes =>
             _enlaces == null ? null : (_enlaces == 0 ? 'Grupos y redes de la liga' : (_enlaces == 1 ? '1 grupo o red' : '$_enlaces grupos y redes')),
           PestanaLiga.finanzas => _totalCuentas == null ? null : '${plata(_totalCuentas!)} en cuentas',
+          PestanaLiga.inventario => 'Equipamiento de la liga',
           _ => 'Reglas, cuotas y equipos',
         },
         alTocar: () => _abrirAtajo(x),
@@ -199,16 +204,18 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           title: _buscador(p),
           // Inventario y Ajustes se abren menos: íconos al lado del buscador
           // (Victor, 2026-11-27).
+          // Mismos íconos (y trazo) que el resto de la app (QA 2026-11-27).
           actions: [
-            ListenableBuilder(
-              listenable: _avisos,
-              builder: (context, _) => IconButton(
-                tooltip: 'Inventario',
-                onPressed: () => _abrirAtajo(PestanaLiga.inventario),
-                icon: Badge(isLabelVisible: _avisos.inventario, smallSize: 9, backgroundColor: p.marca, child: const Icon(Symbols.inventory_2_rounded)),
+            if (_conFinanzas)
+              ListenableBuilder(
+                listenable: _avisos,
+                builder: (context, _) => IconButton(
+                  tooltip: 'Inventario',
+                  onPressed: () => _abrirAtajo(PestanaLiga.inventario),
+                  icon: Badge(isLabelVisible: _avisos.inventario, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.inventory_2_outlined)),
+                ),
               ),
-            ),
-            if (_pivot) IconButton(tooltip: 'Ajustes de la liga', onPressed: () => _abrirAtajo(PestanaLiga.miLiga), icon: const Icon(Symbols.settings_rounded)),
+            if (_pivot) IconButton(tooltip: 'Ajustes de la liga', onPressed: () => _abrirAtajo(PestanaLiga.miLiga), icon: const Icon(Icons.settings_outlined)),
             const SizedBox(width: 4),
           ],
         ),
@@ -432,7 +439,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   String _label(String grupo) => switch (grupo) {
     'Inactivxs' => 'Sin actividad',
-    'Coaches' => 'Entrenadorxs',
+    'Coaches' => 'Equipo técnico',
     _ => grupo,
   };
 
@@ -483,7 +490,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final esEquipo = g != 'Inactivxs' && g != 'Coaches' && g != 'Pivots';
     final String? texto = switch (g) {
       'Inactivxs' => _pivot ? 'Personas archivadas' : null,
-      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar entrenadorxs' : 'Ver entrenadorxs') : null,
+      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar equipo técnico' : 'Ver equipo técnico') : null,
       'Pivots' => _pivot ? 'Gestionar Pivots' : null,
       _ => _pivot ? 'Gestionar $g' : 'Ver $g',
     };
@@ -496,12 +503,14 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      // Uno encima del otro: con un nombre de equipo largo, lado a lado se cortaban (QA 2026-11-27).
       child: esEquipo && _pivot
-          ? Row(
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: gestionar),
-                const SizedBox(width: 8),
-                Expanded(
+                gestionar,
+                const SizedBox(height: 8),
+                SizedBox(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                     onPressed: () async {

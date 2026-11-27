@@ -348,7 +348,7 @@ class _CoachScreenState extends State<CoachScreen> {
           AtajoColor(
             icono: Symbols.badge_rounded,
             seccion: 'organizacion',
-            titulo: 'Entrenadorxs',
+            titulo: 'Equipo técnico',
             detalle: '${(_d?['coaches'] as List? ?? const []).length} en la liga',
             alTocar: () => _abrir(CoachesScreen(sesion: s)),
           ),
@@ -815,7 +815,7 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
               if (esCoach && pl['compartido'] != true)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Solo lo ven lxs entrenadorxs.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                  child: Text('Solo lo ve el equipo técnico.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                 ),
             ],
             // Al terminar: los entrenamientos se evalúan siempre desde aquí
@@ -865,7 +865,7 @@ String _codigoQuienVe(Set<String> s) => s.isEmpty ? 'yo' : '${const ['jugadorx',
 const _opcionesQuienVe = [
   ('jugadorx', 'Usuarios', Icons.person_outline_rounded),
   ('pivots', 'Pivots', Icons.shield_outlined),
-  ('coaches', 'Entrenadorxs', Icons.sports_rounded),
+  ('coaches', 'Equipo técnico', Icons.sports_rounded),
 ];
 
 /// "Usuarios y Pivots", "Solo yo".
@@ -1487,7 +1487,7 @@ Future<List<String>?> elegirEquiposCoach(BuildContext context, Sesion s, List<St
             children: [
               const Text('¿Qué equipos lleva?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              Text('Ve y sigue solo a lxs jugadorxs de esos equipos.', style: TextStyle(fontSize: 13, color: c.pivot.textoSecundario)),
+              Text('Ve y sigue solo a la gente de esos equipos.', style: TextStyle(fontSize: 13, color: c.pivot.textoSecundario)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -1569,7 +1569,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
               title: Text(
-                c['estado'] == 'pendiente' ? 'Rechazar solicitud' : ('${c['username']}' == s.nombre ? 'Dejar de ser entrenadorx' : 'Quitar de entrenadorxs'),
+                c['estado'] == 'pendiente' ? 'Rechazar solicitud' : ('${c['username']}' == s.nombre ? 'Dejar el equipo técnico' : 'Quitar del equipo técnico'),
                 style: TextStyle(color: h.pivot.marcaTexto),
               ),
               onTap: () => Navigator.of(h).pop(c['estado'] == 'pendiente' ? 'rechazar' : 'quitar'),
@@ -1595,14 +1595,14 @@ class _CoachesScreenState extends State<CoachesScreen> {
     final l = _l;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: barraCoach('Entrenadorxs'),
+      appBar: barraCoach('Equipo técnico'),
       body: l == null
           ? const Esqueleto()
           : ListView(
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text(
-                  'Lxs entrenadorxs ven a lxs jugadorxs de sus equipos (sin datos de salud), siguen su progreso, arman el plan de cada evento y toman asistencia.',
+                  'El equipo técnico ve a la gente de sus equipos (sin datos de salud), sigue su progreso, arma el plan de cada evento y toma asistencia.',
                   style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
                 ),
                 const SizedBox(height: 12),
@@ -1610,7 +1610,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 20),
                     child: Center(
-                      child: Text('Todavía no hay entrenadorxs.', style: TextStyle(color: p.textoSecundario)),
+                      child: Text('Todavía no hay nadie en el equipo técnico.', style: TextStyle(color: p.textoSecundario)),
                     ),
                   ),
                 for (final c in l)
@@ -1620,7 +1620,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                     title: Text('${c['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text(
                       c['estado'] == 'pendiente'
-                          ? 'Pidió ser entrenadorx${'${c['mensaje'] ?? ''}'.isEmpty ? '' : ': ${c['mensaje']}'}'
+                          ? 'Pidió sumarse al equipo técnico${'${c['mensaje'] ?? ''}'.isEmpty ? '' : ': ${c['mensaje']}'}'
                           : ((c['equipos'] as List? ?? const []).isEmpty ? 'Todos los equipos' : (c['equipos'] as List).join(' · ')),
                     ),
                     trailing: const Icon(Icons.more_horiz_rounded),
@@ -1633,7 +1633,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _nombrar,
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text('Nombrar entrenadorx'),
+                    label: const Text('Sumar al equipo técnico'),
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                   ),
                 ),
@@ -1658,10 +1658,10 @@ class FilaSerCoach extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Quiero ser entrenadorx', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const Text('Quiero sumarme al equipo técnico', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas de entrenadorx en Entreno para seguir el progreso de tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas del equipo técnico en Entreno para seguir el progreso de la gente que entrenas, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),
@@ -1696,7 +1696,7 @@ class FilaSerCoach extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('¿Dejar de ser entrenadorx?'),
+        title: const Text('¿Dejar el equipo técnico?'),
         content: const Text(
           'Dejas de ver las herramientas de entrenamiento. Las evaluaciones y notas que hiciste se conservan. Puedes volver a pedirlo cuando quieras.',
         ),
@@ -1711,7 +1711,7 @@ class FilaSerCoach extends StatelessWidget {
       final r = await sesion.api.post('dejarDeSerCoach', {});
       if (r['exito'] == false) throw ApiException('${r['error']}');
       await sesion.cargarCoach();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya no eres entrenadorx.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya no estás en el equipo técnico.')));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
@@ -1726,15 +1726,15 @@ class FilaSerCoach extends StatelessWidget {
         return FilaAjuste(
           icono: Icons.sports_rounded,
           seccion: 'coach',
-          titulo: 'Dejar de ser entrenadorx',
-          valor: 'Dejas de ser entrenadorx; tus evaluaciones se conservan',
+          titulo: 'Dejar el equipo técnico',
+          valor: 'Dejas el equipo técnico; tus evaluaciones se conservan',
           alTocar: () => _dejar(context),
         );
       }
       return FilaAjuste(
         icono: Icons.sports_rounded,
         seccion: 'coach',
-        titulo: 'Quiero ser entrenadorx',
+        titulo: 'Quiero sumarme al equipo técnico',
         valor: e == 'pendiente' ? 'Pedido enviado: un Pivot lo está revisando' : 'Pide las herramientas de entrenamiento',
         alTocar: e == 'pendiente' ? null : () => _pedir(context),
       );
@@ -2960,7 +2960,7 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Nombrar entrenadorx', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Sumar al equipo técnico', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
         child: Column(
@@ -2971,7 +2971,7 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
                 controller: _q,
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién será entrenadorx?'),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién se suma al equipo técnico?'),
               ),
             ),
             Expanded(

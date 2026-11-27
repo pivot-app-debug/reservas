@@ -251,7 +251,7 @@ class _PivotsScreenState extends State<PivotsScreen> {
                             padding: EdgeInsets.only(bottom: 12),
                             child: BannerAyuda(
                               clave: 'equipo_Pivots',
-                              titulo: '¿Qué son lxs Pivots?',
+                              titulo: '¿Qué son Pivots?',
                               texto: 'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.',
                             ),
                           ),

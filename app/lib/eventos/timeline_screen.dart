@@ -22,6 +22,7 @@ import '../reservas/reserva_screen.dart';
 import '../reservas/reservas_repo.dart';
 import 'calendario_panel.dart';
 import 'crear_evento_screen.dart';
+import 'social/crear_social_screen.dart';
 import 'social/social_plantillas.dart';
 import 'deco_fiesta.dart';
 import 'tarjeta_cumple.dart';
@@ -1532,8 +1533,8 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           ajuste: ClavesTour.pestana(1),
           titulo: 'Entreno',
           texto: [
-            if (FuncionesLiga.usaCoach(repo.sesion)) 'Tus herramientas de entrenadorx: el próximo entrenamiento, los planes y lo que falta evaluar.',
-            if (FuncionesLiga.coach(repo.sesion)) 'Tu progreso: habilidades, pruebas y notas de tus entrenadorxs.',
+            if (FuncionesLiga.usaCoach(repo.sesion)) 'Tus herramientas del equipo técnico: el próximo entrenamiento, los planes y lo que falta evaluar.',
+            if (FuncionesLiga.coach(repo.sesion)) 'Tu progreso: habilidades, pruebas y notas del equipo técnico.',
             'Los cursos y clínicas que puedes tomar.',
           ].join(' '),
         ),
@@ -1579,8 +1580,10 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       t == TipoReserva.clase
           ? _Accion(Icons.event_available_outlined, 'Reserva por clase', () => _reservar(t))
           : _Accion(Icons.calendar_month_outlined, 'Reserva por mes', () => _reservar(t)),
-    // Crear eventos pasó a Actividad → Eventos (Victor, 2026-11-20): aquí
-    // quedan reservas, pagos y suscripciones.
+    // Crear eventos vuelve al «+» para quien puede crearlos (QA 2026-11-27);
+    // también sigue en Actividad → Eventos.
+    if (repo.sesion.esAdmin) _Accion(Icons.event_rounded, 'Crear un evento', _crearEvento),
+    if (!repo.sesion.esAdmin && repo.sesion.puedeCrearSocial) _Accion(Icons.celebration_rounded, 'Crear una fiesta', _crearEvento),
     // Social o fiesta (Victor, 2026-11-20): los Pivots lo crean en Nuevo evento →
     // Único; el resto, en ⋯ → "Crear un evento".
 
@@ -1615,6 +1618,17 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
   }
 
   /// Resultado de Nuevo evento (se crea desde Actividad → Eventos).
+  Future<void> _crearEvento() async {
+    final nav = Navigator.of(context);
+    if (repo.sesion.esAdmin) {
+      final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearEventoScreen(repo: repo)));
+      if (r != null && mounted) await _alCrearEvento(r);
+      return;
+    }
+    final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: repo.sesion)));
+    if (r is Map && mounted) await _alCrearSocial(r);
+  }
+
   Future<void> _alCrearEvento(Object? r) async {
     if (r == null || !mounted) return;
     if (r is Map) {

@@ -12,6 +12,7 @@ import '../eventos/detalle_screen.dart' show DetalleScreen;
 import '../eventos/eventos_repo.dart';
 import '../sesion/sesion.dart';
 import 'coach_screen.dart';
+import 'equipo_tecnico.dart';
 import 'mi_progreso_hero.dart';
 import 'niveles_coach.dart';
 
@@ -232,13 +233,14 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
         // Herramientas de entrenadorx en la barra (mockup B).
         actions: _usaCoach
             ? [
-                IconButton(tooltip: 'Habilidades', onPressed: () => ir('habilidades'), icon: const Icon(Symbols.military_tech_rounded)),
-                IconButton(tooltip: 'Pruebas', onPressed: () => ir('pruebas'), icon: const Icon(Symbols.timer_rounded)),
-                if (_puedeNombrar) IconButton(tooltip: 'Entrenadorxs', onPressed: () => ir('entrenadorxs'), icon: const Icon(Symbols.badge_rounded)),
+                // Mismos íconos (y trazo) que el resto de la app; el equipo
+                // técnico pasó a una sección de la portada (QA 2026-11-27).
+                IconButton(tooltip: 'Habilidades', onPressed: () => ir('habilidades'), icon: const Icon(Icons.military_tech_outlined)),
+                IconButton(tooltip: 'Pruebas', onPressed: () => ir('pruebas'), icon: const Icon(Icons.timer_outlined)),
                 IconButton(
-                  tooltip: 'Notificaciones de entrenador',
+                  tooltip: 'Notificaciones del equipo técnico',
                   onPressed: () => ir('notificaciones'),
-                  icon: const Icon(Symbols.notifications_active_rounded),
+                  icon: const Icon(Icons.notifications_active_outlined),
                 ),
                 const SizedBox(width: 4),
               ]
@@ -250,7 +252,13 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               eventos: widget.eventos,
               embebida: true,
               encabezado: _hero(compacto: true),
-              despuesDelProximo: _carrusel(context),
+              despuesDelProximo: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _carrusel(context),
+                  EquipoTecnicoSeccion(sesion: s),
+                ],
+              ),
               herramienta: _herramienta,
             )
           : _paraTodxs(context),
@@ -275,6 +283,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
             children: [
               _hero(),
               _carrusel(context),
+              if (_puedeNombrar) EquipoTecnicoSeccion(sesion: s),
               if (proximos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),

@@ -485,7 +485,17 @@ async function _ultimaAsistenciaRealPorUsuario(): Promise<Record<string, string>
   // la historia de asistencias reales.
   const { data, error } = await supabase.rpc('fn_ultima_asistencia_real_por_usuario');
   if (error) console.error('[asist] error rpc real:', JSON.stringify(error));
-  return (data ?? {}) as Record<string, string>;
+  const mapa = { ...((data ?? {}) as Record<string, string>) };
+  // Vuelta de un viaje, lesión o ausencia con motivo (Victor, 2026-11-27):
+  // cuenta como punto de partida para la inactividad, así volver de un viaje
+  // largo no deja a la persona como Inactivx de inmediato.
+  const { data: vueltas } = await supabase.from('equipo').select('username, vuelta_en').not('vuelta_en', 'is', null);
+  for (const v of vueltas ?? []) {
+    const k = String(v.username ?? '').trim().toUpperCase();
+    const f = String(v.vuelta_en).slice(0, 10);
+    if (!mapa[k] || String(mapa[k]).slice(0, 10) < f) mapa[k] = f;
+  }
+  return mapa;
 }
 // Lee el mapa de arriba para UNA persona puntual (`username` real, no
 // normalizado) -- devuelve la fecha ISO completa (con hora) tal cual quedó
@@ -3949,7 +3959,7 @@ async function adminRolesEquipo(params: Record<string, any>): Promise<Record<str
     if (existe(nombre)) return { exito: false, error: 'Ese rol ya existe.' };
     roles.push(nombre);
     } else if ((accion === 'renombrar' || accion === 'borrar') && nombre === ROL_COACH) {
-    return { exito: false, error: 'Entrenadorx no se puede cambiar ni borrar: es el rol de quienes entrenan y pasa por revisión.' };
+    return { exito: false, error: 'Equipo técnico no se puede cambiar ni borrar: es el rol de quienes entrenan y pasa por revisión.' };
   } else if (accion === 'renombrar') {
     const i = roles.indexOf(nombre);
     if (i < 0) return { exito: false, error: 'Ese rol ya no existe.' };
@@ -5199,7 +5209,7 @@ async function pedirCoach(params: Record<string, any>): Promise<Record<string, a
   await supabase.from('coaches').upsert({ username: yo, estado: 'pendiente', mensaje: String(params.mensaje ?? '').trim().slice(0, 300) || null, pedido_en: new Date().toISOString(), resuelto_por: null, resuelto_en: null });
   const admins = await _adminDestinatariosPush(undefined, 'equipo');
   if (admins.length) {
-    await sendPush({ tipo: 'nueva_solicitud', include_external_user_ids: admins, headings: { es: 'Pedido para ser entrenadorx' }, contents: { es: `${yo} pidió ser entrenadorx. Revísalo en Notificaciones.` }, url: APP_URL + '/' }).catch(() => {});
+    await sendPush({ tipo: 'nueva_solicitud', include_external_user_ids: admins, headings: { es: 'Pedido para sumarse al equipo técnico' }, contents: { es: `${yo} pidió sumarse al equipo técnico. Revísalo en Notificaciones.` }, url: APP_URL + '/' }).catch(() => {});
   }
   return { exito: true, estado: 'pendiente' };
 }
@@ -5508,7 +5518,7 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
     const { data: f } = await supabase.from('equipo').select('roles').eq('username', username).maybeSingle();
     const rs = Array.isArray(f?.roles) ? f!.roles : [];
     if (!rs.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: [...rs, ROL_COACH] }).eq('username', username);
-    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: '¡Ya eres entrenadorx!' }, contents: { es: 'Tienes la sección Entreno en la barra de abajo para seguir el progreso de tus jugadorxs.' }, url: APP_URL + '/' }).catch(() => {});
+    await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: '¡Ya estás en el equipo técnico!' }, contents: { es: 'Tienes la sección Entreno en la barra de abajo para seguir el progreso de la gente que entrenas.' }, url: APP_URL + '/' }).catch(() => {});
   } else if (accion === 'equipos') {
     await supabase.from('coaches').update({ equipos }).eq('username', username);
   } else if (accion === 'rechazar' || accion === 'quitar') {
@@ -5516,7 +5526,7 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
     const { data: f } = await supabase.from('equipo').select('roles').eq('username', username).maybeSingle();
     if (Array.isArray(f?.roles) && f!.roles.includes(ROL_COACH)) await supabase.from('equipo').update({ roles: f!.roles.filter((r: string) => r !== ROL_COACH) }).eq('username', username);
     if (accion === 'rechazar') {
-      await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: 'Pedido para ser entrenadorx' }, contents: { es: 'Esta vez un Pivot no lo aprobó. Puedes hablarlo con el equipo.' }, url: APP_URL + '/' }).catch(() => {});
+      await sendPush({ tipo: 'solicitud_resuelta', include_external_user_ids: [username], headings: { es: 'Pedido para sumarse al equipo técnico' }, contents: { es: 'Esta vez un Pivot no lo aprobó. Puedes hablarlo con el equipo.' }, url: APP_URL + '/' }).catch(() => {});
     }
   }
   const { data } = await supabase.from('coaches').select('*').neq('estado', 'rechazado').order('pedido_en');
@@ -5533,7 +5543,7 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
 // Coach: inicio (jugadorxs y próximos planes).
 async function getCoach(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx (o un Pivot todavía no lo aprobó).' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico (o un Pivot todavía no lo aprobó).' };
   const personas = await _jugadorxsDe(c.equipos);
   const asis = await _asistencias30(personas.map((p: any) => p.username));
   const { data: evs } = await supabase.from('coach_evaluaciones').select('username, habilidad_id, nivel, creado_en').in('username', personas.map((p: any) => p.username)).order('creado_en', { ascending: false }).limit(5000);
@@ -5552,7 +5562,7 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
   // Planes sin fecha (de un evento cancelado) y para elegir equipo y quién lo da (Victor, 2026-11-17).
   const { data: sinFecha } = await supabase.from('coach_planes').select('id, coach, bloques, compartido, equipo, da, actualizado_en').is('id_evento', null).order('actualizado_en', { ascending: false }).limit(30);
   const { data: tiersC } = await supabase.from('config_tiers').select('nombre').order('orden');
-  const { data: coachesC } = await supabase.from('coaches').select('username').eq('estado', 'aprobado');
+  const { data: coachesC } = await supabase.from('coaches').select('username, equipos').eq('estado', 'aprobado');
   const quienC = await _mapaEquipoPorNombre();
   return {
     exito: true,
@@ -5560,7 +5570,8 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
     sinFecha: sinFecha ?? [],
     equiposPlan: c.equipos.length ? c.equipos : (tiersC ?? []).map((t: any) => t.nombre),
     deTodaLaLiga: !c.equipos.length,
-    coaches: (coachesC ?? []).map((x: any) => ({ username: x.username, nombre: quienC[String(x.username).toUpperCase()]?.nombreDerby || x.username })),
+    // Equipo técnico en Entreno (Victor, 2026-11-27): con foto y equipos.
+    coaches: (coachesC ?? []).map((x: any) => ({ username: x.username, nombre: quienC[String(x.username).toUpperCase()]?.nombreDerby || x.username, foto: quienC[String(x.username).toUpperCase()]?.fotoPerfil ?? '', equipos: x.equipos ?? [], estado: 'aprobado' })),
     ...(await (async () => {
       const { data: yoC } = await supabase.from('coaches').select('avisar_novedades, sin_avisos').eq('username', c.user).maybeSingle();
       return { avisarNovedades: yoC?.avisar_novedades !== false, sinAvisos: (yoC?.sin_avisos as string[]) ?? [] };
@@ -5657,7 +5668,7 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
 // Coach: guardar evaluación, nota, plan o la lista de habilidades.
 async function coachGuardar(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx.' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico.' };
   const accion = String(params.accion ?? '');
   const username = String(params.username ?? '').trim();
   if (['evaluar', 'nota', 'borrarNota', 'nivel'].includes(accion) && !(await _puedeVer(c, username))) return { exito: false, error: 'Esa persona no está en tus equipos.' };
@@ -5811,7 +5822,7 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
 
 async function getHabilidades(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx.' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico.' };
   return { exito: true, habilidades: await _habilidades(), niveles: await _nivelesLiga() };
 }
 
@@ -5917,7 +5928,7 @@ async function _vinieron(idEvento: string, coach: { equipos: string[] }): Promis
 
 async function coachPruebas(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx.' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico.' };
   const accion = String(params.accion ?? 'listar');
   if (accion === 'guardar') {
     let personas: string[] = [];
@@ -5979,7 +5990,7 @@ async function _progresoPersona(username: string, ve: (x: any) => boolean): Prom
 // Feedback de un evento: lxs que vinieron de sus equipos y lo ya anotado.
 async function coachFeedbackEvento(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx.' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico.' };
   const idEvento = String(params.idEvento ?? '').trim();
   if (!idEvento) return { exito: false, error: 'Falta el evento.' };
   if (String(params.accion ?? '') === 'guardar') {
@@ -6078,7 +6089,7 @@ async function _avisarNovedadesFicha(): Promise<number> {
   await sendPush({
     tipo: 'novedades_progreso', include_external_user_ids: [...quienes], pantalla: 'progreso',
     headings: { es: 'Novedades en tu progreso' },
-    contents: { es: 'Tu entrenadorx dejó notas o resultados esta semana. Míralos en Mi progreso.' }, url: APP_URL + '/',
+    contents: { es: 'El equipo técnico dejó notas o resultados esta semana. Míralos en Mi progreso.' }, url: APP_URL + '/',
   }).catch(() => {});
   return quienes.size;
 }
@@ -6086,7 +6097,7 @@ async function _avisarNovedadesFicha(): Promise<number> {
 // Coach toma asistencia de sus equipos (sin ser Pivot).
 async function coachMarcarAsistencia(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
-  if (!c) return { exito: false, error: 'No eres entrenadorx.' };
+  if (!c) return { exito: false, error: 'No estás en el equipo técnico.' };
   const nombre = String(params.nombre ?? '').trim();
   if (!(await _puedeVer(c, nombre))) return { exito: false, error: 'Esa persona no está en tus equipos.' };
   return await adminMarcarAsistencia({ idEvento: params.idEvento, nombre, estado: params.estado }, c.user);
@@ -8580,6 +8591,8 @@ function _camposSalidaEstado(fila: Record<string, any> | null, estadoNuevo: stri
   const previo = fila?.estado_miembro ?? null;
   const u: Record<string, any> = {};
   if (!previo || previo === estadoNuevo) return u;
+  // Al volver a Activx desde un estado que congela, se anota la vuelta (2026-11-27).
+  if (estadoNuevo === 'Activx' && (previo === 'De viaje' || previo === 'Lesionadx' || ESTADOS_NUEVOS.includes(previo))) u.vuelta_en = _hoyEcuadorISO();
     if (previo === 'De viaje') { u.viaje_desde = null; u.viaje_hasta = null; }
   if (ESTADOS_NUEVOS.includes(previo)) u.exenta_cuota = false;
   if (previo === 'Lesionadx') {

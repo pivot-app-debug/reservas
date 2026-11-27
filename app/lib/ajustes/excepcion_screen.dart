@@ -401,16 +401,16 @@ class _ExcepcionScreenState extends State<ExcepcionScreen> {
               fila(ausencias ? 'Qué pasó' : 'Tu situación', _texto.text.trim()),
               if (!ausencias) fila('Tu aporte', _compromiso, cambiar: () => _irA(_Paso.aportar)),
               fila('Mes', Fechas.mesAnio(Fechas.hoy())),
-              fila('La leen y aprueban', todos ? 'Todxs lxs administradorxs' : nombres.join(', '), cambiar: () => _irA(_Paso.detalle)),
+              fila('La leen y aprueban', todos ? 'Todos los Pivots' : nombres.join(', '), cambiar: () => _irA(_Paso.detalle)),
             ],
           ),
         ),
         const SizedBox(height: 14),
         AvisoPrivado(
           texto: ausencias
-              ? 'Solo lxs administradorxs que elegiste podrán leer y aprobar tu solicitud. Recibirás una notificación con la '
+              ? 'Solo los Pivots que elegiste podrán leer y aprobar tu solicitud. Recibirás una notificación con la '
                     'respuesta. Si se aprueba, pagas media cuota desde este mes; un Pivot decide por cuánto tiempo.'
-              : 'Solo lxs administradorxs que elegiste podrán leer y aprobar tu solicitud. Recibirás una notificación con la '
+              : 'Solo los Pivots que elegiste podrán leer y aprobar tu solicitud. Recibirás una notificación con la '
                     'respuesta. Si se aprueba, la subvención se aplica desde este mes; un Pivot decide cuánto y por cuánto tiempo.',
         ),
       ],
@@ -460,7 +460,7 @@ class _SelectorAdmins extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Esta información es confidencial. Solo lxs administradorxs que elijas podrán leer y aprobar tu solicitud.',
+                        'Esta información es confidencial. Solo los Pivots que elijas podrán leer y aprobar tu solicitud.',
                         style: TextStyle(fontSize: 13.5, height: 1.35, color: p.sobreSuave),
                       ),
                     ),

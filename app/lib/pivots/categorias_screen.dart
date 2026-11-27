@@ -972,6 +972,35 @@ class _EquipoScreenState extends State<_EquipoScreen> {
 
   /// Cobros, clase de gracia, equipamiento y lo de toda la liga que afecta
   /// al equipo (antes en Reglas → "Puntos y equipos").
+  /// Cómo se sube o baja del equipo: arriba de todo (QA 2026-11-27).
+  Widget _bannerSubir() {
+    if (_piso) return const SizedBox.shrink();
+    final r = _Regla.de(t);
+    final propio = _unirY(_propioNombres(t));
+    final curso = '${(t['requisitos'] as Map?)?['cursoNombre'] ?? ''}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: BannerAyuda(
+        clave: 'equipo_subir_$_nombre',
+        titulo: 'Cómo se sube o baja de $_nombre',
+        texto: 'Así se entra, se sigue y se sale de $_nombre según sus reglas.',
+        pasos: [
+          (Icons.verified_outlined, 'Para seguir en $_nombre: ${r.texto}.'),
+          (Icons.trending_up_rounded, 'Para subir desde $_nombreDebajo: cumplirlo ${r.textoSubir.replaceAll(' cumpliéndolo', '')}.'),
+          (
+            Icons.trending_down_rounded,
+            r.gracia == 0
+                ? 'Si se deja de cumplir, se baja a $_nombreDebajo en el siguiente cálculo.'
+                : 'Si se deja de cumplir, hay ${textoPlazo(r.gracia, r.graciaUnidad)} para ponerse al día; si no, se baja a $_nombreDebajo.',
+          ),
+          if (propio.isNotEmpty) (Icons.roller_skating_outlined, 'Equipamiento: hay que tener propio $propio.'),
+          if (curso.isNotEmpty) (Icons.school_outlined, 'Curso: hay que tener aprobado $curso.'),
+          (Icons.event_repeat_rounded, 'Los cambios de equipo se aplican en la fecha que fija la liga.'),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _reglasDelEquipo(BuildContext context) {
     final c = ConfigLiga.de(s);
     final porMes = const {'mes', 'elige', 'segun_equipamiento'}.contains('${c.cobroEquipo(_nombre)['modo']}');
@@ -985,32 +1014,13 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     // Desplegable de cómo se paga en este equipo, con sus valores (Victor, QA 2026-11-26).
     final dia = porMes ? ConfigEquipo(c, _nombre).diaFechaLimite : 0;
     // Desplegables que explican cada regla en su sección (Victor, 2026-11-27).
-    final r = _Regla.de(t);
-    final curso = '${(t['requisitos'] as Map?)?['cursoNombre'] ?? ''}';
     final recompensa = porMes ? ConfigEquipo(c, _nombre).recompensaPago : const <String, dynamic>{};
     final textoPremioPago = textoRecompensa(recompensa);
     final pe = (_rl?['puntosEquipos'] as Map?)?[_nombre] as Map?;
     return [
       const SizedBox(height: 8),
-      if (!_piso)
-        BannerAyuda(
-          clave: 'equipo_subir_$_nombre',
-          titulo: 'Cómo se sube o baja de $_nombre',
-          texto: 'Así se entra, se sigue y se sale de $_nombre según sus reglas.',
-          pasos: [
-            (Icons.verified_outlined, 'Para seguir en $_nombre: ${r.texto}.'),
-            (Icons.trending_up_rounded, 'Para subir desde $_nombreDebajo: cumplirlo ${r.textoSubir.replaceAll(' cumpliéndolo', '')}.'),
-            (
-              Icons.trending_down_rounded,
-              r.gracia == 0
-                  ? 'Si se deja de cumplir, se baja a $_nombreDebajo en el siguiente cálculo.'
-                  : 'Si se deja de cumplir, hay ${textoPlazo(r.gracia, r.graciaUnidad)} para ponerse al día; si no, se baja a $_nombreDebajo.',
-            ),
-            if (propio.isNotEmpty) (Icons.roller_skating_outlined, 'Equipamiento: hay que tener propio $propio.'),
-            if (curso.isNotEmpty) (Icons.school_outlined, 'Curso: hay que tener aprobado $curso.'),
-            (Icons.event_repeat_rounded, 'Los cambios de equipo se aplican en la fecha que fija la liga.'),
-          ],
-        ),
+      const _Seccion('PAGOS'),
+      // Cómo se paga, dentro de Pagos y antes del premio (QA 2026-11-27).
       BannerAyuda(
         clave: 'equipo_pagos_$_nombre',
         titulo: 'Cómo se paga en $_nombre',
@@ -1033,7 +1043,6 @@ class _EquipoScreenState extends State<_EquipoScreen> {
           (Icons.receipt_long_outlined, 'Cada pago queda registrado. Puedes verlo en Calendario → Actividad → Pagos y suscripciones.'),
         ],
       ),
-      const _Seccion('PAGOS'),
       if (porMes && recompensa['activa'] != false && textoPremioPago.isNotEmpty)
         BannerAyuda(
           clave: 'equipo_premio_pago_$_nombre',
@@ -1062,8 +1071,8 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       if (!widget.soloLectura && s.tieneArea('finanzas'))
         _Fila(
           icono: Icons.sports_rounded,
-          titulo: 'Pago a entrenadorxs',
-          texto: 'Cuánto de lo que paga $_nombre va a lxs entrenadorxs, o un monto por entrenamiento',
+          titulo: 'Pago al equipo técnico',
+          texto: 'Cuánto de lo que paga $_nombre va al equipo técnico, o un monto por entrenamiento',
           alTocar: () => abrir(PagoCoachesScreen(sesion: s, equipo: _nombre)),
         ),
       // Reglas propias del equipo (Victor, 2026-11-17): fecha límite y recompensa.
@@ -1137,7 +1146,16 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       const SizedBox(height: 8),
       const _Seccion('PUNTOS Y CLASES'),
       if (pe != null)
-        BannerAyuda(clave: 'equipo_puntos_$_nombre', titulo: 'Cómo se ganan puntos en $_nombre', texto: textoPuntosVersion((pe['actual'] as Map?) ?? const {})),
+        BannerAyuda(
+          clave: 'equipo_puntos_$_nombre',
+          titulo: 'Cómo se ganan puntos en $_nombre',
+          texto: 'En $_nombre se suman puntos por venir a entrenar y por hacer tareas.',
+          pasos: [
+            (Icons.event_available_outlined, 'Asistencia: ${textoPuntosVersion((pe['actual'] as Map?) ?? const {})}.'),
+            // Las tareas suman en cualquier equipo (QA 2026-11-27).
+            (Icons.task_alt_rounded, 'Tareas: cada tarea terminada y aprobada suma los puntos que indica.'),
+          ],
+        ),
       if (_premios.isNotEmpty)
         BannerAyuda(
           clave: 'equipo_premios_$_nombre',
@@ -1499,8 +1517,6 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final r = _Regla.de(t);
-    final miembros = _miembros;
-    final cumplen = miembros.where(r.cumple).length;
     final otros = widget.tiers.where((x) => x['es_default'] != true).toList();
     final pos = otros.indexWhere((x) => x['id'] == t['id']);
     return Scaffold(
@@ -1559,6 +1575,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              _bannerSubir(),
               _SoloLectura(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1594,15 +1611,13 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  _piso
-                      ? 'Equipo inicial: quien se une entra aquí.'
-                      : (miembros.isEmpty ? 'Nadie entra hoy en el cálculo.' : 'Hoy lo cumplen $cumplen de ${miembros.length}.'),
-                  style: TextStyle(color: p.textoSecundario),
+              // Sin «Hoy lo cumplen…» en la vista del equipo (QA 2026-11-27).
+              if (_piso)
+                Center(
+                  child: Text('Equipo inicial: quien se une entra aquí.', style: TextStyle(color: p.textoSecundario)),
                 ),
-              ),
               const SizedBox(height: 16),
+              _bannerSubir(),
               _Fila(icono: Icons.badge_outlined, titulo: 'Nombre del equipo', texto: _nombre, alTocar: _renombrar),
               if (!_piso) ...[
                 _Fila(icono: Icons.verified_outlined, titulo: 'Mantenerse en el equipo', texto: 'Pide ${r.texto}.', alTocar: _mantener),

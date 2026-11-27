@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
+import '../core/banner_ayuda.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../equipo/equipo_modelos.dart';
@@ -161,9 +162,15 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
                 children: [
-                  Text(
-                    'Personas quitadas de Equipo por pasar un tiempo sin venir, por un Pivot o porque borraron su cuenta. Su historial se conserva y se pueden restaurar. Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.',
-                    style: TextStyle(color: p.textoSecundario),
+                  // Desplegable informativo, como en los equipos (QA 2026-11-27).
+                  const BannerAyuda(
+                    clave: 'archivadas',
+                    titulo: '¿Qué son las personas archivadas?',
+                    texto: 'Personas quitadas de Equipo por pasar un tiempo sin venir, por un Pivot o porque borraron su cuenta.',
+                    pasos: [
+                      (Icons.history_rounded, 'Su historial se conserva y se pueden restaurar.'),
+                      (Icons.delete_outline_rounded, 'Eliminar a alguien borra sus datos, pero no sus pagos ni asistencias.'),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   ListenableBuilder(

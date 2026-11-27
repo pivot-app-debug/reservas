@@ -845,7 +845,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
               // Coach es fijo: no se borra (Victor, 2026-11-17).
               for (final r in _roles)
                 r == 'Coach'
-                    ? const InputChip(label: Text('Entrenadorx'), avatar: Icon(Icons.lock_outline_rounded, size: 16), onPressed: null)
+                    ? const InputChip(label: Text('Equipo técnico'), avatar: Icon(Icons.lock_outline_rounded, size: 16), onPressed: null)
                     : InputChip(label: Text(r), onDeleted: () => setState(() => _roles.remove(r))),
               ActionChip(avatar: const Icon(Icons.add_rounded, size: 18), label: const Text('Agregar'), onPressed: _nuevoRol),
             ],
@@ -1130,7 +1130,7 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
       (
         Icons.settings_rounded,
         'Todo se cambia en Liga → Ajustes',
-        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos, entrenadorxs y Pivots están en Liga → Equipos.',
+        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos y Pivots están en Liga → Equipos, y el equipo técnico en Entreno.',
       ),
       (
         Icons.qr_code_2_rounded,
