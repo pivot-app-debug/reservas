@@ -326,7 +326,7 @@ class _ReglasScreenState extends State<ReglasScreen> {
             const SizedBox(height: 16),
             GrupoAjustes(
               titulo: 'Deudas',
-              pie: 'Solo cuenta lo que la app tiene registrado. Pivots, coaches y personas exentas nunca se bloquean, y quien ya mandó su comprobante puede seguir usando la app.',
+              pie: 'Solo cuenta lo que la app tiene registrado. Coaches y personas exentas nunca se bloquean; los Pivots sí, como cualquier persona, y quien ya mandó su comprobante puede seguir usando la app.',
               filas: [
                 _regla(
                   'deuda',

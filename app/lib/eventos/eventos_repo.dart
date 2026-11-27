@@ -208,7 +208,6 @@ class EventosRepo extends ChangeNotifier {
     return c.isEmpty ? 'mirlxs' : c;
   }
 
-  bool get _esAdminActivo => sesion.esAdmin && sesion.adminToken != null;
 
   /// Mirlxs con la cuota al día pueden marcar "Asistiré", pero ya no
   /// "No asistiré" en ese evento (web: `_evRsvpBarraHtml()`).
@@ -226,8 +225,8 @@ class EventosRepo extends ChangeNotifier {
     final d = sesion.datos;
     final c = _cuota;
     final exenta = d['exenta_cuota'] == true || d['exenta_cuota'] == 'true';
+    // Sin excepción para Pivots (Victor, 2026-11-26): también pagan.
     if (_modo == 'mirlxs' &&
-        !_esAdminActivo &&
         ev.tipo == 'Entrenamiento' &&
         !exenta &&
         c != null &&
@@ -388,7 +387,8 @@ class EventosRepo extends ChangeNotifier {
   /// en tantas clases como gracia quede; después hay que pagar. Estar
   /// Lesionadx o De viaje no exime: al venir, usa la gracia. null = puede.
   String? motivoSinAsistire(Evento ev) {
-    if (_esAdminActivo || ev.tipo != 'Entrenamiento') return null;
+    // Los Pivots también pagan su cuota (Victor, 2026-11-26): sin excepción por ser Pivot.
+    if (ev.tipo != 'Entrenamiento') return null;
     final d = sesion.datos;
     // Clases de gracia por equipo (Mi Liga → Cobros; por defecto Quindes 1).
     final n = ConfigLiga.de(sesion).graciaClases('${d['categoria'] ?? ''}');

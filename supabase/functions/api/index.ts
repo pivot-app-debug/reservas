@@ -4535,14 +4535,14 @@ const ESTADOS_RSVP_BAJA = ['No asistiré', 'No jugador'];
  *  Asistencia anticipada (`origenAuto`) seguía creando "Asistiré" a quien
  *  debe la cuota (caso Pechugas: 15 filas hasta 2027). Misma regla que la
  *  app: equipo con clases de gracia, mes sin pagar, y ya usó (o reservó con
- *  "Asistiré") todas sus clases de gracia del mes. Pivots y exentxs, libres.
+ *  "Asistiré") todas sus clases de gracia del mes. Solo exentxs, libres (los Pivots también pagan).
  *  Devuelve el motivo o null si puede marcar. */
 async function _motivoSinAsistireServidor(nombre: string, idEvento: string): Promise<string | null> {
   const { data: ev } = await supabase.from('asistencias').select('fecha, tipo_evento').eq('id_evento', idEvento).maybeSingle();
   if (!ev?.fecha || ev.tipo_evento !== 'Entrenamiento') return null;
   const { data: p } = await supabase.from('equipo').select('categoria, exenta_cuota, estado_miembro, roles').eq('username', nombre).maybeSingle();
   if (!p || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return null;
-  if (Array.isArray(p.roles) && p.roles.includes('Pivot')) return null;
+  // Pivots también (Victor, 2026-11-26): si deben, se les aplica igual que a todxs.
   const reglas = await _reglasLiga();
   const eq = String(p.categoria ?? '');
   const g = (reglas.graciaClases ?? {})[eq];
@@ -4582,12 +4582,12 @@ async function _motivoSinAsistireServidor(nombre: string, idEvento: string): Pro
 /** Lo que una persona le debe al equipo (Victor, 2026-11-26). Solo lo que la
  *  app tiene registrado: cuotas desde noviembre de 2026 (la regla de gracia)
  *  que figuran como "debe" y saldos en contra (clases sin reserva, deudas
- *  anotadas). Un comprobante enviado ya cuenta como pagado. Pivots, coaches y
- *  exentxs no deben nada aquí. */
+ *  anotadas). Un comprobante enviado ya cuenta como pagado. Coaches y exentxs
+ *  no deben nada aquí; los Pivots sí (Victor, 2026-11-26). */
 async function _deudaPersona(username: string): Promise<{ items: any[]; total: number }> {
   const { data: p } = await supabase.from('equipo').select('username, categoria, exenta_cuota, estado_miembro, roles, eliminado_en').eq('username', username).maybeSingle();
   if (!p || p.eliminado_en || p.exenta_cuota === true || p.estado_miembro === 'Técnico') return { items: [], total: 0 };
-  if (Array.isArray(p.roles) && p.roles.includes('Pivot')) return { items: [], total: 0 };
+  // Los Pivots no se eximen (Victor, 2026-11-26): solo coaches aprobados y exentxs.
   const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
   if (c?.estado === 'aprobado') return { items: [], total: 0 };
   const items: any[] = [];

@@ -10,7 +10,7 @@ import '../reservas/reservas_repo.dart';
 /// Solo si la liga eligió "Pantalla de pago al abrir la app" (reglas →
 /// `deudaModo: 'bloqueo'`). No se puede cerrar: se sale pagando (o mandando
 /// el comprobante, que ya cuenta) o cerrando sesión. Lo que debe lo calcula el
-/// servidor (`getMiDeuda`): Pivots, coaches y exentxs nunca la ven.
+/// servidor (`getMiDeuda`): coaches y exentxs nunca la ven; los Pivots sí.
 class PantallaDeuda extends StatefulWidget {
   const PantallaDeuda({super.key, required this.repo, required this.inicial});
   final EventosRepo repo;
@@ -18,7 +18,6 @@ class PantallaDeuda extends StatefulWidget {
 
   /// Al abrir la app: si la liga bloquea y la persona debe, la muestra.
   static Future<void> siCorresponde(BuildContext context, EventosRepo repo) async {
-    if (repo.sesion.esAdmin) return;
     try {
       final r = await repo.sesion.api.get('getMiDeuda');
       if (r['bloquea'] != true || !context.mounted) return;
