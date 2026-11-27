@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-26 (cobros del banco)
+- Finanzas → Cobros del banco: se anotan una vez el mantenimiento, las notificaciones SMS y otras comisiones que el banco descuenta solo, con su cuenta, monto con IVA, si es cada mes o cada año y el día. La app registra el gasto cada periodo; si empezó antes, también los meses pasados.
+- Nueva categoría "Comisiones del banco". Banco Internacional quedó igual a su estado de cuenta ($1.848,66), con la comisión de octubre ($2,02) a la vista.
+
 ## 2026-11-26 (Entrenamiento, etapa 1)
 - Para coaches, la bandeja tiene la pestaña Entrenamiento: el próximo entrenamiento con quién viene y su plan, lo que falta evaluar, "Armar el plan de un entrenamiento" (eligiendo cuál), los planes sin fecha y las herramientas (Habilidades que se evalúan, Pruebas, Coaches).
 - Se fueron los cursos de la sección de coach (siguen en Cursos) y "Ajustes de coach": su único ajuste, avisar novedades a las personas, ahora está a la vista en Entrenamiento.

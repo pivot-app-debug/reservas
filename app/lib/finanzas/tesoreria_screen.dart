@@ -20,6 +20,7 @@ import '../sesion/sesion.dart';
 import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
 import 'cobros_screen.dart';
 import 'revision_screen.dart';
+import 'cobros_programados_screen.dart';
 import 'pago_coaches_screen.dart';
 import 'tesoreria_repo.dart';
 import '../core/vidrio.dart';
@@ -677,6 +678,26 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
           'Pago a coaches',
           'Regla de la liga y de cada equipo, y lo que se le debe a cada coach',
           () => _abrir(PagoCoachesScreen(sesion: widget.sesion)),
+        ),
+      ),
+      // Cobros que el banco descuenta solo (Victor, 2026-11-26).
+      Resaltable(
+        id: 'cobrosBanco',
+        resaltado: _resaltado,
+        child: _fila(
+          context,
+          Icons.account_balance_outlined,
+          'Cobros del banco',
+          'Mantenimiento, SMS y comisiones que se registran solos cada mes',
+          () => _abrir(
+            CobrosProgramadosScreen(
+              repo: repo,
+              cuentas: [
+                for (final c in _todas)
+                  if (c['archivada'] != true) c,
+              ],
+            ),
+          ),
         ),
       ),
       Resaltable(

@@ -15,6 +15,10 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 
 - **Tablas nuevas (regla):** `liga_id` con su default, `create policy liga_aislada … for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual())` y `grant … to liga_api`. Sin el grant, la Edge Function no puede leer la tabla y falla en silencio (pasó con `entrenamientos_legado`, 26/11).
 
+## Cobros del banco (2026-11-26)
+- Tabla `tesoreria_cobros_programados` (cuenta_id, nombre, monto con IVA, frecuencia 'mensual'|'anual', dia 1–28, desde, activo; RLS `to liga_api` + grant). `adminTesoreria`: `cobros`, `guardarCobro` (genera enseguida), `quitarCobro` (activo=false, lo registrado queda). `_generarCobrosProgramados()` en `cronDiario`: un egreso categoría 'comision' por periodo desde `desde`, `origen = 'cobro_programado'`, `origen_id = <id>:<aaaa-mm>` (no se regenera aunque se anule). App: `finanzas/cobros_programados_screen.dart`, fila "Cobros del banco" en Finanzas y en el buscador.
+- Datos: comisión de octubre de Banco Internacional ($2,02) y ajuste de conciliación a $282,44, así la cuenta da $1.848,66 como el estado de cuenta. Todavía no hay cobros programados cargados (se sabrá la frecuencia con el próximo estado de cuenta).
+
 ## Entrenamiento, etapa 1 (2026-11-26)
 - `PestanaActividad.entrenamiento` (solo `sesion.esCoach` y `FuncionesLiga.coach`) → `CoachScreen(embebida: true)`. `CoachScreen` rehecha: `_proximo` (próximo Entrenamiento con `cantidadAsisten` y resumen del plan), `TarjetasPorEvaluar`, `_armarPlan` (elige evento → `elegirEquipoPlan` → `PlanEventoScreen`), `_sinFecha`, `_atajos` (Habilidades que se evalúan, Pruebas, Coaches) y el switch "Avisar novedades" (antes la hoja "Ajustes de coach"). Sin cursos. Fuera de la bandeja el título es "Entrenamiento".
 - `PlanEnEvento.cache` / `PlanEnEvento.precargar(sesion, idEvento, forzar:)`: el detalle muestra lo cacheado y refresca; el shell precarga los 2 próximos eventos no sociales a los 4 s.

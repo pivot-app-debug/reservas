@@ -6972,7 +6972,7 @@ async function usarCreditos(params: Record<string, any>): Promise<Record<string,
 // Cuentas con saldo inicial; cada ingreso o gasto dice de qué cuenta; nada se
 // borra (corregir = anular y volver a registrar); conciliación; saldos de
 // personas; fondos de viaje; transparencia opcional.
-const CATEGORIAS_TESORERIA = ['cuota', 'clase', 'merch', 'evento', 'equipamiento', 'alquiler', 'viaje', 'prestamo', 'abono', 'donacion', 'coaches', 'otro'];
+const CATEGORIAS_TESORERIA = ['cuota', 'clase', 'merch', 'evento', 'equipamiento', 'alquiler', 'viaje', 'prestamo', 'abono', 'donacion', 'coaches', 'comision', 'otro'];
 
 function _num2(n: number): number { return Math.round(n * 100) / 100; }
 
@@ -7471,6 +7471,34 @@ async function _saldoPersonas(username?: string): Promise<Record<string, number>
   return out;
 }
 
+/** Registra los cobros programados que ya vencieron, uno por periodo, desde su
+ *  fecha `desde` (también los meses pasados). No duplica: cada periodo tiene
+ *  su origen_id `<cobro>:<aaaa-mm>`. Corre a diario y al guardar un cobro. */
+async function _generarCobrosProgramados(por = 'automático'): Promise<{ generados: number }> {
+  const { data: cobros } = await supabase.from('tesoreria_cobros_programados').select('*').eq('activo', true);
+  const hoy = _hoyEcuadorISO();
+  let generados = 0;
+  for (const c of cobros ?? []) {
+    const [y0, m0] = String(c.desde).slice(0, 7).split('-').map(Number);
+    const paso = c.frecuencia === 'anual' ? 12 : 1;
+    for (let i = 0; i < 600; i += paso) {
+      const y = y0 + Math.floor((m0 - 1 + i) / 12), m = ((m0 - 1 + i) % 12) + 1;
+      const fecha = `${y}-${String(m).padStart(2, '0')}-${String(c.dia).padStart(2, '0')}`;
+      if (fecha > hoy) break;
+      if (fecha < String(c.desde)) continue;
+      const origenId = `${c.id}:${fecha.slice(0, 7)}`;
+      const { data: ya } = await supabase.from('tesoreria_movimientos').select('id').eq('origen', 'cobro_programado').eq('origen_id', origenId).maybeSingle();
+      if (ya) continue;
+      const id = await _registrarMovimiento({
+        fecha, tipo: 'egreso', monto: _num2(Number(c.monto)), cuenta_id: c.cuenta_id, categoria: 'comision',
+        descripcion: `${c.nombre} (cobro programado)`, origen: 'cobro_programado', origen_id: origenId, registrado_por: por,
+      });
+      if (id) generados++;
+    }
+  }
+  return { generados };
+}
+
 async function adminTesoreria(params: Record<string, any>): Promise<Record<string, any>> {
   const email = await _validarAdminToken(String(params.adminToken ?? ''));
   if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
@@ -7596,6 +7624,33 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     });
     if (!id) return { exito: false, error: 'Primero crea al menos una cuenta.' };
     return { exito: true, id };
+  }
+
+  // Cobros programados del banco (Victor, 2026-11-26).
+  if (accion === 'cobros') {
+    const { data } = await supabase.from('tesoreria_cobros_programados').select('*').eq('activo', true).order('created_at');
+    return { exito: true, cobros: data ?? [] };
+  }
+  if (accion === 'guardarCobro') {
+    const monto = _num2(Number(d.monto));
+    const fila = {
+      cuenta_id: String(d.cuentaId ?? ''), nombre: String(d.nombre ?? '').trim().slice(0, 80), monto,
+      frecuencia: d.frecuencia === 'anual' ? 'anual' : 'mensual', dia: Math.min(28, Math.max(1, Math.round(Number(d.dia) || 1))),
+      desde: fechaOk(d.desde) ?? hoy, creado_por: email,
+    };
+    if (!fila.cuenta_id) return { exito: false, error: 'Elige la cuenta.' };
+    if (!fila.nombre) return { exito: false, error: 'Ponle un nombre al cobro.' };
+    if (!(monto > 0)) return { exito: false, error: 'El monto debe ser mayor a 0.' };
+    const q = d.id ? supabase.from('tesoreria_cobros_programados').update(fila).eq('id', d.id) : supabase.from('tesoreria_cobros_programados').insert(fila);
+    const { error } = await q;
+    if (error) return { exito: false, error: error.message };
+    const r = await _generarCobrosProgramados(email);
+    return { exito: true, generados: r.generados };
+  }
+  if (accion === 'quitarCobro') {
+    // Deja de cobrarse desde hoy; lo ya registrado queda.
+    await supabase.from('tesoreria_cobros_programados').update({ activo: false }).eq('id', String(d.id ?? ''));
+    return { exito: true };
   }
 
   // Revisión de Tesorería (auditoría 2026-11-26): lo que no cuadra, para
@@ -12891,6 +12946,8 @@ async function cronDiario(): Promise<Record<string, any>> {
     await recalcularPuntosAsistencia(m, a);
   } catch (e) { console.error('[puntos] cron:', e); }
         try { await _avisarPrestamosLargos(); } catch (e) { console.error('[inventario] avisos:', e); }
+  // Cobros del banco programados (Victor, 2026-11-26).
+  try { await _generarCobrosProgramados(); } catch (e) { console.error('[tesoreria] cobros programados:', e); }
   // Pago a coaches de los meses cerrados (Victor, 2026-11-26); en enero también el año anterior.
   try {
     const h = _hoyEcuadorISO(), a = Number(h.slice(0, 4));

@@ -116,6 +116,7 @@ const entradasLiga = [
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
   EntradaAjuste('pagoCoaches', 'Pago a coaches', 'Finanzas', 'coach entrenador porcentaje 25 pagar sueldo le debe', dentro: 'tesoreria'),
+  EntradaAjuste('cobrosBanco', 'Cobros del banco', 'Finanzas', 'mantenimiento comisión banco sms notificación cargo mensual programado', dentro: 'tesoreria'),
   EntradaAjuste('revisionTesoreria', 'Revisar cuentas', 'Finanzas', 'auditoría cuadrar duplicados sin registrar errores descuadre', dentro: 'tesoreria'),
   EntradaAjuste('viajes', 'Fondos de viaje', 'Ajustes › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
   EntradaAjuste('movimientos', 'Ver movimientos', 'Finanzas', 'todos los movimientos ingresos gastos exportar excel csv filtrar', dentro: 'tesoreria'),
