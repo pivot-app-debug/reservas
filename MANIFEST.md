@@ -13,6 +13,8 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Sin pronombres femeninos ni en la app ni en los chats: todo neutro, de preferencia sin pronombres (por ejemplo "admins", no "las admins").
 - Español neutro (sin voseo); se corrigieron textos con "debés", "podés", "tenés", "querés", "dejalo", "Escribilo", "elegí".
 
+- **Tablas nuevas (regla):** `liga_id` con su default, `create policy liga_aislada … for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual())` y `grant … to liga_api`. Sin el grant, la Edge Function no puede leer la tabla y falla en silencio (pasó con `entrenamientos_legado`, 26/11).
+
 ## Ronda 2026-11-26 (auditoría de Finanzas y QA pendiente)
 - **Finanzas, auditoría:** informe en el proyecto de Claude (`claude/auditoria_finanzas_2026-11-26.md`) y resumen en el doc QA → Preguntas. Datos corregidos en la base con OK de Victor: Banco Pichincha `fecha_inicial` → 2026-01-01; anulados (con motivo, `anulado_por = claude-auditoria`) el movimiento duplicado de Darah abril y sus 2 filas duplicadas en `pagos`, y la fila de `pagos` del $5 de Vic (su movimiento ya estaba anulado).
 - **Migración `20261126120000_finanzas_blindaje.sql` (aplicada):** `pagos.anulado/anulado_por/anulado_en/motivo_anulacion/reserva_id/saldo_movimiento_id`; `tesoreria_movimientos.periodo_mes/periodo_anio` (+ índice parcial de cuotas activas) y relleno del periodo de las cuotas existentes. Todas las lecturas de `pagos` filtran `anulado = false`.
