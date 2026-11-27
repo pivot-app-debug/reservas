@@ -1024,8 +1024,8 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       if (!widget.soloLectura && s.tieneArea('finanzas'))
         _Fila(
           icono: Icons.sports_rounded,
-          titulo: 'Pago a coaches',
-          texto: 'Cuánto de lo que paga $_nombre va a lxs coaches, o un monto por entrenamiento',
+          titulo: 'Pago a entrenadorxs',
+          texto: 'Cuánto de lo que paga $_nombre va a lxs entrenadorxs, o un monto por entrenamiento',
           alTocar: () => abrir(PagoCoachesScreen(sesion: s, equipo: _nombre)),
         ),
       // Reglas propias del equipo (Victor, 2026-11-17): fecha límite y recompensa.

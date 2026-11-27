@@ -258,7 +258,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
               child: Text(
-                n == 1 ? 'Este evento tenía un plan de coach' : 'Este evento tenía $n planes de coach',
+                n == 1 ? 'Este evento tenía un plan de entrenamiento' : 'Este evento tenía $n planes de entrenamiento',
                 style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
@@ -278,7 +278,7 @@ class _DetalleScreenState extends State<DetalleScreen> {
             ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: const Text('Guardarlo sin fecha'),
-              subtitle: const Text('Queda en Coach → Planes sin fecha para asignarlo después'),
+              subtitle: const Text('Queda en Entrenamiento → Planes sin fecha para asignarlo después'),
               onTap: () => Navigator.of(h).pop(''),
             ),
             const SizedBox(height: 8),

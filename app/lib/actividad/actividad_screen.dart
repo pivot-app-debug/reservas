@@ -1,8 +1,10 @@
+import '../ajustes/componentes.dart' show SubAjustes;
+import '../core/navegacion.dart';
+import '../sesion/sesion.dart';
+import '../tareas/tarea_screen.dart' show TareaScreen;
+import '../tareas/tareas_modelos.dart';
+
 import 'package:flutter/material.dart';
-
-import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
-
-import '../coach/coach_screen.dart' show CoachScreen;
 
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -73,198 +75,126 @@ class ActividadScreen extends StatefulWidget {
   State<ActividadScreen> createState() => _ActividadScreenState();
 }
 
-class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProviderStateMixin {
-  late final List<PestanaActividad> _pestanas = [
-    PestanaActividad.notificaciones,
-    PestanaActividad.tareas,
-    if (widget.verClases) PestanaActividad.clases,
-    // Entrenamiento, para coaches (Victor, 2026-11-26).
-    if (widget.eventos.sesion.esCoach && FuncionesLiga.coach(widget.eventos.sesion)) PestanaActividad.entrenamiento,
-    if (widget.verPagos) PestanaActividad.pagos,
-  ];
-  late final TabController _tabs = TabController(
-    length: _pestanas.length,
-    vsync: this,
-    initialIndex: _pestanas.contains(widget.inicial) ? _pestanas.indexOf(widget.inicial) : 0,
-  );
-  late bool _cursosNuevos = widget.cursosNuevos;
+class _ActividadScreenState extends State<ActividadScreen> {
+  // Bandeja como una sola lista, «Novedades» (Victor, 2026-11-26): eventos,
+  // tareas y cursos nuevos; Tareas y Pagos en pills rojas arriba. Cursos y
+  // Entrenamiento pasaron a Entrenamiento, en la barra de abajo.
+  Sesion get s => widget.eventos.sesion;
+  final _kPills = GlobalKey(debugLabel: 'tour-pills');
+  final _kCuerpo = GlobalKey(debugLabel: 'tour-cuerpo');
+  EstadoCursos _cursos = const EstadoCursos([], false);
 
   @override
   void initState() {
     super.initState();
-    _tabs.addListener(_alCambiar);
-    _alCambiar();
-    // Tour corto la primera vez (Victor, 2026-11-20): los pills y dónde se crean los eventos.
+    widget.tareas.cargar();
+    estadoCursos(s).then((e) {
+      if (mounted) setState(() => _cursos = e);
+    });
+    // Desde una notificación: abre directo lo que pidió.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      switch (widget.inicial) {
+        case PestanaActividad.tareas:
+          _abrirTareas();
+        case PestanaActividad.pagos:
+          _abrirPagos();
+        case PestanaActividad.clases:
+          _irACursos();
+        case PestanaActividad.entrenamiento:
+          _irA('entrenamiento');
+        case PestanaActividad.notificaciones:
+          break;
+      }
+    });
     Future.delayed(const Duration(milliseconds: 900), _tour);
   }
 
-  final _kPills = GlobalKey(debugLabel: 'tour-pills');
-  final _kCuerpo = GlobalKey(debugLabel: 'tour-cuerpo');
-
   Future<void> _tour() async {
     if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-    final crea = widget.eventos.sesion.esAdmin || widget.eventos.sesion.puedeCrearSocial;
+    final crea = s.esAdmin || s.puedeCrearSocial;
     await Tour.mostrarSiCorresponde(
       context,
-      preferencia: 'tour.actividad.v1',
+      preferencia: 'tour.novedades.v1',
       pasos: [
-        PasoTour(
-          clave: _kPills,
-          titulo: 'Tus secciones',
-          texto: 'Toca un ícono para cambiar de sección (o desliza): Próximos eventos, Tareas, Cursos y Pagos. La elegida se marca con su nombre.',
-        ),
+        PasoTour(clave: _kPills, titulo: 'Tareas y pagos', texto: 'Con estos botones entras a las tareas de la liga y a tus pagos y suscripciones.'),
         PasoTour(
           clave: _kCuerpo,
-          // Solo la parte de arriba (los próximos eventos), debajo de la barra.
           ajuste: (r) => Rect.fromLTWH(r.left + 8, r.top + altoBarra(context) + 4, r.width - 16, r.height * 0.35),
-          titulo: 'Lo que viene',
+          titulo: 'Novedades',
           texto: crea
-              ? 'Aquí ves los eventos de los próximos días, los cumpleaños y las fiestas. Debajo está el botón para crear un evento.'
-              : 'Aquí ves los eventos de los próximos días, los cumpleaños y las fiestas. Debajo, tus notificaciones.',
+              ? 'Los eventos de los próximos días, tus tareas, los cursos nuevos y tus notificaciones. Aquí también creas eventos.'
+              : 'Los eventos de los próximos días, tus tareas, los cursos nuevos y tus notificaciones.',
         ),
       ],
     );
   }
 
-  void _alCambiar() {
-    if (_pestanas[_tabs.index] == PestanaActividad.clases && _cursosNuevos) {
-      widget.alVerCursos?.call();
-      setState(() => _cursosNuevos = false);
-    }
+  void _abrirTareas() => SubAjustes.abrir<void>(context, TareasScreen(repo: widget.tareas));
+  void _abrirPagos() => SubAjustes.abrir<void>(context, PagosScreen(repo: widget.eventos));
+
+  /// Ir a Entrenamiento en la barra de abajo.
+  void _irA(String vista) {
+    Navegacion.entrenamiento.value = vista;
+    Navegacion.ir.value = Pestana.entrenamiento;
   }
 
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
+  void _irACursos() {
+    widget.alVerCursos?.call();
+    _irA('cursos');
   }
 
-  static String nombre(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => 'Próximos eventos',
-    PestanaActividad.tareas => 'Tareas',
-    PestanaActividad.clases => 'Cursos',
-    PestanaActividad.entrenamiento => 'Entrenamiento',
-    PestanaActividad.pagos => 'Pagos y suscripciones',
-  };
-
-  /// Texto corto del pill (el título dice el nombre completo).
-  static String _corto(PestanaActividad x) => switch (x) {
-    PestanaActividad.pagos => 'Pagos',
-    // Corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
-    PestanaActividad.notificaciones => 'Eventos',
-    _ => nombre(x),
-  };
-
-  // Material Symbols (Victor, 2026-11-20): los mismos íconos de Google Fonts.
-  static IconData _icono(PestanaActividad x) => switch (x) {
-    PestanaActividad.notificaciones => Symbols.newspaper,
-    PestanaActividad.tareas => Symbols.checklist,
-    PestanaActividad.clases => Symbols.school,
-    PestanaActividad.entrenamiento => Symbols.sports,
-    PestanaActividad.pagos => Symbols.payments,
-  };
-
-  /// Ícono con su punto o número de novedades.
-  Widget _iconoCon(PivotPaleta p, PestanaActividad x, Color color, bool lleno) {
-    final icono = Icon(_icono(x), size: 24, color: color, fill: lleno ? 1 : 0);
-    Widget punto(bool ver) => Badge(isLabelVisible: ver, smallSize: 9, backgroundColor: p.marca, child: icono);
-    return switch (x) {
-      PestanaActividad.notificaciones => ListenableBuilder(listenable: widget.bandeja, builder: (_, _) => punto(widget.bandeja.hayNovedades)),
-      PestanaActividad.tareas => ListenableBuilder(
-        listenable: widget.tareas,
-        builder: (_, _) => Badge(
-          isLabelVisible: widget.tareas.disponibles.isNotEmpty,
-          backgroundColor: p.marca,
-          label: Text('${widget.tareas.disponibles.length}'),
-          child: icono,
-        ),
-      ),
-      PestanaActividad.clases => punto(_cursosNuevos),
-      PestanaActividad.entrenamiento => icono,
-      PestanaActividad.pagos => icono,
-    };
-  }
-
-  /// Navegación por pills (Victor, 2026-11-20): la elegida se expande con su
-  /// ícono y su nombre en el color de énfasis; las demás quedan solo con ícono.
-  Widget _pills(PivotPaleta p) => KeyedSubtree(key: _kPills, child: _pillsBarra(p));
-
-  Widget _pillsBarra(PivotPaleta p) => AnimatedBuilder(
-    animation: _tabs.animation!,
-    builder: (context, _) {
-      final actual = _tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
-      return Padding(
-        padding: const EdgeInsets.only(right: 12),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
+  /// Pill roja de acceso (Victor, 2026-11-26).
+  Widget _pill(PivotPaleta p, IconData icono, String texto, VoidCallback alTocar, {int? numero}) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: Material(
+      color: p.marca,
+      borderRadius: BorderRadius.circular(PivotRadios.chip),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: alTocar,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final (i, x) in _pestanas.indexed)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: Tooltip(
-                    message: nombre(x),
-                    child: Semantics(
-                      selected: i == actual,
-                      button: true,
-                      label: nombre(x),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(PivotRadios.chip),
-                        onTap: () => _tabs.animateTo(i),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOutCubic,
-                          height: 44,
-                          padding: EdgeInsets.symmetric(horizontal: i == actual ? 16 : 12),
-                          // Sin recuadro (Victor, 2026-11-21): la elegida va con texto e ícono en rojo.
-                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(PivotRadios.chip)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _iconoCon(p, x, i == actual ? p.marcaTexto : p.textoSecundario, i == actual),
-                              AnimatedSize(
-                                duration: const Duration(milliseconds: 260),
-                                curve: Curves.easeOutCubic,
-                                child: i == actual
-                                    ? Padding(
-                                        padding: const EdgeInsets.only(left: 8),
-                                        child: Text(
-                                          _corto(x),
-                                          style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+              Icon(icono, size: 18, color: p.sobreMarca),
+              const SizedBox(width: 6),
+              Text(
+                texto,
+                style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreMarca),
+              ),
+              if (numero != null && numero > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: p.sobreMarca, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                  child: Text(
+                    '$numero',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.marcaTexto),
                   ),
                 ),
+              ],
             ],
           ),
         ),
-      );
-    },
+      ),
+    ),
   );
 
-  Widget _cuerpo(PestanaActividad x) {
-    final s = widget.eventos.sesion;
-    return switch (x) {
-      // Novedades (Victor, 2026-11-20): primero los próximos eventos, después las notificaciones.
-      PestanaActividad.notificaciones => BandejaPivotsScreen(
-        repo: widget.bandeja,
-        embebida: true,
-        encabezado: _SeccionEventos(eventos: widget.eventos, alCrearSocial: widget.alCrearSocial, alCrearEvento: widget.alCrearEvento),
+  Widget _pills(PivotPaleta p) => KeyedSubtree(
+    key: _kPills,
+    child: ListenableBuilder(
+      listenable: widget.tareas,
+      builder: (context, _) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _pill(p, Symbols.checklist, 'Tareas', _abrirTareas, numero: widget.tareas.disponibles.length),
+          if (widget.verPagos) _pill(p, Symbols.payments, 'Pagos', _abrirPagos),
+        ],
       ),
-      PestanaActividad.tareas => TareasScreen(repo: widget.tareas, embebida: true),
-      PestanaActividad.clases => s.esAdmin ? CursosScreen(sesion: s, embebida: true) : CursosAbiertosScreen(sesion: s, embebida: true),
-      PestanaActividad.entrenamiento => CoachScreen(sesion: s, eventos: widget.eventos, embebida: true),
-      PestanaActividad.pagos => PagosScreen(repo: widget.eventos, embebida: true),
-    };
-  }
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -276,16 +206,90 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        // Los pills van en el lugar del título (Victor, 2026-11-20): la elegida
-        // muestra su nombre, así que no hace falta otro título.
-        titleSpacing: 0,
         toolbarHeight: 64,
-        title: Align(alignment: Alignment.centerLeft, child: _pills(p)),
+        title: const Text('Novedades', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [_pills(p), const SizedBox(width: 4)],
       ),
       body: KeyedSubtree(
         key: _kCuerpo,
-        child: TabBarView(controller: _tabs, children: [for (final x in _pestanas) _cuerpo(x)]),
+        child: BandejaPivotsScreen(
+          repo: widget.bandeja,
+          embebida: true,
+          encabezado: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SeccionEventos(eventos: widget.eventos, alCrearSocial: widget.alCrearSocial, alCrearEvento: widget.alCrearEvento),
+              _SeccionTareas(repo: widget.tareas, alVerTodas: _abrirTareas),
+              if (_cursos.nuevosLista.isNotEmpty) ...[
+                EncabezadoSeccion(titulo: 'Cursos nuevos', icono: Icons.school_outlined, cantidad: _cursos.nuevosLista.length),
+                for (final c in _cursos.nuevosLista.take(3))
+                  Card(
+                    margin: const EdgeInsets.only(top: 8),
+                    child: ListTile(
+                      leading: Icon(Icons.school_outlined, color: p.marcaTexto),
+                      title: Text(
+                        c.$2,
+                        style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+                      ),
+                      subtitle: Text('Nuevo · míralo en Entrenamiento → Cursos', style: TextStyle(color: p.textoSecundario)),
+                      trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+                      onTap: _irACursos,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ],
+          ),
+        ),
       ),
+    );
+  }
+}
+
+/// Tareas en Novedades (Victor, 2026-11-26): las que tomaste y las que hay
+/// para tomar.
+class _SeccionTareas extends StatelessWidget {
+  const _SeccionTareas({required this.repo, required this.alVerTodas});
+  final TareasRepo repo;
+  final VoidCallback alVerTodas;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return ListenableBuilder(
+      listenable: repo,
+      builder: (context, _) {
+        final mias = repo.mias.where((m) => !m.terminada).toList();
+        final libres = repo.disponibles;
+        if (mias.isEmpty && libres.isEmpty) return const SizedBox.shrink();
+        Widget fila(Tarea t, String sub, {MiTarea? mia}) => Card(
+          margin: const EdgeInsets.only(top: 8),
+          child: ListTile(
+            leading: Icon(Symbols.checklist, color: p.marcaTexto),
+            title: Text(
+              t.titulo,
+              style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
+            ),
+            subtitle: Text(sub, style: TextStyle(color: p.textoSecundario)),
+            trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+            onTap: () => SubAjustes.abrir<void>(context, TareaScreen(repo: repo, tarea: t, mia: mia)),
+          ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            EncabezadoSeccion(titulo: 'Tareas', icono: Symbols.checklist, cantidad: mias.length + libres.length),
+            for (final m in mias.take(3)) fila(m.tarea, m.enRevision ? 'Tomada por ti · en revisión' : 'Tomada por ti · ${textoVence(m.vence)}', mia: m),
+            for (final t in libres.take(3)) fila(t, t.puntos > 0 ? 'Para tomar · ${t.puntos} puntos' : 'Para tomar'),
+            if (mias.length + libres.length > 6 || libres.length > 3)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(onPressed: alVerTodas, child: const Text('Ver todas las tareas')),
+              ),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
     );
   }
 }

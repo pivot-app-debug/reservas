@@ -293,7 +293,7 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
               ? 'Parten de las habilidades mínimas de WFTDA. Puedes editarlas, sumar otras o apagarlas.'
               : 'Las básicas de tu deporte. Puedes editarlas, sumar otras o apagarlas.',
         ),
-        desplegable('avanzada', 'Habilidades avanzadas', 'Las escribe el coach: lo que se trabaja después de las básicas.'),
+        desplegable('avanzada', 'Habilidades avanzadas', 'Las escribe lx entrenadorx: lo que se trabaja después de las básicas.'),
       ],
     );
   }

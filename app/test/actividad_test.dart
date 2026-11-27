@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('Actividad: pestañas y Fiestas sin crear para quien no es Pivot de fiestas', (t) async {
+  testWidgets('Novedades: lista única y Fiestas sin crear para quien no es Pivot de fiestas', (t) async {
     SharedPreferences.setMockInitialValues({});
     t.view.physicalSize = const Size(360 * 3, 760 * 3);
     t.view.devicePixelRatio = 3;
@@ -26,12 +26,13 @@ void main() {
     await t.pump(const Duration(seconds: 1));
     // Título según la pestaña; pestañas con íconos.
     // Novedades: primero los próximos eventos, después las notificaciones.
-    expect(find.byTooltip('Próximos eventos'), findsOneWidget);
-    expect(find.byTooltip('Cursos'), findsOneWidget);
+    // Novedades: una sola lista con pills a Tareas y Pagos (2026-11-26).
+    expect(find.text('Novedades'), findsOneWidget);
+    expect(find.text('Tareas'), findsOneWidget);
     expect(find.text('Próximos 7 días'), findsOneWidget);
     expect(find.text('No hay eventos en los próximos 7 días.'), findsOneWidget);
     expect(find.text('Crear un evento'), findsNothing);
-    expect(find.byTooltip('Pagos y suscripciones'), findsOneWidget);
+    expect(find.text('Pagos'), findsOneWidget);
     expect(s.puedeCrearSocial, isFalse);
     // Un Pivot solo de fiestas no ve las herramientas de Pivot.
     s

@@ -236,7 +236,11 @@ class _RaizState extends State<_Raiz> {
         );
       case 'equipo':
         Navegacion.ir.value = Pestana.equipo;
-      case 'novedades' || 'tareas' || 'cursos' || 'pagos':
+      // Entrenamiento en la barra (Victor, 2026-11-26): cursos, progreso y lo de entrenadorxs.
+      case 'entrenamiento' || 'progreso' || 'cursos':
+        Navegacion.ir.value = Pestana.entrenamiento;
+        Navegacion.entrenamiento.value = partes.first;
+      case 'novedades' || 'tareas' || 'pagos':
         Navegacion.ir.value = Pestana.calendario;
         Navegacion.actividad.value = partes.first;
     }

@@ -9,6 +9,6 @@ class Deporte {
   static String get numero => esDerby ? 'Número derby' : 'Número';
 
   /// Ejemplos de roles para textos de ayuda.
-  static String get ejemplosRoles => esDerby ? 'Jammer, blocker, coach…' : 'Capitanx, coach, staff…';
-  static String get ejemploRolBusqueda => esDerby ? 'jammer, blocker' : 'coach, staff';
+  static String get ejemplosRoles => esDerby ? 'Jammer, blocker, entrenadorx…' : 'Capitanx, entrenadorx, staff…';
+  static String get ejemploRolBusqueda => esDerby ? 'jammer, blocker' : 'entrenadorx, staff';
 }

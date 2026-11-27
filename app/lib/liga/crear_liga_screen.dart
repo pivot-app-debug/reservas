@@ -1,3 +1,4 @@
+import '../equipo/equipo_repo.dart' show nombreRol;
 import '../core/selector_hora.dart';
 
 import 'dart:async';
@@ -844,7 +845,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
               // Coach es fijo: no se borra (Victor, 2026-11-17).
               for (final r in _roles)
                 r == 'Coach'
-                    ? const InputChip(label: Text('Coach'), avatar: Icon(Icons.lock_outline_rounded, size: 16), onPressed: null)
+                    ? const InputChip(label: Text('Entrenadorx'), avatar: Icon(Icons.lock_outline_rounded, size: 16), onPressed: null)
                     : InputChip(label: Text(r), onDeleted: () => setState(() => _roles.remove(r))),
               ActionChip(avatar: const Icon(Icons.add_rounded, size: 18), label: const Text('Agregar'), onPressed: _nuevoRol),
             ],
@@ -894,7 +895,7 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
             fila('Medios de pago', _medios.isEmpty ? 'Los agregas después' : _medios.map((m) => '${m['nombre']}').join(', '), _Paso.medios),
             fila('Entrenamientos', _entrenamientos.isEmpty ? 'Los creas después en el calendario' : '${_entrenamientos.length} horarios', _Paso.entrenamientos),
             fila('Cambios de equipo', _cambiosEquipo ? 'Cada mes, aprobados por un Pivot' : 'No', _Paso.asistencia),
-            fila('Roles', _roles.join(', '), _Paso.roles),
+            fila('Roles', _roles.map(nombreRol).join(', '), _Paso.roles),
             fila('Premio por pagar a tiempo', _premios && _cobra ? 'Sí' : 'No', _Paso.premios),
           ],
         ];
@@ -939,7 +940,11 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
             runSpacing: 8,
             children: [
               for (final r in _roles)
-                FilterChip(label: Text(r), selected: _misRoles.contains(r), onSelected: (v) => setState(() => v ? _misRoles.add(r) : _misRoles.remove(r))),
+                FilterChip(
+                  label: Text(nombreRol(r)),
+                  selected: _misRoles.contains(r),
+                  onSelected: (v) => setState(() => v ? _misRoles.add(r) : _misRoles.remove(r)),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -1125,7 +1130,7 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
       (
         Icons.settings_rounded,
         'Todo se cambia en Liga → Ajustes',
-        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos, coaches y Pivots están en Liga → Equipos.',
+        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos, entrenadorxs y Pivots están en Liga → Equipos.',
       ),
       (
         Icons.qr_code_2_rounded,

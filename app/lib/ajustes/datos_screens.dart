@@ -89,12 +89,13 @@ class MiPerfilEditable extends StatelessWidget {
                       icono: Icons.shield_outlined,
                       seccion: 'roles',
                       titulo: 'Roles en el equipo',
-                      valor: roles.join(', '),
+                      valor: roles.map(nombreRol).join(', '),
                       alTocar: () async {
                         final v = await elegirOpciones(
                           context,
                           titulo: 'Roles en el equipo',
                           opciones: equipo.roles,
+                          etiqueta: nombreRol,
                           valor: roles.join(', '),
                           multi: true,
                           // Pivots: editar el catálogo desde aquí (Victor, 2026-11-13).

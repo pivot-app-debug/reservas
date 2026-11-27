@@ -302,13 +302,15 @@ Future<String?> elegirOpciones(
   bool otro = false,
   String? ayuda,
   (String, VoidCallback)? secundaria,
+  String Function(String)? etiqueta,
 }) {
   return showModalBottomSheet<String>(
     useRootNavigator: true,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => _HojaOpciones(titulo: titulo, opciones: opciones, valor: valor, multi: multi, otro: otro, ayuda: ayuda, secundaria: secundaria),
+    builder: (_) =>
+        _HojaOpciones(titulo: titulo, opciones: opciones, valor: valor, multi: multi, otro: otro, ayuda: ayuda, secundaria: secundaria, etiqueta: etiqueta),
   );
 }
 
@@ -321,8 +323,10 @@ class _HojaOpciones extends StatefulWidget {
     required this.otro,
     required this.ayuda,
     this.secundaria,
+    this.etiqueta,
   });
   final (String, VoidCallback)? secundaria;
+  final String Function(String)? etiqueta;
   final String titulo;
   final List<String> opciones;
   final String valor;
@@ -382,7 +386,7 @@ class _HojaOpcionesState extends State<_HojaOpciones> {
             children: [
               for (final o in widget.opciones)
                 ChoiceChip(
-                  label: Text(o),
+                  label: Text(widget.etiqueta?.call(o) ?? o),
                   selected: _sel.contains(o),
                   onSelected: (si) => setState(() {
                     if (!widget.multi) {

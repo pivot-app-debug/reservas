@@ -80,7 +80,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                equipo == null ? 'Pago a coaches de la liga' : 'Pago a coaches de $equipo',
+                equipo == null ? 'Pago a entrenadorxs de la liga' : 'Pago a entrenadorxs de $equipo',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
@@ -117,7 +117,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Porcentaje de lo cobrado',
                       suffixText: '%',
-                      helperText: 'De cada cuota y clase pagada, esta parte va a lxs coaches.',
+                      helperText: 'De cada cuota y clase pagada, esta parte va a lxs entrenadorxs.',
                     ),
                   )
                 else
@@ -126,7 +126,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       labelText: 'Monto por entrenamiento',
-                      helperText: 'Lo que cobra cada coach por entrenamiento dado a horario.',
+                      helperText: 'Lo que cobra cada entrenadorx por entrenamiento dado a horario.',
                     ),
                   ),
               ],
@@ -163,7 +163,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
     }
     final debe = (d['seLeDebe'] as num?) ?? 0;
     final monto = TextEditingController(text: debe.toStringAsFixed(2));
-    final nota = TextEditingController(text: 'Pago a coaches');
+    final nota = TextEditingController(text: 'Pago a entrenadorxs');
     String cuenta = '${cuentas.first['id']}';
     final ok = await abrirFormulario<bool>(
       context,
@@ -222,7 +222,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
           'tipo': 'devolucion',
           'monto': m,
           'cuentaId': cuenta,
-          'concepto': concepto.isEmpty ? 'Pago a coaches' : concepto,
+          'concepto': concepto.isEmpty ? 'Pago a entrenadorxs' : concepto,
           'pagoCoach': true,
         }),
       });
@@ -286,7 +286,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Pago a coaches', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Pago a entrenadorxs', style: TextStyle(fontWeight: FontWeight.w700)),
         bottom: _ocupado ? const PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2)) : null,
       ),
       body: r == null
@@ -299,20 +299,20 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                   const BannerAyuda(
                     clave: 'pago_coaches',
                     titulo: 'Cómo se calcula',
-                    texto: 'Cada mes se junta la parte de lxs coaches de lo que pagaron las personas (cuotas del mes y clases) y se reparte por entrenamiento dado.',
+                    texto: 'Cada mes se junta la parte de lxs entrenadorxs de lo que pagaron las personas (cuotas del mes y clases) y se reparte por entrenamiento dado.',
                     pasos: [
                       (
                         Icons.check_circle_outline_rounded,
-                        'Cada entrenamiento se divide entre lxs coaches que estuvieron a horario. Quien llegó tarde cobra la mitad de su parte.',
+                        'Cada entrenamiento se divide entre lxs entrenadorxs que estuvieron a horario. Quien llegó tarde cobra la mitad de su parte.',
                       ),
-                      (Icons.event_busy_outlined, 'Entrenamientos cancelados o sin coaches en la lista no se pagan: esa parte queda para el equipo.'),
+                      (Icons.event_busy_outlined, 'Entrenamientos cancelados o sin entrenadorxs en la lista no se pagan: esa parte queda para el equipo.'),
                       (
                         Icons.person_add_alt_outlined,
-                        'Un coach cobra desde la fecha en que empezó; si entra a mitad de mes, cobra solo los entrenamientos que dio.',
+                        'Unx entrenadorx cobra desde la fecha en que empezó; si entra a mitad de mes, cobra solo los entrenamientos que dio.',
                       ),
                       (
                         Icons.account_balance_wallet_outlined,
-                        'Al cerrar cada mes, lo de cada coach queda en Saldos como "El equipo le debe". Nada sale de una cuenta hasta que se registra el pago.',
+                        'Al cerrar cada mes, lo de cada entrenadorx queda en Saldos como "El equipo le debe". Nada sale de una cuenta hasta que se registra el pago.',
                       ),
                     ],
                   ),
@@ -322,7 +322,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                       FilaAjuste(
                         icono: Icons.toggle_on_outlined,
                         seccion: 'entrenamientos',
-                        titulo: 'Pagar a coaches',
+                        titulo: 'Pagar a entrenadorxs',
                         valor: regla['activa'] == false ? 'Desactivado' : 'Activado',
                         derecha: Switch(value: regla['activa'] != false, onChanged: (v) => _cambiar((r) => r['activa'] = v)),
                       ),
@@ -377,7 +377,7 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                             seccion: 'entrenamientos',
                             titulo: nombres[u] ?? u,
                             valor: (coachesRegla[u] as Map?)?['desde'] == null
-                                ? 'Desde que lo nombraron coach'
+                                ? 'Desde que lx nombraron entrenadorx'
                                 : 'Desde el ${_fecha('${(coachesRegla[u] as Map)['desde']}')}',
                             alTocar: () => _desdeCoach(u, nombres[u] ?? u),
                           ),
@@ -453,7 +453,7 @@ class _Mes extends StatelessWidget {
         child: ExpansionTile(
           shape: const Border(),
           title: Text('${_meses[n - 1]}${cerrado ? '' : ' (en curso)'}', style: const TextStyle(fontWeight: FontWeight.w700)),
-          subtitle: Text('${m['entrenamientos']} entrenamientos · ${m['cancelados']} cancelados · para coaches ${plata((m['paraCoaches'] as num?) ?? 0)}'),
+          subtitle: Text('${m['entrenamientos']} entrenamientos · ${m['cancelados']} cancelados · para entrenadorxs ${plata((m['paraCoaches'] as num?) ?? 0)}'),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           children: [
             for (final d in (m['detalle'] as List? ?? const []))

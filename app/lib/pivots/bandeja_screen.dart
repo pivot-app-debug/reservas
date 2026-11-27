@@ -272,7 +272,7 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
     (TipoPedido.prestamo, 'Equipamiento', Icons.content_paste_rounded),
     (TipoPedido.equipo, 'Cambios de equipo', Icons.swap_vert_rounded),
     (TipoPedido.revisionEquipo, 'Revisión de cambios de equipo', Icons.rate_review_outlined),
-    (TipoPedido.coach, 'Pedidos para ser coach', Icons.sports_rounded),
+    (TipoPedido.coach, 'Pedidos para ser entrenadorx', Icons.sports_rounded),
     (TipoPedido.social, 'Social o fiesta por aprobar', Icons.celebration_outlined),
   ];
 
@@ -755,8 +755,8 @@ class _CuentaCorte extends StatelessWidget {
       );
     case TipoPedido.coach:
       return (
-        'Pidió ser coach',
-        v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de Coach en Liga → Coaches.' : 'Mensaje: ${v('mensaje')}',
+        'Pidió ser entrenadorx',
+        v('mensaje').isEmpty ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas de Entrenamiento.' : 'Mensaje: ${v('mensaje')}',
       );
     case TipoPedido.social:
       final ev = x.evento;

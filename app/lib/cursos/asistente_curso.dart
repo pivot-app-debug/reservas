@@ -444,7 +444,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     const opciones = [
       ('todos', Icons.groups_rounded, 'Toda la liga', 'Disponible para toda la liga.'),
       ('equipos', Icons.group_outlined, 'Ciertos equipos', 'Disponible para los equipos que decidas.'),
-      ('nivel', Icons.stacked_bar_chart_rounded, 'Por nivel', 'Según sus habilidades en Coach.'),
+      ('nivel', Icons.stacked_bar_chart_rounded, 'Por nivel', 'Según sus habilidades en Entrenamiento.'),
       ('personas', Icons.person_outline_rounded, 'Para pocas personas', 'Un curso individual o para unas pocas personas, sin importar su equipo.'),
     ];
     return ListView(

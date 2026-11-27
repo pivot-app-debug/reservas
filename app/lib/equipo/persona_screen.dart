@@ -195,7 +195,7 @@ class _FichaState extends State<_Ficha> {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(color: pal.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
                       child: Text(
-                        p.roles[i],
+                        nombreRol(p.roles[i]),
                         style: TextStyle(fontWeight: FontWeight.w700, color: pal.texto),
                       ),
                     ),

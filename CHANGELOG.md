@@ -2,6 +2,15 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (navegación nueva y Entrenamiento)
+- Entrenamiento está en la barra de abajo para todxs: Mi progreso y Cursos, y para entrenadorxs además el próximo entrenamiento, lo que falta evaluar, los planes y las herramientas.
+- La bandeja vuelve a ser una sola lista, «Novedades»: próximos eventos, tus tareas y las que hay para tomar, cursos nuevos y notificaciones. Arriba, botones rojos para entrar a Tareas y a Pagos.
+- Liga sin pestañas: Equipos es la pantalla, y arriba están los íconos de Comunicación, Inventario, Finanzas y Ajustes de la liga, según tus accesos. Se fueron los desplegables informativos de cada sección; el de Pivots está dentro de «Pivots y permisos».
+- «Coaches» ahora es «Entrenadorxs» en toda la app.
+- Armar un plan es una subsección en dos pasos, y se puede armar un plan por nivel (Aprendiendo lo básico, Habilidades básicas, Habilidades avanzadas).
+- Nueva subsección «Notificaciones de entrenador»: elegir a quién le llegan tus avisos, mandar un aviso a todxs o a algunas personas y elegir los recordatorios que te llegan a ti (falta evaluar, entrenamiento sin plan).
+- Cada entrenadorx ve arriba lo que lleva este mes según la regla de pago.
+
 ## 2026-11-26 (cobros del banco)
 - Finanzas → Cobros del banco: se anotan una vez el mantenimiento, las notificaciones SMS y otras comisiones que el banco descuenta solo, con su cuenta, monto con IVA, si es cada mes o cada año y el día. La app registra el gasto cada periodo; si empezó antes, también los meses pasados.
 - Nueva categoría "Comisiones del banco". Banco Internacional quedó igual a su estado de cuenta ($1.848,66), con la comisión de octubre ($2,02) a la vista.

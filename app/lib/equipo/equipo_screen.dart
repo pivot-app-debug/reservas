@@ -9,7 +9,6 @@ import '../core/sincroniza.dart';
 
 import '../core/fechas.dart';
 import '../core/tema.dart';
-import '../core/banner_ayuda.dart';
 import '../core/vidrio.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/componentes.dart';
@@ -52,49 +51,47 @@ enum PestanaLiga { comunidad, redes, inventario, finanzas, miLiga }
 
 class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMixin {
   EquipoRepo get repo => widget.repo;
-  TabController? _tabs;
-  List<PestanaLiga> _pestanas = const [];
 
   bool get _pivot => repo.sesion.esAdmin && repo.sesion.adminToken != null;
   AvisosLiga get _avisos => AvisosLiga.de(repo.sesion);
 
-  List<PestanaLiga> _calcularPestanas() => [
-    PestanaLiga.comunidad,
+  /// Liga sin pestañas (Victor, 2026-11-26): Equipos es la pantalla y arriba
+  /// van los íconos de Comunicación, Inventario, Finanzas y Ajustes, cada uno
+  /// solo con acceso. Cada uno abre su subsección.
+  List<PestanaLiga> _atajos() => [
     PestanaLiga.redes,
     PestanaLiga.inventario,
     if (repo.sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(repo.sesion)) PestanaLiga.finanzas,
-    // Mi Liga como pestaña, para Pivots (Victor, 2026-11-22).
     if (_pivot) PestanaLiga.miLiga,
   ];
 
-  /// Rehace las pestañas si cambia el permiso de Finanzas.
-  TabController _controlador() {
-    final l = _calcularPestanas();
-    if (_tabs == null || l.length != _pestanas.length) {
-      final antes = _tabs == null ? PestanaLiga.comunidad : _pestanas[_tabs!.index];
-      _tabs?.dispose();
-      _pestanas = l;
-      _tabs = TabController(length: l.length, vsync: this, initialIndex: l.indexOf(antes).clamp(0, l.length - 1))..addListener(() => setState(() {}));
-    }
-    return _tabs!;
-  }
-
   static String _nombreLiga(PestanaLiga x) => switch (x) {
-    // Más corto para que la barra no cambie de tamaño (Victor, 2026-11-22).
     PestanaLiga.comunidad => 'Equipos',
     PestanaLiga.redes => 'Comunicación',
     PestanaLiga.inventario => 'Inventario',
     PestanaLiga.finanzas => 'Finanzas',
-    PestanaLiga.miLiga => 'Ajustes',
+    PestanaLiga.miLiga => 'Ajustes de la liga',
   };
 
   static IconData _iconoLiga(PestanaLiga x) => switch (x) {
     PestanaLiga.comunidad => Icons.groups_rounded,
-    PestanaLiga.redes => Icons.forum_rounded,
+    PestanaLiga.redes => Icons.forum_outlined,
     PestanaLiga.inventario => Icons.content_paste_rounded,
-    PestanaLiga.finanzas => Icons.account_balance_wallet_rounded,
-    PestanaLiga.miLiga => Icons.settings_rounded,
+    PestanaLiga.finanzas => Icons.account_balance_wallet_outlined,
+    PestanaLiga.miLiga => Icons.settings_outlined,
   };
+
+  void _abrirAtajo(PestanaLiga x) {
+    final s = repo.sesion;
+    SubAjustes.abrir(context, switch (x) {
+      PestanaLiga.redes => ComunidadScreen(repo: ComunidadRepo.de(s)),
+      PestanaLiga.inventario => InventarioScreen(sesion: s),
+      PestanaLiga.finanzas => TesoreriaScreen(sesion: s),
+      PestanaLiga.miLiga => AjustesLigaScreen(sesion: s, pestana: true),
+      PestanaLiga.comunidad => const SizedBox.shrink(),
+    });
+  }
+
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
 
@@ -117,7 +114,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _tabs?.dispose();
     _reloj?.cancel();
     _tick.dispose();
     _busqueda.dispose();
@@ -133,7 +129,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    final tabs = _controlador();
     return PopScope(
       // Atrás con texto en el buscador: primero lo borra.
       canPop: _busqueda.text.isEmpty,
@@ -148,27 +143,26 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
           flexibleSpace: const Vidrio(child: SizedBox.expand()),
-          // Solo las pestañas (Victor, 2026-11-22): buscar y filtrar van
-          // dentro de Gente, y Mi Liga es otra pestaña.
-          titleSpacing: 0,
-          title: Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Align(alignment: Alignment.centerLeft, child: _pillsLiga(p, tabs)),
-          ),
-        ),
-        body: TabBarView(
-          controller: tabs,
-          children: [
-            for (final x in _pestanas)
-              switch (x) {
-                PestanaLiga.comunidad => _comunidad(context, p),
-                PestanaLiga.redes => ComunidadScreen(repo: ComunidadRepo.de(repo.sesion), embebida: true),
-                PestanaLiga.inventario => InventarioScreen(sesion: repo.sesion, embebida: true),
-                PestanaLiga.finanzas => TesoreriaScreen(sesion: repo.sesion, embebida: true),
-                PestanaLiga.miLiga => AjustesLigaScreen(sesion: repo.sesion, pestana: true, embebida: true),
-              },
+          title: const Text('Equipos', style: TextStyle(fontWeight: FontWeight.w800)),
+          actions: [
+            for (final x in _atajos())
+              ListenableBuilder(
+                listenable: _avisos,
+                builder: (context, _) => IconButton(
+                  tooltip: _nombreLiga(x),
+                  onPressed: () => _abrirAtajo(x),
+                  icon: Badge(
+                    isLabelVisible: x == PestanaLiga.inventario && _avisos.inventario,
+                    smallSize: 9,
+                    backgroundColor: p.marca,
+                    child: Icon(_iconoLiga(x)),
+                  ),
+                ),
+              ),
+            const SizedBox(width: 4),
           ],
         ),
+        body: _comunidad(context, p),
       ),
     );
   }
@@ -254,72 +248,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
         ),
       ),
     ),
-  );
-
-  /// Pills como en Actividad: la elegida con ícono y nombre en rojo.
-  Widget _pillsLiga(PivotPaleta p, TabController tabs) => AnimatedBuilder(
-    animation: tabs.animation!,
-    builder: (context, _) {
-      final actual = tabs.animation!.value.round().clamp(0, _pestanas.length - 1);
-      return FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (i, x) in _pestanas.indexed)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Semantics(
-                  selected: i == actual,
-                  button: true,
-                  label: _nombreLiga(x),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(PivotRadios.chip),
-                    onTap: () => tabs.animateTo(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      height: 44,
-                      padding: EdgeInsets.symmetric(horizontal: i == actual ? 14 : 10),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListenableBuilder(
-                            listenable: _avisos,
-                            builder: (context, _) => Badge(
-                              isLabelVisible: switch (x) {
-                                PestanaLiga.comunidad => _avisos.comunidad,
-                                PestanaLiga.inventario => _avisos.inventario,
-                                _ => false,
-                              },
-                              smallSize: 9,
-                              backgroundColor: p.marca,
-                              child: Icon(_iconoLiga(x), size: 24, color: i == actual ? p.marcaTexto : p.textoSecundario),
-                            ),
-                          ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                            child: i == actual
-                                ? Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: Text(
-                                      _nombreLiga(x),
-                                      style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                                    ),
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    },
   );
 
   Widget _envolverScroll(Widget hijo) => NotificationListener<ScrollNotification>(
@@ -417,45 +345,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                   child: _Plegable(
                     abierto: g == abierto,
                     child: Column(
-                      children: [
-                        if (g == 'Quindes')
-                          _bannerEquipo(
-                            p,
-                            'Quindes',
-                            'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.',
-                            alDetalles: () => _entrar('Quindes'),
-                          ),
-                        if (g == 'Mirlxs')
-                          _bannerEquipo(
-                            p,
-                            'Mirlxs',
-                            'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.',
-                            alDetalles: () => _entrar('Mirlxs'),
-                          ),
-                        if (g == 'Inactivxs')
-                          _bannerEquipo(
-                            p,
-                            'Sin actividad',
-                            'Personas que no vinieron a ningún entrenamiento en los últimos 30 días (o nunca vinieron), salvo que estén de viaje, lesionadxs o con otro motivo válido. Salen de aquí en cuanto vuelven a entrenar. El botón "Archivar" de cada persona la quita de la vista del equipo: su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. Con "Personas archivadas" ves a quién se archivó y a quién conviene archivar.',
-                            alDetalles: () => _entrar('Inactivxs'),
-                          ),
-                        if (g == 'Coaches')
-                          _bannerEquipo(
-                            p,
-                            'Coaches',
-                            'Entrenadorxs del equipo. Pueden tomar asistencia, evaluar y crear pruebas. Los nombra un Pivot, y cada coach puede quitarse de la lista desde los 3 puntos de su fila en Gestionar coaches.',
-                            alDetalles: () => _entrar('Coaches'),
-                          ),
-                        if (g == 'Pivots')
-                          _bannerEquipo(
-                            p,
-                            'Pivots',
-                            'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.',
-                            alDetalles: () => _entrar('Pivots'),
-                          ),
-                        for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy),
-                        _accionesSeccion(g),
-                      ],
+                      children: [for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy), _accionesSeccion(g)],
                     ),
                   ),
                 ),
@@ -485,7 +375,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     return true;
   }
 
-  String _label(String grupo) => grupo == 'Inactivxs' ? 'Sin actividad' : grupo;
+  String _label(String grupo) => switch (grupo) {
+    'Inactivxs' => 'Sin actividad',
+    'Coaches' => 'Entrenadorxs',
+    _ => grupo,
+  };
 
   void _entrar(String titulo) {
     final s = repo.sesion;
@@ -527,7 +421,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final esEquipo = g != 'Inactivxs' && g != 'Coaches' && g != 'Pivots';
     final String? texto = switch (g) {
       'Inactivxs' => _pivot ? 'Personas archivadas' : null,
-      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar coaches' : 'Ver coaches') : null,
+      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar entrenadorxs' : 'Ver entrenadorxs') : null,
       'Pivots' => _pivot ? 'Gestionar Pivots' : null,
       _ => _pivot ? 'Gestionar $g' : 'Ver $g',
     };
@@ -656,15 +550,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     return SliverPersistentHeader(pinned: true, delegate: _Encabezado(contenido));
   }
 
-  Widget _bannerEquipo(PivotPaleta p, String titulo, String texto, {VoidCallback? alDetalles}) => BannerAyuda(
-    clave: 'equipo_$titulo',
-    titulo: titulo,
-    texto: texto,
-    boton: alDetalles != null
-        ? OutlinedButton.icon(onPressed: alDetalles, icon: const Icon(Icons.info_outline_rounded, size: 18), label: const Text('Ver detalles del equipo'))
-        : null,
-  );
-
   Widget _fila(BuildContext context, Integrante x, DateTime hoy, {List<String>? motivos}) {
     final datos = datosRelevantes(x, hoy);
     return _FilaIntegrante(
@@ -688,7 +573,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
       child: Wrap(
         spacing: 8,
         runSpacing: 6,
-        children: [for (final r in repo.filtroRoles) InputChip(label: Text(r), onDeleted: () => repo.alternarRol(r), onPressed: _abrirFiltros)],
+        children: [for (final r in repo.filtroRoles) InputChip(label: Text(nombreRol(r)), onDeleted: () => repo.alternarRol(r), onPressed: _abrirFiltros)],
       ),
     );
   }
@@ -924,7 +809,7 @@ class _FilaIntegrante extends StatelessWidget {
                   // En la búsqueda: por qué aparece. En la lista: el dato que rota.
                   if (motivos != null)
                     Text(
-                      motivos!.isEmpty ? (p.roles.isEmpty ? '@${p.username}' : p.roles.join(' · ')) : motivos!.join(' · '),
+                      motivos!.isEmpty ? (p.roles.isEmpty ? '@${p.username}' : p.roles.map(nombreRol).join(' · ')) : motivos!.join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13, color: pal.textoSecundario),
@@ -937,7 +822,7 @@ class _FilaIntegrante extends StatelessWidget {
                         final DatoFila? dato = datos.isEmpty ? null : (datos.first.fijo || rota.length <= 1 || reducir ? datos.first : rota[n % rota.length]);
                         final linea = dato == null
                             ? Text(
-                                p.roles.isEmpty ? '@${p.username}' : p.roles.join(' · '),
+                                p.roles.isEmpty ? '@${p.username}' : p.roles.map(nombreRol).join(' · '),
                                 key: const ValueKey('base'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1090,7 +975,7 @@ class _HojaFiltros extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   for (final r in repo.rolesCatalogo)
-                    FilterChip(label: Text(r), selected: repo.filtroRoles.contains(r), onSelected: (_) => repo.alternarRol(r)),
+                    FilterChip(label: Text(nombreRol(r)), selected: repo.filtroRoles.contains(r), onSelected: (_) => repo.alternarRol(r)),
                 ],
               ),
             ),

@@ -64,7 +64,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     _cacheTipos = [
       for (final t in (c['tipos'] as List? ?? const []))
         // Administración y Cuenta no se pueden apagar (Victor, 2026-11-08).
-        if (t is Map<String, dynamic> && t['soloAdmin'] != true && !_fija('${t['categoria'] ?? ''}')) t,
+        if (t is Map<String, dynamic> && t['soloAdmin'] != true && t['soloCoach'] != true && !_fija('${t['categoria'] ?? ''}')) t,
     ];
     _cacheActivas = p['activas'] != false;
     _cachePrefs = {for (final e in ((p['preferencias'] as Map?) ?? const {}).entries) '${e.key}': e.value == true};

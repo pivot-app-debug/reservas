@@ -1,3 +1,5 @@
+import '../core/banner_ayuda.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -222,7 +224,6 @@ class _PivotsScreenState extends State<PivotsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
     final l = _pivots;
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -245,11 +246,13 @@ class _PivotsScreenState extends State<PivotsScreen> {
                       child: ListView(
                         padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-                            child: Text(
-                              'Cada Pivot ve y gestiona solo sus áreas, y recibe avisos solo de ellas.',
-                              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                          // El desplegable de Pivots vive aquí (Victor, 2026-11-26).
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: BannerAyuda(
+                              clave: 'equipo_Pivots',
+                              titulo: '¿Qué son lxs Pivots?',
+                              texto: 'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.',
                             ),
                           ),
                           for (final x in l)

@@ -16,6 +16,8 @@ import 'ajustes/ajustes_screen.dart';
 import 'core/aviso_sin_conexion.dart';
 import 'equipo/equipo_repo.dart';
 import 'coach/coach_screen.dart' show PlanEnEvento;
+import 'coach/entrenamiento_screen.dart';
+import 'cursos/cursos_screen.dart' show estadoCursos;
 import 'eventos/tipos_evento.dart' show kTipoSocial;
 import 'equipo/avisos_liga.dart';
 import 'equipo/equipo_screen.dart';
@@ -93,6 +95,8 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       if (!mounted) return;
       AvisosLiga.de(widget.sesion);
       EquipoRepo.de(widget.sesion).cargar();
+      // Punto de cursos nuevos en Entrenamiento aunque no hayas entrado.
+      estadoCursos(widget.sesion).then((e) => Navegacion.puntoEntrenamiento.value = e.nuevos);
       // Plan de los 2 próximos eventos ya cargado (Victor, 2026-11-26: que
       // "Plan del evento" aparezca al abrir el evento, sin esperar).
       final hoy = Fechas.hoy();
@@ -147,8 +151,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     setState(
       () => _indice = switch (p) {
         Pestana.calendario => 0,
-        Pestana.equipo => 1,
-        Pestana.perfil => 2,
+        Pestana.entrenamiento => 1,
+        Pestana.equipo => 2,
+        Pestana.perfil => 3,
       },
     );
   }
@@ -237,6 +242,21 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
           tooltip: 'Calendario · tócalo de nuevo para ir a hoy',
         ),
         TimelineScreen(repo: widget.repo, irAHoy: _irAHoy),
+      ),
+      (
+        // Entrenamiento en la barra, para todxs (Victor, 2026-11-26).
+        NavigationDestination(
+          icon: ValueListenableBuilder<bool>(
+            valueListenable: Navegacion.puntoEntrenamiento,
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.sports_outlined)),
+          ),
+          selectedIcon: ValueListenableBuilder<bool>(
+            valueListenable: Navegacion.puntoEntrenamiento,
+            builder: (context, v, _) => Badge(isLabelVisible: v, smallSize: 9, backgroundColor: context.pivot.marca, child: const Icon(Icons.sports)),
+          ),
+          label: 'Entrenamiento',
+        ),
+        EntrenamientoScreen(sesion: widget.sesion, eventos: widget.repo),
       ),
       (
         // Equipo pasó a Liga (Victor, 2026-11-22): Comunidad, Redes, Inventario y Finanzas.

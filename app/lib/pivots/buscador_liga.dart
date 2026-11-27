@@ -28,7 +28,7 @@ const entradasLiga = [
   EntradaAjuste('equipos', 'Equipos', 'Liga › Equipos', 'categorías quindes mirlxs equipo ajustes de un equipo crear equipo nuevo', dentro: 'liga'),
   EntradaAjuste('tesoreria', 'Finanzas', 'Barra de abajo', 'dinero cuentas caja banco saldo plata finanzas ingreso egreso'),
   EntradaAjuste('pivots', 'Pivots y permisos', 'Liga › Equipos › Pivots', 'administradores admins áreas acceso permisos roles', dentro: 'pivots'),
-  EntradaAjuste('coaches', 'Coaches', 'Liga › Equipos › Coaches', 'entrenadores entrenadorxs coach nombrar quitar', dentro: 'coaches'),
+  EntradaAjuste('coaches', 'Entrenadorxs', 'Liga › Equipos › Entrenadorxs', 'coaches entrenadores entrenadorxs coach nombrar quitar', dentro: 'coaches'),
   EntradaAjuste('pedidos', 'Pedidos de Pivots', 'Ajustes › Pivots y permisos', 'aprobar solicitudes otro pivot automático', dentro: 'pivots'),
   EntradaAjuste(
     'reglas',
@@ -103,7 +103,7 @@ const entradasLiga = [
   EntradaAjuste('mensualidad', 'Mensualidad', 'Finanzas › Cobros', 'precio cuota mes valor', dentro: 'cobros'),
   EntradaAjuste('clase', 'Valor por clase', 'Finanzas › Cobros', 'precio por clase valor clase suelta', dentro: 'cobros'),
 
-  EntradaAjuste('coaches', 'Coaches', 'Ajustes', 'coach entrenador entrenadora seguimiento jugadorxs ficha deportiva habilidades'),
+  EntradaAjuste('coaches', 'Entrenamiento', 'Barra de abajo', 'coach entrenador entrenadorxs seguimiento jugadorxs progreso ficha deportiva habilidades'),
   EntradaAjuste('planes', 'Planes de pago', 'Finanzas › Cobros', 'paquete pack trimestral semestral meses clases descuento', dentro: 'cobros'),
   EntradaAjuste(
     'formas',
@@ -115,7 +115,7 @@ const entradasLiga = [
   // Dentro de Tesorería.
   EntradaAjuste('cuotas', 'Cuotas del mes', 'Finanzas', 'quién pagó mensualidad desglose debe mes pagos', dentro: 'tesoreria'),
   EntradaAjuste('saldos', 'Saldos de personas', 'Finanzas', 'deudas préstamos a favor debe', dentro: 'tesoreria'),
-  EntradaAjuste('pagoCoaches', 'Pago a coaches', 'Finanzas', 'coach entrenador porcentaje 25 pagar sueldo le debe', dentro: 'tesoreria'),
+  EntradaAjuste('pagoCoaches', 'Pago a entrenadorxs', 'Finanzas', 'coach entrenadorx entrenador porcentaje 25 pagar sueldo le debe', dentro: 'tesoreria'),
   EntradaAjuste('cobrosBanco', 'Cobros del banco', 'Finanzas', 'mantenimiento comisión banco sms notificación cargo mensual programado', dentro: 'tesoreria'),
   EntradaAjuste('revisionTesoreria', 'Revisar cuentas', 'Finanzas', 'auditoría cuadrar duplicados sin registrar errores descuadre', dentro: 'tesoreria'),
   EntradaAjuste('viajes', 'Fondos de viaje', 'Ajustes › Equipos › De toda la liga', 'fondos de viaje torneo reparto asistencia', dentro: 'viajes'),
@@ -151,7 +151,7 @@ const entradasPerfil = [
   EntradaAjuste('privacidad', 'Privacidad', 'Mi perfil', 'qué ve el equipo ocultar público', dentro: 'privacidad'),
   EntradaAjuste('privacidad', 'Mi cumpleaños y mi edad', 'Mi perfil › Privacidad', 'fecha de nacimiento cumpleaños edad mostrar', dentro: 'privacidad'),
   EntradaAjuste('notificaciones', 'Notificaciones', 'Mi perfil', 'avisos push alertas recordatorios silenciar', dentro: 'notificaciones'),
-  EntradaAjuste('coach', 'Ser coach', 'Mi perfil', 'coach entrenador entrenadora pedir'),
+  EntradaAjuste('coach', 'Ser entrenadorx', 'Mi perfil', 'coach entrenador entrenadora pedir'),
   EntradaAjuste('cuenta', 'Cuenta y acceso', 'Mi perfil', 'usuario correo contraseña clave', dentro: 'cuenta'),
   EntradaAjuste('cuenta', 'Cerrar sesión', 'Mi perfil › Cuenta y acceso', 'salir cerrar sesión', dentro: 'cuenta'),
   EntradaAjuste('cuenta', 'Ver de nuevo los tours guiados', 'Mi perfil › Cuenta y acceso', 'tour ayuda guía tutorial', dentro: 'cuenta'),
@@ -178,7 +178,7 @@ List<EntradaAjuste> entradasEquipos(Iterable<String> equipos) => [
       ('Puntos por asistencia', 'puntos asistir'),
       ('Qué cuenta como clase', 'entrenamiento cuenta clase tipo evento'),
       ('Fondos de viaje', 'viaje torneo fondo'),
-      ('Pago a coaches', 'coach entrenador porcentaje pagar sueldo 25'),
+      ('Pago a entrenadorxs', 'coach entrenadorx entrenador porcentaje pagar sueldo 25'),
     ])
       EntradaAjuste(t, '$t de $e', 'Liga › Equipos › $e', '$palabras $e equipo', dentro: 'equipo:$e'),
 ];

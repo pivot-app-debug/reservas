@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Pestañas de la barra inferior que otras pantallas pueden abrir
 /// (ej. "Editar mi perfil" desde tu ficha en Equipo).
-enum Pestana { calendario, equipo, perfil }
+enum Pestana { calendario, entrenamiento, equipo, perfil }
 
 class Navegacion {
   Navegacion._();
@@ -24,4 +24,10 @@ class Navegacion {
   /// lesionadx que no viste o cosas para llevar.
   static final puntoCalendario = ValueNotifier<bool>(false);
   static final puntoLiga = ValueNotifier<bool>(false);
+
+  /// Entrenamiento (Victor, 2026-11-26): punto si hay cursos nuevos, y la
+  /// vista que pidió abrir una notificación ('entrenamiento' | 'progreso' |
+  /// 'cursos'); la aplica Entrenamiento y vuelve a null.
+  static final puntoEntrenamiento = ValueNotifier<bool>(false);
+  static final entrenamiento = ValueNotifier<String?>(null);
 }

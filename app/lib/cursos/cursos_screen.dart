@@ -200,9 +200,12 @@ AppBar _barra(String titulo) => AppBar(
 /// Cursos que puedo ver ([ids]) y si hay alguno nuevo sin abrir Cursos
 /// ([nuevos], el punto rojo del botón). Sin señal, ninguno.
 class EstadoCursos {
-  const EstadoCursos(this.ids, this.nuevos);
+  const EstadoCursos(this.ids, this.nuevos, [this.nuevosLista = const []]);
   final List<String> ids;
   final bool nuevos;
+
+  /// Los cursos nuevos (id y nombre), para Novedades (Victor, 2026-11-26).
+  final List<(String, String)> nuevosLista;
   bool get hay => ids.isNotEmpty;
 }
 
@@ -214,8 +217,11 @@ Future<EstadoCursos> estadoCursos(Sesion s) async {
     final l = [for (final c in (r['cursos'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
     final pr = await SharedPreferences.getInstance();
     final vistos = (pr.getStringList(_kCursosVistos) ?? const <String>[]).toSet();
-    final nuevos = l.any((c) => c['miInscripcion'] == null && !vistos.contains('${c['id']}'));
-    return EstadoCursos([for (final c in l) '${c['id']}'], nuevos);
+    final nuevos = [
+      for (final c in l)
+        if (c['miInscripcion'] == null && !vistos.contains('${c['id']}')) ('${c['id']}', '${c['nombre'] ?? 'Curso'}'),
+    ];
+    return EstadoCursos([for (final c in l) '${c['id']}'], nuevos.isNotEmpty, nuevos);
   } catch (_) {
     return const EstadoCursos([], false);
   }

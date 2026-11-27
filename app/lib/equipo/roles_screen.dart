@@ -129,7 +129,7 @@ class _RolesScreenState extends State<RolesScreen> {
                   child: ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
                     leading: Icon(Icons.shield_outlined, color: p.marcaTexto),
-                    title: Text(r, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(nombreRol(r), style: const TextStyle(fontWeight: FontWeight.w600)),
                     // Coach es fijo: no se renombra ni se borra (Victor, 2026-11-17).
                     subtitle: Text(r == 'Coach' ? 'Fijo · pasa por revisión de un Pivot' : (n == 0 ? 'Nadie todavía' : _personas(n))),
                     onTap: _guardando || r == 'Coach' ? null : () => _renombrar(r),

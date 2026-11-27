@@ -28,7 +28,7 @@ const categoriasTesoreria = {
   'prestamo': 'Préstamos',
   'abono': 'Abonos',
   'donacion': 'Donaciones',
-  'coaches': 'Pago a coaches',
+  'coaches': 'Pago a entrenadorxs',
   'comision': 'Comisiones del banco',
   'otro': 'Otro',
 };

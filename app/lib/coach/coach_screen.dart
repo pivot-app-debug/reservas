@@ -15,6 +15,9 @@ import '../eventos/modelos.dart';
 import '../eventos/widgets_comunes.dart';
 import '../eventos/detalle_screen.dart' show DetalleScreen;
 import 'por_evaluar.dart';
+import 'armar_plan_screen.dart';
+import 'notificaciones_entrenador_screen.dart';
+import 'mi_estimado.dart';
 import '../equipo/habilidades_screen.dart';
 import '../ajustes/herramientas_liga.dart';
 import '../sesion/sesion.dart';
@@ -34,6 +37,14 @@ AppBar barraCoach(String titulo, {List<Widget>? acciones, PreferredSizeWidget? a
   actions: acciones,
   bottom: abajo,
 );
+
+/// Para quién es un plan: '' toda la liga, 'nivel:x' un nivel, o un equipo
+/// (planes por nivel, Victor 2026-11-26).
+String paraPlan(String equipo) {
+  if (equipo.isEmpty) return 'Toda la liga';
+  if (equipo.startsWith('nivel:')) return nivelesCoach[equipo.substring(6)] ?? equipo.substring(6);
+  return equipo;
+}
 
 String errorCoach(Object e) => e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.';
 
@@ -144,71 +155,19 @@ class _CoachScreenState extends State<CoachScreen> {
     ),
   );
 
-  /// Armar el plan de cualquier entrenamiento desde aquí (Victor, 2026-11-26).
+  /// Armar el plan de un entrenamiento, en pasos (Victor, 2026-11-26: antes
+  /// era un bottom sheet enorme).
   Future<void> _armarPlan() async {
-    final evs = _proximos;
-    if (evs.isEmpty) {
+    if (_proximos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay entrenamientos próximos en el calendario.')));
       return;
     }
-    final e = await showModalBottomSheet<Evento>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (h) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('¿Para qué entrenamiento?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            ),
-            for (final e in evs.take(12))
-              ListTile(
-                leading: const Icon(Icons.event_outlined),
-                title: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}'),
-                subtitle: e.lugar.isEmpty ? null : Text(e.lugar),
-                onTap: () => Navigator.of(h).pop(e),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (e == null || !mounted) return;
-    final m = ScaffoldMessenger.of(context);
-    try {
-      final r = await PlanEnEvento.precargar(s, e.id, forzar: true) ?? const <String, dynamic>{};
-      if (!mounted) return;
-      final hechos = [for (final x in (r['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
-      final equipo = await elegirEquipoPlan(context, r, hechos);
-      if (equipo == null || !mounted) return;
-      final ok = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => PlanEventoScreen(sesion: s, evento: e, equipo: equipo, plan: hechos.where((x) => '${x['equipo'] ?? ''}' == equipo).firstOrNull),
-        ),
-      );
-      if (ok == true) {
-        await PlanEnEvento.precargar(s, e.id, forzar: true);
-        if (mounted) setState(() {});
-      }
-    } catch (err) {
-      m.showSnackBar(SnackBar(content: Text(errorCoach(err))));
-    }
-  }
-
-  Future<void> _avisar(bool v) async {
-    setState(() => _d?['avisarNovedades'] = v);
-    try {
-      await s.api.post('coachGuardar', {'accion': 'ajustes', 'avisarNovedades': v});
-    } catch (_) {
-      if (mounted) setState(() => _d?['avisarNovedades'] = !v);
-    }
+    final ok = await SubAjustes.abrir<bool>(context, ArmarPlanScreen(sesion: s, entrenamientos: _proximos));
+    if (ok == true && mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
     final cuerpo = AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       child: _d == null
@@ -221,10 +180,7 @@ class _CoachScreenState extends State<CoachScreen> {
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
-                    Text(
-                      (_d?['equipos'] as List? ?? const []).isEmpty ? 'Llevas todos los equipos.' : 'Llevas: ${(_d!['equipos'] as List).join(' · ')}',
-                      style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                    ),
+                    MiEstimado(sesion: s),
                     ..._proximo(context),
                     // Lo que falta evaluar (antes en Próximos eventos).
                     TarjetasPorEvaluar(sesion: s),
@@ -238,21 +194,6 @@ class _CoachScreenState extends State<CoachScreen> {
                     ..._sinFecha(context),
                     _titulo(context, 'HERRAMIENTAS'),
                     _atajos(context),
-                    // Antes escondido en "Ajustes de coach" (Victor: no se entendía qué editaba).
-                    Material(
-                      color: p.tarjeta,
-                      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                      clipBehavior: Clip.antiAlias,
-                      child: SwitchListTile(
-                        secondary: Icon(Icons.notifications_active_outlined, color: p.marcaTexto),
-                        title: const Text('Avisar novedades a las personas'),
-                        subtitle: const Text(
-                          'Los lunes, a quien tiene notas, feedback o pruebas nuevas en su progreso. Si no hay nada nuevo, no le llega nada.',
-                        ),
-                        value: _d?['avisarNovedades'] != false,
-                        onChanged: _avisar,
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -322,14 +263,24 @@ class _CoachScreenState extends State<CoachScreen> {
     final p = context.pivot;
     final puedeNombrar = s.esCoach || (_pivot && (s.tieneArea('coach') || s.tieneArea('equipo') || s.esAdmin));
     final l = <(IconData, String, String, VoidCallback)>[
-      (
-        Icons.checklist_rounded,
-        'Habilidades que se evalúan',
-        'Básicas y avanzadas: crear, editar y marcar',
-        () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
-      ),
+      (Icons.checklist_rounded, 'Habilidades', 'Básicas y avanzadas: crear, editar y marcar', () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true))),
       (Icons.timer_outlined, 'Pruebas', 'Medir el progreso, como vueltas en 5 minutos', () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs))),
-      if (puedeNombrar) (Icons.person_add_outlined, 'Coaches', 'Nombrar o gestionar coaches del equipo', () => _abrir(CoachesScreen(sesion: s))),
+      if (puedeNombrar) (Icons.person_add_outlined, 'Entrenadorxs', 'Nombrar o gestionar entrenadorxs del equipo', () => _abrir(CoachesScreen(sesion: s))),
+      // Notificaciones de entrenador (Victor, 2026-11-26), al lado de Entrenadorxs.
+      if (s.esCoach)
+        (
+          Icons.notifications_active_outlined,
+          'Notificaciones de entrenador',
+          'Qué avisos le llegan a cada persona, mandar avisos y los tuyos',
+          () => _abrir(
+            NotificacionesEntrenadorScreen(
+              sesion: s,
+              jugadorxs: _jugadorxs,
+              sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
+              avisarNovedades: _d?['avisarNovedades'] != false,
+            ),
+          ),
+        ),
     ];
     Widget atajo((IconData, String, String, VoidCallback) a) => Material(
       color: p.tarjeta,
@@ -407,7 +358,7 @@ class _CoachScreenState extends State<CoachScreen> {
             child: ListTile(
               leading: Icon(Icons.inventory_2_outlined, color: p.sobreSuave),
               title: Text(
-                '${'${x['equipo'] ?? ''}'.isEmpty ? 'Toda la liga' : x['equipo']} · ${_resumenPlan([x])}',
+                '${paraPlan('${x['equipo'] ?? ''}')} · ${_resumenPlan([x])}',
                 style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
               ),
               subtitle: Text(
@@ -425,7 +376,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
   static String _resumenPlan(List<Map<String, dynamic>>? l) {
     if (l == null || l.isEmpty) return 'Sin plan';
-    if (l.length > 1) return '${l.length} planes (${l.map((x) => '${x['equipo'] ?? ''}'.isEmpty ? 'toda la liga' : '${x['equipo']}').join(', ')})';
+    if (l.length > 1) return '${l.length} planes (${l.map((x) => paraPlan('${x['equipo'] ?? ''}')).join(', ')})';
     final x = l.first;
     final b = (x['bloques'] as List? ?? const []);
     final min = b.fold<int>(0, (a, y) => a + ((y as Map)['minutos'] as num? ?? 0).toInt());
@@ -587,7 +538,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
           ),
           Text(
-            [e.lugar, widget.equipo.isEmpty ? 'Toda la liga' : 'Para ${widget.equipo}'].where((x) => x.isNotEmpty).join(' · '),
+            [e.lugar, widget.equipo.isEmpty ? 'Toda la liga' : 'Para ${paraPlan(widget.equipo)}'].where((x) => x.isNotEmpty).join(' · '),
             style: TextStyle(color: p.textoSecundario),
           ),
           const SizedBox(height: 14),
@@ -804,7 +755,7 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '${pl['equipo'] ?? ''}'.isEmpty ? 'Toda la liga' : '${pl['equipo']}',
+                    paraPlan('${pl['equipo'] ?? ''}'),
                     style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
                   ),
                 ),
@@ -824,7 +775,7 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
               if (esCoach && pl['compartido'] != true)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Solo lo ven lxs coaches.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
+                  child: Text('Solo lo ven lxs entrenadorxs.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),
                 ),
             ],
             // Al terminar: los entrenamientos se evalúan siempre desde aquí
@@ -874,7 +825,7 @@ String _codigoQuienVe(Set<String> s) => s.isEmpty ? 'yo' : '${const ['jugadorx',
 const _opcionesQuienVe = [
   ('jugadorx', 'Usuarios', Icons.person_outline_rounded),
   ('pivots', 'Pivots', Icons.shield_outlined),
-  ('coaches', 'Coaches', Icons.sports_rounded),
+  ('coaches', 'Entrenadorxs', Icons.sports_rounded),
 ];
 
 /// "Usuarios y Pivots", "Solo yo".
@@ -919,8 +870,11 @@ class QuienVe extends StatelessWidget {
 }
 
 class FichaDeportivaScreen extends StatefulWidget {
-  const FichaDeportivaScreen({super.key, required this.sesion, this.username, this.nombre});
+  const FichaDeportivaScreen({super.key, required this.sesion, this.username, this.nombre, this.embebida = false});
   final Sesion sesion;
+
+  /// Dentro de Entrenamiento (sin su propia barra).
+  final bool embebida;
 
   /// Sin username: la propia (desde Ajustes).
   final String? username;
@@ -1035,22 +989,25 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
     final notas = [for (final n in (d?['notas'] as List? ?? const [])) Map<String, dynamic>.from(n as Map)];
     return Scaffold(
       extendBodyBehindAppBar: true,
+      backgroundColor: widget.embebida ? Colors.transparent : null,
       // Gestionar la lista de habilidades desde la ficha (Victor, 2026-11-21:
       // salió el botón Habilidades de Equipo).
-      appBar: barraCoach(
-        widget.username == null ? 'Mi progreso' : 'Progreso de ${widget.nombre ?? 'la persona'}',
-        acciones: [
-          if (_puedeEditar)
-            IconButton(
-              tooltip: 'Lista de habilidades',
-              icon: const Icon(Icons.checklist_rounded),
-              onPressed: () async {
-                await SubAjustes.abrir<void>(context, HabilidadesEquipoScreen(sesion: s, lista: true));
-                _cargar();
-              },
+      appBar: widget.embebida
+          ? null
+          : barraCoach(
+              widget.username == null ? 'Mi progreso' : 'Progreso de ${widget.nombre ?? 'la persona'}',
+              acciones: [
+                if (_puedeEditar)
+                  IconButton(
+                    tooltip: 'Lista de habilidades',
+                    icon: const Icon(Icons.checklist_rounded),
+                    onPressed: () async {
+                      await SubAjustes.abrir<void>(context, HabilidadesEquipoScreen(sesion: s, lista: true));
+                      _cargar();
+                    },
+                  ),
+              ],
             ),
-        ],
-      ),
       floatingActionButton: _puedeEditar
           ? FloatingActionButton.extended(onPressed: _nuevaNota, icon: const Icon(Icons.mic_none_rounded), label: const Text('Nota'))
           : null,
@@ -1379,7 +1336,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
               title: Text(
-                c['estado'] == 'pendiente' ? 'Rechazar solicitud' : ('${c['username']}' == s.nombre ? 'Quitarme de coaches' : 'Quitar de coaches'),
+                c['estado'] == 'pendiente' ? 'Rechazar solicitud' : ('${c['username']}' == s.nombre ? 'Dejar de ser entrenadorx' : 'Quitar de entrenadorxs'),
                 style: TextStyle(color: h.pivot.marcaTexto),
               ),
               onTap: () => Navigator.of(h).pop(c['estado'] == 'pendiente' ? 'rechazar' : 'quitar'),
@@ -1405,14 +1362,14 @@ class _CoachesScreenState extends State<CoachesScreen> {
     final l = _l;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: barraCoach('Coaches'),
+      appBar: barraCoach('Entrenadorxs'),
       body: l == null
           ? const Esqueleto()
           : ListView(
               padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Text(
-                  'Lxs coaches ven a lxs jugadorxs de sus equipos (sin datos de salud), llevan su ficha deportiva, arman el plan de cada evento y toman asistencia.',
+                  'Lxs entrenadorxs ven a lxs jugadorxs de sus equipos (sin datos de salud), siguen su progreso, arman el plan de cada evento y toman asistencia.',
                   style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
                 ),
                 const SizedBox(height: 12),
@@ -1420,7 +1377,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 20),
                     child: Center(
-                      child: Text('Todavía no hay coaches.', style: TextStyle(color: p.textoSecundario)),
+                      child: Text('Todavía no hay entrenadorxs.', style: TextStyle(color: p.textoSecundario)),
                     ),
                   ),
                 for (final c in l)
@@ -1430,7 +1387,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                     title: Text('${c['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text(
                       c['estado'] == 'pendiente'
-                          ? 'Pidió ser coach${'${c['mensaje'] ?? ''}'.isEmpty ? '' : ': ${c['mensaje']}'}'
+                          ? 'Pidió ser entrenadorx${'${c['mensaje'] ?? ''}'.isEmpty ? '' : ': ${c['mensaje']}'}'
                           : ((c['equipos'] as List? ?? const []).isEmpty ? 'Todos los equipos' : (c['equipos'] as List).join(' · ')),
                     ),
                     trailing: const Icon(Icons.more_horiz_rounded),
@@ -1443,7 +1400,7 @@ class _CoachesScreenState extends State<CoachesScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _nombrar,
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text('Nombrar coach'),
+                    label: const Text('Nombrar entrenadorx'),
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                   ),
                 ),
@@ -1468,10 +1425,10 @@ class FilaSerCoach extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Quiero ser coach', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const Text('Quiero ser entrenadorx', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás Coaches en Liga y las fichas deportivas para seguir a tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas de Entrenamiento para seguir el progreso de tus jugadorxs, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),
@@ -1506,8 +1463,10 @@ class FilaSerCoach extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('¿Quitarte de coaches?'),
-        content: const Text('Dejas de ver la sección Coach. Las evaluaciones y notas que hiciste se conservan. Puedes volver a pedirlo cuando quieras.'),
+        title: const Text('¿Dejar de ser entrenadorx?'),
+        content: const Text(
+          'Dejas de ver las herramientas de entrenamiento. Las evaluaciones y notas que hiciste se conservan. Puedes volver a pedirlo cuando quieras.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Quitarme')),
@@ -1519,7 +1478,7 @@ class FilaSerCoach extends StatelessWidget {
       final r = await sesion.api.post('dejarDeSerCoach', {});
       if (r['exito'] == false) throw ApiException('${r['error']}');
       await sesion.cargarCoach();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya no eres coach.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ya no eres entrenadorx.')));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
     }
@@ -1534,16 +1493,16 @@ class FilaSerCoach extends StatelessWidget {
         return FilaAjuste(
           icono: Icons.sports_rounded,
           seccion: 'coach',
-          titulo: 'Quitarme de coaches',
-          valor: 'Dejas de ser coach; tus evaluaciones se conservan',
+          titulo: 'Dejar de ser entrenadorx',
+          valor: 'Dejas de ser entrenadorx; tus evaluaciones se conservan',
           alTocar: () => _dejar(context),
         );
       }
       return FilaAjuste(
         icono: Icons.sports_rounded,
         seccion: 'coach',
-        titulo: 'Quiero ser coach',
-        valor: e == 'pendiente' ? 'Pedido enviado: un Pivot lo está revisando' : 'Pide la sección Coach',
+        titulo: 'Quiero ser entrenadorx',
+        valor: e == 'pendiente' ? 'Pedido enviado: un Pivot lo está revisando' : 'Pide las herramientas de entrenamiento',
         alTocar: e == 'pendiente' ? null : () => _pedir(context),
       );
     },
@@ -2761,7 +2720,7 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Nombrar coach', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Nombrar entrenadorx', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
         child: Column(
@@ -2772,7 +2731,7 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
                 controller: _q,
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién será coach?'),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '¿Quién será entrenadorx?'),
               ),
             ),
             Expanded(

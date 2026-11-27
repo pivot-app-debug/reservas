@@ -87,7 +87,7 @@ class GrupoHerramientasLiga extends StatelessWidget {
         final finanzas = FuncionesLiga.finanzas(sesion);
         final coach = FuncionesLiga.coach(sesion);
         const textoFinanzas = 'Tesorería, cuotas, cobros y comprobantes de la liga, para quienes gestionan finanzas.';
-        const textoCoach = 'Lxs coaches siguen las habilidades de cada persona, evalúan los entrenamientos y arman cursos.';
+        const textoCoach = 'Lxs entrenadorxs siguen las habilidades de cada persona, evalúan los entrenamientos y arman cursos.';
         return GrupoAjustes(
           pie: 'Si la liga no las usa, se ocultan para todo el mundo.',
           filas: [
@@ -102,9 +102,9 @@ class GrupoHerramientasLiga extends StatelessWidget {
             FilaAjuste(
               icono: Icons.sports_rounded,
               seccion: 'entrenamientos',
-              titulo: 'Coach',
+              titulo: 'Entrenamiento',
               valor: coach ? 'Activado' : 'Desactivado',
-              alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Coach', textoCoach),
+              alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Entrenamiento', textoCoach),
               derecha: Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)),
             ),
           ],

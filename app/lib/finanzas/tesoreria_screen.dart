@@ -675,8 +675,8 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
         child: _fila(
           context,
           Icons.sports_rounded,
-          'Pago a coaches',
-          'Regla de la liga y de cada equipo, y lo que se le debe a cada coach',
+          'Pago a entrenadorxs',
+          'Regla de la liga y de cada equipo, y lo que se le debe a cada entrenadorx',
           () => _abrir(PagoCoachesScreen(sesion: widget.sesion)),
         ),
       ),
