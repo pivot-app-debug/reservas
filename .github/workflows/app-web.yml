@@ -42,7 +42,9 @@ jobs:
           # la web seguía mostrando la versión vieja por la caché del navegador).
           sed -i 's/"mainJsPath":"main.dart.js"/"mainJsPath":"main.dart.js?v=${{ github.run_number }}"/' build/web/flutter_bootstrap.js
           sed -i 's/src="flutter_bootstrap.js"/src="flutter_bootstrap.js?v=${{ github.run_number }}"/' build/web/index.html
-          grep -q 'main.dart.js?v=' build/web/flutter_bootstrap.js && grep -q 'flutter_bootstrap.js?v=' build/web/index.html
+          # Número de esta publicación para la revisión de index.html (Victor, 2026-11-27).
+          sed -i 's/__WEB_BUILD__/${{ github.run_number }}/' build/web/index.html
+          grep -q 'main.dart.js?v=' build/web/flutter_bootstrap.js && grep -q 'flutter_bootstrap.js?v=' build/web/index.html && ! grep -q '__WEB_BUILD__' build/web/index.html
 
       - name: Publicar en la raíz
         run: |

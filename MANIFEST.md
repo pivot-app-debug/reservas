@@ -23,6 +23,11 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Entrenamiento (entrenadorxs): sin «Llevas…», `MiEstimado` (getMiPagoCoach) arriba, «Habilidades», «Armar un plan» = `ArmarPlanScreen` (2 pasos: entrenamiento → para quién: toda la liga, equipo o nivel). Planes por nivel: `equipo = 'nivel:sin|basicas|avanzadas'` (`paraPlan()`); el servidor deja guardarlos a cualquier entrenadorx y los muestra compartidos a quien tiene ese nivel (`_nivelPersona`).
 - Notificaciones de entrenador (`coach/notificaciones_entrenador_screen.dart`): resumen de los lunes, por persona (`coaches.sin_avisos text[]`, `coachGuardar` accion `avisosPersona`), `EnviarAvisoEntrenadorScreen` (accion `enviarAviso`, tipo `aviso_entrenador`) y lo que te llega (`coach_por_evaluar`, `coach_pedido_plan`, `cambios_asistencia`). Catálogo: `aviso_entrenador`, `novedades_progreso` (antes el lunes usaba `solicitud_resuelta`), y `soloCoach` (ocultos en Mi perfil → Notificaciones). `_avisosEntrenadorxs()` en `cronDiario`.
 
+## Web: actualización antes de cargar (2026-11-27)
+- `app/web/index.html`: script que compara `__WEB_BUILD__` (lo cambia el CI por el número de la corrida) con `web_version.json` (no-store). Si hay una más nueva: borra CacheStorage, desregistra service workers salvo firebase-messaging-sw, pide `/` con cache:'reload' y va a `/?v=<n>`. Máximo 2 intentos por versión (`localStorage pivot.intentos`); después, aviso fijo con cómo borrar la caché.
+- `app/web/flutter_bootstrap.js` propio: `_flutter.loader.load()` sin `serviceWorkerSettings` (el SW de Flutter está obsoleto; el de limpieza recargaba los clientes).
+- Liga: el buscador sin autofocus; `_entrar('Coaches')` para entrenadorxs → `Pestana.entrenamiento`.
+
 ## Etapas 2–4 de Entrenamiento y grupo A (2026-11-27)
 - `getFichaDeportiva` devuelve `nivel` (`_nivelPersona`) y en cada habilidad `tipo` (básica/avanzada; `nivel` sigue siendo la evaluación). `_NivelFicha` en la ficha.
 - `coach/prueba_en_vivo.dart`: `PruebaEnVivoScreen` (más es mejor: cuenta regresiva + toques; menos es mejor: cronómetro y toque al terminar) → `coachPruebas` accion `marca` por persona.

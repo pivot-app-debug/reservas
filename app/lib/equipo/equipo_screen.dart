@@ -1,3 +1,4 @@
+import '../core/navegacion.dart';
 import '../core/deporte.dart';
 
 import 'dart:async';
@@ -83,6 +84,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   void _abrirAtajo(PestanaLiga x) {
     final s = repo.sesion;
+    _focoBusqueda.unfocus();
     SubAjustes.abrir(context, switch (x) {
       PestanaLiga.redes => ComunidadScreen(repo: ComunidadRepo.de(s)),
       PestanaLiga.inventario => InventarioScreen(sesion: s),
@@ -227,7 +229,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     child: TextField(
       controller: _busqueda,
       focusNode: _focoBusqueda,
-      autofocus: _busqueda.text.isEmpty,
+      // Sin foco automático (bug 2026-11-27: al volver de una sección se abría el buscador).
       textInputAction: TextInputAction.search,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
@@ -383,6 +385,13 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   void _entrar(String titulo) {
     final s = repo.sesion;
+    _focoBusqueda.unfocus();
+    // Entrenadorxs lleva a Entrenamiento en la barra de abajo (bug 2026-11-27).
+    if (titulo == 'Coaches' && s.esCoach && FuncionesLiga.coach(s)) {
+      Navegacion.entrenamiento.value = 'entrenamiento';
+      Navegacion.ir.value = Pestana.entrenamiento;
+      return;
+    }
     if (titulo == 'Coaches') {
       SubAjustes.abrir(context, s.esCoach && EventosRepo.actual != null ? CoachScreen(sesion: s, eventos: EventosRepo.actual!) : CoachesScreen(sesion: s));
     } else if (titulo == 'Inactivxs') {
