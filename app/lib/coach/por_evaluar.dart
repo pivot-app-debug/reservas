@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'niveles_coach.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/encabezado_seccion.dart';
@@ -60,6 +63,7 @@ class _TarjetasPorEvaluarState extends State<TarjetasPorEvaluar> {
     if (!FuncionesLiga.usaCoach(s)) return;
     try {
       final r = await s.api.get('getCoach');
+      NivelesCoach.actualizar(r['niveles']);
       if (r['exito'] == false || !mounted) return;
       final pr = await SharedPreferences.getInstance();
       final fuera = (pr.getStringList(_pref) ?? const <String>[]).toSet();

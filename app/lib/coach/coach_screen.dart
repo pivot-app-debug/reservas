@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -62,10 +63,27 @@ String errorCoach(Object e) => e is ApiException ? e.message : 'No se pudo carga
 /// de coach". Es la pestaña Entrenamiento de la bandeja ([embebida]) y lo que
 /// abre Liga → Coaches para quien es coach.
 class CoachScreen extends StatefulWidget {
-  const CoachScreen({super.key, required this.sesion, required this.eventos, this.embebida = false, this.atajosExtra = const []});
+  const CoachScreen({
+    super.key,
+    required this.sesion,
+    required this.eventos,
+    this.embebida = false,
+    this.atajosExtra = const [],
+    this.encabezado,
+    this.despuesDelProximo,
+    this.herramienta,
+  });
 
   /// Atajos que van primero en la grilla (Mi progreso y Cursos, desde Entreno).
   final List<AtajoColor> atajosExtra;
+
+  /// Entreno (mockup B, 2026-11-27): arriba va Mi progreso en lugar de la
+  /// grilla, Cursos después del próximo entrenamiento, y las herramientas se
+  /// abren desde los íconos de la barra de Entreno ([herramienta]:
+  /// 'habilidades' | 'pruebas' | 'entrenadorxs' | 'notificaciones').
+  final Widget? encabezado;
+  final Widget? despuesDelProximo;
+  final ValueNotifier<String?>? herramienta;
   final Sesion sesion;
   final EventosRepo eventos;
   final bool embebida;
@@ -84,11 +102,42 @@ class _CoachScreenState extends State<CoachScreen> {
     super.initState();
     _cargar();
     widget.eventos.cargar();
+    widget.herramienta?.addListener(_abrirHerramienta);
+  }
+
+  @override
+  void dispose() {
+    widget.herramienta?.removeListener(_abrirHerramienta);
+    super.dispose();
+  }
+
+  void _abrirHerramienta() {
+    final h = widget.herramienta?.value;
+    if (h == null) return;
+    widget.herramienta!.value = null;
+    switch (h) {
+      case 'habilidades':
+        _abrir(HabilidadesEquipoScreen(sesion: s, lista: true));
+      case 'pruebas':
+        _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs));
+      case 'entrenadorxs':
+        _abrir(CoachesScreen(sesion: s));
+      case 'notificaciones':
+        _abrir(
+          NotificacionesEntrenadorScreen(
+            sesion: s,
+            jugadorxs: _jugadorxs,
+            sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
+            avisarNovedades: _d?['avisarNovedades'] != false,
+          ),
+        );
+    }
   }
 
   Future<void> _cargar() async {
     try {
       final r = await s.api.get('getCoach');
+      NivelesCoach.actualizar(r['niveles']);
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _d = r);
     } catch (e) {
@@ -185,10 +234,15 @@ class _CoachScreenState extends State<CoachScreen> {
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
-                    // Atajos de color como en Liga (Victor, 2026-11-27).
-                    const SizedBox(height: 8),
-                    _atajos(context),
+                    if (widget.encabezado != null)
+                      widget.encabezado!
+                    else ...[
+                      // Atajos de color como en Liga (Victor, 2026-11-27).
+                      const SizedBox(height: 8),
+                      _atajos(context),
+                    ],
                     ..._proximo(context),
+                    ?widget.despuesDelProximo,
                     // Lo que falta evaluar (antes en Próximos eventos).
                     TarjetasPorEvaluar(sesion: s),
                     _titulo(context, 'PLANES'),
@@ -416,6 +470,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
     super.initState();
     if (_coaches.isEmpty) {
       widget.sesion.api.get('getCoach').then((r) {
+        NivelesCoach.actualizar(r['niveles']);
         if (mounted) setState(() => _coaches = [for (final c in (r['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)]);
       }, onError: (_) {});
     }
@@ -879,6 +934,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
   Future<void> _cargar() async {
     try {
       final r = await s.api.get('getFichaDeportiva', {'username': ?widget.username, if (s.adminToken != null) 'adminToken': s.adminToken});
+      NivelesCoach.actualizar(r['niveles']);
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _d = r);
     } catch (e) {
@@ -957,16 +1013,43 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
     }
   }
 
+  final Set<String> _logrosAbiertos = {};
+
+  /// Las habilidades de un nivel, por grupo.
+  List<Widget> _filasNivel(BuildContext context, List<Map<String, dynamic>> habs, String nivel) {
+    final p = context.pivot;
+    final g = <String, List<Map<String, dynamic>>>{};
+    for (final h in habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == nivel)) {
+      (g['${h['categoria']}'] ??= []).add(h);
+    }
+    return [
+      for (final c in g.entries) ...[
+        const SizedBox(height: 12),
+        Text(
+          c.key.toUpperCase(),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+        ),
+        const SizedBox(height: 4),
+        for (final h in c.value)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text('${h['nombre']}', style: const TextStyle(fontSize: 15)),
+            subtitle: h['fecha'] == null ? null : Text('Desde el ${Fechas.corta(DateTime.parse('${h['fecha']}').toLocal())}'),
+            trailing: _Nivel(nivel: h['nivel'] as String?),
+            onTap: _puedeEditar ? () => _evaluar(h) : null,
+          ),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
     final d = _d;
     final habs = [for (final h in (d?['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)];
     final logradas = habs.where((h) => h['nivel'] == 'logrado').length;
-    final categorias = <String, List<Map<String, dynamic>>>{};
-    for (final h in habs) {
-      (categorias['${h['categoria']}'] ??= []).add(h);
-    }
+    final logros = {for (final x in (d?['logros'] as List? ?? const [])) '${(x as Map)['clave']}': '${x['fecha'] ?? ''}'};
     final notas = [for (final n in (d?['notas'] as List? ?? const [])) Map<String, dynamic>.from(n as Map)];
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -1030,23 +1113,30 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                         style: TextStyle(fontSize: 13, color: p.textoSecundario),
                       ),
                     ),
-                  for (final c in categorias.entries) ...[
-                    const SizedBox(height: 18),
-                    Text(
-                      c.key.toUpperCase(),
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-                    ),
-                    const SizedBox(height: 4),
-                    for (final h in c.value)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text('${h['nombre']}', style: const TextStyle(fontSize: 15)),
-                        subtitle: h['fecha'] == null ? null : Text('Desde el ${Fechas.corta(DateTime.parse('${h['fecha']}').toLocal())}'),
-                        trailing: _Nivel(nivel: h['nivel'] as String?),
-                        onTap: _puedeEditar ? () => _evaluar(h) : null,
-                      ),
-                  ],
+                  // Por niveles de la liga (Victor, 2026-11-27): un nivel completo es
+                  // un logro y sus habilidades se pliegan.
+                  for (final n in NivelesCoach.lista)
+                    if (habs.any((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave))
+                      if (logros.containsKey(n.clave))
+                        _LogroNivel(
+                          nivel: n,
+                          fecha: logros[n.clave]!,
+                          abierto: _logrosAbiertos.contains(n.clave),
+                          alAbrir: () => setState(() => _logrosAbiertos.contains(n.clave) ? _logrosAbiertos.remove(n.clave) : _logrosAbiertos.add(n.clave)),
+                          hijos: _filasNivel(context, habs, n.clave),
+                        )
+                      else ...[
+                        const SizedBox(height: 20),
+                        Text(
+                          n.nombre,
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.texto),
+                        ),
+                        Text(
+                          '${habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave && h['nivel'] == 'logrado').length} de ${habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave).length} logradas · ${n.textoRegla}',
+                          style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+                        ),
+                        ..._filasNivel(context, habs, n.clave),
+                      ],
                   _ProgresoFicha(d: d, puedeEditar: _puedeEditar, alMarca: (pr) => _nuevaMarca(pr)),
                   const SizedBox(height: 22),
                   Text(
@@ -1113,21 +1203,23 @@ class _NivelFicha extends StatelessWidget {
     final p = context.pivot;
     final nivel = '${d['nivel'] ?? ''}';
     if (nivel.isEmpty || habs.isEmpty) return const SizedBox.shrink();
-    final basicas = [
-      for (final h in habs)
-        if (h['tipo'] != 'avanzada') h,
-    ];
+    final logros = {for (final x in (d['logros'] as List? ?? const [])) '${(x as Map)['clave']}'};
     final enProceso = habs.where((h) => h['nivel'] == 'proceso').map((h) => '${h['nombre']}').toList();
-    final logradasBas = basicas.where((h) => h['nivel'] == 'logrado').length;
-    final meta = (basicas.length * 0.8).ceil();
-    final siguiente = switch (nivel) {
-      'sin' =>
-        meta - logradasBas > 0
-            ? 'Te ${meta - logradasBas == 1 ? 'falta 1 habilidad' : 'faltan ${meta - logradasBas} habilidades'} para «${nivelesCoach['basicas']}».'
-            : 'Ya casi: tu entrenadorx revisará tu nivel.',
-      'basicas' => 'Para «${nivelesCoach['avanzadas']}» falta lograr una habilidad avanzada.',
-      _ => 'Estás en el nivel más alto. Sigue sumando habilidades avanzadas.',
-    };
+    // El primer nivel sin completar y cuánto le falta (niveles de la liga).
+    String siguiente = 'Completaste todos los niveles. Sigue sumando habilidades.';
+    for (final n in NivelesCoach.lista) {
+      final hs = habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave).toList();
+      if (hs.isEmpty || logros.contains(n.clave)) continue;
+      final ok = hs.where((h) => h['nivel'] == 'logrado').length;
+      final meta = switch (n.regla) {
+        'todas' => hs.length,
+        'una' => 1,
+        _ => (hs.length * n.porcentaje / 100).ceil(),
+      };
+      final falta = (meta - ok).clamp(1, hs.length);
+      siguiente = 'Para completar «${n.nombre}» te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'}.';
+      break;
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Container(
@@ -1156,6 +1248,86 @@ class _NivelFicha extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Un nivel completo (Victor, 2026-11-27): se ve como logro y sus habilidades
+/// quedan plegadas; se abren tocándolo.
+class _LogroNivel extends StatelessWidget {
+  const _LogroNivel({required this.nivel, required this.fecha, required this.abierto, required this.alAbrir, required this.hijos});
+  final NivelCoach nivel;
+  final String fecha;
+  final bool abierto;
+  final VoidCallback alAbrir;
+  final List<Widget> hijos;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final (degradado, sobre) = PivotPaleta.seccion('entrenamientos', Theme.of(context).brightness);
+    final cuando = DateTime.tryParse(fecha)?.toLocal();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: p.tarjeta,
+            borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: alAbrir,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+                      child: Icon(Icons.military_tech_rounded, color: sobre),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Logro completado',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.marcaTexto),
+                          ),
+                          Text(
+                            nivel.nombre,
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
+                          ),
+                          Text(
+                            abierto
+                                ? 'Toca para plegar sus habilidades'
+                                : (cuando == null ? 'Toca para ver sus habilidades' : 'Desde el ${Fechas.corta(cuando)} · toca para ver sus habilidades'),
+                            style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: abierto ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      child: Icon(Icons.expand_more_rounded, color: p.textoSecundario),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: abierto ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: hijos) : const SizedBox(width: double.infinity),
+          ),
+        ],
       ),
     );
   }

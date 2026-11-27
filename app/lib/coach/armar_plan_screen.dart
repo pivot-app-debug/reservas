@@ -4,7 +4,7 @@ import '../core/esqueleto.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart' show altoBarra;
-import '../equipo/habilidades_screen.dart' show nivelesCoach;
+import 'niveles_coach.dart';
 import '../eventos/modelos.dart';
 import '../sesion/sesion.dart';
 import 'coach_screen.dart';
@@ -196,7 +196,7 @@ class _ArmarPlanScreenState extends State<ArmarPlanScreen> {
             style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
           ),
         ),
-        for (final n in nivelesCoach.entries) opcion('nivel:${n.key}', Icons.stairs_outlined, n.value),
+        for (final n in nivelesCoachElegibles.entries) opcion('nivel:${n.key}', Icons.stairs_outlined, n.value),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
           child: Text('Un plan por nivel lo ven, si lo compartes, las personas de ese nivel.', style: TextStyle(fontSize: 12.5, color: p.textoSecundario)),

@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (Entreno nuevo y niveles de habilidades)
+- Entreno rediseñado: Mi progreso grande arriba (tu nivel, la barra de lo logrado en el nivel que estás, cuánto te falta, lo que trabajas y lo último que te dejaron), los cursos en un carrusel y los próximos entrenamientos. Para entrenadorxs: Mi progreso más compacto, el próximo entrenamiento con su plan y lo que falta evaluar, los cursos y los planes; Habilidades, Pruebas, Entrenadorxs y Notificaciones son íconos en la barra de arriba.
+- Niveles de habilidades propios de la liga: además de básicas y avanzadas se pueden crear otros (por ejemplo intermedias), ordenarlos y elegir cuándo se completa cada uno (un porcentaje, todas o una de sus habilidades). Las dos de siempre quedan con la misma regla, así que nadie cambió de nivel.
+- Cuando alguien completa un nivel, lo ve como «Logro completado» en Mi progreso, le llega un aviso y esas habilidades se pliegan (se pueden abrir). Lo mismo cuando unx entrenadorx mira su progreso.
+- Cursos y planes por nivel usan los niveles de la liga.
+
 ## 2026-11-27 (ajustes de Liga, Calendario, Mi perfil y equipos)
 - Liga: Inventario y Ajustes pasan a íconos al lado del buscador; en tarjetas quedan Comunicación y Finanzas.
 - Calendario: primero Novedades y después Tareas. Abrir el buscador ya no da un salto.

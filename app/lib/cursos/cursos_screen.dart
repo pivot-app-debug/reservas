@@ -31,6 +31,7 @@ import '../eventos/widgets_comunes.dart' show AvatarPersona, Etiqueta;
 import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
+import '../coach/niveles_coach.dart';
 import '../eventos/eventos_repo.dart' show EventosRepo;
 
 import 'importar_clases.dart';
@@ -201,7 +202,10 @@ AppBar _barra(String titulo) => AppBar(
 /// Cursos que puedo ver ([ids]) y si hay alguno nuevo sin abrir Cursos
 /// ([nuevos], el punto rojo del botón). Sin señal, ninguno.
 class EstadoCursos {
-  const EstadoCursos(this.ids, this.nuevos, [this.nuevosLista = const []]);
+  const EstadoCursos(this.ids, this.nuevos, [this.nuevosLista = const [], this.lista = const []]);
+
+  /// Los cursos que ve la persona, para el carrusel de Entreno (2026-11-27).
+  final List<Map<String, dynamic>> lista;
   final List<String> ids;
   final bool nuevos;
 
@@ -222,7 +226,7 @@ Future<EstadoCursos> estadoCursos(Sesion s) async {
       for (final c in l)
         if (c['miInscripcion'] == null && !vistos.contains('${c['id']}')) ('${c['id']}', '${c['nombre'] ?? 'Curso'}'),
     ];
-    return EstadoCursos([for (final c in l) '${c['id']}'], nuevos.isNotEmpty, nuevos);
+    return EstadoCursos([for (final c in l) '${c['id']}'], nuevos.isNotEmpty, nuevos, l);
   } catch (_) {
     return const EstadoCursos([], false);
   }

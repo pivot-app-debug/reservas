@@ -103,7 +103,17 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   num? get _monto => !_cobrar ? 0 : num.tryParse(_precio.text.trim().replaceAll(',', '.'));
 
   /// Curso solo para habilidades avanzadas: los temas son solo avanzados.
-  bool get _soloAvanzadas => _paraTipo == 'nivel' && _paraValores.length == 1 && _paraValores.first == 'avanzadas';
+  /// Curso para un solo nivel que no es el primero: los temas son de ese
+  /// nivel (niveles de la liga, 2026-11-27).
+  String? get _soloNivel {
+    if (_paraTipo != 'nivel' || _paraValores.length != 1) return null;
+    final v = switch (_paraValores.first) {
+      'basicas' => 'basica',
+      'avanzadas' => 'avanzada',
+      final x => x,
+    };
+    return v != 'sin' && v != NivelesCoach.primero && NivelesCoach.lista.any((n) => n.clave == v) ? v : null;
+  }
 
   List<_PasoCurso> get _pasos => [
     if (o == null && widget.plantillas.isNotEmpty) _PasoCurso.origen,
@@ -245,7 +255,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => _HojaTemas(habilidades: widget.habilidades, ya: ya, soloAvanzadas: _soloAvanzadas),
+    builder: (_) => _HojaTemas(habilidades: widget.habilidades, ya: ya, soloNivel: _soloNivel),
   );
 
   Future<void> _agregarTema(int i) async {
@@ -478,7 +488,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
             }),
             child: switch (k) {
               'equipos' => _chipsPara([for (final e in widget.equipos) (e, e)]),
-              'nivel' => _chipsPara(const [('sin', 'Aprendiendo lo básico'), ('basicas', 'Habilidades básicas'), ('avanzadas', 'Habilidades avanzadas')]),
+              'nivel' => _chipsPara([for (final e in nivelesCoachElegibles.entries) (e.key, e.value)]),
               'personas' => _elegirPersonas(context),
               _ => null,
             },
@@ -979,7 +989,7 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
         fila(_clinica ? 'Clínica' : 'Curso', _nombre.text.trim(), _PasoCurso.nombre),
         fila('Para quién', switch (_paraTipo) {
           'equipos' => _paraValores.join(', '),
-          'nivel' => _paraValores.map((v) => const {'sin': 'Aprendiendo lo básico', 'basicas': 'Básicas', 'avanzadas': 'Avanzadas'}[v] ?? v).join(', '),
+          'nivel' => _paraValores.map((v) => nivelesCoach[v] ?? v).join(', '),
           'personas' => '${_paraValores.length} ${_paraValores.length == 1 ? 'persona' : 'personas'}',
           _ => 'Toda la liga',
         }, _PasoCurso.para),
@@ -1153,12 +1163,12 @@ class _OpcionExpandible extends StatelessWidget {
 
 /// Temas: de la lista de habilidades de la liga, o uno nuevo corto.
 class _HojaTemas extends StatefulWidget {
-  const _HojaTemas({required this.habilidades, required this.ya, this.soloAvanzadas = false});
+  const _HojaTemas({required this.habilidades, required this.ya, this.soloNivel});
   final List<Map<String, dynamic>> habilidades;
   final Set<String> ya;
 
-  /// Curso por nivel avanzado: solo habilidades avanzadas.
-  final bool soloAvanzadas;
+  /// Curso para un nivel: solo las habilidades de ese nivel.
+  final String? soloNivel;
   @override
   State<_HojaTemas> createState() => _HojaTemasState();
 }
@@ -1166,10 +1176,10 @@ class _HojaTemas extends StatefulWidget {
 class _HojaTemasState extends State<_HojaTemas> {
   final _q = TextEditingController();
 
-  /// Filtro por nivel (Victor, 2026-11-18): null todas, 'basica' o 'avanzada'.
+  /// Filtro por nivel de la liga: null todas.
   String? _nivel;
 
-  static String _nivelDe(Map h) => h['nivel'] == 'avanzada' ? 'avanzada' : 'basica';
+  static String _nivelDe(Map h) => '${h['nivel'] ?? NivelesCoach.primero}';
 
   @override
   void dispose() {
@@ -1181,7 +1191,7 @@ class _HojaTemasState extends State<_HojaTemas> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final q = _q.text.trim();
-    final nivel = widget.soloAvanzadas ? 'avanzada' : _nivel;
+    final nivel = widget.soloNivel ?? _nivel;
     final l = widget.habilidades
         .where(
           (h) =>
@@ -1199,14 +1209,6 @@ class _HojaTemasState extends State<_HojaTemas> {
     );
     Widget fila(Map<String, dynamic> h) =>
         ListTile(dense: true, title: Text('${h['nombre']}'), subtitle: Text('${h['categoria']}'), onTap: () => Navigator.of(context).pop('${h['nombre']}'));
-    final basicas = [
-      for (final h in l)
-        if (_nivelDe(h) == 'basica') h,
-    ];
-    final avanzadas = [
-      for (final h in l)
-        if (_nivelDe(h) == 'avanzada') h,
-    ];
     final existe = widget.habilidades.any((h) => '${h['nombre']}'.toLowerCase() == q.toLowerCase());
     final palabras = q.split(RegExp(r'\s+')).where((x) => x.isNotEmpty).length;
     return SafeArea(
@@ -1228,10 +1230,13 @@ class _HojaTemasState extends State<_HojaTemas> {
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Busca o escribe un tema nuevo', counterText: ''),
                 ),
               ),
-              if (widget.soloAvanzadas)
+              if (widget.soloNivel != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  child: Text('Curso para habilidades avanzadas: solo se muestran las avanzadas.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                  child: Text(
+                    'Curso para ${NivelesCoach.nombre(widget.soloNivel!)}: solo se muestran sus habilidades.',
+                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                  ),
                 )
               else
                 Padding(
@@ -1239,7 +1244,7 @@ class _HojaTemasState extends State<_HojaTemas> {
                   child: Wrap(
                     spacing: 6,
                     children: [
-                      for (final (v, t) in const [(null, 'Todas'), ('basica', 'Básicas'), ('avanzada', 'Avanzadas')])
+                      for (final (v, t) in [(null, 'Todas'), for (final n in NivelesCoach.lista) (n.clave, n.nombre)])
                         ChoiceChip(label: Text(t), selected: _nivel == v, onSelected: (_) => setState(() => _nivel = v)),
                     ],
                   ),
@@ -1258,8 +1263,11 @@ class _HojaTemasState extends State<_HojaTemas> {
                     key: ValueKey(nivel),
                     children: [
                       if (nivel == null) ...[
-                        if (basicas.isNotEmpty) ...[seccion('HABILIDADES BÁSICAS'), for (final h in basicas) fila(h)],
-                        if (avanzadas.isNotEmpty) ...[seccion('HABILIDADES AVANZADAS'), for (final h in avanzadas) fila(h)],
+                        for (final n in NivelesCoach.lista)
+                          if (l.any((h) => _nivelDe(h) == n.clave)) ...[
+                            seccion(n.nombre.toUpperCase()),
+                            for (final h in l.where((h) => _nivelDe(h) == n.clave)) fila(h),
+                          ],
                       ] else
                         for (final h in l) fila(h),
                     ],

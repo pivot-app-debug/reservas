@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../core/espacio_barra.dart';
 
+export '../coach/niveles_coach.dart' show nivelesCoach, nivelesCoachElegibles, NivelesCoach, NivelCoach;
 import '../coach/coach_screen.dart' show BotonDictar, FichaDeportivaScreen, QuienVe, barraCoach, errorCoach;
 import '../core/api.dart';
+import '../coach/niveles_coach.dart';
 import '../core/deporte.dart';
 import '../core/esqueleto.dart';
 import '../core/fechas.dart';
@@ -24,7 +26,6 @@ import '../sesion/sesion.dart';
 /// desplegables). Solo para coaches aprobadxs.
 
 /// Niveles en Coach (Victor, 2026-11-17).
-const nivelesCoach = {'sin': 'Aprendiendo lo básico', 'basicas': 'Habilidades básicas', 'avanzadas': 'Habilidades avanzadas'};
 
 class HabilidadesEquipoScreen extends StatefulWidget {
   const HabilidadesEquipoScreen({super.key, required this.sesion, this.lista = false});
@@ -112,7 +113,7 @@ class _ListaHabilidades extends StatefulWidget {
 
 class _ListaHabilidadesState extends State<_ListaHabilidades> {
   List<Map<String, dynamic>>? _l;
-  final Set<String> _abiertos = {'basica'};
+  late final Set<String> _abiertos = {NivelesCoach.primero};
 
   @override
   void initState() {
@@ -123,6 +124,7 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
   Future<void> _cargar() async {
     try {
       final r = await widget.sesion.api.get('getHabilidades');
+      NivelesCoach.actualizar(r['niveles']);
       if (mounted) setState(() => _l = [for (final h in (r['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)]);
     } catch (_) {
       if (mounted) setState(() => _l ??= const []);
@@ -163,7 +165,7 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
     if (l == null) return const Esqueleto(key: ValueKey('c'));
     Map<String, List<Map<String, dynamic>>> porGrupo(String nivel) {
       final g = <String, List<Map<String, dynamic>>>{};
-      for (final h in l.where((h) => '${h['nivel'] ?? 'basica'}' == nivel)) {
+      for (final h in l.where((h) => '${h['nivel'] ?? NivelesCoach.primero}' == nivel)) {
         (g['${h['categoria']}'] ??= []).add(h);
       }
       return g;
@@ -264,7 +266,7 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
                               child: TextButton.icon(
                                 onPressed: () => editar(null, null, nivel),
                                 icon: const Icon(Icons.add_rounded),
-                                label: Text(nivel == 'avanzada' ? 'Agregar habilidad avanzada' : 'Agregar habilidad básica'),
+                                label: Text('Agregar a ${NivelesCoach.nombre(nivel)}'),
                               ),
                             ),
                           ],
@@ -286,14 +288,21 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
           style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
         ),
         const SizedBox(height: 12),
-        desplegable(
-          'basica',
-          'Habilidades básicas',
-          Deporte.esDerby
-              ? 'Parten de las habilidades mínimas de WFTDA. Puedes editarlas, sumar otras o apagarlas.'
-              : 'Las básicas de tu deporte. Puedes editarlas, sumar otras o apagarlas.',
+        // Niveles propios de la liga, en orden (Victor, 2026-11-27).
+        for (final nv in NivelesCoach.lista)
+          desplegable(
+            nv.clave,
+            nv.nombre,
+            nv.clave == 'basica' && Deporte.esDerby ? '${nv.textoRegla} Parten de las habilidades mínimas de WFTDA.' : nv.textoRegla,
+          ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => NivelesScreen(sesion: widget.sesion)));
+            if (ok == true) _cargar();
+          },
+          icon: const Icon(Icons.stairs_outlined),
+          label: const Text('Niveles: agregar, ordenar o cambiar su regla'),
         ),
-        desplegable('avanzada', 'Habilidades avanzadas', 'Las escribe lx entrenadorx: lo que se trabaja después de las básicas.'),
       ],
     );
   }
@@ -328,6 +337,7 @@ class _MarcarPersonasState extends State<_MarcarPersonas> {
   Future<void> _cargar() async {
     try {
       final r = await s.api.get('getCoach');
+      NivelesCoach.actualizar(r['niveles']);
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (mounted) setState(() => _d = r);
     } catch (e) {
@@ -378,7 +388,7 @@ class _MarcarPersonasState extends State<_MarcarPersonas> {
               trailing: x['nivelAMano'] != true ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
               onTap: () => Navigator.of(h).pop(''),
             ),
-            for (final e in nivelesCoach.entries)
+            for (final e in nivelesCoachElegibles.entries)
               ListTile(
                 title: Text(e.value),
                 trailing: x['nivelAMano'] == true && x['nivel'] == e.key ? Icon(Icons.check_rounded, color: h.pivot.marcaTexto) : null,
@@ -471,7 +481,7 @@ class _MarcarPersonasState extends State<_MarcarPersonas> {
             ),
             const SizedBox(height: 12),
             fila('NIVEL', [
-              for (final (k, t) in [(null, 'Todxs'), ...nivelesCoach.entries.map((e) => (e.key, e.value))])
+              for (final (k, t) in [(null, 'Todxs'), ...nivelesCoachElegibles.entries.map((e) => (e.key, e.value))])
                 ChoiceChip(
                   label: Text('$t (${k == null ? todos.length : todos.where((x) => x['nivel'] == k).length})'),
                   selected: _nivel == k,
@@ -682,15 +692,16 @@ class _ElegirHabilidadesScreenState extends State<_ElegirHabilidadesScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    Map<String, List<Map<String, dynamic>>> porGrupo(bool avanzada) {
+    // Por nivel de la liga (2026-11-27).
+    Map<String, List<Map<String, dynamic>>> porGrupo(String nivel) {
       final g = <String, List<Map<String, dynamic>>>{};
-      for (final h in widget.habilidades.where((h) => (h['nivel'] == 'avanzada') == avanzada)) {
+      for (final h in widget.habilidades.where((h) => '${h['nivel'] ?? NivelesCoach.primero}' == nivel)) {
         (g['${h['categoria']}'] ??= []).add(h);
       }
       return g;
     }
 
-    final basicas = widget.habilidades.where((h) => h['nivel'] != 'avanzada').map((h) => '${h['id']}').toSet();
+    final basicas = widget.habilidades.where((h) => '${h['nivel'] ?? NivelesCoach.primero}' == NivelesCoach.primero).map((h) => '${h['id']}').toSet();
     List<Widget> grupos(Map<String, List<Map<String, dynamic>>> g) => [
       for (final e in g.entries) ...[
         CheckboxListTile(
@@ -712,7 +723,6 @@ class _ElegirHabilidadesScreenState extends State<_ElegirHabilidadesScreen> {
           ),
       ],
     ];
-    final av = porGrupo(true);
     final n = widget.personas.length;
     Widget titulo(String t) => Padding(
       padding: const EdgeInsets.fromLTRB(2, 16, 2, 4),
@@ -740,16 +750,15 @@ class _ElegirHabilidadesScreenState extends State<_ElegirHabilidadesScreen> {
               clipBehavior: Clip.antiAlias,
               child: CheckboxListTile(
                 title: Text(
-                  Deporte.esDerby ? 'Todas las básicas (Freshmeat)' : 'Todas las básicas',
+                  Deporte.esDerby && NivelesCoach.primero == 'basica' ? 'Todas las básicas (Freshmeat)' : 'Todas: ${NivelesCoach.nombre(NivelesCoach.primero)}',
                   style: TextStyle(fontWeight: FontWeight.w700, color: p.sobreSuave),
                 ),
                 value: basicas.every(_habs.contains),
                 onChanged: (v) => setState(() => v == true ? _habs.addAll(basicas) : _habs.removeAll(basicas)),
               ),
             ),
-          titulo('Habilidades básicas'),
-          ...grupos(porGrupo(false)),
-          if (av.isNotEmpty) ...[titulo('Habilidades avanzadas'), ...grupos(av)],
+          for (final nv in NivelesCoach.lista)
+            if (porGrupo(nv.clave).isNotEmpty) ...[titulo(nv.nombre), ...grupos(porGrupo(nv.clave))],
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -913,7 +922,7 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
   late final nombre = TextEditingController();
   late final cat = TextEditingController();
   late bool activa = true;
-  late String nivel = 'basica';
+  late String nivel = NivelesCoach.primero;
 
   @override
   void initState() {
@@ -921,7 +930,7 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
     nombre.text = widget.habilidad?['nombre'] ?? '';
     cat.text = '${widget.habilidad?['categoria'] ?? widget.categoria ?? ''}';
     activa = widget.habilidad?['activa'] != false;
-    nivel = '${widget.habilidad?['nivel'] ?? widget.nivelInicial ?? 'basica'}';
+    nivel = '${widget.habilidad?['nivel'] ?? widget.nivelInicial ?? NivelesCoach.primero}';
   }
 
   @override
@@ -983,15 +992,16 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
                 decoration: const InputDecoration(labelText: 'Grupo', hintText: 'Ej. Frenos'),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'basica', label: Text('Básica')),
-                    ButtonSegment(value: 'avanzada', label: Text('Avanzada')),
+              // Nivel de la liga (2026-11-27).
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (final nv in NivelesCoach.lista)
+                      ChoiceChip(label: Text(nv.nombre), selected: nivel == nv.clave, onSelected: (_) => setState(() => nivel = nv.clave)),
                   ],
-                  selected: {nivel},
-                  onSelectionChanged: (v) => setState(() => nivel = v.first),
                 ),
               ),
               if (widget.habilidad != null)
@@ -1008,6 +1018,206 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
                 child: FilledButton(onPressed: _guardar, child: const Text('Guardar')),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Niveles de la liga (Victor, 2026-11-27) ───────────────────────────────
+
+/// Los niveles de habilidades, en orden: cada uno se completa con su regla.
+/// Quien completa uno ve el logro en Mi progreso y sus habilidades se pliegan.
+class NivelesScreen extends StatefulWidget {
+  const NivelesScreen({super.key, required this.sesion});
+  final Sesion sesion;
+  @override
+  State<NivelesScreen> createState() => _NivelesScreenState();
+}
+
+class _NivelesScreenState extends State<NivelesScreen> {
+  Sesion get s => widget.sesion;
+  bool _cambio = false, _ocupado = false;
+
+  Future<void> _recargar() async {
+    final r = await s.api.get('getHabilidades');
+    NivelesCoach.actualizar(r['niveles']);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _hacer(Map<String, Object?> params) async {
+    setState(() => _ocupado = true);
+    try {
+      final r = await s.api.post('coachGuardar', params);
+      if (r['exito'] == false) throw ApiException('${r['error']}');
+      _cambio = true;
+      await _recargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _editar([NivelCoach? n]) async {
+    final r = await Navigator.of(context).push<Map<String, Object?>>(MaterialPageRoute(builder: (_) => _EditarNivelScreen(nivel: n)));
+    if (r == null) return;
+    if (r['quitar'] == true) return _hacer({'accion': 'quitarNivel', 'clave': n!.clave});
+    await _hacer({'accion': 'guardarNivel', 'clave': n?.clave ?? '', ...r});
+  }
+
+  void _mover(int i, int d) {
+    final l = [...NivelesCoach.lista];
+    final x = l.removeAt(i);
+    l.insert(i + d, x);
+    NivelesCoach.lista = l;
+    setState(() {});
+    _hacer({
+      'accion': 'ordenNiveles',
+      'claves': jsonEncode([for (final n in l) n.clave]),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final l = NivelesCoach.lista;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (hizo, _) {
+        if (!hizo) Navigator.of(context).pop(_cambio);
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: barraCoach('Niveles'),
+        body: ListView(
+          padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
+          children: [
+            Text(
+              'Se completan en orden. Cuando alguien completa un nivel, lo ve como logro en Mi progreso, le llega un aviso y esas habilidades dejan de mostrarse (se pueden abrir). Lo ya evaluado no se borra.',
+              style: TextStyle(fontSize: 14, height: 1.35, color: p.texto),
+            ),
+            const SizedBox(height: 12),
+            for (final (i, n) in l.indexed)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: p.tarjeta,
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    leading: CircleAvatar(backgroundColor: p.suave, foregroundColor: p.sobreSuave, child: Text('${i + 1}')),
+                    title: Text(n.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(n.textoRegla),
+                    onTap: _ocupado ? null : () => _editar(n),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(tooltip: 'Subir', onPressed: _ocupado || i == 0 ? null : () => _mover(i, -1), icon: const Icon(Icons.arrow_upward_rounded)),
+                        IconButton(
+                          tooltip: 'Bajar',
+                          onPressed: _ocupado || i == l.length - 1 ? null : () => _mover(i, 1),
+                          icon: const Icon(Icons.arrow_downward_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(onPressed: _ocupado ? null : () => _editar(), icon: const Icon(Icons.add_rounded), label: const Text('Agregar nivel')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditarNivelScreen extends StatefulWidget {
+  const _EditarNivelScreen({this.nivel});
+  final NivelCoach? nivel;
+  @override
+  State<_EditarNivelScreen> createState() => _EditarNivelScreenState();
+}
+
+class _EditarNivelScreenState extends State<_EditarNivelScreen> {
+  late final _nombre = TextEditingController(text: widget.nivel?.nombre ?? '');
+  late String _regla = widget.nivel?.regla ?? 'porcentaje';
+  late double _porc = (widget.nivel?.porcentaje ?? 80).toDouble();
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: barraCoach(widget.nivel == null ? 'Nuevo nivel' : 'Editar nivel'),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 12 + altoBarra(context), 16, 120 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          TextField(
+            controller: _nombre,
+            maxLength: 60,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej. Habilidades intermedias'),
+          ),
+          const SizedBox(height: 8),
+          const Text('¿Cuándo se completa?', style: TextStyle(fontWeight: FontWeight.w700)),
+          RadioGroup<String>(
+            groupValue: _regla,
+            onChanged: (v) => setState(() => _regla = v ?? 'porcentaje'),
+            child: const Column(
+              children: [
+                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'porcentaje', title: Text('Al lograr un porcentaje de sus habilidades')),
+                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'todas', title: Text('Al lograr todas sus habilidades')),
+                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'una', title: Text('Al lograr una de sus habilidades')),
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: _regla != 'porcentaje'
+                ? const SizedBox(width: double.infinity)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_porc.round()} % de sus habilidades',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
+                      ),
+                      Slider(value: _porc, min: 10, max: 100, divisions: 18, label: '${_porc.round()} %', onChanged: (v) => setState(() => _porc = v)),
+                    ],
+                  ),
+          ),
+          if (widget.nivel != null) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).pop({'quitar': true}),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Quitar este nivel (solo si no tiene habilidades)'),
+            ),
+          ],
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            onPressed: _nombre.text.trim().isEmpty
+                ? null
+                : () => Navigator.of(context).pop({'nombre': _nombre.text.trim(), 'regla': _regla, 'porcentaje': _porc.round()}),
+            child: const Text('Guardar'),
           ),
         ),
       ),

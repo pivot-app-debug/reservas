@@ -5086,6 +5086,71 @@ async function _habilidades(): Promise<any[]> {
   return data ?? [];
 }
 
+/// Niveles de habilidades de la liga, en orden (Victor, 2026-11-27). Una liga
+/// nueva arranca con los dos de siempre.
+const _NIVELES_BASE = [
+  { clave: 'basica', nombre: 'Habilidades básicas', orden: 1, regla: 'porcentaje', porcentaje: 80 },
+  { clave: 'avanzada', nombre: 'Habilidades avanzadas', orden: 2, regla: 'una', porcentaje: 80 },
+];
+async function _nivelesLiga(): Promise<any[]> {
+  const { data } = await supabase.from('coach_niveles').select('clave, nombre, orden, regla, porcentaje').order('orden');
+  if (data?.length) return data;
+  await supabase.from('coach_niveles').insert(_NIVELES_BASE);
+  return _NIVELES_BASE;
+}
+
+/// Nivel de una persona según lo logrado: los niveles se completan en orden,
+/// cada uno con su regla (porcentaje, todas o una). Un nivel sin habilidades
+/// no cuenta. Devuelve la clave del último completo ('sin' si ninguno).
+function _calcularNivel(habs: any[], niveles: any[], logradas: Set<string>): { nivel: string; completos: string[] } {
+  const activas = habs.filter((h: any) => h.activa !== false);
+  const primero = niveles[0]?.clave ?? 'basica';
+  let nivel = 'sin';
+  const completos: string[] = [];
+  for (const n of niveles) {
+    const hs = activas.filter((h: any) => (h.nivel || primero) === n.clave);
+    if (!hs.length) continue;
+    const ok = hs.filter((h: any) => logradas.has(h.id)).length;
+    const cumple = n.regla === 'todas' ? ok === hs.length : n.regla === 'una' ? ok >= 1 : ok >= Math.ceil(hs.length * (Number(n.porcentaje) || 80) / 100);
+    if (!cumple) break;
+    nivel = n.clave;
+    completos.push(n.clave);
+  }
+  return { nivel, completos };
+}
+
+/// Claves viejas del nivel de una persona ('basicas', 'avanzadas').
+function _claveNivel(v: unknown): string {
+  const s = String(v ?? '');
+  return s === 'basicas' ? 'basica' : s === 'avanzadas' ? 'avanzada' : s;
+}
+
+async function _logradasDe(username: string): Promise<Set<string>> {
+  const { data: evs } = await supabase.from('coach_evaluaciones').select('habilidad_id, nivel, creado_en').eq('username', username).order('creado_en', { ascending: false }).limit(2000);
+  const vistas = new Set<string>(), l = new Set<string>();
+  for (const e of evs ?? []) { if (vistas.has(e.habilidad_id)) continue; vistas.add(e.habilidad_id); if (e.nivel === 'logrado') l.add(e.habilidad_id); }
+  return l;
+}
+
+/// Aviso de logro (Victor, 2026-11-27): si con lo último que marcó lx
+/// entrenadorx la persona completó un nivel nuevo.
+async function _avisarLogros(username: string, antes: string[]): Promise<void> {
+  try {
+    const niveles = await _nivelesLiga();
+    const { completos } = _calcularNivel(await _habilidades(), niveles, await _logradasDe(username));
+    const nuevos = completos.filter((x) => !antes.includes(x));
+    if (!nuevos.length) return;
+    const n = niveles.find((x: any) => x.clave === nuevos[nuevos.length - 1]);
+    await sendPush({
+      tipo: 'logro_nivel', include_external_user_ids: [username], personal: true, pantalla: 'progreso',
+      headings: { es: '¡Logro completado!' }, contents: { es: `Completaste ${n?.nombre ?? 'un nivel'}. Míralo en Mi progreso.` }, url: APP_URL + '/',
+    });
+  } catch (e) { console.error('[coach] logro', username, e); }
+}
+async function _completosDe(username: string): Promise<string[]> {
+  return _calcularNivel(await _habilidades(), await _nivelesLiga(), await _logradasDe(username)).completos;
+}
+
 /// Último nivel por habilidad (y cuándo), con historial corto.
 async function _fichaHabilidades(username: string): Promise<Record<string, any>> {
   const { data } = await supabase.from('coach_evaluaciones').select('habilidad_id, nivel, creado_en, coach').eq('username', username).order('creado_en', { ascending: false }).limit(500);
@@ -5458,6 +5523,7 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
     if (e.nivel === 'logrado') (logradas[e.username] ??= new Set()).add(e.habilidad_id);
   }
   const habs = (await _habilidades()).filter((h: any) => h.activa);
+  const nivelesL = await _nivelesLiga();
   const hoy = _hoyEcuadorISO();
         const { data: planes } = await supabase.from('coach_planes').select('id, id_evento, fecha, coach, bloques, compartido, equipo, da').gte('fecha', hoy).order('fecha').limit(120);
   // Planes sin fecha (de un evento cancelado) y para elegir equipo y quién lo da (Victor, 2026-11-17).
@@ -5485,16 +5551,12 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
             pronombres: p.pronombres ?? '', asistencias30: asis[p.username] ?? 0, logradas: logradas[p.username]?.size ?? 0,
       // Nivel (Victor, 2026-11-17): a mano o según lo logrado. Básicas con el
       // 80 % de las habilidades básicas; avanzadas, además, alguna avanzada.
-      nivel: p.nivel_coach ?? (() => {
-        const l = logradas[p.username] ?? new Set();
-        const bas = habs.filter((h: any) => (h.nivel ?? 'basica') === 'basica'), av = habs.filter((h: any) => h.nivel === 'avanzada');
-        const okBas = bas.length > 0 && bas.filter((h: any) => l.has(h.id)).length >= Math.ceil(bas.length * 0.8);
-        if (!okBas) return 'sin';
-        return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
-      })(),
+      // Niveles propios de la liga (2026-11-27).
+      nivel: p.nivel_coach ? _claveNivel(p.nivel_coach) : _calcularNivel(habs, nivelesL, logradas[p.username] ?? new Set()).nivel,
       nivelAMano: !!p.nivel_coach,
     })),
-    habilidades: habs.map((h: any) => ({ id: h.id, categoria: h.categoria, nombre: h.nombre, nivel: h.nivel ?? 'basica' })),
+    habilidades: habs.map((h: any) => ({ id: h.id, categoria: h.categoria, nombre: h.nombre, nivel: h.nivel || (nivelesL[0]?.clave ?? 'basica') })),
+    niveles: nivelesL,
     planes: planes ?? [],
   };
 }
@@ -5533,8 +5595,8 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
   if (!username) return { exito: false, error: 'Sesión inválida.' };
   const propia = !!yo && yo === username;
   if (!propia && !adminEmail && !(coach && await _puedeVer(coach, username))) return { exito: false, error: 'No puedes ver esta ficha.' };
-  const [habs, niveles, { data: notas }] = await Promise.all([
-    _habilidades(), _fichaHabilidades(username),
+  const [habs, niveles, nivelesL, { data: notas }] = await Promise.all([
+    _habilidades(), _fichaHabilidades(username), _nivelesLiga(),
     supabase.from('coach_notas').select('*').eq('username', username).order('creado_en', { ascending: false }).limit(200),
   ]);
     // Quién ve cada nota (Victor, 2026-11-17: se eligen por separado):
@@ -5550,8 +5612,19 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
     username, nombre: quien[username.toUpperCase()]?.nombreDerby || username,
     asistencias30: asis[username] ?? 0,
     // tipo: básica o avanzada (nivel queda para la evaluación). Nivel de la persona (Victor, 2026-11-26).
-    habilidades: habs.filter((h: any) => h.activa).map((h: any) => ({ ...h, tipo: h.nivel ?? 'basica', ...(niveles[h.id] ?? { nivel: null }) })),
+    // tipo = clave del nivel de la habilidad; nivel = la evaluación.
+    habilidades: habs.filter((h: any) => h.activa).map((h: any) => ({ ...h, tipo: h.nivel || (nivelesL[0]?.clave ?? 'basica'), ...(niveles[h.id] ?? { nivel: null }) })),
     nivel: await _nivelPersona(username),
+    niveles: nivelesL,
+    // Logros: niveles completos con la fecha del último logrado (Victor, 2026-11-27).
+    logros: (() => {
+      const l = new Set(Object.entries(niveles).filter(([, x]: any) => x.nivel === 'logrado').map(([k]) => k));
+      return _calcularNivel(habs, nivelesL, l).completos.map((clave) => ({
+        clave,
+        nombre: nivelesL.find((n: any) => n.clave === clave)?.nombre ?? clave,
+        fecha: habs.filter((h: any) => h.activa && (h.nivel || nivelesL[0]?.clave) === clave).map((h: any) => String(niveles[h.id]?.fecha ?? '')).sort().pop() ?? '',
+      }));
+    })(),
         notas: (notas ?? []).filter(ve).map((n: any) => _notaJson(n, quien)),
     ...(await _progresoPersona(username, ve)),
     puedeEditar: !!coach && !propia,
@@ -5568,7 +5641,9 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
   if (accion === 'evaluar') {
     const nivel = String(params.nivel ?? '');
     if (!['no', 'proceso', 'logrado'].includes(nivel)) return { exito: false, error: 'Nivel inválido.' };
+    const antes = nivel === 'logrado' ? await _completosDe(username) : null;
     await supabase.from('coach_evaluaciones').insert({ username, habilidad_id: String(params.habilidadId ?? ''), nivel, coach: c.user });
+    if (antes) await _avisarLogros(username, antes);
   } else if (accion === 'nota') {
     const texto = String(params.texto ?? '').trim().slice(0, 4000);
     if (!texto) return { exito: false, error: 'La nota está vacía.' };
@@ -5609,7 +5684,8 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     await supabase.from('coach_planes').update({ id_evento: idEvento, fecha }).eq('id', id);
       } else if (accion === 'nivel') {
     // Nivel de una persona en Coach a mano (null = calculado).
-    const nivel = ['sin', 'basicas', 'avanzadas'].includes(String(params.nivel)) ? String(params.nivel) : null;
+    const claves = ['sin', ...(await _nivelesLiga()).map((n: any) => n.clave)];
+    const nivel = claves.includes(_claveNivel(params.nivel)) ? _claveNivel(params.nivel) : null;
     await supabase.from('equipo').update({ nivel_coach: nivel }).eq('username', username);
   } else if (accion === 'marcarGrupo') {
     // Varias personas y varias habilidades logradas de una vez (quienes ya
@@ -5621,7 +5697,10 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     for (const u of personas) if (await _puedeVer(c, u)) ok.push(u);
     if (!ok.length || !habs.length) return { exito: false, error: 'Elige personas y habilidades.' };
     const filas = ok.flatMap((u) => habs.map((h) => ({ username: u, habilidad_id: h, nivel: 'logrado', coach: c.user })));
+    const antes: Record<string, string[]> = {};
+    for (const u of ok) antes[u] = await _completosDe(u);
     for (let i = 0; i < filas.length; i += 500) await supabase.from('coach_evaluaciones').insert(filas.slice(i, i + 500));
+    for (const u of ok) await _avisarLogros(u, antes[u]);
     return { exito: true, marcadas: filas.length };
   } else if (accion === 'ajustes') {
     await supabase.from('coaches').update({ avisar_novedades: params.avisarNovedades !== false && params.avisarNovedades !== 'false' }).eq('username', c.user);
@@ -5648,12 +5727,43 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     const yoNombre = quien[c.user.toUpperCase()]?.nombreDerby || c.user;
     await sendPush({ tipo: 'aviso_entrenador', include_external_user_ids: ok, personal: true, headings: { es: titulo || `Aviso de ${yoNombre}` }, contents: { es: texto }, url: APP_URL + '/' });
     return { exito: true, enviados: ok.length };
+  } else if (accion === 'guardarNivel') {
+    // Niveles propios (Victor, 2026-11-27): nombre, regla y porcentaje.
+    const nombre = String(params.nombre ?? '').trim().slice(0, 60);
+    const regla = ['porcentaje', 'todas', 'una'].includes(String(params.regla)) ? String(params.regla) : 'porcentaje';
+    const porcentaje = Math.min(100, Math.max(1, Math.round(Number(params.porcentaje) || 80)));
+    if (!nombre) return { exito: false, error: 'Ponle un nombre al nivel.' };
+    const nv = await _nivelesLiga();
+    const clave = String(params.clave ?? '');
+    if (clave) {
+      if (!nv.some((n: any) => n.clave === clave)) return { exito: false, error: 'Ese nivel ya no existe.' };
+      await supabase.from('coach_niveles').update({ nombre, regla, porcentaje }).eq('clave', clave);
+    } else {
+      const base = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'nivel';
+      let nueva = base, i = 2;
+      while (nv.some((n: any) => n.clave === nueva) || nueva === 'sin') nueva = `${base}-${i++}`;
+      await supabase.from('coach_niveles').insert({ clave: nueva, nombre, regla, porcentaje, orden: (nv[nv.length - 1]?.orden ?? 0) + 1 });
+    }
+  } else if (accion === 'quitarNivel') {
+    const clave = String(params.clave ?? '');
+    const nv = await _nivelesLiga();
+    if (nv.length <= 1) return { exito: false, error: 'Tiene que quedar al menos un nivel.' };
+    const { count } = await supabase.from('coach_habilidades').select('id', { count: 'exact', head: true }).eq('nivel', clave);
+    if (count) return { exito: false, error: 'Ese nivel tiene habilidades. Muévelas a otro nivel primero.' };
+    await supabase.from('coach_niveles').delete().eq('clave', clave);
+  } else if (accion === 'ordenNiveles') {
+    let claves: string[] = [];
+    try { claves = JSON.parse(String(params.claves ?? '[]')).map(String); } catch { claves = []; }
+    for (const [i, k] of claves.entries()) await supabase.from('coach_niveles').update({ orden: i + 1 }).eq('clave', k);
   } else if (accion === 'habilidad') {
     // Agregar, renombrar o apagar una habilidad de la lista de la liga.
     const id = String(params.id ?? '');
         const fila: Record<string, any> = { categoria: String(params.categoria ?? '').trim().slice(0, 60), nombre: String(params.nombre ?? '').trim().slice(0, 100), activa: params.activa !== false && params.activa !== 'false' };
     // Básica o avanzada (Victor, 2026-11-17).
-    if (params.nivel != null) fila.nivel = params.nivel === 'avanzada' ? 'avanzada' : 'basica';
+    if (params.nivel != null) {
+      const nv = await _nivelesLiga();
+      fila.nivel = nv.some((n: any) => n.clave === String(params.nivel)) ? String(params.nivel) : (nv[0]?.clave ?? 'basica');
+    }
     if (!fila.nombre || !fila.categoria) return { exito: false, error: 'Falta el nombre o la categoría.' };
     if (id) await supabase.from('coach_habilidades').update(fila).eq('id', id);
     else {
@@ -5670,7 +5780,7 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
 async function getHabilidades(params: Record<string, any>): Promise<Record<string, any>> {
   const c = await _coachDe(String(params.token ?? ''));
   if (!c) return { exito: false, error: 'No eres entrenadorx.' };
-  return { exito: true, habilidades: await _habilidades() };
+  return { exito: true, habilidades: await _habilidades(), niveles: await _nivelesLiga() };
 }
 
 // Plan de un evento: lo edita el coach; lxs jugadorxs lo ven si está compartido.
@@ -5678,14 +5788,8 @@ async function getHabilidades(params: Record<string, any>): Promise<Record<strin
 /// regla que getCoach).
 async function _nivelPersona(username: string): Promise<string> {
   const { data: f } = await supabase.from('equipo').select('nivel_coach').eq('username', username).maybeSingle();
-  if (f?.nivel_coach) return String(f.nivel_coach);
-  const { data: evs } = await supabase.from('coach_evaluaciones').select('habilidad_id, nivel, creado_en').eq('username', username).order('creado_en', { ascending: false }).limit(2000);
-  const vistas = new Set<string>(), l = new Set<string>();
-  for (const e of evs ?? []) { if (vistas.has(e.habilidad_id)) continue; vistas.add(e.habilidad_id); if (e.nivel === 'logrado') l.add(e.habilidad_id); }
-  const habs = (await _habilidades()).filter((h: any) => h.activa);
-  const bas = habs.filter((h: any) => (h.nivel ?? 'basica') === 'basica'), av = habs.filter((h: any) => h.nivel === 'avanzada');
-  if (!(bas.length > 0 && bas.filter((h: any) => l.has(h.id)).length >= Math.ceil(bas.length * 0.8))) return 'sin';
-  return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
+  if (f?.nivel_coach) return _claveNivel(f.nivel_coach);
+  return _nivelDe(username);
 }
 
 async function getPlanEvento(params: Record<string, any>): Promise<Record<string, any>> {
@@ -5699,7 +5803,7 @@ async function getPlanEvento(params: Record<string, any>): Promise<Record<string
   const quien = await _mapaEquipoPorNombre();
   const miNivel = !coach && (data ?? []).some((p: any) => String(p.equipo ?? '').startsWith('nivel:')) ? await _nivelPersona(yo) : null;
   const ve = (p: any) => String(p.equipo ?? '').startsWith('nivel:')
-    ? (!!coach || (p.compartido && `nivel:${miNivel}` === p.equipo))
+    ? (!!coach || (p.compartido && `nivel:${miNivel}` === `nivel:${_claveNivel(String(p.equipo).slice(6))}`))
     : coach ? (!coach.equipos.length || p.equipo === '' || coach.equipos.includes(p.equipo)) : (p.compartido && (p.equipo === '' || p.equipo === yoFila?.categoria));
   const planes = (data ?? []).filter(ve).sort((a: any, b: any) => String(a.equipo).localeCompare(String(b.equipo))).map((p: any) => ({
     id: p.id, equipo: p.equipo ?? '', bloques: p.bloques ?? [], compartido: p.compartido, coach: p.coach,
@@ -9796,7 +9900,7 @@ async function _plantillasCursos(): Promise<any[]> {
   const out: any[] = (data ?? []).map((p: any) => ({ id: p.id, nombre: p.nombre, tipo: p.tipo, descripcion: p.descripcion ?? '', clases: p.clases ?? [], evaluacion: p.evaluacion ?? {} }));
   const deporte = (await supabaseServicio.from('ligas').select('deporte').eq('id', _ligaEnCurso()).maybeSingle()).data?.deporte ?? 'roller_derby';
   if (deporte === 'roller_derby') {
-    const { data: hab } = await supabase.from('coach_habilidades').select('categoria, nombre, orden, nivel').eq('activa', true).eq('nivel', 'basica').neq('categoria', 'Temas de cursos').order('orden');
+    const { data: hab } = await supabase.from('coach_habilidades').select('categoria, nombre, orden, nivel').eq('activa', true).eq('nivel', (await _nivelesLiga())[0]?.clave ?? 'basica').neq('categoria', 'Temas de cursos').order('orden');
     const grupos: Record<string, string[]> = {};
     for (const h of hab ?? []) (grupos[h.categoria] ??= []).push(String(h.nombre).slice(0, 40));
     if (Object.keys(grupos).length) {
@@ -9813,13 +9917,7 @@ async function _plantillasCursos(): Promise<any[]> {
 
 /// Nivel de Coach calculado de una persona (mismo criterio que getCoach).
 async function _nivelDe(username: string): Promise<string> {
-  const habs = (await _habilidades()).filter((h: any) => h.activa);
-  const { data: evs } = await supabase.from('coach_evaluaciones').select('habilidad_id, nivel, creado_en').eq('username', username).order('creado_en', { ascending: false });
-  const vistas = new Set<string>(), l = new Set<string>();
-  for (const e of evs ?? []) { if (vistas.has(e.habilidad_id)) continue; vistas.add(e.habilidad_id); if (e.nivel === 'logrado') l.add(e.habilidad_id); }
-  const bas = habs.filter((h: any) => (h.nivel ?? 'basica') === 'basica'), av = habs.filter((h: any) => h.nivel === 'avanzada');
-  if (!(bas.length > 0 && bas.filter((h: any) => l.has(h.id)).length >= Math.ceil(bas.length * 0.8))) return 'sin';
-  return av.some((h: any) => l.has(h.id)) ? 'avanzadas' : 'basicas';
+  return _calcularNivel(await _habilidades(), await _nivelesLiga(), await _logradasDe(username)).nivel;
 }
 
 /** Quiénes pueden tomar un curso según "para quién": toda la liga, equipos, un nivel o personas. */
@@ -9832,7 +9930,7 @@ async function _destinatariosCurso(para: any, emailAutor?: string): Promise<stri
     if (/archiv/i.test(String(p.estado_miembro ?? ''))) continue;
     if (emailAutor && String(p.email ?? '').toLowerCase() === emailAutor.toLowerCase()) continue;
     if (tipo === 'equipos' && !v.includes(p.categoria ?? '')) continue;
-    if (tipo === 'nivel' && !v.includes(p.nivel_coach ?? await _nivelDe(p.username))) continue;
+    if (tipo === 'nivel' && !v.map(_claveNivel).includes(p.nivel_coach ? _claveNivel(p.nivel_coach) : await _nivelDe(p.username))) continue;
     out.push(p.username);
   }
   return out;
@@ -9854,7 +9952,7 @@ async function getCursos(params: Record<string, any>): Promise<Record<string, an
     if (p.tipo === 'personas') return v.includes(yo);
     if (p.tipo === 'nivel') {
       miNivel ??= await _nivelDe(yo);
-      return v.includes(miNivel);
+      return v.map(_claveNivel).includes(_claveNivel(miNivel));
     }
     return true;
   };
@@ -10036,11 +10134,13 @@ async function adminCursos(params: Record<string, any>): Promise<Record<string, 
     await supabase.from('curso_inscripciones').update({ notas: limpias, resultado: aprobado ? 'aprobado' : 'no_aprobado', equipo_final: aprobado && cu?.cambia_equipo ? cu?.equipo_destino ?? null : null }).eq('id', i.id);
     const { data: hab } = await supabase.from('coach_habilidades').select('id, nombre');
     const quienEvalua = (await supabase.from('equipo').select('username').ilike('email', email).maybeSingle()).data?.username ?? email;
+    const logrosAntes = await _completosDe(i.username);
     for (const t of temas) {
       const h = (hab ?? []).find((x: any) => String(x.nombre).toLowerCase() === String(t.nombre).toLowerCase());
       if (!h || limpias[t.nombre] == null) continue;
       await supabase.from('coach_evaluaciones').insert({ username: i.username, habilidad_id: h.id, nivel: limpias[t.nombre] >= (Number(t.minimo) || 5) ? 'logrado' : 'proceso', coach: quienEvalua });
     }
+    await _avisarLogros(i.username, logrosAntes);
     if (aprobado && cu?.cambia_equipo && cu?.equipo_destino) {
       const { data: f } = await supabase.from('equipo').select('categoria').eq('username', i.username).maybeSingle();
       if (f && f.categoria !== cu.equipo_destino) {
@@ -11519,6 +11619,7 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
   // Notificaciones de entrenador (Victor, 2026-11-26).
   { clave: 'aviso_entrenador', nombre: 'Avisos de tu entrenadorx', descripcion: 'Mensajes que lxs entrenadorxs te mandan.', categoria: 'Entrenamientos' },
+  { clave: 'logro_nivel', nombre: 'Logros de nivel', descripcion: 'Cuando completas un nivel de habilidades.', categoria: 'Entrenamientos' },
   { clave: 'novedades_progreso', nombre: 'Novedades en tu progreso', descripcion: 'Los lunes, si tu entrenadorx dejó notas o resultados nuevos.', categoria: 'Entrenamientos' },
   { clave: 'coach_por_evaluar', nombre: 'Entrenamientos por evaluar', descripcion: 'El día siguiente a un entrenamiento, si falta evaluar a quienes vinieron.', categoria: 'Entrenamientos', soloCoach: true },
   { clave: 'coach_pedido_plan', nombre: 'Entrenamiento sin plan', descripcion: 'El día antes de un entrenamiento de tus equipos que todavía no tiene plan.', categoria: 'Entrenamientos', soloCoach: true },
@@ -12039,7 +12140,7 @@ const PANTALLA_POR_TIPO: Record<string, string> = {
   comprobante_pendiente: 'pagos', cuota_pendiente: 'pagos', solicitud_resuelta: 'pagos', reserva_sin_terminar: 'pagos',
   tarea_nueva: 'tareas', tarea_vence: 'tareas', tarea_revisada: 'tareas',
   curso_nuevo: 'cursos',
-  aviso_entrenador: 'entrenamiento', novedades_progreso: 'progreso', coach_por_evaluar: 'entrenamiento', coach_pedido_plan: 'entrenamiento',
+  aviso_entrenador: 'entrenamiento', novedades_progreso: 'progreso', logro_nivel: 'progreso', coach_por_evaluar: 'entrenamiento', coach_pedido_plan: 'entrenamiento',
   avisos_admin: 'novedades', aviso_pivots: 'novedades', cumpleanos: 'novedades', cumpleanos_propio: 'novedades', aniversario: 'novedades', social: 'novedades',
   integrante_nuevo: 'equipo', cambio_estado_miembro: 'equipo', cambio_categoria: 'equipo',
 };
