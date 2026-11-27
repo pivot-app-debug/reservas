@@ -7,11 +7,11 @@ Victor hace estos pasos a mano. Al terminar cada servicio, avisar a Claude para 
 | Servicio | Estado |
 |---|---|
 | GitHub | **Hecho.** Repositorio transferido a la cuenta de Pivot `pivot-app-debug` (cuenta personal, sin organización): `pivot-app-debug/reservas`. App de Claude instalada en esa cuenta. Enlace de descargas de la app actualizado. |
-| Supabase | **Hecho.** El proyecto `uusbnreitoobqssizbfq` (mismo proyecto, mismas claves) está en la organización «Pivot» de la cuenta de Pivot. Falta quitar la cuenta vieja como Owner. |
+| Supabase | **Hecho.** El proyecto `uusbnreitoobqssizbfq` (mismo proyecto, mismas claves) está en la organización «Pivot» de la cuenta de Pivot. La cuenta vieja ya no es Owner (2026-11-27). Conector de Claude y `SUPABASE_ACCESS_TOKEN` con la cuenta nueva. |
 | Web y dominio | **Hecho.** La web se publica en Firebase Hosting (`pivot-d65f4.web.app`). `app.quindesvolcanicos.com` y `reservas.quindesvolcanicos.com` redirigen ahí desde Cloudflare. |
-| Google Cloud / Firebase | En la cuenta de Pivot (proyectos `pivot-d65f4` y «Pivot Login», ex mirlxs-app). Falta quitar la cuenta vieja como Owner de «Pivot Login». |
+| Google Cloud / Firebase | En la cuenta de Pivot (proyectos `pivot-d65f4` y «Pivot Login», ex mirlxs-app). **Hecho.** La cuenta vieja ya no es Owner de «Pivot Login» (2026-11-27). |
 | OneSignal | **Pendiente.** Sigue en uso para los avisos de la web y de iPhone (Android va por Firebase). |
-| Tareas programadas de Claude | **Pendiente.** Revisar que usen `pivot-app-debug/reservas`. |
+| Tareas programadas de Claude | **Revisado.** «Leer documento» (pausada) no usa el repo; «Pivot: pendientes del jueves» ya corrió y no vuelve a correr. Se dejan como están. |
 | Repo `reservas-backups` | **Pendiente.** Sigue en la cuenta vieja `quindesvolcanicosrd-sys`. |
 
 La guía de abajo queda como referencia de cómo se hizo cada paso.
@@ -37,7 +37,7 @@ El repositorio era `quindesvolcanicosrd-sys/reservas` y se transfirió directame
 11. Avisar a Claude para actualizar en el código el enlace de descargas de la app (`app/lib/core/actualizacion.dart`). Hecho el 2026-11-27: apunta a `pivot-app-debug`.
 12. Reconectar el acceso de Claude a GitHub con el repositorio en su nueva ubicación (claude.ai → conectar GitHub e instalar la app de Claude en la organización nueva).
 
-## 2. Supabase (hecho, falta quitar la cuenta vieja)
+## 2. Supabase (hecho)
 1. Entrar a supabase.com con "Continue with Google" usando pivot.app.support@gmail.com.
 2. Crear una organización nueva (plan Free o el que tenga hoy el proyecto; si el proyecto está en un plan pago, la organización nueva debe tener el mismo plan).
 3. En la organización nueva: Team → Invite → invitar la cuenta actual de Supabase como Owner. Aceptar desde la cuenta actual.
