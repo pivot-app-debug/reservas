@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-26 (subida de la ronda del 26/11)
+- Subidos los 5 commits del 26/11: Finanzas blindada, pago a coaches con el botón Pagarle, regla de deudas, y los Pivots también pagan.
+- Creada en Supabase la tabla de entrenamientos de enero a junio para el pago a coaches, con el permiso de lectura del servidor que le faltaba.
+
 ## 2026-11-26 (Bottom sheets → subsecciones)
 - Tesorería: "Conciliar cuenta" (`ConciliarCuentaScreen`) y el formulario de ingreso/egreso/transferencia (`MovimientoScreen`) abren como subsecciones en vez de hojas desde abajo, para no perder el foco al escribir con el teclado.
 - Equipo: "Nuevo rol" y "Renombrar rol" (`EditarRolScreen`) abren como subsección en vez de dialog.

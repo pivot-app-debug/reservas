@@ -11,7 +11,9 @@ create table if not exists public.entrenamientos_legado (
 );
 alter table public.entrenamientos_legado enable row level security;
 drop policy if exists liga_aislada on public.entrenamientos_legado;
-create policy liga_aislada on public.entrenamientos_legado using (liga_id = liga_actual());
+-- Como las demás tablas: el servidor lee con el rol liga_api (sin esto la lectura falla y enero a mayo quedan en $0).
+create policy liga_aislada on public.entrenamientos_legado for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual());
+grant select on public.entrenamientos_legado to liga_api;
 insert into public.entrenamientos_legado (id_evento, fecha, estado, a_horario, tarde) values
 ('ev_20260103_cumanda','2026-01-03'::date,'Evento Cancelado','',''),
 ('ev_20260105_cci','2026-01-05'::date,'Evento Cancelado','',''),
