@@ -140,16 +140,11 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
           habilidad: h,
           categoria: categoria,
           nivelInicial: nivelInicial,
+          // EditarHabilidadScreen ya la guarda en el servidor; aquí solo se
+          // recarga (antes se mandaba otra vez y las nuevas quedaban
+          // duplicadas, QA 2026-11-27).
           alGuardar: (resultado) async {
-            await widget.sesion.api.post('coachGuardar', {
-              'accion': 'habilidad',
-              'id': h?['id'],
-              'nombre': resultado['nombre'],
-              'categoria': resultado['categoria'],
-              'activa': resultado['activa'],
-              'nivel': resultado['nivel'],
-            });
-            setState(() => _abiertos.add(resultado['nivel']));
+            if (mounted) setState(() => _abiertos.add(resultado['nivel']));
             _cargar();
           },
         ),
@@ -301,7 +296,7 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
             if (ok == true) _cargar();
           },
           icon: const Icon(Icons.stairs_outlined),
-          label: const Text('Niveles: agregar, ordenar o cambiar su regla'),
+          label: const Text('Niveles: agregar, ordenar o cambiar su nombre'),
         ),
       ],
     );
@@ -940,8 +935,11 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
     super.dispose();
   }
 
+  bool _guardando = false;
+
   Future<void> _guardar() async {
-    if (nombre.text.trim().isEmpty || cat.text.trim().isEmpty) return;
+    if (_guardando || nombre.text.trim().isEmpty || cat.text.trim().isEmpty) return;
+    setState(() => _guardando = true);
     try {
       final r = await widget.sesion.api.post('coachGuardar', {
         'accion': 'habilidad',
@@ -956,7 +954,10 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
       widget.alGuardar({'nombre': nombre.text.trim(), 'categoria': cat.text.trim(), 'activa': activa, 'nivel': nivel});
       Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+      if (mounted) {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
+      }
     }
   }
 
@@ -1015,7 +1016,7 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(onPressed: _guardar, child: const Text('Guardar')),
+                child: FilledButton(onPressed: _guardando ? null : _guardar, child: const Text('Guardar')),
               ),
             ],
           ),
@@ -1027,7 +1028,7 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
 
 // ─── Niveles de la liga (Victor, 2026-11-27) ───────────────────────────────
 
-/// Los niveles de habilidades, en orden: cada uno se completa con su regla.
+/// Los niveles de habilidades, en orden: cada uno se completa al lograr todas sus habilidades.
 /// Quien completa uno ve el logro en Mi progreso y sus habilidades se pliegan.
 class NivelesScreen extends StatefulWidget {
   const NivelesScreen({super.key, required this.sesion});
@@ -1109,7 +1110,6 @@ class _NivelesScreenState extends State<NivelesScreen> {
                   child: ListTile(
                     leading: CircleAvatar(backgroundColor: p.suave, foregroundColor: p.sobreSuave, child: Text('${i + 1}')),
                     title: Text(n.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(n.textoRegla),
                     onTap: _ocupado ? null : () => _editar(n),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1145,8 +1145,6 @@ class _EditarNivelScreen extends StatefulWidget {
 
 class _EditarNivelScreenState extends State<_EditarNivelScreen> {
   late final _nombre = TextEditingController(text: widget.nivel?.nombre ?? '');
-  late String _regla = widget.nivel?.regla ?? 'porcentaje';
-  late double _porc = (widget.nivel?.porcentaje ?? 80).toDouble();
 
   @override
   void dispose() {
@@ -1171,34 +1169,8 @@ class _EditarNivelScreenState extends State<_EditarNivelScreen> {
             decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej. Habilidades intermedias'),
           ),
           const SizedBox(height: 8),
-          const Text('¿Cuándo se completa?', style: TextStyle(fontWeight: FontWeight.w700)),
-          RadioGroup<String>(
-            groupValue: _regla,
-            onChanged: (v) => setState(() => _regla = v ?? 'porcentaje'),
-            child: const Column(
-              children: [
-                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'porcentaje', title: Text('Al lograr un porcentaje de sus habilidades')),
-                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'todas', title: Text('Al lograr todas sus habilidades')),
-                RadioListTile<String>(contentPadding: EdgeInsets.zero, value: 'una', title: Text('Al lograr una de sus habilidades')),
-              ],
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            child: _regla != 'porcentaje'
-                ? const SizedBox(width: double.infinity)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_porc.round()} % de sus habilidades',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: p.marcaTexto),
-                      ),
-                      Slider(value: _porc, min: 10, max: 100, divisions: 18, label: '${_porc.round()} %', onChanged: (v) => setState(() => _porc = v)),
-                    ],
-                  ),
-          ),
+          // Logros por grupo (Victor, 2026-11-27): ya no se elige una regla.
+          Text(const NivelCoach('', '').textoRegla, style: TextStyle(color: p.textoSecundario)),
           if (widget.nivel != null) ...[
             const SizedBox(height: 16),
             TextButton.icon(
@@ -1214,9 +1186,7 @@ class _EditarNivelScreenState extends State<_EditarNivelScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            onPressed: _nombre.text.trim().isEmpty
-                ? null
-                : () => Navigator.of(context).pop({'nombre': _nombre.text.trim(), 'regla': _regla, 'porcentaje': _porc.round()}),
+            onPressed: _nombre.text.trim().isEmpty ? null : () => Navigator.of(context).pop({'nombre': _nombre.text.trim()}),
             child: const Text('Guardar'),
           ),
         ),

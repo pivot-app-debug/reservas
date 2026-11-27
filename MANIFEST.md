@@ -15,6 +15,12 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 
 - **Tablas nuevas (regla):** `liga_id` con su default, `create policy liga_aislada … for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual())` y `grant … to liga_api`. Sin el grant, la Edge Function no puede leer la tabla y falla en silencio (pasó con `entrenamientos_legado`, 26/11).
 
+## Habilidades: logros por grupo y sin duplicados (2026-11-27)
+- Duplicado al crear: `EditarHabilidadScreen` ya guardaba en el servidor y `_ListaHabilidades.editar` (alGuardar) volvía a mandar `coachGuardar/habilidad` sin id → dos filas. Ahora alGuardar solo recarga, y el botón Guardar se bloquea mientras guarda.
+- Logros por grupo: un nivel y cada grupo de un nivel (Frenos, Elementos…) se completan al lograr TODAS sus habilidades activas; si se agrega una habilidad, el logro se pierde hasta completarla. Sin regla de porcentaje ni «una»: `_nivelesLiga()` manda siempre `regla: 'todas'` (para versiones viejas de la app), `guardarNivel` guarda solo el nombre, migración `*_coach_niveles_todas.sql`.
+- Servidor: `_logrosDe(habs, niveles, logradas)` → [{clave, tipo 'nivel'|'grupo', nivel, grupo, nombre, ids}] (clave del grupo `nivel|grupo`); `_completosDe` devuelve esas claves y `_avisarLogros` avisa niveles o grupos nuevos. `getFichaDeportiva.logros` incluye grupos con su fecha. El nivel de la persona sigue siendo el último nivel completo en orden (`_calcularNivel`).
+- App: `NivelCoach` sin regla/porcentaje. Ficha (`_filasNivel(..., logros)`): un grupo completo es `_LogroNivel(grupo: true)` plegado («Grupo completo»); un nivel completo, como antes. `MiProgresoHero`: falta = todas las del nivel menos las logradas, y chip «N grupos completos». `_EditarNivelScreen` solo pide el nombre.
+
 ## Formas de pago: ordenar medios y datos (2026-11-27)
 - `FormasPagoScreen`: los medios se ordenan arrastrando el ícono de la derecha (`ReorderableListView` con `onReorderItem`, sin asas por defecto); el orden se guarda al soltar («Orden guardado») y es el que se ve al pagar.
 - `_MedioScreen`: los «Datos para pagar» también se ordenan arrastrando su ícono; se guarda con el resto al tocar Guardar.

@@ -3,26 +3,18 @@
 /// manda con getCoach, getHabilidades y getFichaDeportiva; aquí queda la
 /// última lista vista para nombrarlos en toda la app.
 class NivelCoach {
-  const NivelCoach(this.clave, this.nombre, {this.regla = 'porcentaje', this.porcentaje = 80});
+  const NivelCoach(this.clave, this.nombre);
   final String clave, nombre;
 
-  /// 'porcentaje' | 'todas' | 'una'.
-  final String regla;
-  final int porcentaje;
+  factory NivelCoach.de(Map m) => NivelCoach('${m['clave']}', '${m['nombre']}');
 
-  factory NivelCoach.de(Map m) =>
-      NivelCoach('${m['clave']}', '${m['nombre']}', regla: '${m['regla'] ?? 'porcentaje'}', porcentaje: (m['porcentaje'] as num?)?.toInt() ?? 80);
-
-  /// Cómo se completa, dicho en palabras.
-  String get textoRegla => switch (regla) {
-    'todas' => 'Se completa al lograr todas sus habilidades.',
-    'una' => 'Se completa al lograr una de sus habilidades.',
-    _ => 'Se completa al lograr el $porcentaje % de sus habilidades.',
-  };
+  /// Cómo se completa (logros por grupo, Victor 2026-11-27): un nivel y cada
+  /// uno de sus grupos se completan al lograr todas sus habilidades.
+  String get textoRegla => 'Cada grupo y el nivel se completan al lograr todas sus habilidades.';
 }
 
 class NivelesCoach {
-  static List<NivelCoach> lista = const [NivelCoach('basica', 'Habilidades básicas'), NivelCoach('avanzada', 'Habilidades avanzadas', regla: 'una')];
+  static List<NivelCoach> lista = const [NivelCoach('basica', 'Habilidades básicas'), NivelCoach('avanzada', 'Habilidades avanzadas')];
 
   static void actualizar(Object? l) {
     if (l is! List || l.isEmpty) return;

@@ -1016,30 +1016,47 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
   final Set<String> _logrosAbiertos = {};
 
   /// Las habilidades de un nivel, por grupo.
-  List<Widget> _filasNivel(BuildContext context, List<Map<String, dynamic>> habs, String nivel) {
+  /// Habilidades de un nivel por grupo. Con [logros], un grupo completo es un
+  /// logro plegado (Victor, 2026-11-27); dentro de un nivel completo, no.
+  List<Widget> _filasNivel(BuildContext context, List<Map<String, dynamic>> habs, String nivel, [Map<String, String>? logros]) {
     final p = context.pivot;
     final g = <String, List<Map<String, dynamic>>>{};
     for (final h in habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == nivel)) {
       (g['${h['categoria']}'] ??= []).add(h);
     }
-    return [
-      for (final c in g.entries) ...[
-        const SizedBox(height: 12),
-        Text(
-          c.key.toUpperCase(),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+    List<Widget> filas(List<Map<String, dynamic>> hs) => [
+      for (final h in hs)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('${h['nombre']}', style: const TextStyle(fontSize: 15)),
+          subtitle: h['fecha'] == null ? null : Text('Desde el ${Fechas.corta(DateTime.parse('${h['fecha']}').toLocal())}'),
+          trailing: _Nivel(nivel: h['nivel'] as String?),
+          onTap: _puedeEditar ? () => _evaluar(h) : null,
         ),
-        const SizedBox(height: 4),
-        for (final h in c.value)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text('${h['nombre']}', style: const TextStyle(fontSize: 15)),
-            subtitle: h['fecha'] == null ? null : Text('Desde el ${Fechas.corta(DateTime.parse('${h['fecha']}').toLocal())}'),
-            trailing: _Nivel(nivel: h['nivel'] as String?),
-            onTap: _puedeEditar ? () => _evaluar(h) : null,
+    ];
+    return [
+      for (final c in g.entries)
+        if (logros?['$nivel|${c.key}'] case final fecha?)
+          _LogroNivel(
+            titulo: c.key,
+            fecha: fecha,
+            grupo: true,
+            abierto: _logrosAbiertos.contains('$nivel|${c.key}'),
+            alAbrir: () => setState(
+              () => _logrosAbiertos.contains('$nivel|${c.key}') ? _logrosAbiertos.remove('$nivel|${c.key}') : _logrosAbiertos.add('$nivel|${c.key}'),
+            ),
+            hijos: filas(c.value),
+          )
+        else ...[
+          const SizedBox(height: 12),
+          Text(
+            c.key.toUpperCase(),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
           ),
-      ],
+          const SizedBox(height: 4),
+          ...filas(c.value),
+        ],
     ];
   }
 
@@ -1114,12 +1131,12 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                       ),
                     ),
                   // Por niveles de la liga (Victor, 2026-11-27): un nivel completo es
-                  // un logro y sus habilidades se pliegan.
+                  // un logro y sus habilidades se pliegan; también cada grupo completo.
                   for (final n in NivelesCoach.lista)
                     if (habs.any((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave))
                       if (logros.containsKey(n.clave))
                         _LogroNivel(
-                          nivel: n,
+                          titulo: n.nombre,
                           fecha: logros[n.clave]!,
                           abierto: _logrosAbiertos.contains(n.clave),
                           alAbrir: () => setState(() => _logrosAbiertos.contains(n.clave) ? _logrosAbiertos.remove(n.clave) : _logrosAbiertos.add(n.clave)),
@@ -1135,7 +1152,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                           '${habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave && h['nivel'] == 'logrado').length} de ${habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave).length} logradas · ${n.textoRegla}',
                           style: TextStyle(fontSize: 12.5, color: p.textoSecundario),
                         ),
-                        ..._filasNivel(context, habs, n.clave),
+                        ..._filasNivel(context, habs, n.clave, logros),
                       ],
                   _ProgresoFicha(d: d, puedeEditar: _puedeEditar, alMarca: (pr) => _nuevaMarca(pr)),
                   const SizedBox(height: 22),
@@ -1211,12 +1228,7 @@ class _NivelFicha extends StatelessWidget {
       final hs = habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave).toList();
       if (hs.isEmpty || logros.contains(n.clave)) continue;
       final ok = hs.where((h) => h['nivel'] == 'logrado').length;
-      final meta = switch (n.regla) {
-        'todas' => hs.length,
-        'una' => 1,
-        _ => (hs.length * n.porcentaje / 100).ceil(),
-      };
-      final falta = (meta - ok).clamp(1, hs.length);
+      final falta = (hs.length - ok).clamp(1, hs.length);
       siguiente = 'Para completar «${n.nombre}» te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'}.';
       break;
     }
@@ -1256,8 +1268,11 @@ class _NivelFicha extends StatelessWidget {
 /// Un nivel completo (Victor, 2026-11-27): se ve como logro y sus habilidades
 /// quedan plegadas; se abren tocándolo.
 class _LogroNivel extends StatelessWidget {
-  const _LogroNivel({required this.nivel, required this.fecha, required this.abierto, required this.alAbrir, required this.hijos});
-  final NivelCoach nivel;
+  const _LogroNivel({required this.titulo, required this.fecha, required this.abierto, required this.alAbrir, required this.hijos, this.grupo = false});
+  final String titulo;
+
+  /// Un grupo dentro de un nivel (más chico, con menos espacio arriba).
+  final bool grupo;
   final String fecha;
   final bool abierto;
   final VoidCallback alAbrir;
@@ -1269,7 +1284,7 @@ class _LogroNivel extends StatelessWidget {
     final (degradado, sobre) = PivotPaleta.seccion('entrenamientos', Theme.of(context).brightness);
     final cuando = DateTime.tryParse(fecha)?.toLocal();
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: EdgeInsets.only(top: grupo ? 10 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1284,10 +1299,10 @@ class _LogroNivel extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: grupo ? 36 : 44,
+                      height: grupo ? 36 : 44,
                       decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
-                      child: Icon(Icons.military_tech_rounded, color: sobre),
+                      child: Icon(grupo ? Icons.verified_rounded : Icons.military_tech_rounded, color: sobre, size: grupo ? 20 : 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1295,12 +1310,12 @@ class _LogroNivel extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Logro completado',
+                            grupo ? 'Grupo completo' : 'Logro completado',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.marcaTexto),
                           ),
                           Text(
-                            nivel.nombre,
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.texto),
+                            titulo,
+                            style: TextStyle(fontSize: grupo ? 15 : 16, fontWeight: FontWeight.w800, color: p.texto),
                           ),
                           Text(
                             abierto

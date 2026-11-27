@@ -20,23 +20,20 @@ class MiProgresoHero extends StatelessWidget {
     final d = this.d;
     final habs = [for (final h in (d?['habilidades'] as List? ?? const [])) Map<String, dynamic>.from(h as Map)];
     final logros = {for (final x in (d?['logros'] as List? ?? const [])) '${(x as Map)['clave']}'};
-    // El primer nivel sin completar.
+    // Logros por grupo (Victor, 2026-11-27): cuántos grupos completos tiene.
+    final gruposLogrados = (d?['logros'] as List? ?? const []).where((x) => (x as Map)['tipo'] == 'grupo').length;
+    // El primer nivel sin completar: se completa con todas sus habilidades.
     NivelCoach? actual;
-    var ok = 0, total = 0, meta = 0;
+    var ok = 0, total = 0;
     for (final n in NivelesCoach.lista) {
       final hs = habs.where((h) => '${h['tipo'] ?? NivelesCoach.primero}' == n.clave).toList();
       if (hs.isEmpty || logros.contains(n.clave)) continue;
       actual = n;
       total = hs.length;
       ok = hs.where((h) => h['nivel'] == 'logrado').length;
-      meta = switch (n.regla) {
-        'todas' => hs.length,
-        'una' => 1,
-        _ => (hs.length * n.porcentaje / 100).ceil(),
-      };
       break;
     }
-    final falta = (meta - ok).clamp(0, total);
+    final falta = (total - ok).clamp(0, total);
     final enProceso = habs.where((h) => h['nivel'] == 'proceso').map((h) => '${h['nombre']}').toList();
     final pruebas = [for (final x in (d?['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
     final ultima = pruebas.where((x) => x['mejor'] != null).firstOrNull;
@@ -104,7 +101,7 @@ class MiProgresoHero extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(habs.isEmpty ? 'Todavía no hay habilidades en tu liga.' : 'Completaste todos los niveles.', style: st(14)),
                     ],
-                    if (!compacto && d != null && (enProceso.isNotEmpty || ultima != null || notas > 0)) ...[
+                    if (!compacto && d != null && (enProceso.isNotEmpty || ultima != null || notas > 0 || gruposLogrados > 0)) ...[
                       if (enProceso.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -122,6 +119,7 @@ class MiProgresoHero extends StatelessWidget {
                           if (ultima != null)
                             chip('${ultima['nombre']}: ${_num(ultima['mejor'])}${'${ultima['unidad'] ?? ''}'.isEmpty ? '' : ' ${ultima['unidad']}'}'),
                           if (notas > 0) chip(notas == 1 ? '1 nota de tu entrenadorx' : '$notas notas de tus entrenadorxs'),
+                          if (gruposLogrados > 0) chip(gruposLogrados == 1 ? '1 grupo completo' : '$gruposLogrados grupos completos'),
                         ],
                       ),
                     ],

@@ -5087,19 +5087,22 @@ async function _habilidades(): Promise<any[]> {
 /// Niveles de habilidades de la liga, en orden (Victor, 2026-11-27). Una liga
 /// nueva arranca con los dos de siempre.
 const _NIVELES_BASE = [
-  { clave: 'basica', nombre: 'Habilidades básicas', orden: 1, regla: 'porcentaje', porcentaje: 80 },
-  { clave: 'avanzada', nombre: 'Habilidades avanzadas', orden: 2, regla: 'una', porcentaje: 80 },
+  { clave: 'basica', nombre: 'Habilidades básicas', orden: 1, regla: 'todas', porcentaje: 100 },
+  { clave: 'avanzada', nombre: 'Habilidades avanzadas', orden: 2, regla: 'todas', porcentaje: 100 },
 ];
+/// Logros por grupo (Victor, 2026-11-27): un nivel o un grupo se completa al
+/// lograr TODAS sus habilidades; ya no hay regla de porcentaje ni «una». Se
+/// manda `regla: 'todas'` para que las versiones viejas de la app calculen igual.
 async function _nivelesLiga(): Promise<any[]> {
-  const { data } = await supabase.from('coach_niveles').select('clave, nombre, orden, regla, porcentaje').order('orden');
-  if (data?.length) return data;
+  const { data } = await supabase.from('coach_niveles').select('clave, nombre, orden').order('orden');
+  if (data?.length) return data.map((n: any) => ({ ...n, regla: 'todas', porcentaje: 100 }));
   await supabase.from('coach_niveles').insert(_NIVELES_BASE);
   return _NIVELES_BASE;
 }
 
-/// Nivel de una persona según lo logrado: los niveles se completan en orden,
-/// cada uno con su regla (porcentaje, todas o una). Un nivel sin habilidades
-/// no cuenta. Devuelve la clave del último completo ('sin' si ninguno).
+/// Nivel de una persona según lo logrado: los niveles se completan en orden y
+/// cada uno al lograr todas sus habilidades. Un nivel sin habilidades no
+/// cuenta. Devuelve la clave del último completo ('sin' si ninguno).
 function _calcularNivel(habs: any[], niveles: any[], logradas: Set<string>): { nivel: string; completos: string[] } {
   const activas = habs.filter((h: any) => h.activa !== false);
   const primero = niveles[0]?.clave ?? 'basica';
@@ -5108,13 +5111,32 @@ function _calcularNivel(habs: any[], niveles: any[], logradas: Set<string>): { n
   for (const n of niveles) {
     const hs = activas.filter((h: any) => (h.nivel || primero) === n.clave);
     if (!hs.length) continue;
-    const ok = hs.filter((h: any) => logradas.has(h.id)).length;
-    const cumple = n.regla === 'todas' ? ok === hs.length : n.regla === 'una' ? ok >= 1 : ok >= Math.ceil(hs.length * (Number(n.porcentaje) || 80) / 100);
-    if (!cumple) break;
+    if (!hs.every((h: any) => logradas.has(h.id))) break;
     nivel = n.clave;
     completos.push(n.clave);
   }
   return { nivel, completos };
+}
+
+/// Logros (Victor, 2026-11-27): cada nivel y cada grupo de un nivel (Frenos,
+/// Elementos…) con TODAS sus habilidades activas logradas. Si se agrega una
+/// habilidad, el logro se pierde hasta completarla. Un nivel cuenta aunque el
+/// anterior no esté completo. Clave del grupo: `nivel|grupo`.
+function _logrosDe(habs: any[], niveles: any[], logradas: Set<string>): { clave: string; tipo: 'nivel' | 'grupo'; nivel: string; grupo?: string; nombre: string; ids: string[] }[] {
+  const activas = habs.filter((h: any) => h.activa !== false);
+  const primero = niveles[0]?.clave ?? 'basica';
+  const out: { clave: string; tipo: 'nivel' | 'grupo'; nivel: string; grupo?: string; nombre: string; ids: string[] }[] = [];
+  for (const n of niveles) {
+    const hs = activas.filter((h: any) => (h.nivel || primero) === n.clave);
+    if (!hs.length) continue;
+    const grupos = new Map<string, any[]>();
+    for (const h of hs) { const g = String(h.categoria ?? ''); if (!grupos.has(g)) grupos.set(g, []); grupos.get(g)!.push(h); }
+    for (const [g, gh] of grupos) {
+      if (gh.every((h: any) => logradas.has(h.id))) out.push({ clave: `${n.clave}|${g}`, tipo: 'grupo', nivel: n.clave, grupo: g, nombre: g, ids: gh.map((h: any) => h.id) });
+    }
+    if (hs.every((h: any) => logradas.has(h.id))) out.push({ clave: n.clave, tipo: 'nivel', nivel: n.clave, nombre: n.nombre, ids: hs.map((h: any) => h.id) });
+  }
+  return out;
 }
 
 /// Claves viejas del nivel de una persona ('basicas', 'avanzadas').
@@ -5131,22 +5153,25 @@ async function _logradasDe(username: string): Promise<Set<string>> {
 }
 
 /// Aviso de logro (Victor, 2026-11-27): si con lo último que marcó lx
-/// entrenadorx la persona completó un nivel nuevo.
+/// entrenadorx la persona completó un nivel o un grupo nuevo.
 async function _avisarLogros(username: string, antes: string[]): Promise<void> {
   try {
-    const niveles = await _nivelesLiga();
-    const { completos } = _calcularNivel(await _habilidades(), niveles, await _logradasDe(username));
-    const nuevos = completos.filter((x) => !antes.includes(x));
+    const logros = _logrosDe(await _habilidades(), await _nivelesLiga(), await _logradasDe(username));
+    const nuevos = logros.filter((x) => !antes.includes(x.clave));
     if (!nuevos.length) return;
-    const n = niveles.find((x: any) => x.clave === nuevos[nuevos.length - 1]);
+    // Un nivel nuevo se nombra solo (ya incluye sus grupos).
+    const niv = nuevos.filter((x) => x.tipo === 'nivel');
+    const nombres = (niv.length ? niv : nuevos).map((x) => x.nombre);
+    const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`;
     await sendPush({
       tipo: 'logro_nivel', include_external_user_ids: [username], personal: true, pantalla: 'progreso',
-      headings: { es: '¡Logro completado!' }, contents: { es: `Completaste ${n?.nombre ?? 'un nivel'}. Míralo en Mi progreso.` }, url: APP_URL + '/',
+      headings: { es: '¡Logro completado!' }, contents: { es: `Completaste ${lista}. Míralo en Mi progreso.` }, url: APP_URL + '/',
     });
   } catch (e) { console.error('[coach] logro', username, e); }
 }
+/// Claves de los logros que la persona tiene ahora (niveles y grupos).
 async function _completosDe(username: string): Promise<string[]> {
-  return _calcularNivel(await _habilidades(), await _nivelesLiga(), await _logradasDe(username)).completos;
+  return _logrosDe(await _habilidades(), await _nivelesLiga(), await _logradasDe(username)).map((x) => x.clave);
 }
 
 /// Último nivel por habilidad (y cuándo), con historial corto.
@@ -5614,13 +5639,13 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
     habilidades: habs.filter((h: any) => h.activa).map((h: any) => ({ ...h, tipo: h.nivel || (nivelesL[0]?.clave ?? 'basica'), ...(niveles[h.id] ?? { nivel: null }) })),
     nivel: await _nivelPersona(username),
     niveles: nivelesL,
-    // Logros: niveles completos con la fecha del último logrado (Victor, 2026-11-27).
+    // Logros: niveles y grupos completos, con la fecha del último logrado
+    // (Victor, 2026-11-27). tipo 'nivel' | 'grupo'; clave del grupo: `nivel|grupo`.
     logros: (() => {
       const l = new Set(Object.entries(niveles).filter(([, x]: any) => x.nivel === 'logrado').map(([k]) => k));
-      return _calcularNivel(habs, nivelesL, l).completos.map((clave) => ({
-        clave,
-        nombre: nivelesL.find((n: any) => n.clave === clave)?.nombre ?? clave,
-        fecha: habs.filter((h: any) => h.activa && (h.nivel || nivelesL[0]?.clave) === clave).map((h: any) => String(niveles[h.id]?.fecha ?? '')).sort().pop() ?? '',
+      return _logrosDe(habs, nivelesL, l).map(({ ids, ...x }) => ({
+        ...x,
+        fecha: ids.map((id) => String(niveles[id]?.fecha ?? '')).sort().pop() ?? '',
       }));
     })(),
         notas: (notas ?? []).filter(ve).map((n: any) => _notaJson(n, quien)),
@@ -5726,10 +5751,10 @@ async function coachGuardar(params: Record<string, any>): Promise<Record<string,
     await sendPush({ tipo: 'aviso_entrenador', include_external_user_ids: ok, personal: true, headings: { es: titulo || `Aviso de ${yoNombre}` }, contents: { es: texto }, url: APP_URL + '/' });
     return { exito: true, enviados: ok.length };
   } else if (accion === 'guardarNivel') {
-    // Niveles propios (Victor, 2026-11-27): nombre, regla y porcentaje.
+    // Niveles propios (Victor, 2026-11-27): solo el nombre; todos se completan
+    // al lograr todas sus habilidades (logros por grupo, 2026-11-27).
     const nombre = String(params.nombre ?? '').trim().slice(0, 60);
-    const regla = ['porcentaje', 'todas', 'una'].includes(String(params.regla)) ? String(params.regla) : 'porcentaje';
-    const porcentaje = Math.min(100, Math.max(1, Math.round(Number(params.porcentaje) || 80)));
+    const regla = 'todas', porcentaje = 100;
     if (!nombre) return { exito: false, error: 'Ponle un nombre al nivel.' };
     const nv = await _nivelesLiga();
     const clave = String(params.clave ?? '');
