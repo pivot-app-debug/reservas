@@ -79,7 +79,7 @@ class _FormasPagoScreenState extends State<FormasPagoScreen> {
         builder: (_) => _MedioScreen(config: c, medio: i == null ? null : Map.of(_medios[i])),
       ),
     );
-    if (r == null) return;
+    if (r == null || !mounted) return;
     if (r == 'borrar' && i != null) {
       final nombre = '${_medios[i]['nombre']}';
       setState(() => _medios.removeAt(i));

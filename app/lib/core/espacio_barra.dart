@@ -19,8 +19,11 @@ class EspacioBarraAbajo extends StatelessWidget {
     if (r == null || r.isFirst) return child;
     final raiz = Navigator.maybeOf(context, rootNavigator: true);
     if (raiz == null || r.navigator == raiz) return child;
+    // Siempre el mismo árbol (Padding + removePadding), aunque el alto sea 0:
+    // con el teclado abierto el alto pasa a 0 y, si aquí se devolvía `child`
+    // solo, la pantalla se volvía a crear y perdía su estado (bug, Victor
+    // 2026-11-27: un medio de pago nuevo no se guardaba).
     final abajo = MediaQuery.paddingOf(context).bottom;
-    if (abajo <= 0) return child;
     return Padding(
       padding: EdgeInsets.only(bottom: abajo),
       child: MediaQuery.removePadding(context: context, removeBottom: true, child: child),

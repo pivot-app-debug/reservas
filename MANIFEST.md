@@ -15,6 +15,10 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 
 - **Tablas nuevas (regla):** `liga_id` con su default, `create policy liga_aislada … for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual())` y `grant … to liga_api`. Sin el grant, la Edge Function no puede leer la tabla y falla en silencio (pasó con `entrenamientos_legado`, 26/11).
 
+## Pantallas que se recreaban con el teclado (2026-11-27)
+- `EspacioBarraAbajo` (core/espacio_barra.dart) devuelve siempre `Padding` + `MediaQuery.removePadding`, aunque el alto sea 0. Antes, con el teclado abierto devolvía `child` solo: el árbol cambiaba y la subsección de abajo se volvía a crear y perdía su estado (un medio de pago nuevo volvía de «Guardar» a una pantalla nueva y no se guardaba). Prueba: `test/espacio_barra_test.dart`.
+- `FormasPagoScreen._editar` no sigue si la pantalla ya no está montada.
+
 ## Avisos solo por Firebase; OneSignal dado de baja (2026-11-27)
 - `sendPush()` manda solo por FCM a los tokens de `dispositivos_push` (app Android y web Flutter, `plataforma` 'android'|'web'). Sin `FCM_SERVICE_ACCOUNT` no se manda nada. Quien no tiene token no recibe push hasta aceptar los avisos en la app o en pivot-d65f4.web.app.
 - Se quitaron `ONESIGNAL_APP_ID`/`ONESIGNAL_API_KEY`, el segmento 'Total Subscriptions', `adminEnviarPush` (envío manual de la web vieja; la app usa `adminEnviarAviso`) y `reportarEstadoPush`. `_notificarCambioAsistenciaCore` ya no se corta sin OneSignal.
