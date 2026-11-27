@@ -1074,6 +1074,22 @@ class _EquipoScreenState extends State<_EquipoScreen> {
             }
           },
         ),
+      // Requisito "tener aprobado tal curso" (Victor, 2026-11-26).
+      if (!_piso)
+        _Fila(
+          icono: Icons.school_outlined,
+          titulo: 'Curso aprobado',
+          texto: '${(t['requisitos'] as Map?)?['cursoId'] ?? ''}'.isEmpty
+              ? 'No pide un curso'
+              : 'Pide tener aprobado ${(t['requisitos'] as Map?)?['cursoNombre'] ?? 'un curso'}',
+          alTocar: () async {
+            if (await editarCursoRequerido(context, s, t) && mounted) {
+              final r = await s.api.get('getTiers', {'adminToken': s.adminToken});
+              final nuevo = (r['tiers'] as List? ?? const []).whereType<Map>().where((x) => x['id'] == t['id']);
+              if (mounted && nuevo.isNotEmpty) setState(() => t = Map<String, dynamic>.from(nuevo.first));
+            }
+          },
+        ),
       _Fila(
         icono: Icons.handshake_outlined,
         titulo: 'Préstamo de equipamiento',
@@ -2403,6 +2419,60 @@ Future<bool> editarEquipamientoPropio(BuildContext context, Sesion s, Map<String
     final cambios = {
       'requisitos': {...req, 'propio': elegidas.toList()},
     };
+    final base = _Regla.de(t).params({...t, ...cambios});
+    await _guardarTier(s, {...base, ...cambios.map((k, v) => MapEntry(k, jsonEncode(v)))});
+    m.showSnackBar(const SnackBar(content: Text('Guardado')));
+    return true;
+  } catch (e) {
+    m.showSnackBar(SnackBar(content: Text(e is ApiException ? e.message : 'No se pudo guardar. Revisa tu conexión.')));
+    return false;
+  }
+}
+
+/// Curso que hay que tener aprobado para estar en un equipo (Victor,
+/// 2026-11-26). El cálculo de equipos ya lo revisaba; aquí se elige. Quien no
+/// lo tiene aprobado baja o no sube, y quien se inscribe con el enlace del
+/// equipo entra al equipo inicial con el aviso de qué curso le falta.
+Future<bool> editarCursoRequerido(BuildContext context, Sesion s, Map<String, dynamic> t) async {
+  final req = (t['requisitos'] as Map?) ?? const {};
+  List<Map<String, dynamic>> cursos = const [];
+  try {
+    final r = await s.api.post('adminCursos', {'adminToken': s.adminToken, 'accion': 'listar'});
+    cursos = [for (final c in (r['cursos'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+  } catch (_) {}
+  if (!context.mounted) return false;
+  String elegido = '${req['cursoId'] ?? ''}';
+  final ok = await abrirSubseccion(
+    context,
+    titulo: 'Curso aprobado',
+    contenido: (set) => [
+      Text(
+        'Para estar en ${t['nombre']} hay que tener aprobado este curso. Quien no lo tiene no sube a este equipo.',
+        style: TextStyle(color: context.pivot.textoSecundario),
+      ),
+      const SizedBox(height: 8),
+      RadioGroup<String>(
+        groupValue: elegido,
+        onChanged: (v) => set(() => elegido = v ?? ''),
+        child: Column(
+          children: [
+            const RadioListTile<String>(contentPadding: EdgeInsets.zero, value: '', title: Text('No pide un curso')),
+            for (final c in cursos) RadioListTile<String>(contentPadding: EdgeInsets.zero, value: '${c['id']}', title: Text('${c['nombre'] ?? 'Curso'}')),
+          ],
+        ),
+      ),
+      if (cursos.isEmpty) Text('Todavía no hay cursos creados.', style: TextStyle(color: context.pivot.textoSecundario)),
+    ],
+  );
+  if (ok != true || !context.mounted) return false;
+  final m = ScaffoldMessenger.of(context);
+  try {
+    final nombre = cursos.where((c) => '${c['id']}' == elegido).map((c) => '${c['nombre'] ?? ''}').firstOrNull ?? '';
+    final nuevo = {...req}
+      ..remove('cursoId')
+      ..remove('cursoNombre');
+    if (elegido.isNotEmpty) nuevo.addAll({'cursoId': elegido, 'cursoNombre': nombre});
+    final cambios = {'requisitos': nuevo};
     final base = _Regla.de(t).params({...t, ...cambios});
     await _guardarTier(s, {...base, ...cambios.map((k, v) => MapEntry(k, jsonEncode(v)))});
     m.showSnackBar(const SnackBar(content: Text('Guardado')));

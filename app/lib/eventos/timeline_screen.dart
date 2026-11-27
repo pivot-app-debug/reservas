@@ -1,3 +1,5 @@
+import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -1476,14 +1478,16 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
       context,
       // v3 (Victor, 2026-11-20): la casita, Filtros y Buscar; los eventos se
       // crean en la casita. Se muestra de nuevo a todxs una vez.
-      preferencia: 'tour.calendario.v3',
+      // v4 (Victor, 2026-11-26): barra nueva con Entrenamiento y Liga; los
+      // pasos dependen de las funciones activas de la liga y tus accesos.
+      preferencia: 'tour.calendario.v4',
       pasos: [
         PasoTour(
           clave: _kBandeja,
-          titulo: 'Tu bandeja',
+          titulo: 'Novedades',
           texto: crea
-              ? 'En la bandeja ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Ahí también creas eventos. Si tiene un punto rojo, hay novedades.'
-              : 'En la bandeja ves lo que viene (eventos, cumpleaños y fiestas), tus notificaciones, las tareas, los cursos y tus pagos. Si tiene un punto rojo, hay novedades.',
+              ? 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a Tareas y a Pagos. Aquí también creas eventos. Si tiene un punto rojo, hay novedades.'
+              : 'Aquí ves lo que viene (eventos, cumpleaños y fiestas), tus tareas, los cursos nuevos y tus notificaciones, y entras a Tareas y a Pagos. Si tiene un punto rojo, hay novedades.',
         ),
         PasoTour(
           clave: _kFiltros,
@@ -1492,7 +1496,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         ),
         PasoTour(clave: _kBuscar, titulo: 'Busca', texto: 'Encuentra eventos, tareas, cumpleaños o lugares escribiendo una palabra.'),
         if (_acciones.isNotEmpty)
-          PasoTour(clave: _kMas, titulo: 'Reserva o paga', texto: 'Toca aquí para $lista. Tus pagos y recibos están en la bandeja, en Pagos y suscripciones.'),
+          PasoTour(clave: _kMas, titulo: 'Reserva o paga', texto: 'Toca aquí para $lista. Tus pagos y recibos están en Novedades, en Pagos.'),
         PasoTour(clave: _kMes, titulo: 'Navega por mes', texto: 'Toca el mes o desliza hacia abajo para abrir el calendario y saltar a cualquier fecha.'),
         PasoTour(clave: _kTarjeta, titulo: 'Detalle del evento', texto: 'Toca un evento para ver quiénes van, responder si vas y ver cómo llegar.'),
         PasoTour(
@@ -1500,6 +1504,30 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
           ajuste: ClavesTour.primeraPestana,
           titulo: 'Vuelve a hoy',
           texto: 'El ícono de Calendario muestra la fecha de hoy. Tócalo de nuevo estando aquí para volver a hoy.',
+        ),
+        PasoTour(
+          clave: ClavesTour.navegacion,
+          ajuste: ClavesTour.pestana(1),
+          titulo: 'Entrenamiento',
+          texto: [
+            if (FuncionesLiga.usaCoach(repo.sesion)) 'Tus herramientas de entrenadorx: el próximo entrenamiento, los planes y lo que falta evaluar.',
+            if (FuncionesLiga.coach(repo.sesion)) 'Tu progreso: habilidades, pruebas y notas de tus entrenadorxs.',
+            'Los cursos y clínicas que puedes tomar.',
+          ].join(' '),
+        ),
+        PasoTour(
+          clave: ClavesTour.navegacion,
+          ajuste: ClavesTour.pestana(2),
+          titulo: 'Liga',
+          texto: () {
+            final l = [
+              'Comunicación',
+              'Inventario',
+              if (repo.sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(repo.sesion)) 'Finanzas',
+              if (_esAdmin) 'los Ajustes de la liga',
+            ];
+            return 'Los equipos y la gente de la liga. Arriba están ${l.sublist(0, l.length - 1).join(', ')} y ${l.last}.';
+          }(),
         ),
         // Se resalta la parte de arriba de la línea de tiempo (toda la lista
         // no dejaría lugar para la tarjeta y el recorte no se notaría).

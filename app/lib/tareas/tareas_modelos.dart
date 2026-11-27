@@ -77,6 +77,9 @@ class Tarea {
   AreaTarea get areaInfo => AreaTarea.de(areas.first);
   int get puntos => (m['puntos'] as num?)?.toInt() ?? 0;
   int get cupos => (m['cuposTotales'] as num?)?.toInt() ?? 1;
+
+  /// Personas que se asignan solas en cada repetición (Victor, 2026-11-26).
+  List<String> get personasFijas => [for (final x in (m['personasFijas'] as List? ?? const [])) '$x'];
   int get libres => (m['cuposLibres'] as num?)?.toInt() ?? 0;
   String get estado => '${m['estado'] ?? ''}';
   bool get enBaul => estado == 'expirada';
@@ -123,6 +126,9 @@ class Recurrente {
   List<String> get areas => AreaTarea.separar(area);
   int get puntos => (m['puntos'] as num?)?.toInt() ?? 0;
   int get cupos => (m['cuposTotales'] as num?)?.toInt() ?? 1;
+
+  /// Personas que se asignan solas en cada repetición (Victor, 2026-11-26).
+  List<String> get personasFijas => [for (final x in (m['personasFijas'] as List? ?? const [])) '$x'];
   bool get pausada => m['estado'] == 'pausada';
   String get frecuencia => '${m['frecuencia'] ?? 'Cada mes'}';
 }

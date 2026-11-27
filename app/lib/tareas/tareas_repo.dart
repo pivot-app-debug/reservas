@@ -252,6 +252,13 @@ class TareasRepo extends ChangeNotifier {
         'datosJson': jsonEncode({'titulo': titulo, 'notas': notas, 'area': area, 'puntos': puntos, 'maxAsignados': cupos}),
       });
 
+  /// Personas fijas de una recurrente (Victor, 2026-11-26).
+  Future<void> fijarPersonas(Recurrente p, List<String> personas) => _accion('adminEditarTareaRecurrente', {
+    ..._admin,
+    'idPlantilla': p.id,
+    'datosJson': jsonEncode({'personasFijas': personas}),
+  });
+
   /// 'activa' | 'pausada' | 'terminada'.
   Future<void> estadoPlantilla(String idPlantilla, String estado) =>
       _accion('adminEstadoTareaRecurrente', {..._admin, 'idPlantilla': idPlantilla, 'estado': estado});

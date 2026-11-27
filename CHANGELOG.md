@@ -2,6 +2,16 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (Entrenamiento etapas 2–4 y pendientes chicos)
+- Mi progreso muestra tu nivel y qué te falta para el siguiente, y lo que estás trabajando.
+- Pruebas en vivo: con «En vivo» corre el tiempo (o un cronómetro si menos es mejor), se suma a cada persona con un toque y al final se guardan todos los resultados.
+- Equipos: nuevo requisito «Curso aprobado». Quien se inscribe con el enlace del equipo sin el curso entra al equipo inicial con el aviso.
+- Tareas recurrentes: «Personas fijas», que se asignan solas cada vez. Al archivar a alguien o si borra su cuenta, sus tareas en curso quedan libres y sale de las personas fijas.
+- Cursos: la hora y el lugar se precargan con los de los entrenamientos de siempre.
+- Finanzas: «Exportar a Excel» da un .xlsx de verdad, con los montos como números y una hoja de totales.
+- Inventario: foto por artículo (cada talla o pieza).
+- El recorrido del Calendario explica la barra nueva (Entrenamiento y Liga) según lo que la liga tiene activado y tus accesos.
+
 ## 2026-11-27 (navegación nueva y Entrenamiento)
 - Entrenamiento está en la barra de abajo para todxs: Mi progreso y Cursos, y para entrenadorxs además el próximo entrenamiento, lo que falta evaluar, los planes y las herramientas.
 - La bandeja vuelve a ser una sola lista, «Novedades»: próximos eventos, tus tareas y las que hay para tomar, cursos nuevos y notificaciones. Arriba, botones rojos para entrar a Tareas y a Pagos.

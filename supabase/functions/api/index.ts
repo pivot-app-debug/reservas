@@ -1996,12 +1996,18 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
       const listasE = await _listasEntrenar();
       const usaIds = new Set(Object.keys(row.equipo_liga ?? {}));
       const faltan = listasE.filter((l) => _propioDe(t.requisitos ?? {}, listasE).includes(l.id) && usaIds.has(l.id));
-      const cumple = !faltan.length;
+      // Curso requerido (Victor, 2026-11-26): quien recién entra no lo tiene aprobado.
+      let cursoOk = !t.requisitos?.cursoId;
+      if (!cursoOk && row.username) {
+        const { data: ap } = await supabase.from('curso_inscripciones').select('id').eq('username', row.username).eq('curso_id', String(t.requisitos.cursoId)).eq('resultado', 'aprobado').limit(1);
+        cursoOk = !!ap?.length;
+      }
+      const cumple = !faltan.length && cursoOk;
             if (cumple) row.categoria = t.nombre;
       // Si no cumple, entra al equipo inicial y se le dice por qué (Victor, 2026-11-15).
       else {
         const { data: ini } = await supabase.from('config_tiers').select('nombre').eq('es_default', true).maybeSingle();
-        if (t.requisitos?.cursoId) {
+        if (!cursoOk) {
           const cNom = t.requisitos.cursoNombre || 'el curso requerido';
           avisoEquipo = `Entraste a ${ini?.nombre ?? 'tu equipo inicial'}: ${t.nombre} pide tener aprobado ${cNom}. Puedes inscribirte al curso desde la app para calificar a ${t.nombre}.`;
         } else {
@@ -2137,6 +2143,22 @@ async function inscribirPersonaExpress(params: Record<string, any>): Promise<Rec
 // Solo se siguen borrando `sessions`/`pin_attempts` (no son historial) y se
 // anulan las invitaciones pendientes (`invite_tokens.usado=true` -- no
 // tiene sentido un link de activación vivo para una cuenta archivada).
+/// Al archivar o borrar a alguien (Victor, 2026-11-26): sus tareas en curso
+/// vuelven a quedar libres para otra persona y sale de las personas fijas de
+/// las recurrentes. Lo ya enviado a revisión o aprobado no se toca.
+async function _liberarTareasDe(nombre: string): Promise<void> {
+  try {
+    const { data: asigs } = await supabase.from('asignaciones_tareas').select('id, tarea_id').eq('nombre_usuario', nombre).eq('estado', 'iniciada');
+    for (const a of asigs ?? []) {
+      await supabase.from('asignaciones_tareas').delete().eq('id', a.id);
+      const { data: quedan } = await supabase.from('asignaciones_tareas').select('id').eq('tarea_id', a.tarea_id).in('estado', ['iniciada', 'pendiente_revision']);
+      if (!quedan?.length) await supabase.from('tareas').update({ estado: 'no_iniciada' }).eq('id', a.tarea_id).eq('estado', 'en_progreso');
+    }
+    const { data: recs } = await supabase.from('tareas_recurrentes').select('id, personas_fijas').contains('personas_fijas', [nombre]);
+    for (const r of recs ?? []) await supabase.from('tareas_recurrentes').update({ personas_fijas: ((r.personas_fijas as string[]) ?? []).filter((u) => u !== nombre) }).eq('id', r.id);
+  } catch (e) { console.error('[tareas] liberar', nombre, e); }
+}
+
 async function eliminarCuenta(params: Record<string, any>): Promise<Record<string, any>> {
   const tok = params.token as string;
   const usr = await _validarToken(tok);
@@ -2160,6 +2182,7 @@ async function eliminarCuenta(params: Record<string, any>): Promise<Record<strin
   await supabase.from('pin_attempts').delete().eq('username', usr);
   await supabase.from('invite_tokens').update({ usado: true }).eq('username', usr).eq('usado', false);
   await supabase.storage.from('fotos-perfil').remove(['avatars/' + usr + '.jpg']);
+  await _liberarTareasDe(usr);
   return { exito: true };
 }
 
@@ -2220,13 +2243,21 @@ async function adminSubirLogo(params: Record<string, any>): Promise<Record<strin
   if (base64Data) {
     const parsed = await _base64ToBuffer(base64Data);
     if (!parsed) return { exito: false, error: 'Formato de imagen inválido.' };
-                const path = `logos/${destino === 'liga' ? 'liga' : destino.startsWith('medio-') || destino.startsWith('inv-') ? destino.replace(/[^a-z0-9_-]/gi, '') : 'equipo-' + destino.replace(/[^a-z0-9-]/gi, '')}.png`;
+    // Foto de un artículo: 'invf-<listaId>:<variante>' (Victor, 2026-11-26).
+    const archivo = destino.startsWith('invf-')
+      ? 'invf-' + destino.slice(5, 41).replace(/[^a-z0-9-]/gi, '') + '-' + Array.from(new TextEncoder().encode(destino.slice(42))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 80)
+      : destino === 'liga' ? 'liga' : destino.startsWith('medio-') || destino.startsWith('inv-') ? destino.replace(/[^a-z0-9_-]/gi, '') : 'equipo-' + destino.replace(/[^a-z0-9-]/gi, '');
+                const path = `logos/${archivo}.png`;
     const { error } = await supabase.storage.from('fotos-perfil').upload(path, parsed.buffer, { contentType: parsed.mimeType, upsert: true });
     if (error) return { exito: false, error: 'Error al subir imagen: ' + error.message };
     url = `${supabase.storage.from('fotos-perfil').getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
   }
         if (destino.startsWith('medio-')) {
     // Logo de un medio de pago: se guarda con el medio en Formas de pago.
+  } else if (destino.startsWith('invf-')) {
+    const listaId = destino.slice(5, 41), variante = destino.slice(42);
+    const { error } = await supabase.from('inventario_stock').update({ foto: url || null }).eq('lista_id', listaId).eq('variante', variante);
+    if (error) return { exito: false, error: error.message };
   } else if (destino.startsWith('inv-')) {
     // Foto de una lista del inventario (Victor, 2026-11-16).
     const { error } = await supabase.from('inventario_listas').update({ foto: url || null }).eq('id', destino.slice(4));
@@ -3097,6 +3128,7 @@ async function adminGetTareasRecurrentes(params: Record<string, any>): Promise<R
     idPlantilla: p.id, titulo: p.titulo, notas: p.notas ?? '', area: p.area ?? '', puntos: p.puntos, cuposTotales: p.max_asignados, estado: p.estado,
     unidad: p.unidad ?? 'mes', cadaN: p.cada_n ?? 1, inicio: p.inicio, venceEnDias: p.vence_en_dias, proxima: p.proxima,
     frecuencia: _textoRecurrencia(p.unidad ?? 'mes', Number(p.cada_n) || 1),
+    personasFijas: p.personas_fijas ?? [],
   })) };
 }
 
@@ -3112,10 +3144,12 @@ async function adminEditarTareaRecurrente(params: Record<string, any>): Promise<
   if (datos.area != null) cambios.area = datos.area;
   if (datos.puntos != null) cambios.puntos = Number(datos.puntos) || 0;
   if (datos.maxAsignados != null) cambios.max_asignados = Math.max(1, Number(datos.maxAsignados) || 1);
-  if (!Object.keys(cambios).length) return { exito: true };
-  const { error } = await supabase.from('tareas_recurrentes').update(cambios).eq('id', params.idPlantilla);
+  // Personas fijas (Victor, 2026-11-26): se asignan solas en cada repetición.
+  const fijas = Array.isArray(datos.personasFijas) ? [...new Set(datos.personasFijas.map(String))].slice(0, 50) as string[] : null;
+  if (!Object.keys(cambios).length && !fijas) return { exito: true };
+  const { error } = await supabase.from('tareas_recurrentes').update({ ...cambios, ...(fijas ? { personas_fijas: fijas } : {}) }).eq('id', params.idPlantilla);
   if (error) return { exito: false, error: 'No se pudo guardar.' };
-  await supabase.from('tareas').update(cambios).eq('tarea_recurrente_id', params.idPlantilla).in('estado', ['no_iniciada', 'en_progreso', 'expirada']);
+  if (Object.keys(cambios).length) await supabase.from('tareas').update(cambios).eq('tarea_recurrente_id', params.idPlantilla).in('estado', ['no_iniciada', 'en_progreso', 'expirada']);
   return { exito: true };
 }
 
@@ -3331,7 +3365,7 @@ type ListaInv = { id: string; nombre: string; tipo: string; icono: string | null
 async function _listasInventario(): Promise<{ listas: ListaInv[]; stock: any[] }> {
   const [{ data: listas }, { data: stock }] = await Promise.all([
     supabase.from('inventario_listas').select('*').order('orden').order('created_at'),
-        supabase.from('inventario_stock').select('lista_id, variante, cantidad, vence, minimo, etiqueta'),
+        supabase.from('inventario_stock').select('lista_id, variante, cantidad, vence, minimo, etiqueta, foto'),
   ]);
   return {
     listas: (listas ?? []).map((l: any) => ({ ...l, piezas: Array.isArray(l.piezas) ? l.piezas.map((p: any) => ({ nombre: String(p.nombre), cantidad: Number(p.cantidad) || 1 })) : [] })),
@@ -3431,14 +3465,14 @@ async function getInventario(params: Record<string, any>): Promise<Record<string
         const total = Number(st.find((x: any) => x.variante === v)?.cantidad) || 0;
         const uso = enUso[l.id + '|' + v] ?? 0;
                 const f = st.find((x: any) => x.variante === v);
-                return { variante: v, cantidad: total, enUso: uso, libres: Math.max(0, total - uso), vence: f?.vence ?? null, minimo: f?.minimo == null ? null : Number(f.minimo), etiqueta: f?.etiqueta ?? null };
+                return { variante: v, cantidad: total, enUso: uso, libres: Math.max(0, total - uso), vence: f?.vence ?? null, minimo: f?.minimo == null ? null : Number(f.minimo), etiqueta: f?.etiqueta ?? null, foto: f?.foto ?? null };
       });
             if (l.seccion === 'botiquin' || l.tipo === 'insumo') {
         // El botiquín y los insumos tienen un renglón por cosa (variante = nombre).
         filas.length = 0;
         for (const x of st) {
           const uso = enUso[l.id + '|' + x.variante] ?? 0;
-                    filas.push({ variante: x.variante, cantidad: Number(x.cantidad) || 0, enUso: uso, libres: Math.max(0, (Number(x.cantidad) || 0) - uso), vence: x.vence ?? null, minimo: x.minimo == null ? null : Number(x.minimo), etiqueta: x.etiqueta ?? null });
+                    filas.push({ variante: x.variante, cantidad: Number(x.cantidad) || 0, enUso: uso, libres: Math.max(0, (Number(x.cantidad) || 0) - uso), vence: x.vence ?? null, minimo: x.minimo == null ? null : Number(x.minimo), etiqueta: x.etiqueta ?? null, foto: x.foto ?? null });
         }
         filas.sort((a: any, b: any) => String(a.variante).localeCompare(String(b.variante)));
       }
@@ -3718,14 +3752,16 @@ async function adminInventarioLista(params: Record<string, any>): Promise<Record
     if (!Array.isArray(stock)) return;
                 const fecha = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : null;
     // Sin 'etiqueta' en el pedido, se conserva la que tenía.
-    const { data: previas } = await supabase.from('inventario_stock').select('variante, etiqueta').eq('lista_id', listaId);
-    const etiq: Record<string, string | null> = {};
-    (previas ?? []).forEach((r: any) => { etiq[r.variante] = r.etiqueta ?? null; });
+    const { data: previas } = await supabase.from('inventario_stock').select('variante, etiqueta, foto').eq('lista_id', listaId);
+    const etiq: Record<string, string | null> = {}, fotos: Record<string, string | null> = {};
+    (previas ?? []).forEach((r: any) => { etiq[r.variante] = r.etiqueta ?? null; fotos[r.variante] = r.foto ?? null; });
     const filas = stock.map((x: any) => ({
       lista_id: listaId, variante: String(x.variante ?? '').trim().slice(0, 60), cantidad: Math.max(0, Math.min(100000, Number(x.cantidad) || 0)),
             vence: fecha(x.vence), minimo: x.minimo == null || x.minimo === '' ? null : Math.max(0, Number(x.minimo) || 0),
       // Etiqueta física (Victor, 2026-11-16): número, caja o marca para encontrarlo.
             etiqueta: 'etiqueta' in x ? (String(x.etiqueta ?? '').trim().slice(0, 60) || null) : (etiq[String(x.variante ?? '').trim().slice(0, 60)] ?? null),
+      // La foto de cada artículo se conserva (Victor, 2026-11-26).
+      foto: fotos[String(x.variante ?? '').trim().slice(0, 60)] ?? null,
     }));
     const vistas = new Set<string>();
     for (const f of filas) { if (vistas.has(f.variante)) return; vistas.add(f.variante); }
@@ -4223,10 +4259,17 @@ async function _generarInstanciaTareaRecurrente(p: Record<string, any>): Promise
   await supabase.from('tareas_recurrentes').update({ proxima: siguiente }).eq('id', p.id);
   const { data: existe } = await supabase.from('tareas').select('id').eq('tarea_recurrente_id', p.id).eq('fecha_vencimiento', vence).maybeSingle();
   if (existe) return false;
-  await supabase.from('tareas').insert({
+  const fijas = ((p.personas_fijas as string[]) ?? []).slice(0, Math.max(1, Number(p.max_asignados) || 1));
+  // Solo personas que siguen en la liga (Victor, 2026-11-26).
+  const { data: vivas } = fijas.length ? await supabase.from('equipo').select('username').in('username', fijas).is('eliminado_en', null) : { data: [] as any[] };
+  const asignar = (vivas ?? []).map((x: any) => String(x.username));
+  const { data: nueva } = await supabase.from('tareas').insert({
     titulo: p.titulo, notas: p.notas, area: p.area, puntos: p.puntos, max_asignados: p.max_asignados,
-    fecha_vencimiento: vence, estado: 'no_iniciada', creado_por: p.creado_por, tarea_recurrente_id: p.id,
-  });
+    fecha_vencimiento: vence, estado: asignar.length ? 'en_progreso' : 'no_iniciada', creado_por: p.creado_por, tarea_recurrente_id: p.id,
+  }).select('id').maybeSingle();
+  if (nueva && asignar.length) {
+    await supabase.from('asignaciones_tareas').insert(asignar.map((u) => ({ tarea_id: nueva.id, nombre_usuario: u, estado: 'iniciada', es_rescate: false, fecha_vencimiento_personal: vence })));
+  }
   return true;
 }
 
@@ -4258,6 +4301,7 @@ async function adminCrearTareaRecurrente(params: Record<string, any>): Promise<R
     puntos: datos.puntos ?? 1, max_asignados: datos.maxAsignados ?? 1,
     activa: true, creado_por: datos.creadoPor ?? null,
     unidad, cada_n: cadaN, inicio, vence_en_dias: venceEnDias, proxima: inicio,
+    personas_fijas: Array.isArray(datos.personasFijas) ? [...new Set(datos.personasFijas.map(String))].slice(0, 50) : [],
   }).select();
   if (error) return { exito: false, error: error.message };
     const plantilla = creada[0];
@@ -5505,7 +5549,9 @@ async function getFichaDeportiva(params: Record<string, any>): Promise<Record<st
     exito: true,
     username, nombre: quien[username.toUpperCase()]?.nombreDerby || username,
     asistencias30: asis[username] ?? 0,
-    habilidades: habs.filter((h: any) => h.activa).map((h: any) => ({ ...h, ...(niveles[h.id] ?? { nivel: null }) })),
+    // tipo: básica o avanzada (nivel queda para la evaluación). Nivel de la persona (Victor, 2026-11-26).
+    habilidades: habs.filter((h: any) => h.activa).map((h: any) => ({ ...h, tipo: h.nivel ?? 'basica', ...(niveles[h.id] ?? { nivel: null }) })),
+    nivel: await _nivelPersona(username),
         notas: (notas ?? []).filter(ve).map((n: any) => _notaJson(n, quien)),
     ...(await _progresoPersona(username, ve)),
     puedeEditar: !!coach && !propia,
@@ -7638,7 +7684,9 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
       const esc = (v: unknown) => { const s = String(v ?? ''); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
       const lineas = [['Fecha', 'Tipo', 'Monto', 'Cuenta', 'Cuenta destino', 'Categoría', 'Descripción', 'Persona', 'Anulado', 'Motivo anulación'].join(',')];
       for (const m of lista) lineas.push([m.fecha, m.tipo, m.monto.toFixed(2), m.cuenta, m.cuentaDestino ?? '', m.categoria, m.descripcion, m.personaNombre ?? '', m.anulado ? 'sí' : '', m.motivoAnulacion ?? ''].map(esc).join(','));
-      return { exito: true, csv: '﻿' + lineas.join('\n'), totales, cantidad: lista.length };
+      // Filas para el .xlsx de la app (Victor, 2026-11-26).
+      const filasX = lista.map((m) => [m.fecha, m.tipo, m.monto, m.cuenta, m.cuentaDestino ?? '', m.categoria, m.descripcion, m.personaNombre ?? '', m.anulado ? 'sí' : '', m.motivoAnulacion ?? '']);
+      return { exito: true, csv: '﻿' + lineas.join('\n'), filas: filasX, totales, cantidad: lista.length };
     }
     return { exito: true, movimientos: lista, totales };
   }
@@ -9546,6 +9594,7 @@ async function adminEliminarUsuario(params: Record<string, any>): Promise<Record
     .update({ eliminado_en: new Date().toISOString(), eliminado_por: 'admin' })
     .eq('username', nombre);
   if (error) return { exito: false, error: error.message };
+  await _liberarTareasDe(nombre);
   await supabase.from('sessions').delete().eq('username', nombre);
   await supabase.from('pin_attempts').delete().eq('username', nombre);
   await supabase.from('invite_tokens').update({ usado: true }).eq('username', nombre).eq('usado', false);

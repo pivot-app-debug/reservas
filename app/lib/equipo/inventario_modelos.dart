@@ -58,8 +58,12 @@ class StockFila {
       libres = (m['libres'] as num?)?.toInt() ?? 0,
       vence = DateTime.tryParse('${m['vence'] ?? ''}'),
       minimo = (m['minimo'] as num?)?.toInt(),
-      etiqueta = '${m['etiqueta'] ?? ''}';
+      etiqueta = '${m['etiqueta'] ?? ''}',
+      foto = '${m['foto'] ?? ''}';
   final String variante;
+
+  /// Foto del artículo (Victor, 2026-11-26).
+  final String foto;
 
   /// Número, caja o marca para encontrarlo (Victor, 2026-11-16).
   final String etiqueta;

@@ -5,7 +5,9 @@ import '../core/tema.dart';
 import 'tareas_modelos.dart';
 import 'tareas_repo.dart';
 import 'tareas_widgets.dart';
-import '../eventos/widgets_comunes.dart' show TextoDeslizante;
+import '../eventos/widgets_comunes.dart' show TextoDeslizante, AvatarPersona;
+import '../equipo/equipo_repo.dart';
+import '../pivots/editores_liga.dart' show abrirSubseccion;
 
 /// Tareas recurrentes (Pivots) como tarjetas que se deslizan de lado dentro
 /// de Tareas (Victor, 2026-11-13: no como subsección). Tocar una la edita,
@@ -43,6 +45,17 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ListTile(leading: const Icon(Icons.edit_rounded), title: const Text('Editar'), onTap: () => Navigator.pop(c, 'editar')),
+            // Personas fijas (Victor, 2026-11-26).
+            ListTile(
+              leading: const Icon(Icons.person_pin_outlined),
+              title: const Text('Personas fijas'),
+              subtitle: Text(
+                r.personasFijas.isEmpty
+                    ? 'Nadie: cada vez la toma quien quiera'
+                    : '${r.personasFijas.length} de ${r.cupos} ${r.cupos == 1 ? 'cupo' : 'cupos'} se asignan solos',
+              ),
+              onTap: () => Navigator.pop(c, 'fijas'),
+            ),
             ListTile(
               leading: CirculoPausa(icono: r.pausada ? Icons.play_arrow_rounded : Icons.pause_rounded),
               title: Text(r.pausada ? 'Reanudar' : 'Pausar'),
@@ -62,6 +75,7 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
     );
     if (v == null || !mounted) return;
     if (v == 'editar') return _editar(r);
+    if (v == 'fijas') return _fijas(r);
     if (v == 'terminada') {
       final ok = await showDialog<bool>(
         context: context,
@@ -81,6 +95,39 @@ class _RecurrentesScreenState extends State<RecurrentesScreen> {
       'pausada' => 'Recurrente pausada',
       _ => 'Recurrente terminada',
     });
+  }
+
+  /// Quiénes la tienen siempre: se les asigna sola cada vez que aparece.
+  /// Si alguien se archiva o borra su cuenta, sale de aquí y su cupo queda libre.
+  Future<void> _fijas(Recurrente r) async {
+    final eq = EquipoRepo.de(widget.repo.sesion);
+    if (eq.personas == null) await eq.cargar();
+    if (!mounted) return;
+    final gente = [...?eq.personas]..sort((a, b) => a.nombreMostrar.toLowerCase().compareTo(b.nombreMostrar.toLowerCase()));
+    final elegidas = <String>{...r.personasFijas};
+    final ok = await abrirSubseccion(
+      context,
+      titulo: 'Personas fijas',
+      contenido: (set) => [
+        Text(
+          'Se asignan solas cada vez que aparece «${r.titulo}». Hasta ${r.cupos == 1 ? '1 persona' : '${r.cupos} personas'} (los cupos). Si alguien se archiva o borra su cuenta, sale de aquí y su cupo queda libre.',
+          style: TextStyle(color: context.pivot.textoSecundario),
+        ),
+        const SizedBox(height: 8),
+        for (final x in gente)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: AvatarPersona(nombre: x.nombreMostrar, foto: x.foto, tamano: 36),
+            title: Text(x.nombreMostrar),
+            value: elegidas.contains(x.username),
+            onChanged: !elegidas.contains(x.username) && elegidas.length >= r.cupos
+                ? null
+                : (v) => set(() => v == true ? elegidas.add(x.username) : elegidas.remove(x.username)),
+          ),
+      ],
+    );
+    if (ok != true || !mounted) return;
+    await _hacer(() => widget.repo.fijarPersonas(r, elegidas.toList()), elegidas.isEmpty ? 'Ya no hay personas fijas' : 'Personas fijas guardadas');
   }
 
   Future<void> _editar(Recurrente r) async {

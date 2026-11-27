@@ -692,6 +692,22 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
     if (url != null && mounted) Navigator.of(context).pop(true);
   }
 
+  Future<void> _fotoArticulo(String clave) async {
+    final url = await elegirYSubirLogo(context, repo.sesion, 'invf-${l.id}:$clave');
+    if (url != null && mounted) Navigator.of(context).pop(true);
+  }
+
+  void _verFoto(String url) => showDialog<void>(
+    context: context,
+    builder: (d) => Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(d).pop(),
+        child: Image.network(url, fit: BoxFit.contain),
+      ),
+    ),
+  );
+
   /// Etiqueta de una talla o pieza: número, caja o marca.
   Future<void> _etiqueta(String clave, String titulo) async {
     final c = TextEditingController(text: _etiquetas[clave] ?? l.fila(clave)?.etiqueta ?? '');
@@ -842,8 +858,33 @@ class _ListaInventarioScreenState extends State<ListaInventarioScreen> {
       final f = l.fila(clave);
       final n = _stock[clave] ?? 0;
       final etiqueta = _etiquetas[clave] ?? f?.etiqueta ?? '';
+      final foto = f?.foto ?? '';
       return ListTile(
         onTap: pivot ? () => _etiqueta(clave, titulo) : null,
+        // Foto de cada artículo (Victor, 2026-11-26): un Pivot la cambia tocándola.
+        leading: foto.isEmpty && !(pivot && f != null)
+            ? null
+            : InkWell(
+                borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                onTap: pivot && f != null ? () => _fotoArticulo(clave) : (foto.isEmpty ? null : () => _verFoto(foto)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: foto.isEmpty
+                        ? ColoredBox(
+                            color: p.suave,
+                            child: Icon(Icons.add_a_photo_outlined, size: 20, color: p.sobreSuave),
+                          )
+                        : Image.network(
+                            foto,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Icon(Icons.image_not_supported_outlined, color: p.textoSecundario),
+                          ),
+                  ),
+                ),
+              ),
         title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(
           [

@@ -23,6 +23,16 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Entrenamiento (entrenadorxs): sin «Llevas…», `MiEstimado` (getMiPagoCoach) arriba, «Habilidades», «Armar un plan» = `ArmarPlanScreen` (2 pasos: entrenamiento → para quién: toda la liga, equipo o nivel). Planes por nivel: `equipo = 'nivel:sin|basicas|avanzadas'` (`paraPlan()`); el servidor deja guardarlos a cualquier entrenadorx y los muestra compartidos a quien tiene ese nivel (`_nivelPersona`).
 - Notificaciones de entrenador (`coach/notificaciones_entrenador_screen.dart`): resumen de los lunes, por persona (`coaches.sin_avisos text[]`, `coachGuardar` accion `avisosPersona`), `EnviarAvisoEntrenadorScreen` (accion `enviarAviso`, tipo `aviso_entrenador`) y lo que te llega (`coach_por_evaluar`, `coach_pedido_plan`, `cambios_asistencia`). Catálogo: `aviso_entrenador`, `novedades_progreso` (antes el lunes usaba `solicitud_resuelta`), y `soloCoach` (ocultos en Mi perfil → Notificaciones). `_avisosEntrenadorxs()` en `cronDiario`.
 
+## Etapas 2–4 de Entrenamiento y grupo A (2026-11-27)
+- `getFichaDeportiva` devuelve `nivel` (`_nivelPersona`) y en cada habilidad `tipo` (básica/avanzada; `nivel` sigue siendo la evaluación). `_NivelFicha` en la ficha.
+- `coach/prueba_en_vivo.dart`: `PruebaEnVivoScreen` (más es mejor: cuenta regresiva + toques; menos es mejor: cronómetro y toque al terminar) → `coachPruebas` accion `marca` por persona.
+- Requisito de curso: `config_tiers.requisitos.cursoId/cursoNombre` (`editarCursoRequerido` en categorias_screen). Ya lo usaba `recalcular-categorias`; ahora también la inscripción por enlace.
+- `tareas_recurrentes.personas_fijas text[]`: `_generarInstanciaTareaRecurrente` las asigna (solo personas no archivadas, hasta los cupos); `adminEditarTareaRecurrente` acepta `personasFijas`. `_liberarTareasDe(nombre)` al archivar (admin) y en `eliminarCuenta`.
+- Cursos: `_habitual` (hora y lugar más comunes de los Entrenamientos) precarga el asistente.
+- `core/xlsx.dart` (`crearXlsx`, sin paquetes: el paquete `excel` choca con archive ^4). Tesorería `exportar` devuelve `filas`.
+- `inventario_stock.foto`; `adminSubirLogo` con destino `invf-<listaId>:<variante>`; se conserva al guardar el stock.
+- Tour del Calendario v4 con pasos de Entrenamiento y Liga según funciones y accesos (`ClavesTour.pestana(i)`).
+
 ## Cobros del banco (2026-11-26)
 - Tabla `tesoreria_cobros_programados` (cuenta_id, nombre, monto con IVA, frecuencia 'mensual'|'anual', dia 1–28, desde, activo; RLS `to liga_api` + grant). `adminTesoreria`: `cobros`, `guardarCobro` (genera enseguida), `quitarCobro` (activo=false, lo registrado queda). `_generarCobrosProgramados()` en `cronDiario`: un egreso categoría 'comision' por periodo desde `desde`, `origen = 'cobro_programado'`, `origen_id = <id>:<aaaa-mm>` (no se regenera aunque se anule). App: `finanzas/cobros_programados_screen.dart`, fila "Cobros del banco" en Finanzas y en el buscador.
 - Datos: comisión de octubre de Banco Internacional ($2,02) y ajuste de conciliación a $282,44, así la cuenta da $1.848,66 como el estado de cuenta. Todavía no hay cobros programados cargados (se sabrá la frecuencia con el próximo estado de cuenta).

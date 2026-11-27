@@ -1,3 +1,5 @@
+import '../core/xlsx.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -1223,11 +1225,44 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
   Future<void> _exportar() async {
     try {
       final r = await widget.repo.accion('exportar', _filtros);
-      final bytes = utf8.encode('${r['csv'] ?? ''}');
+      // Excel de verdad (.xlsx) con números como números (Victor, 2026-11-26).
+      final filas = r['filas'] as List?;
+      if (filas == null) {
+        final bytes = utf8.encode('${r['csv'] ?? ''}');
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile.fromData(bytes, mimeType: 'text/csv', name: 'tesoreria.csv')],
+            fileNameOverrides: ['movimientos-${isoFecha(Fechas.hoy())}.csv'],
+            subject: 'Movimientos de Finanzas',
+          ),
+        );
+        return;
+      }
+      final t = (r['totales'] as Map?) ?? const {};
+      final bytes = crearXlsx([
+        HojaXlsx(
+          'Movimientos',
+          [
+            const ['Fecha', 'Tipo', 'Monto', 'Cuenta', 'Cuenta destino', 'Categoría', 'Descripción', 'Persona', 'Anulado', 'Motivo anulación'],
+            for (final f in filas) [for (final x in (f as List)) x],
+          ],
+          anchos: const [12, 12, 12, 22, 22, 22, 40, 22, 10, 30],
+        ),
+        HojaXlsx(
+          'Totales',
+          [
+            const ['Concepto', 'Monto'],
+            ['Ingresos', (t['ingresos'] as num?) ?? 0],
+            ['Egresos', (t['egresos'] as num?) ?? 0],
+            ['Diferencia', ((t['ingresos'] as num?) ?? 0) - ((t['egresos'] as num?) ?? 0)],
+          ],
+          anchos: const [20, 14],
+        ),
+      ]);
       await SharePlus.instance.share(
         ShareParams(
-          files: [XFile.fromData(bytes, mimeType: 'text/csv', name: 'tesoreria.csv')],
-          fileNameOverrides: ['movimientos-${isoFecha(Fechas.hoy())}.csv'],
+          files: [XFile.fromData(bytes, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', name: 'finanzas.xlsx')],
+          fileNameOverrides: ['movimientos-${isoFecha(Fechas.hoy())}.xlsx'],
           subject: 'Movimientos de Finanzas',
         ),
       );
@@ -1315,7 +1350,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Movimientos', style: TextStyle(fontWeight: FontWeight.w700)),
-        actions: [IconButton(tooltip: 'Exportar a Excel (CSV)', onPressed: _exportar, icon: const Icon(Icons.file_download_outlined))],
+        actions: [IconButton(tooltip: 'Exportar a Excel', onPressed: _exportar, icon: const Icon(Icons.file_download_outlined))],
       ),
       body: Column(
         children: [
@@ -1453,7 +1488,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                           child: OutlinedButton.icon(
                             onPressed: _exportar,
                             icon: const Icon(Icons.file_download_outlined, size: 18),
-                            label: Text('Exportar a Excel (CSV) · ${movs.length} ${movs.length == 1 ? 'movimiento' : 'movimientos'}'),
+                            label: Text('Exportar a Excel · ${movs.length} ${movs.length == 1 ? 'movimiento' : 'movimientos'}'),
                           ),
                         ),
                       ],

@@ -18,6 +18,7 @@ import 'por_evaluar.dart';
 import 'armar_plan_screen.dart';
 import 'notificaciones_entrenador_screen.dart';
 import 'mi_estimado.dart';
+import 'prueba_en_vivo.dart';
 import '../equipo/habilidades_screen.dart';
 import '../ajustes/herramientas_liga.dart';
 import '../sesion/sesion.dart';
@@ -1040,6 +1041,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                       color: p.marca,
                     ),
                   ),
+                  _NivelFicha(d: d, habs: habs),
                   if (_puedeEditar)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -1114,6 +1116,66 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
                     ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+/// Nivel y próximo paso (Victor, 2026-11-26, etapa 2): en qué nivel está la
+/// persona, qué le falta para el siguiente y lo que está trabajando.
+class _NivelFicha extends StatelessWidget {
+  const _NivelFicha({required this.d, required this.habs});
+  final Map<String, dynamic> d;
+  final List<Map<String, dynamic>> habs;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final nivel = '${d['nivel'] ?? ''}';
+    if (nivel.isEmpty || habs.isEmpty) return const SizedBox.shrink();
+    final basicas = [
+      for (final h in habs)
+        if (h['tipo'] != 'avanzada') h,
+    ];
+    final enProceso = habs.where((h) => h['nivel'] == 'proceso').map((h) => '${h['nombre']}').toList();
+    final logradasBas = basicas.where((h) => h['nivel'] == 'logrado').length;
+    final meta = (basicas.length * 0.8).ceil();
+    final siguiente = switch (nivel) {
+      'sin' =>
+        meta - logradasBas > 0
+            ? 'Te ${meta - logradasBas == 1 ? 'falta 1 habilidad' : 'faltan ${meta - logradasBas} habilidades'} para «${nivelesCoach['basicas']}».'
+            : 'Ya casi: tu entrenadorx revisará tu nivel.',
+      'basicas' => 'Para «${nivelesCoach['avanzadas']}» falta lograr una habilidad avanzada.',
+      _ => 'Estás en el nivel más alto. Sigue sumando habilidades avanzadas.',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.stairs_outlined, color: p.sobreSuave),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    nivelesCoach[nivel] ?? nivel,
+                    style: TextStyle(fontWeight: FontWeight.w800, color: p.sobreSuave),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(siguiente, style: TextStyle(color: p.sobreSuave)),
+            if (enProceso.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('Trabajando: ${enProceso.take(4).join(', ')}${enProceso.length > 4 ? '…' : ''}', style: TextStyle(fontSize: 13, color: p.sobreSuave)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1837,7 +1899,14 @@ class _PruebasCoachState extends State<_PruebasCoach> {
                 'Lo ven: ${textoQuienVe('${x['visible']}')}',
               ].join(' · '),
             ),
-            trailing: const Icon(Icons.edit_outlined, size: 18),
+            trailing: x['activa'] == false
+                ? const Icon(Icons.edit_outlined, size: 18)
+                : TextButton.icon(
+                    // Prueba en vivo con temporizador (Victor, 2026-11-26).
+                    onPressed: () => SubAjustes.abrir<bool>(context, PruebaEnVivoScreen(sesion: widget.sesion, prueba: x, jugadorxs: widget.jugadorxs)),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('En vivo'),
+                  ),
             onTap: () => _editar(x),
           ),
         Align(

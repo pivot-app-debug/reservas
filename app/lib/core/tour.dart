@@ -27,6 +27,10 @@ class ClavesTour {
 
   /// La primera pestaña (Eventos) de la barra inferior.
   static Rect primeraPestana(Rect barra) => Rect.fromLTWH(barra.left, barra.top, barra.width / destinos, barra.height);
+
+  /// La pestaña número [i] (desde 0) de la barra inferior.
+  static Rect Function(Rect) pestana(int i) =>
+      (barra) => Rect.fromLTWH(barra.left + barra.width / destinos * i, barra.top, barra.width / destinos, barra.height);
 }
 
 /// Tour guiado de primera vez, como el de la web (`_evTourIniciarConPasos()`):

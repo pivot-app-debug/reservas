@@ -41,9 +41,25 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
   // Curso abierto: se repite cada semana hasta que se termina (Victor, 2026-11-17).
   late bool _abierto = o?.abierto ?? false;
   late final Set<String> _dias = {for (final d in (o?.repite?['dias'] as List? ?? const [])) '$d'};
-  late String _hora = '${o?.repite?['hora'] ?? '19:00'}';
+  late String _hora = '${o?.repite?['hora'] ?? _habitual.$1 ?? '19:00'}';
   late String? _termina = o?.repite?['termina'] as String?;
-  late String _lugar = '${o?.repite?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
+  late String _lugar = '${o?.repite?['lugar'] ?? _lugarHabitual}';
+
+  /// Hora y lugar de siempre (Victor, 2026-11-26): los que más se repiten en
+  /// los entrenamientos del calendario, para precargarlos.
+  late final (String?, String?) _habitual = () {
+    final evs = [...?EventosRepo.actual?.eventos.where((e) => e.tipo == 'Entrenamiento' && !e.cancelado)];
+    String? masComun(Iterable<String> l) {
+      final c = <String, int>{};
+      for (final x in l) {
+        if (x.isNotEmpty) c[x] = (c[x] ?? 0) + 1;
+      }
+      return c.isEmpty ? null : (c.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+    }
+
+    return (masComun(evs.map((e) => e.horaInicio)), masComun(evs.map((e) => e.lugar)));
+  }();
+  String get _lugarHabitual => widget.lugares.contains(_habitual.$2) ? _habitual.$2! : (widget.lugares.isEmpty ? '' : widget.lugares.first);
   late final List<String> _temasCurso = [...?o?.temasCurso];
 
   // Para quién: toda la liga, equipos, un nivel o personas.
@@ -159,9 +175,9 @@ class _AsistenteCursoState extends State<_AsistenteCurso> {
     );
     if (d == null || !mounted) return null;
     final base = previa ?? (_clases.isEmpty ? null : _clases.last);
-    final h = await elegirHoraTexto(context, inicial: '${base?['hora'] ?? '09:00'}', titulo: tituloHora);
+    final h = await elegirHoraTexto(context, inicial: '${base?['hora'] ?? _habitual.$1 ?? '09:00'}', titulo: tituloHora);
     if (h == null || !mounted) return null;
-    var lugar = '${base?['lugar'] ?? (widget.lugares.isEmpty ? '' : widget.lugares.first)}';
+    var lugar = '${base?['lugar'] ?? _lugarHabitual}';
     if (widget.lugares.length > 1) {
       final l = await showModalBottomSheet<String>(
         useRootNavigator: true,

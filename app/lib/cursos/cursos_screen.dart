@@ -31,6 +31,7 @@ import '../eventos/widgets_comunes.dart' show AvatarPersona, Etiqueta;
 import '../equipo/equipo_repo.dart';
 import '../core/asistente.dart';
 import '../coach/coach_screen.dart' show EscalaDiez;
+import '../eventos/eventos_repo.dart' show EventosRepo;
 
 import 'importar_clases.dart';
 
