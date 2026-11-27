@@ -10,7 +10,7 @@ Cursos en la barra; cada pestaña recuerda dónde estabas; notificaciones casi o
 - Preguntas de Naviquinde y de lenguaje de suscripción: ya respondidas.
 
 ## Próxima sesión (Victor, 2026-11-27)
-- [ ] Borrar la app en OneSignal y los secretos `ONESIGNAL_APP_ID` y `ONESIGNAL_API_KEY` en Supabase (Victor; el código ya no los usa).
+- [x] Secretos `ONESIGNAL_APP_ID` y `ONESIGNAL_API_KEY` borrados en Supabase (2026-11-27). Opcional: borrar la app en onesignal.com.
 - [ ] **Habilidades** (detalle en el doc de QA, pestaña Pendientes): arreglar el duplicado al crear una habilidad y pasar a logros por grupo.
 
 ## A. Pendientes chicos (sin dinero ni permisos)

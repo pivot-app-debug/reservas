@@ -10,7 +10,7 @@ Victor hace estos pasos a mano. Al terminar cada servicio, avisar a Claude para 
 | Supabase | **Hecho.** El proyecto `uusbnreitoobqssizbfq` (mismo proyecto, mismas claves) está en la organización «Pivot» de la cuenta de Pivot. La cuenta vieja ya no es Owner (2026-11-27). Conector de Claude y `SUPABASE_ACCESS_TOKEN` con la cuenta nueva. |
 | Web y dominio | **Hecho.** La web se publica en Firebase Hosting (`pivot-d65f4.web.app`). `app.quindesvolcanicos.com` y `reservas.quindesvolcanicos.com` redirigen ahí desde Cloudflare. |
 | Google Cloud / Firebase | En la cuenta de Pivot (proyectos `pivot-d65f4` y «Pivot Login», ex mirlxs-app). **Hecho.** La cuenta vieja ya no es Owner de «Pivot Login» (2026-11-27). |
-| OneSignal | **Dado de baja** (2026-11-27). No se migró: los avisos van solo por Firebase (app Android y web Flutter). Se quitó del servidor y de la web vieja; falta borrar la app en OneSignal y los secretos `ONESIGNAL_APP_ID` y `ONESIGNAL_API_KEY` en Supabase. |
+| OneSignal | **Dado de baja** (2026-11-27). No se migró: los avisos van solo por Firebase (app Android y web Flutter). Quitado del servidor y de la web vieja; secretos `ONESIGNAL_APP_ID` y `ONESIGNAL_API_KEY` borrados de Supabase. Opcional: borrar la app en onesignal.com. |
 | Tareas programadas de Claude | **Revisado.** «Leer documento» (pausada) no usa el repo; «Pivot: pendientes del jueves» ya corrió y no vuelve a correr. Se dejan como están. |
 | Repo `reservas-backups` | Fuera de la migración: sigue en la cuenta vieja `quindesvolcanicosrd-sys`. |
 
