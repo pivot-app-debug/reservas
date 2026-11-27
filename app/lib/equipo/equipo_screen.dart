@@ -1,3 +1,5 @@
+import 'package:material_symbols_icons/symbols.dart';
+
 import '../core/atajos_color.dart';
 import '../finanzas/tesoreria_repo.dart' show TesoreriaRepo, plata;
 import 'inventario_modelos.dart' show InventarioRepo;
@@ -78,11 +80,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   };
 
   static IconData _iconoLiga(PestanaLiga x) => switch (x) {
-    PestanaLiga.comunidad => Icons.groups_rounded,
-    PestanaLiga.redes => Icons.forum_outlined,
-    PestanaLiga.inventario => Icons.content_paste_rounded,
-    PestanaLiga.finanzas => Icons.account_balance_wallet_outlined,
-    PestanaLiga.miLiga => Icons.settings_outlined,
+    PestanaLiga.comunidad => Symbols.groups_rounded,
+    PestanaLiga.redes => Symbols.forum_rounded,
+    PestanaLiga.inventario => Symbols.inventory_2_rounded,
+    PestanaLiga.finanzas => Symbols.account_balance_wallet_rounded,
+    PestanaLiga.miLiga => Symbols.settings_rounded,
   };
 
   // Lo que hay adentro de cada atajo, para verlo sin entrar.
@@ -110,11 +112,11 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     for (final x in _atajos())
       AtajoColor(
         icono: _iconoLiga(x),
-        color: switch (x) {
-          PestanaLiga.redes => PivotPaleta.atajoAzul,
-          PestanaLiga.inventario => PivotPaleta.atajoNaranja,
-          PestanaLiga.finanzas => PivotPaleta.atajoVerde,
-          _ => PivotPaleta.atajoMorado,
+        seccion: switch (x) {
+          PestanaLiga.redes => 'redes',
+          PestanaLiga.inventario => 'mantenimiento',
+          PestanaLiga.finanzas => 'reservas',
+          _ => 'organizacion',
         },
         titulo: x == PestanaLiga.miLiga ? 'Ajustes' : _nombreLiga(x),
         punto: x == PestanaLiga.inventario && _avisos.inventario,

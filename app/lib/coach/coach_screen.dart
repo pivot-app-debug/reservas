@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -275,23 +276,23 @@ class _CoachScreenState extends State<CoachScreen> {
       atajos: [
         ...widget.atajosExtra,
         AtajoColor(
-          icono: Icons.checklist_rounded,
-          color: PivotPaleta.atajoAzul,
+          icono: Symbols.military_tech_rounded,
+          seccion: 'redes',
           titulo: 'Habilidades',
           detalle: '${_d?['totalHabilidades'] ?? 0} en la lista de la liga',
           alTocar: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
         ),
         AtajoColor(
-          icono: Icons.timer_outlined,
-          color: PivotPaleta.atajoNaranja,
+          icono: Symbols.timer_rounded,
+          seccion: 'mantenimiento',
           titulo: 'Pruebas',
           detalle: pruebas == null ? 'Medir el progreso' : (pendientes > 0 ? '$pendientes por evaluar' : 'Medir el progreso, en vivo'),
           alTocar: () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs)),
         ),
         if (puedeNombrar)
           AtajoColor(
-            icono: Icons.person_add_outlined,
-            color: PivotPaleta.atajoMorado,
+            icono: Symbols.badge_rounded,
+            seccion: 'organizacion',
             titulo: 'Entrenadorxs',
             detalle: '${(_d?['coaches'] as List? ?? const []).length} en la liga',
             alTocar: () => _abrir(CoachesScreen(sesion: s)),
@@ -299,8 +300,8 @@ class _CoachScreenState extends State<CoachScreen> {
         // Notificaciones de entrenador (Victor, 2026-11-26), al lado de Entrenadorxs.
         if (s.esCoach)
           AtajoColor(
-            icono: Icons.notifications_active_outlined,
-            color: PivotPaleta.atajoTeal,
+            icono: Symbols.notifications_active_rounded,
+            seccion: 'notificaciones',
             titulo: 'Notificaciones',
             detalle: callados == 0 ? 'Avisos a tus personas y los tuyos' : '$callados ${callados == 1 ? 'persona sin' : 'personas sin'} tus avisos',
             alTocar: () => _abrir(

@@ -120,15 +120,6 @@ class PivotPaleta extends ThemeExtension<PivotPaleta> {
   static const cargandoRosa = Color(0xFFFFD9D9);
   static const sobreSeccion = Color(0xFFFFFFFF);
 
-  /// Atajos de color de Liga y Entreno (Victor, 2026-11-27, opción B del
-  /// mockup): ícono blanco (`sobreSeccion`) sobre un cuadrado de color.
-  static const atajoAzul = Color(0xFF1E6FD9);
-  static const atajoNaranja = Color(0xFFD9541E);
-  static const atajoVerde = Color(0xFF2E8B3E);
-  static const atajoMorado = Color(0xFF7A3FA0);
-  static const atajoRojo = Color(0xFFC8000F);
-  static const atajoTeal = Color(0xFF00796B);
-
   /// Offseason (Victor, 2026-11-22): cielo nocturno azulado con estrellas, en
   /// claro y en oscuro. Texto claro encima; borde azul cuando está en curso.
   static const degradadoNoche = LinearGradient(colors: [Color(0xFF22345C), Color(0xFF0B1328)], begin: Alignment.topLeft, end: Alignment.bottomRight);

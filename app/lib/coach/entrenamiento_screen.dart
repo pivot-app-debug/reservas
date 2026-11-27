@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../ajustes/componentes.dart' show SubAjustes;
 import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
@@ -96,15 +97,15 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   List<AtajoColor> get _atajos => [
     if (FuncionesLiga.coach(s))
       AtajoColor(
-        icono: Icons.trending_up_rounded,
-        color: PivotPaleta.atajoRojo,
+        icono: Symbols.trending_up_rounded,
+        seccion: 'entrenamientos',
         titulo: 'Mi progreso',
         detalle: _progreso ?? 'Habilidades, pruebas y notas',
         alTocar: _abrirProgreso,
       ),
     AtajoColor(
-      icono: Icons.school_outlined,
-      color: PivotPaleta.atajoVerde,
+      icono: Symbols.school_rounded,
+      seccion: 'reservas',
       titulo: 'Cursos',
       punto: _cursos.nuevos,
       detalle: _cursos.nuevos

@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'tema.dart';
 
 /// Un atajo de Liga o Entreno (Victor, 2026-11-27, opción B): ícono en un
-/// cuadrado de color, nombre y una línea con lo que hay adentro, para saber
-/// qué pasa sin entrar.
+/// recuadro con el degradado de su sección (los rojos, vinos y rosas de la
+/// app, `PivotPaleta.seccion`), nombre y una línea con lo que hay adentro,
+/// para saber qué pasa sin entrar. Íconos de Material Symbols redondeados y
+/// llenos, como los de la bandeja.
 class AtajoColor {
-  const AtajoColor({required this.icono, required this.color, required this.titulo, required this.alTocar, this.detalle, this.punto = false});
+  const AtajoColor({required this.icono, required this.seccion, required this.titulo, required this.alTocar, this.detalle, this.punto = false});
   final IconData icono;
-  final Color color;
+
+  /// Clave de `PivotPaleta.seccion` (da el degradado y el color del ícono).
+  final String seccion;
   final String titulo;
 
   /// Lo que hay adentro ("2 préstamos", "$1.848 en cuentas"). Null: cargando.
@@ -25,6 +29,7 @@ class GrillaAtajos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
+    final brillo = Theme.of(context).brightness;
     Widget tarjeta(AtajoColor a) => Material(
       color: p.tarjeta,
       borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
@@ -39,11 +44,16 @@ class GrillaAtajos extends StatelessWidget {
                 isLabelVisible: a.punto,
                 smallSize: 10,
                 backgroundColor: p.marca,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: a.color, borderRadius: BorderRadius.circular(13)),
-                  child: Icon(a.icono, color: PivotPaleta.sobreSeccion),
+                child: Builder(
+                  builder: (context) {
+                    final (degradado, sobre) = PivotPaleta.seccion(a.seccion, brillo);
+                    return Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+                      child: Icon(a.icono, color: sobre, fill: 1, weight: 500, size: 24),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
