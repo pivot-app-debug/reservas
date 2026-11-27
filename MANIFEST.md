@@ -15,6 +15,10 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 
 - **Tablas nuevas (regla):** `liga_id` con su default, `create policy liga_aislada … for all to liga_api using (liga_id = liga_actual()) with check (liga_id = liga_actual())` y `grant … to liga_api`. Sin el grant, la Edge Function no puede leer la tabla y falla en silencio (pasó con `entrenamientos_legado`, 26/11).
 
+## Formas de pago: ordenar medios y datos (2026-11-27)
+- `FormasPagoScreen`: los medios se ordenan arrastrando el ícono de la derecha (`ReorderableListView` con `onReorderItem`, sin asas por defecto); el orden se guarda al soltar («Orden guardado») y es el que se ve al pagar.
+- `_MedioScreen`: los «Datos para pagar» también se ordenan arrastrando su ícono; se guarda con el resto al tocar Guardar.
+
 ## Pantallas que se recreaban con el teclado (2026-11-27)
 - `EspacioBarraAbajo` (core/espacio_barra.dart) devuelve siempre `Padding` + `MediaQuery.removePadding`, aunque el alto sea 0. Antes, con el teclado abierto devolvía `child` solo: el árbol cambiaba y la subsección de abajo se volvía a crear y perdía su estado (un medio de pago nuevo volvía de «Guardar» a una pantalla nueva y no se guardaba). Prueba: `test/espacio_barra_test.dart`.
 - `FormasPagoScreen._editar` no sigue si la pantalla ya no está montada.

@@ -120,49 +120,70 @@ class _FormasPagoScreenState extends State<FormasPagoScreen> {
                   style: TextStyle(color: p.marcaTexto),
                 ),
               ),
-            for (final (i, m) in _medios.indexed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: p.tarjeta,
-                  borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _editar(i),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: PivotMedios.de(MedioPago(m).color), width: 5)),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-                      child: Row(
-                        children: [
-                          LogoMedio(medio: MedioPago(m)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  MedioPago(m).nombre,
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: p.texto),
+            // Mantener presionado el ícono de la derecha y arrastrar cambia el
+            // orden en que se muestran al pagar (Victor, 2026-11-27).
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              onReorderItem: (de, a) {
+                setState(() => _medios.insert(a, _medios.removeAt(de)));
+                _guardar(ok: 'Orden guardado');
+              },
+              children: [
+                for (final (i, m) in _medios.indexed)
+                  Padding(
+                    key: ValueKey(m['id']),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Material(
+                      color: p.tarjeta,
+                      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _editar(i),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border(left: BorderSide(color: PivotMedios.de(MedioPago(m).color), width: 5)),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+                          child: Row(
+                            children: [
+                              LogoMedio(medio: MedioPago(m)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      MedioPago(m).nombre,
+                                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: p.texto),
+                                    ),
+                                    Text(MedioPago(m).nombreTipo, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                                  ],
                                 ),
-                                Text(MedioPago(m).nombreTipo, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                              ],
-                            ),
+                              ),
+                              Switch(
+                                value: MedioPago(m).activo,
+                                onChanged: (v) {
+                                  setState(() => _medios[i]['activo'] = v);
+                                  _guardar(ok: v ? '${m['nombre']} visible al pagar' : '${m['nombre']} oculto al pagar');
+                                },
+                              ),
+                              ReorderableDragStartListener(
+                                index: i,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                  child: Icon(Icons.drag_indicator_rounded, color: p.textoSecundario),
+                                ),
+                              ),
+                            ],
                           ),
-                          Switch(
-                            value: MedioPago(m).activo,
-                            onChanged: (v) {
-                              setState(() => _medios[i]['activo'] = v);
-                              _guardar(ok: v ? '${m['nombre']} visible al pagar' : '${m['nombre']} oculto al pagar');
-                            },
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+              ],
+            ),
             const SizedBox(height: 12),
             Material(
               color: p.tarjeta,
@@ -364,26 +385,42 @@ class _MedioScreenState extends State<_MedioScreen> {
           ],
           if (_tipo != 'efectivo') ...[
             _titulo('Datos para pagar (se pueden copiar)'),
-            for (final (i, (e, v)) in _datos.indexed)
-              Row(
-                children: [
-                  SizedBox(
-                    width: 110,
-                    child: TextField(
-                      controller: e,
-                      decoration: const InputDecoration(labelText: 'Dato'),
-                    ),
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              onReorderItem: (de, a) => setState(() => _datos.insert(a, _datos.removeAt(de))),
+              children: [
+                for (final (i, (e, v)) in _datos.indexed)
+                  Row(
+                    key: ObjectKey(e),
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: e,
+                          decoration: const InputDecoration(labelText: 'Dato'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: v,
+                          decoration: const InputDecoration(labelText: 'Valor'),
+                        ),
+                      ),
+                      IconButton(tooltip: 'Quitar', onPressed: () => setState(() => _datos.removeAt(i)), icon: const Icon(Icons.close_rounded)),
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(Icons.drag_indicator_rounded, color: context.pivot.textoSecundario),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: v,
-                      decoration: const InputDecoration(labelText: 'Valor'),
-                    ),
-                  ),
-                  IconButton(tooltip: 'Quitar', onPressed: () => setState(() => _datos.removeAt(i)), icon: const Icon(Icons.close_rounded)),
-                ],
-              ),
+              ],
+            ),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(

@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (ordenar formas de pago)
+- En Formas de pago se puede cambiar el orden de los medios arrastrando el ícono de la derecha; se guarda solo y es el orden que se ve al pagar.
+- Dentro de cada medio, los datos para pagar (titular, número, etc.) también se ordenan arrastrando.
+
 ## 2026-11-27 (formas de pago)
 - Corregido: un medio de pago nuevo no se guardaba (al escribir con el teclado, la lista de formas de pago se reiniciaba y perdía lo que volvía de «Guardar»). El mismo arreglo evita que otras subsecciones pierdan lo que tenían al abrir el teclado.
 
