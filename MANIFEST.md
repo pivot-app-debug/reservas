@@ -326,7 +326,7 @@ Plan validado en el Claude Doc "Pivot app — Fase 3" (https://claude.ai/artifac
 - Cuenta de Google de Pivot: **pivot.app.support@gmail.com** (antes se llamaba `pivot.app.suppor`; se le cambió el nombre). Guía y estado en `MIGRACION_CUENTAS.md`.
 - Hecho: GitHub → `pivot-app-debug/reservas` (cuenta de Pivot, sin organización; `Actualizacion._base` en `app/lib/core/actualizacion.dart` ya apunta ahí), Supabase → organización «Pivot» (mismo proyecto `uusbnreitoobqssizbfq`), web en Firebase Hosting (`pivot-d65f4.web.app`) con app.quindesvolcanicos.com y reservas.quindesvolcanicos.com redirigiendo desde Cloudflare.
 - La cuenta vieja ya no es Owner en Supabase ni en Google Cloud «Pivot Login»; `SUPABASE_ACCESS_TOKEN` es de la cuenta nueva.
-- Falta: OneSignal y el repo `reservas-backups` (sigue en `quindesvolcanicosrd-sys`).
+- Falta: OneSignal (no se migra: se deja de usar, pasos en PENDIENTES.md → «Próxima sesión»; la web Flutter y Android ya usan Firebase, OneSignal solo lo usa la web vieja) y el repo `reservas-backups` (sigue en `quindesvolcanicosrd-sys`).
 
 ## Revisión 2026-11-16 (bloque A y parte del B)
 - **Barras de arriba:** `Vidrio` (core/vidrio.dart) es del color de la página en reposo y pasa a vidrio recién cuando el contenido se desplaza por detrás (escucha `ScrollNotificationObserver`); antes el desenfoque tomaba el color de la tarjeta de abajo. `altoBarra()` usa `viewPaddingOf` (servía mal desde dentro del Scaffold: hueco en Reglas). Tema: `scrolledUnderElevation: 0` y `cardTheme` sin sombra. Emergencia ya no tiene barra roja.

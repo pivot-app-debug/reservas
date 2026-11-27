@@ -9,6 +9,13 @@ Cursos en la barra; cada pestaña recuerda dónde estabas; notificaciones casi o
 - "Herramientas de la liga" en Ajustes y "Coach y Finanzas a Ajustes": lo reemplaza el plan de **Liga** (pestañas Comunidad, Equipos, Redes, Inventario, Finanzas y Coach; Ajustes pasa a Mi perfil). Esperando que Victor apruebe el boceto.
 - Preguntas de Naviquinde y de lenguaje de suscripción: ya respondidas.
 
+## Próxima sesión (Victor, 2026-11-27)
+- [ ] **Dejar de usar OneSignal** (decidido: opción 2). Orden:
+  1. Contar las personas activas que reciben avisos solo por OneSignal (sin token en `dispositivos_push`) y decírselo a Victor.
+  2. Si son cero o muy pocas: mostrarle qué se cambia (quitar el envío por OneSignal en `supabase/functions/api/index.ts` y el código de OneSignal de la web vieja: `js/pwa.js`, `vieja/`, `OneSignalSDKWorker.js`, `firebase.json`) y **esperar su OK antes del commit**.
+  3. Guiarlo para borrar la app en OneSignal y los secretos `ONESIGNAL_APP_ID` y `ONESIGNAL_API_KEY` en Supabase.
+- [ ] **Habilidades** (detalle en el doc de QA, pestaña Pendientes): arreglar el duplicado al crear una habilidad y pasar a logros por grupo.
+
 ## A. Pendientes chicos (sin dinero ni permisos)
 - [ ] Cambiar la talla en una suscripción ya hecha con las listas de equipamiento de cada liga (hoy solo patines).
 - [ ] Requisito de equipo "tener aprobado tal curso".
@@ -47,6 +54,6 @@ Cursos en la barra; cada pestaña recuerda dónde estabas; notificaciones casi o
 - [ ] Seguridad (permisos de Pivot, fugas de datos, advisors de Supabase, RLS en todas las tablas) y escalabilidad (consultas grandes, índices, prueba de carga).
 - [ ] Legal: aviso de Tesorería revisado por abogado.
 - [ ] Pruebas automáticas de totales en Tesorería.
-- [ ] Migración de cuentas a pivot.app.support@gmail.com.
+- [ ] Migración de cuentas a pivot.app.support@gmail.com: falta OneSignal (se deja de usar, ver arriba) y el repo `reservas-backups`.
 - [ ] Probar en teléfonos reales (también que cada notificación abra su pantalla).
 - [ ] Dos versiones (prueba y producción) y Play Store.

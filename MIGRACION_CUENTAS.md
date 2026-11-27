@@ -10,7 +10,7 @@ Victor hace estos pasos a mano. Al terminar cada servicio, avisar a Claude para 
 | Supabase | **Hecho.** El proyecto `uusbnreitoobqssizbfq` (mismo proyecto, mismas claves) está en la organización «Pivot» de la cuenta de Pivot. La cuenta vieja ya no es Owner (2026-11-27). Conector de Claude y `SUPABASE_ACCESS_TOKEN` con la cuenta nueva. |
 | Web y dominio | **Hecho.** La web se publica en Firebase Hosting (`pivot-d65f4.web.app`). `app.quindesvolcanicos.com` y `reservas.quindesvolcanicos.com` redirigen ahí desde Cloudflare. |
 | Google Cloud / Firebase | En la cuenta de Pivot (proyectos `pivot-d65f4` y «Pivot Login», ex mirlxs-app). **Hecho.** La cuenta vieja ya no es Owner de «Pivot Login» (2026-11-27). |
-| OneSignal | **Pendiente.** Sigue en uso para los avisos de la web y de iPhone (Android va por Firebase). |
+| OneSignal | **Pendiente: se deja de usar** (Victor, 2026-11-27). La web nueva (Flutter) y Android usan Firebase; OneSignal solo queda para la web vieja. No se migra: ver PENDIENTES.md, «Próxima sesión». |
 | Tareas programadas de Claude | **Revisado.** «Leer documento» (pausada) no usa el repo; «Pivot: pendientes del jueves» ya corrió y no vuelve a correr. Se dejan como están. |
 | Repo `reservas-backups` | **Pendiente.** Sigue en la cuenta vieja `quindesvolcanicosrd-sys`. |
 
@@ -55,7 +55,7 @@ El repositorio era `quindesvolcanicosrd-sys/reservas` y se transfirió directame
 6. No hace falta cambiar `google-services.json` ni claves: el proyecto es el mismo.
 7. Recién cuando todo funcione, decidir si se quita la cuenta vieja (opcional).
 
-## 4. OneSignal
+## 4. OneSignal (no se migra: se deja de usar)
 1. Entrar a onesignal.com con la cuenta actual y abrir la app de Pivot.
 2. Settings → Team Members → "Invite" → pivot.app.support@gmail.com → rol **Admin**.
 3. Aceptar desde el correo nuevo y crear la contraseña.
