@@ -74,7 +74,9 @@ class _AvisosScreenState extends State<AvisosScreen> {
     DateTime? cuando;
     DateTime? vence; // null = 3 días en Notificaciones
 
-    final ok = await abrirFormulario<bool>(context, builder: (h) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (h) => StatefulBuilder(
         builder: (h, set) {
           final p = h.pivot;
           final listo = titulo.text.trim().isNotEmpty && mensaje.text.trim().isNotEmpty;

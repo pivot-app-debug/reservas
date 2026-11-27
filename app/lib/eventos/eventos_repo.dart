@@ -208,7 +208,6 @@ class EventosRepo extends ChangeNotifier {
     return c.isEmpty ? 'mirlxs' : c;
   }
 
-
   /// Mirlxs con la cuota al día pueden marcar "Asistiré", pero ya no
   /// "No asistiré" en ese evento (web: `_evRsvpBarraHtml()`).
   bool sinNoAsistire(Evento ev) => _modo == 'mirlxs' && ev.miEstado == EstadoRsvp.asistire;

@@ -1790,51 +1790,52 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
                 : (c.aportes.isEmpty ? 'Nadie aún' : '${c.aportes.length}'),
             style: TextStyle(fontSize: 13, color: p.textoSecundario),
           );
-/// Sugerencias contextuales según la categoría y festividad/plantilla (Victor, 2026-11-23).
-List<String> sugerenciasParaCategoria(CategoriaComida c, EstadoSocial estado) {
-  final base = c.sugerencias;
-  if (base.isNotEmpty) return base;
 
-  final nombre = c.nombre.toLowerCase();
-  final evNombre = '${estado.evento['nombre'] ?? ''} ${estado.titulo} ${estado.social?['festividad'] ?? ''}'.toLowerCase();
-  final esNavidad = evNombre.contains('navi') || evNombre.contains('navidad');
-  final esAnoNuevo = evNombre.contains('año nuevo') || evNombre.contains('fin de año') || evNombre.contains('ano nuevo');
-  final esHalloween = evNombre.contains('halloween') || evNombre.contains('miedo');
+    /// Sugerencias contextuales según la categoría y festividad/plantilla (Victor, 2026-11-23).
+    List<String> sugerenciasParaCategoria(CategoriaComida c, EstadoSocial estado) {
+      final base = c.sugerencias;
+      if (base.isNotEmpty) return base;
 
-  if (nombre.contains('acompañ')) {
-    if (esNavidad) return const ['Arroz navideño', 'Puré de manzana', 'Ensalada rusa'];
-    if (esAnoNuevo) return const ['Arroz con frutos secos', 'Ensalada waldorf', 'Papas rústicas'];
-    return const ['Arroz', 'Papas fritas', 'Ensalada'];
-  }
-  if (nombre.contains('salado') || nombre.contains('plato') || nombre.contains('comida')) {
-    if (esNavidad) return const ['Pavo', 'Pernil', 'Pollo relleno'];
-    if (esAnoNuevo) return const ['Pernil', 'Lasaña', 'Picadas'];
-    return const ['Pizza', 'Lasaña', 'Empanadas', 'Pollo asado'];
-  }
-  if (nombre.contains('bebida') || nombre.contains('trago') || nombre.contains('tomar') || nombre.contains('alcohol')) {
-    if (esNavidad) return const ['Ponche navideño', 'Vino tinto', 'Gaseosas'];
-    if (esAnoNuevo) return const ['Vino espumante', 'Champaña', 'Cerveza', 'Gaseosas'];
-    return const ['Gaseosa', 'Cerveza', 'Agua mineral', 'Jugo'];
-  }
-  if (nombre.contains('postre') || nombre.contains('dulce')) {
-    if (esNavidad) return const ['Panetón', 'Galletas navideñas', 'Tronco navideño'];
-    if (esAnoNuevo) return const ['Uvas para las 12', 'Mousse', 'Torta'];
-    return const ['Torta', 'Brownies', 'Cheesecake', 'Helado'];
-  }
-  if (nombre.contains('snack') || nombre.contains('bocadito')) {
-    return const ['Papas fritas', 'Doritos', 'Nachos con queso', 'Frutos secos'];
-  }
-  if (nombre.contains('vaso') || nombre.contains('plato') || nombre.contains('cubierto') || nombre.contains('vajilla')) {
-    return const ['Vasos descartables', 'Platos descartables', 'Cubiertos'];
-  }
-  if (nombre.contains('adorno') || nombre.contains('decor')) {
-    if (esNavidad) return const ['Luces navideñas', 'Guirnalda', 'Gorro navideño'];
-    if (esAnoNuevo) return const ['Globos dorados', 'Cotillón', 'Serpentinas'];
-    if (esHalloween) return const ['Telarañas', 'Calabazas', 'Velas'];
-    return const ['Globos', 'Cartel de bienvenida', 'Mantel'];
-  }
-  return const [];
-}
+      final nombre = c.nombre.toLowerCase();
+      final evNombre = '${estado.evento['nombre'] ?? ''} ${estado.titulo} ${estado.social?['festividad'] ?? ''}'.toLowerCase();
+      final esNavidad = evNombre.contains('navi') || evNombre.contains('navidad');
+      final esAnoNuevo = evNombre.contains('año nuevo') || evNombre.contains('fin de año') || evNombre.contains('ano nuevo');
+      final esHalloween = evNombre.contains('halloween') || evNombre.contains('miedo');
+
+      if (nombre.contains('acompañ')) {
+        if (esNavidad) return const ['Arroz navideño', 'Puré de manzana', 'Ensalada rusa'];
+        if (esAnoNuevo) return const ['Arroz con frutos secos', 'Ensalada waldorf', 'Papas rústicas'];
+        return const ['Arroz', 'Papas fritas', 'Ensalada'];
+      }
+      if (nombre.contains('salado') || nombre.contains('plato') || nombre.contains('comida')) {
+        if (esNavidad) return const ['Pavo', 'Pernil', 'Pollo relleno'];
+        if (esAnoNuevo) return const ['Pernil', 'Lasaña', 'Picadas'];
+        return const ['Pizza', 'Lasaña', 'Empanadas', 'Pollo asado'];
+      }
+      if (nombre.contains('bebida') || nombre.contains('trago') || nombre.contains('tomar') || nombre.contains('alcohol')) {
+        if (esNavidad) return const ['Ponche navideño', 'Vino tinto', 'Gaseosas'];
+        if (esAnoNuevo) return const ['Vino espumante', 'Champaña', 'Cerveza', 'Gaseosas'];
+        return const ['Gaseosa', 'Cerveza', 'Agua mineral', 'Jugo'];
+      }
+      if (nombre.contains('postre') || nombre.contains('dulce')) {
+        if (esNavidad) return const ['Panetón', 'Galletas navideñas', 'Tronco navideño'];
+        if (esAnoNuevo) return const ['Uvas para las 12', 'Mousse', 'Torta'];
+        return const ['Torta', 'Brownies', 'Cheesecake', 'Helado'];
+      }
+      if (nombre.contains('snack') || nombre.contains('bocadito')) {
+        return const ['Papas fritas', 'Doritos', 'Nachos con queso', 'Frutos secos'];
+      }
+      if (nombre.contains('vaso') || nombre.contains('plato') || nombre.contains('cubierto') || nombre.contains('vajilla')) {
+        return const ['Vasos descartables', 'Platos descartables', 'Cubiertos'];
+      }
+      if (nombre.contains('adorno') || nombre.contains('decor')) {
+        if (esNavidad) return const ['Luces navideñas', 'Guirnalda', 'Gorro navideño'];
+        if (esAnoNuevo) return const ['Globos dorados', 'Cotillón', 'Serpentinas'];
+        if (esHalloween) return const ['Telarañas', 'Calabazas', 'Velas'];
+        return const ['Globos', 'Cartel de bienvenida', 'Mantel'];
+      }
+      return const [];
+    }
 
     final tomadas = {for (final a in c.aportes) '${a['detalle'] ?? ''}'.trim().toLowerCase()};
     final rawIdeas = c.sugerencias.isNotEmpty ? c.sugerencias : sugerenciasParaCategoria(c, _e);

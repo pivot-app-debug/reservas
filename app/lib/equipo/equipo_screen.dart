@@ -335,15 +335,15 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final hoy = Fechas.hoy();
     List<Integrante> grupo(String g) {
       // Coaches (Victor, 2026-11-22): quienes son coach, estén en un equipo o inactivxs.
-      final l = personas.where((x) {
-        final matchesGroup = g == 'Coaches' ? x.esCoach : (g == 'Pivots' ? x.esAdminMiembro : x.grupo == g);
-        return matchesGroup && repo.pasaRoles(x);
-      }).toList()
-        ..sort((a, b) {
-          // Tu fila primero; después por nombre.
-          if (repo.esYo(a) != repo.esYo(b)) return repo.esYo(a) ? -1 : 1;
-          return BuscadorEquipo.normalizar(a.nombreMostrar).compareTo(BuscadorEquipo.normalizar(b.nombreMostrar));
-        });
+      final l =
+          personas.where((x) {
+            final matchesGroup = g == 'Coaches' ? x.esCoach : (g == 'Pivots' ? x.esAdminMiembro : x.grupo == g);
+            return matchesGroup && repo.pasaRoles(x);
+          }).toList()..sort((a, b) {
+            // Tu fila primero; después por nombre.
+            if (repo.esYo(a) != repo.esYo(b)) return repo.esYo(a) ? -1 : 1;
+            return BuscadorEquipo.normalizar(a.nombreMostrar).compareTo(BuscadorEquipo.normalizar(b.nombreMostrar));
+          });
       return l;
     }
 
@@ -418,11 +418,41 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                     abierto: g == abierto,
                     child: Column(
                       children: [
-                        if (g == 'Quindes') _bannerEquipo(p, 'Quindes', 'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.', alDetalles: () => _entrar('Quindes')),
-                        if (g == 'Mirlxs') _bannerEquipo(p, 'Mirlxs', 'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.', alDetalles: () => _entrar('Mirlxs')),
-                        if (g == 'Inactivxs') _bannerEquipo(p, 'Sin actividad', 'Personas que no vinieron a ningún entrenamiento en los últimos 30 días (o nunca vinieron), salvo que estén de viaje, lesionadxs o con otro motivo válido. Salen de aquí en cuanto vuelven a entrenar. El botón "Archivar" de cada persona la quita de la vista del equipo: su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. Con "Personas archivadas" ves a quién se archivó y a quién conviene archivar.', alDetalles: () => _entrar('Inactivxs')),
-                        if (g == 'Coaches') _bannerEquipo(p, 'Coaches', 'Entrenadorxs del equipo. Pueden tomar asistencia, evaluar y crear pruebas. Los nombra un Pivot, y cada coach puede quitarse de la lista desde los 3 puntos de su fila en Gestionar coaches.', alDetalles: () => _entrar('Coaches')),
-                        if (g == 'Pivots') _bannerEquipo(p, 'Pivots', 'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.', alDetalles: () => _entrar('Pivots')),
+                        if (g == 'Quindes')
+                          _bannerEquipo(
+                            p,
+                            'Quindes',
+                            'El equipo de lxs que pagan la mensualidad. Tienen clases de gracia (por defecto 1 por mes): si no pagan la cuota del mes, ya no pueden marcar "Asistiré" hasta pagar. Suben de Mirlxs cuando el Pivot los aprueba y bajan si dejan de cumplir los requisitos del equipo.',
+                            alDetalles: () => _entrar('Quindes'),
+                          ),
+                        if (g == 'Mirlxs')
+                          _bannerEquipo(
+                            p,
+                            'Mirlxs',
+                            'El equipo de lxs que pagan por clase o no tienen cuota fija. Cada reserva se paga al momento. Suben a Quindes si el Pivot los aprueba y pagan la mensualidad. Bajan a Inactivxs si no asisten a entrenamientos durante 30 días.',
+                            alDetalles: () => _entrar('Mirlxs'),
+                          ),
+                        if (g == 'Inactivxs')
+                          _bannerEquipo(
+                            p,
+                            'Sin actividad',
+                            'Personas que no vinieron a ningún entrenamiento en los últimos 30 días (o nunca vinieron), salvo que estén de viaje, lesionadxs o con otro motivo válido. Salen de aquí en cuanto vuelven a entrenar. El botón "Archivar" de cada persona la quita de la vista del equipo: su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. Con "Personas archivadas" ves a quién se archivó y a quién conviene archivar.',
+                            alDetalles: () => _entrar('Inactivxs'),
+                          ),
+                        if (g == 'Coaches')
+                          _bannerEquipo(
+                            p,
+                            'Coaches',
+                            'Entrenadorxs del equipo. Pueden tomar asistencia, evaluar y crear pruebas. Los nombra un Pivot, y cada coach puede quitarse de la lista desde los 3 puntos de su fila en Gestionar coaches.',
+                            alDetalles: () => _entrar('Coaches'),
+                          ),
+                        if (g == 'Pivots')
+                          _bannerEquipo(
+                            p,
+                            'Pivots',
+                            'Quienes administran la liga. Cada Pivot gestiona las áreas que se le asignan (finanzas, asistencia, equipo, inventario…): editar equipos y cobros, archivar personas, invitar al equipo o cambiar reglas. Los nombra la persona dueña de la liga u otro Pivot con ese permiso.',
+                            alDetalles: () => _entrar('Pivots'),
+                          ),
                         for (final x in grupos[g]!) g == 'Coaches' ? _filaCoach(context, p, x) : _fila(context, x, hoy),
                         _accionesSeccion(g),
                       ],
@@ -563,16 +593,16 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                     _entrar(titulo);
                   }
                 },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Row(
-                            children: [
-                              AnimatedDefaultTextStyle(
-                                duration: dur,
-                                style: Theme.of(context).textTheme.titleMedium!
-                                    .copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: abierta ? p.texto : p.textoSecundario),
-                                child: Text(_label(titulo)),
-                              ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      AnimatedDefaultTextStyle(
+                        duration: dur,
+                        style: Theme.of(context).textTheme.titleMedium!
+                            .copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: abierta ? p.texto : p.textoSecundario),
+                        child: Text(_label(titulo)),
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -631,11 +661,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     titulo: titulo,
     texto: texto,
     boton: alDetalles != null
-        ? OutlinedButton.icon(
-            onPressed: alDetalles,
-            icon: const Icon(Icons.info_outline_rounded, size: 18),
-            label: const Text('Ver detalles del equipo'),
-          )
+        ? OutlinedButton.icon(onPressed: alDetalles, icon: const Icon(Icons.info_outline_rounded, size: 18), label: const Text('Ver detalles del equipo'))
         : null,
   );
 

@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+
+import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
+
+import '../coach/coach_screen.dart' show CoachScreen;
+
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/encabezado_seccion.dart';
@@ -22,7 +27,7 @@ import '../tareas/tareas_repo.dart';
 import '../tareas/tareas_screen.dart' show TareasScreen;
 
 /// Pestañas de Actividad.
-enum PestanaActividad { notificaciones, tareas, clases, pagos }
+enum PestanaActividad { notificaciones, tareas, clases, entrenamiento, pagos }
 
 /// Actividad (Victor, 2026-11-20): lo que se abre con la campana del
 /// Calendario. Junta en pestañas Notificaciones, Tareas, Clases (cursos y
@@ -73,6 +78,8 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones,
     PestanaActividad.tareas,
     if (widget.verClases) PestanaActividad.clases,
+    // Entrenamiento, para coaches (Victor, 2026-11-26).
+    if (widget.eventos.sesion.esCoach && FuncionesLiga.coach(widget.eventos.sesion)) PestanaActividad.entrenamiento,
     if (widget.verPagos) PestanaActividad.pagos,
   ];
   late final TabController _tabs = TabController(
@@ -136,6 +143,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones => 'Próximos eventos',
     PestanaActividad.tareas => 'Tareas',
     PestanaActividad.clases => 'Cursos',
+    PestanaActividad.entrenamiento => 'Entrenamiento',
     PestanaActividad.pagos => 'Pagos y suscripciones',
   };
 
@@ -152,6 +160,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
     PestanaActividad.notificaciones => Symbols.newspaper,
     PestanaActividad.tareas => Symbols.checklist,
     PestanaActividad.clases => Symbols.school,
+    PestanaActividad.entrenamiento => Symbols.sports,
     PestanaActividad.pagos => Symbols.payments,
   };
 
@@ -171,6 +180,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
         ),
       ),
       PestanaActividad.clases => punto(_cursosNuevos),
+      PestanaActividad.entrenamiento => icono,
       PestanaActividad.pagos => icono,
     };
   }
@@ -251,6 +261,7 @@ class _ActividadScreenState extends State<ActividadScreen> with SingleTickerProv
       ),
       PestanaActividad.tareas => TareasScreen(repo: widget.tareas, embebida: true),
       PestanaActividad.clases => s.esAdmin ? CursosScreen(sesion: s, embebida: true) : CursosAbiertosScreen(sesion: s, embebida: true),
+      PestanaActividad.entrenamiento => CoachScreen(sesion: s, eventos: widget.eventos, embebida: true),
       PestanaActividad.pagos => PagosScreen(repo: widget.eventos, embebida: true),
     };
   }

@@ -424,7 +424,9 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
   /// Motivo del rechazo y mensaje que recibe la persona. null si se cancela.
   Future<Map<String, Object?>?> _motivoRechazo(Pedido p) async {
     final r = await Navigator.of(context).push<Map<String, Object?>>(
-      MaterialPageRoute(builder: (_) => MotivoRechazoScreen(p: p, motivos: _motivos, alGuardar: (resultado) => Navigator.of(context).pop(resultado))),
+      MaterialPageRoute(
+        builder: (_) => MotivoRechazoScreen(p: p, motivos: _motivos, alGuardar: (resultado) => Navigator.of(context).pop(resultado)),
+      ),
     );
     return r;
   }
@@ -581,7 +583,8 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
           }
           final vacia = hijos.isEmpty && delEquipo.isEmpty;
           // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
-          final arriba = <Widget>[...delEquipo, TarjetasPorEvaluar(sesion: repo.sesion)];
+          // Para coaches, lo que falta evaluar vive en Entrenamiento (Victor, 2026-11-26).
+          final arriba = <Widget>[...delEquipo, if (!repo.sesion.esCoach) TarjetasPorEvaluar(sesion: repo.sesion)];
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));
             hijos.add(
@@ -1461,7 +1464,10 @@ class _MotivoRechazoScreenState extends State<MotivoRechazoScreen> {
               for (final e in [...widget.motivos.keys, 'otro'])
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(motivo == e ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: motivo == e ? pal.marcaTexto : pal.textoSecundario),
+                  leading: Icon(
+                    motivo == e ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    color: motivo == e ? pal.marcaTexto : pal.textoSecundario,
+                  ),
                   title: Text(e == 'otro' ? 'Otro motivo' : e),
                   subtitle: e == 'otro' || motivo != e ? null : Text(widget.motivos[e]!),
                   onTap: () => setState(() => motivo = e),

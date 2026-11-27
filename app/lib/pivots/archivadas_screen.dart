@@ -68,7 +68,9 @@ class _ArchivadasScreenState extends State<ArchivadasScreen> {
       context: context,
       builder: (d) => AlertDialog(
         title: Text('¿Archivar a ${x.nombreMostrar}?'),
-        content: const Text('Deja de aparecer en Liga. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. No se puede archivar si tiene reservas activas o cuotas pendientes.'),
+        content: const Text(
+          'Deja de aparecer en Liga. Su historial se conserva y, si vuelve a ingresar, sale de archivo y queda activx. No se puede archivar si tiene reservas activas o cuotas pendientes.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
           FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Archivar')),

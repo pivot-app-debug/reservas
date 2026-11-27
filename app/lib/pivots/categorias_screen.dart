@@ -1390,6 +1390,7 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         juntar(w.child);
       }
     }
+
     hijos.forEach(juntar);
     final l = <Widget>[
       for (final h in filas)
@@ -1397,7 +1398,11 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     ];
     if (l.isNotEmpty) {
       return widget.soloLectura
-          ? [_SoloLectura(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: l))]
+          ? [
+              _SoloLectura(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: l),
+              ),
+            ]
           : l;
     }
     return [

@@ -173,7 +173,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
 
   Future<void> _cuenta([Map<String, dynamic>? c]) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => CuentaEdicionScreen(repo: repo, cuenta: c)),
+      MaterialPageRoute(
+        builder: (_) => CuentaEdicionScreen(repo: repo, cuenta: c),
+      ),
     );
     if (ok != true) return;
     await _cargar();
@@ -181,7 +183,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
 
   Future<void> _conciliar(Map<String, dynamic> c) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ConciliarCuentaScreen(repo: repo, cuenta: c)),
+      MaterialPageRoute(
+        builder: (_) => ConciliarCuentaScreen(repo: repo, cuenta: c),
+      ),
     );
     if (ok == true) await _cargar();
   }
@@ -310,7 +314,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   /// como deuda (o abono) de cada persona; entre varias se divide en partes iguales.
   Future<void> _plataDelEquipo({required bool devolver}) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => PlataDelEquipoScreen(repo: repo, cuentas: _cuentas, devolver: devolver)),
+      MaterialPageRoute(
+        builder: (_) => PlataDelEquipoScreen(repo: repo, cuentas: _cuentas, devolver: devolver),
+      ),
     );
     if (ok == true) {
       if (mounted) _aviso(context, devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
@@ -981,7 +987,10 @@ class _MovimientoScreenState extends State<MovimientoScreen> {
     final p = context.pivot;
     Widget etiqueta(String t) => Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),
-      child: Text(t, style: TextStyle(fontWeight: FontWeight.w700, color: p.texto)),
+      child: Text(
+        t,
+        style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+      ),
     );
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -1113,7 +1122,9 @@ Future<bool?> abrirFormularioMovimiento(
   String? desdeCuenta,
 }) {
   return Navigator.of(context).push<bool>(
-    MaterialPageRoute(builder: (_) => MovimientoScreen(repo: repo, cuentas: cuentas, tipo: tipo, corregir: corregir, desdeCuenta: desdeCuenta)),
+    MaterialPageRoute(
+      builder: (_) => MovimientoScreen(repo: repo, cuentas: cuentas, tipo: tipo, corregir: corregir, desdeCuenta: desdeCuenta),
+    ),
   );
 }
 
@@ -1567,7 +1578,9 @@ class _SaldoPersonaScreenState extends State<SaldoPersonaScreen> {
 
   Future<void> _registrar() async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => RegistrarSaldoScreen(repo: widget.repo, username: widget.username, nombre: widget.nombre, cuentas: widget.cuentas, alGuardar: _cargar)),
+      MaterialPageRoute(
+        builder: (_) => RegistrarSaldoScreen(repo: widget.repo, username: widget.username, nombre: widget.nombre, cuentas: widget.cuentas, alGuardar: _cargar),
+      ),
     );
     if (ok == true && mounted) _aviso(context, 'Registrado');
   }
@@ -2556,19 +2569,19 @@ class _PlataDelEquipoScreenState extends State<PlataDelEquipoScreen> {
     try {
       for (var i = 0; i < gente.length; i++) {
         final m = i == gente.length - 1 ? double.parse((total - parte * (gente.length - 1)).toStringAsFixed(2)) : parte;
-await widget.repo.accion('registrarSaldo', {
-        'username': gente[i].username,
-        'tipo': widget.devolver ? 'abono' : 'prestamo',
-        'monto': m,
-        'concepto': concepto.text.trim(),
-        'cuentaId': cuenta,
-        'aplicar': 'aparte',
-      });
-    }
-    if (!mounted) return;
-    _aviso(context, widget.devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
-    Navigator.of(context).pop(true);
-  } catch (e) {
+        await widget.repo.accion('registrarSaldo', {
+          'username': gente[i].username,
+          'tipo': widget.devolver ? 'abono' : 'prestamo',
+          'monto': m,
+          'concepto': concepto.text.trim(),
+          'cuentaId': cuenta,
+          'aplicar': 'aparte',
+        });
+      }
+      if (!mounted) return;
+      _aviso(context, widget.devolver ? 'Registrado: baja lo que deben.' : 'Registrado: queda como deuda con el equipo.');
+      Navigator.of(context).pop(true);
+    } catch (e) {
       if (mounted) _aviso(context, _error(e));
     }
   }
@@ -2792,7 +2805,11 @@ class _RegistrarSaldoScreenState extends State<RegistrarSaldoScreen> {
                   spacing: 8,
                   children: [
                     ChoiceChip(label: const Text('Aparte'), selected: aplicar == 'aparte', onSelected: (_) => setState(() => aplicar = 'aparte')),
-                    ChoiceChip(label: const Text('Junto con la cuota'), selected: aplicar == 'con_cuota', onSelected: (_) => setState(() => aplicar = 'con_cuota')),
+                    ChoiceChip(
+                      label: const Text('Junto con la cuota'),
+                      selected: aplicar == 'con_cuota',
+                      onSelected: (_) => setState(() => aplicar = 'con_cuota'),
+                    ),
                     ChoiceChip(label: const Text('En cuotas'), selected: aplicar == 'cuotas', onSelected: (_) => setState(() => aplicar = 'cuotas')),
                   ],
                 ),
@@ -2804,10 +2821,7 @@ class _RegistrarSaldoScreenState extends State<RegistrarSaldoScreen> {
                   ),
               ],
               const SizedBox(height: 20),
-              FilledButton(
-                onPressed: mueveDinero && cuenta == null ? null : _registrar,
-                child: const Text('Registrar'),
-              ),
+              FilledButton(onPressed: mueveDinero && cuenta == null ? null : _registrar, child: const Text('Registrar')),
             ],
           ),
         ),
@@ -2862,8 +2876,8 @@ class _ConciliarCuentaScreenState extends State<ConciliarCuentaScreen> {
             dif == 0
                 ? 'El saldo real y el de la app coinciden.'
                 : dif > 0
-                    ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
-                    : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
+                ? 'Hay ${plata(dif)} más de lo registrado: puede faltar registrar un ingreso.'
+                : 'Faltan ${plata(-dif)}: puede faltar registrar un gasto o hay un ingreso de más.',
           ),
           actions: [FilledButton(onPressed: () => Navigator.of(d).pop(), child: const Text('Entendido'))],
         ),
@@ -2896,23 +2910,20 @@ class _ConciliarCuentaScreenState extends State<ConciliarCuentaScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Según la app: ${plata(widget.cuenta['saldo'] as num? ?? 0)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).', style: TextStyle(color: p.textoSecundario)),
+              Text(
+                'Según la app: ${plata(widget.cuenta['saldo'] as num? ?? 0)}. Escribe el saldo real (estado de cuenta, billetera virtual o lo que hay en la caja).',
+                style: TextStyle(color: p.textoSecundario),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: ctl,
                 autofocus: true,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,-]'))],
-                decoration: InputDecoration(
-                  labelText: 'Saldo real',
-                  prefixText: '${Moneda.s} ',
-                ),
+                decoration: InputDecoration(labelText: 'Saldo real', prefixText: '${Moneda.s} '),
               ),
               const SizedBox(height: 20),
-              FilledButton(
-                onPressed: ocupado ? null : _comparar,
-                child: const Text('Comparar'),
-              ),
+              FilledButton(onPressed: ocupado ? null : _comparar, child: const Text('Comparar')),
             ],
           ),
         ),

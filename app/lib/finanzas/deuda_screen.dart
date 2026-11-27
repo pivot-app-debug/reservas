@@ -25,7 +25,10 @@ class PantallaDeuda extends StatefulWidget {
         PageRouteBuilder<void>(
           transitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (_, _, _) => PantallaDeuda(repo: repo, inicial: r),
-          transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: CurvedAnimation(parent: a, curve: Curves.easeOutCubic), child: child),
+          transitionsBuilder: (_, a, _, child) => FadeTransition(
+            opacity: CurvedAnimation(parent: a, curve: Curves.easeOutCubic),
+            child: child,
+          ),
         ),
       );
     } catch (_) {
@@ -84,7 +87,11 @@ class _PantallaDeudaState extends State<PantallaDeuda> {
             children: [
               Icon(Icons.account_balance_wallet_outlined, size: 56, color: p.marcaTexto),
               const SizedBox(height: 16),
-              Text('Tienes un pago pendiente', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                'Tienes un pago pendiente',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Para seguir usando la app, ponte al día con el equipo. Apenas mandes tu comprobante, puedes seguir usándola mientras un Pivot lo revisa.',
@@ -106,7 +113,11 @@ class _PantallaDeudaState extends State<PantallaDeuda> {
                   ),
                 ),
               const SizedBox(height: 4),
-              Text('Total: ${Moneda.s}${total.toStringAsFixed(2)}', textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                'Total: ${Moneda.s}${total.toStringAsFixed(2)}',
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
               const SizedBox(height: 20),
               FilledButton.icon(
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),

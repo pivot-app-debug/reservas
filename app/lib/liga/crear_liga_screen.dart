@@ -966,7 +966,9 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
   Future<void> _nuevoMedio(String tipo, String etiqueta) async {
     final nombre = TextEditingController(text: tipo == 'efectivo' ? 'Efectivo' : '');
     final enlace = TextEditingController();
-    final ok = await abrirFormulario<bool>(context, builder: (c) => Padding(
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (c) => Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1004,7 +1006,9 @@ class _CrearLigaScreenState extends State<CrearLigaScreen> {
     var finaliza = const TimeOfDay(hour: 21, minute: 0);
     final lugar = TextEditingController();
     String h(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-    final ok = await abrirFormulario<bool>(context, builder: (c) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (c) => StatefulBuilder(
         builder: (c, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
           child: Column(
@@ -1123,7 +1127,11 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
         'Todo se cambia en Liga → Ajustes',
         'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos, coaches y Pivots están en Liga → Equipos.',
       ),
-      (Icons.qr_code_2_rounded, 'Invita a tu gente', 'En Liga → Equipos, con «Gestionar» en cada equipo, tienes el enlace y el código QR de inscripción de cada equipo para compartirlo.'),
+      (
+        Icons.qr_code_2_rounded,
+        'Invita a tu gente',
+        'En Liga → Equipos, con «Gestionar» en cada equipo, tienes el enlace y el código QR de inscripción de cada equipo para compartirlo.',
+      ),
       (
         Icons.group_add_rounded,
         'No lo hagas sin ayuda',

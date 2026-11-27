@@ -13,7 +13,8 @@ import '../core/vidrio.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
 import '../eventos/widgets_comunes.dart';
-import '../cursos/cursos_screen.dart' show Curso, CursosAbiertosScreen, CursosScreen;
+import '../eventos/detalle_screen.dart' show DetalleScreen;
+import 'por_evaluar.dart';
 import '../equipo/habilidades_screen.dart';
 import '../ajustes/herramientas_liga.dart';
 import '../sesion/sesion.dart';
@@ -42,10 +43,16 @@ String errorCoach(Object e) => e is ApiException ? e.message : 'No se pudo carga
 /// nada más. Las fichas y "Marcar habilidades" viven en Equipo; los cursos
 /// y la evaluación de cada entrenamiento, en el Calendario. Se quitó el
 /// Cronograma (para eso está el Calendario).
+/// Entrenamiento (Victor, 2026-11-26): el lugar del coach. Arriba el próximo
+/// entrenamiento con su plan, después lo pendiente, los planes y las
+/// herramientas con nombres claros. Sin cursos (viven en Cursos) ni "Ajustes
+/// de coach". Es la pestaña Entrenamiento de la bandeja ([embebida]) y lo que
+/// abre Liga → Coaches para quien es coach.
 class CoachScreen extends StatefulWidget {
-  const CoachScreen({super.key, required this.sesion, required this.eventos});
+  const CoachScreen({super.key, required this.sesion, required this.eventos, this.embebida = false});
   final Sesion sesion;
   final EventosRepo eventos;
+  final bool embebida;
   @override
   State<CoachScreen> createState() => _CoachScreenState();
 }
@@ -53,7 +60,6 @@ class CoachScreen extends StatefulWidget {
 class _CoachScreenState extends State<CoachScreen> {
   Map<String, dynamic>? _d;
   String? _error_;
-  List<Curso>? _cursos;
   Sesion get s => widget.sesion;
   bool get _pivot => s.esAdmin && s.adminToken != null;
 
@@ -61,7 +67,6 @@ class _CoachScreenState extends State<CoachScreen> {
   void initState() {
     super.initState();
     _cargar();
-    _cargarCursos();
     widget.eventos.cargar();
   }
 
@@ -75,30 +80,11 @@ class _CoachScreenState extends State<CoachScreen> {
     }
   }
 
-  Future<void> _cargarCursos() async {
-    try {
-      final r = await s.api.get('getCursos', const {});
-      final l = [
-        for (final c in (r['cursos'] as List? ?? const []))
-          if ('${(c as Map)['estado'] ?? 'abierto'}' != 'terminado') Curso(Map<String, dynamic>.from(c)),
-      ];
-      if (mounted) setState(() => _cursos = l);
-    } catch (_) {
-      if (mounted) setState(() => _cursos ??= const []);
-    }
-  }
-
   List<Map<String, dynamic>> get _jugadorxs => [for (final x in (_d?['jugadorxs'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
 
   Future<void> _abrir(Widget pantalla) async {
     await SubAjustes.abrir<void>(context, pantalla);
     if (mounted) _cargar();
-  }
-
-  /// Los mismos Cursos del Calendario (Pivots: crear, editar y pre-armados).
-  Future<void> _abrirCursos() async {
-    await SubAjustes.abrir<void>(context, _pivot ? CursosScreen(sesion: s) : CursosAbiertosScreen(sesion: s));
-    if (mounted) _cargarCursos();
   }
 
   /// Plan sin fecha (de un evento cancelado) a un evento próximo.
@@ -143,52 +129,207 @@ class _CoachScreenState extends State<CoachScreen> {
     }
   }
 
+  /// Entrenamientos que vienen (los próximos primero).
+  List<Evento> get _proximos {
+    final hoy = Fechas.hoy();
+    return [
+      for (final e in widget.eventos.eventos)
+        if (e.tipo == 'Entrenamiento' && !e.cancelado && !e.finalizado && !e.fecha.isBefore(hoy)) e,
+    ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
+  }
+
+  void _abrirEvento(Evento e) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => DetalleScreen(repo: widget.eventos, eventoId: e.id),
+    ),
+  );
+
+  /// Armar el plan de cualquier entrenamiento desde aquí (Victor, 2026-11-26).
+  Future<void> _armarPlan() async {
+    final evs = _proximos;
+    if (evs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay entrenamientos próximos en el calendario.')));
+      return;
+    }
+    final e = await showModalBottomSheet<Evento>(
+      useRootNavigator: true,
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (h) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('¿Para qué entrenamiento?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ),
+            for (final e in evs.take(12))
+              ListTile(
+                leading: const Icon(Icons.event_outlined),
+                title: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}'),
+                subtitle: e.lugar.isEmpty ? null : Text(e.lugar),
+                onTap: () => Navigator.of(h).pop(e),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (e == null || !mounted) return;
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final r = await PlanEnEvento.precargar(s, e.id, forzar: true) ?? const <String, dynamic>{};
+      if (!mounted) return;
+      final hechos = [for (final x in (r['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+      final equipo = await elegirEquipoPlan(context, r, hechos);
+      if (equipo == null || !mounted) return;
+      final ok = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => PlanEventoScreen(sesion: s, evento: e, equipo: equipo, plan: hechos.where((x) => '${x['equipo'] ?? ''}' == equipo).firstOrNull),
+        ),
+      );
+      if (ok == true) {
+        await PlanEnEvento.precargar(s, e.id, forzar: true);
+        if (mounted) setState(() {});
+      }
+    } catch (err) {
+      m.showSnackBar(SnackBar(content: Text(errorCoach(err))));
+    }
+  }
+
+  Future<void> _avisar(bool v) async {
+    setState(() => _d?['avisarNovedades'] = v);
+    try {
+      await s.api.post('coachGuardar', {'accion': 'ajustes', 'avisarNovedades': v});
+    } catch (_) {
+      if (mounted) setState(() => _d?['avisarNovedades'] = !v);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: barraCoach('Coach'),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: _d == null
-            ? (_error_ == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error_!)))
-            : ListView(
-                key: const ValueKey('l'),
-                padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 32 + MediaQuery.paddingOf(context).bottom),
-                children: [
-                  Text(
-                    (_d?['equipos'] as List? ?? const []).isEmpty ? 'Llevas todos los equipos.' : 'Llevas: ${(_d!['equipos'] as List).join(' · ')}',
-                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                  ),
-                  const SizedBox(height: 12),
-                  _atajos(context),
-                  ..._sinFecha(context),
-                  ..._enCurso(context),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Las fichas deportivas y "Marcar habilidades" están en Liga. Para evaluar un entrenamiento, ábrelo en el Calendario y toca "Evaluar".',
-                    style: TextStyle(fontSize: 12.5, height: 1.35, color: p.textoSecundario),
-                  ),
-                ],
+    final cuerpo = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: _d == null
+          ? (_error_ == null ? const Esqueleto(key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error_!)))
+          : ListenableBuilder(
+              key: const ValueKey('l'),
+              listenable: widget.eventos,
+              builder: (context, _) => RefreshIndicator(
+                onRefresh: _cargar,
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
+                  children: [
+                    Text(
+                      (_d?['equipos'] as List? ?? const []).isEmpty ? 'Llevas todos los equipos.' : 'Llevas: ${(_d!['equipos'] as List).join(' · ')}',
+                      style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                    ),
+                    ..._proximo(context),
+                    // Lo que falta evaluar (antes en Próximos eventos).
+                    TarjetasPorEvaluar(sesion: s),
+                    _titulo(context, 'PLANES'),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      onPressed: _armarPlan,
+                      icon: const Icon(Icons.edit_calendar_outlined),
+                      label: const Text('Armar el plan de un entrenamiento'),
+                    ),
+                    ..._sinFecha(context),
+                    _titulo(context, 'HERRAMIENTAS'),
+                    _atajos(context),
+                    // Antes escondido en "Ajustes de coach" (Victor: no se entendía qué editaba).
+                    Material(
+                      color: p.tarjeta,
+                      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                      clipBehavior: Clip.antiAlias,
+                      child: SwitchListTile(
+                        secondary: Icon(Icons.notifications_active_outlined, color: p.marcaTexto),
+                        title: const Text('Avisar novedades a las personas'),
+                        subtitle: const Text(
+                          'Los lunes, a quien tiene notas, feedback o pruebas nuevas en su progreso. Si no hay nada nuevo, no le llega nada.',
+                        ),
+                        value: _d?['avisarNovedades'] != false,
+                        onChanged: _avisar,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-      ),
+            ),
     );
+    if (widget.embebida) return cuerpo;
+    return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Entrenamiento'), body: cuerpo);
   }
 
-  /// Atajos de la portada, del mismo estilo que los de Inventario.
+  /// Próximo entrenamiento: fecha, quién viene y su plan, ya cargado.
+  List<Widget> _proximo(BuildContext context) {
+    final p = context.pivot;
+    final e = _proximos.firstOrNull;
+    if (e == null) return const [];
+    final cache = PlanEnEvento.cache[e.id];
+    if (cache == null) {
+      PlanEnEvento.precargar(s, e.id).then((_) {
+        if (mounted) setState(() {});
+      }, onError: (_) {});
+    }
+    final planes = [for (final x in (cache?['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    return [
+      _titulo(context, 'PRÓXIMO ENTRENAMIENTO'),
+      Material(
+        color: p.tarjeta,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _abrirEvento(e),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const IconoRecuadroCoach(icono: Icons.sports_rounded),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}',
+                        style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (e.lugar.isNotEmpty) e.lugar,
+                          e.cantidadAsisten == 1 ? 'Viene 1 persona' : 'Vienen ${e.cantidadAsisten} personas',
+                          cache == null ? 'Cargando el plan…' : _resumenPlan(planes),
+                        ].join(' · '),
+                        style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Herramientas, con nombres que dicen qué hacen (Victor, 2026-11-26).
   Widget _atajos(BuildContext context) {
     final p = context.pivot;
-    final n = _cursos?.length;
     final puedeNombrar = s.esCoach || (_pivot && (s.tieneArea('coach') || s.tieneArea('equipo') || s.esAdmin));
     final l = <(IconData, String, String, VoidCallback)>[
-      (Icons.checklist_rounded, 'Habilidades', 'Básicas y avanzadas: crear, editar y marcar', () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true))),
-      (Icons.tune_rounded, 'Ajustes de coach', 'Avisos de novedades a las personas', _ajustes),
-      (Icons.school_outlined, 'Cursos en curso', n == null ? 'Cursos y clínicas' : (n == 1 ? '1 curso abierto' : '$n cursos abiertos'), _abrirCursos),
-      if (_pivot) (Icons.auto_awesome_motion_outlined, 'Pre-armados', 'Plantillas para crear cursos', _abrirCursos),
+      (
+        Icons.checklist_rounded,
+        'Habilidades que se evalúan',
+        'Básicas y avanzadas: crear, editar y marcar',
+        () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
+      ),
       (Icons.timer_outlined, 'Pruebas', 'Medir el progreso, como vueltas en 5 minutos', () => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs))),
-      if (puedeNombrar)
-        (Icons.person_add_outlined, 'Agregar nuevo coach', 'Nombrar o gestionar coaches del equipo', () => _abrir(CoachesScreen(sesion: s))),
+      if (puedeNombrar) (Icons.person_add_outlined, 'Coaches', 'Nombrar o gestionar coaches del equipo', () => _abrir(CoachesScreen(sesion: s))),
     ];
     Widget atajo((IconData, String, String, VoidCallback) a) => Material(
       color: p.tarjeta,
@@ -282,78 +423,6 @@ class _CoachScreenState extends State<CoachScreen> {
     ];
   }
 
-  /// Cursos que están corriendo, con atajo a editarlos.
-  List<Widget> _enCurso(BuildContext context) {
-    final p = context.pivot;
-    final l = _cursos;
-    if (l == null) return const [];
-    return [
-      _titulo(context, 'CURSOS EN CURSO'),
-      if (l.isEmpty)
-        Text('No hay cursos abiertos ahora.', style: TextStyle(color: p.textoSecundario))
-      else
-        for (final c in l.take(5))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: p.tarjeta,
-              borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-              clipBehavior: Clip.antiAlias,
-              child: ListTile(
-                leading: Icon(c.esClinica ? Icons.bolt_rounded : Icons.school_outlined, color: p.marcaTexto),
-                title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${c.resumenFechas} · ${c.inscritos == 1 ? '1 inscritx' : '${c.inscritos} inscritxs'}'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: _abrirCursos,
-              ),
-            ),
-          ),
-    ];
-  }
-
-  /// Aviso semanal a las personas con novedades en su ficha (Victor, 2026-11-17).
-  Future<void> _ajustes() async {
-    var avisar = _d?['avisarNovedades'] != false;
-    await showModalBottomSheet<void>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      builder: (h) => StatefulBuilder(
-        builder: (h, set) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: Text('Ajustes de coach', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                ),
-                SwitchListTile(
-                  title: const Text('Avisar novedades a las personas'),
-                  subtitle: const Text(
-                    'Los lunes, a quien tiene notas, feedback o pruebas nuevas que puede ver en su ficha. Si no hay nada nuevo, no le llega nada.',
-                  ),
-                  value: avisar,
-                  onChanged: (v) async {
-                    set(() => avisar = v);
-                    try {
-                      await s.api.post('coachGuardar', {'accion': 'ajustes', 'avisarNovedades': v});
-                      _d?['avisarNovedades'] = v;
-                    } catch (_) {
-                      set(() => avisar = !v);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   static String _resumenPlan(List<Map<String, dynamic>>? l) {
     if (l == null || l.isEmpty) return 'Sin plan';
     if (l.length > 1) return '${l.length} planes (${l.map((x) => '${x['equipo'] ?? ''}'.isEmpty ? 'toda la liga' : '${x['equipo']}').join(', ')})';
@@ -422,9 +491,7 @@ class _PlanEventoScreenState extends State<PlanEventoScreen> {
 
   Future<void> _bloque([int? i]) async {
     final b = i == null ? null : _bloques[i];
-    final r = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(builder: (_) => BloqueCoachScreen(bloque: b)),
-    );
+    final r = await Navigator.of(context).push<Map<String, dynamic>>(MaterialPageRoute(builder: (_) => BloqueCoachScreen(bloque: b)));
     if (r == null) return;
     setState(() {
       if (i == null) {
@@ -645,12 +712,25 @@ class PlanEnEvento extends StatefulWidget {
   const PlanEnEvento({super.key, required this.sesion, required this.evento});
   final Sesion sesion;
   final Evento evento;
+
+  /// Plan ya cargado (Victor, 2026-11-26: que aparezca al abrir el evento).
+  /// Se llena al ver la bandeja o el timeline; al abrir el evento se muestra
+  /// enseguida y se refresca por detrás.
+  static final cache = <String, Map<String, dynamic>>{};
+
+  static Future<Map<String, dynamic>?> precargar(Sesion s, String idEvento, {bool forzar = false}) async {
+    if (!forzar && cache.containsKey(idEvento)) return cache[idEvento];
+    final r = await s.api.get('getPlanEvento', {'idEvento': idEvento});
+    if (r['exito'] == false) return null;
+    return cache[idEvento] = r;
+  }
+
   @override
   State<PlanEnEvento> createState() => _PlanEnEventoState();
 }
 
 class _PlanEnEventoState extends State<PlanEnEvento> {
-  Map<String, dynamic>? _r;
+  late Map<String, dynamic>? _r = PlanEnEvento.cache[widget.evento.id];
 
   @override
   void initState() {
@@ -660,10 +740,10 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
 
   Future<void> _cargar() async {
     try {
-      final r = await widget.sesion.api.get('getPlanEvento', {'idEvento': widget.evento.id});
-      if (mounted && r['exito'] != false) setState(() => _r = r);
+      final r = await PlanEnEvento.precargar(widget.sesion, widget.evento.id, forzar: true);
+      if (mounted && r != null) setState(() => _r = r);
     } catch (_) {
-      if (mounted) setState(() => _r = const {});
+      if (mounted) setState(() => _r ??= const {});
     }
   }
 
@@ -913,10 +993,17 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
 
   Future<void> _nuevaMarca(Map<String, dynamic> pr) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => NuevaMarcaScreen(sesion: widget.sesion, pr: pr, username: _d?['username'] ?? '', alGuardar: (v) async {
-        await _guardar({'accion': 'marca', 'pruebaId': pr['id'], 'username': _d?['username'], 'valor': v, 'fecha': Fechas.iso(Fechas.hoy())});
-        await _cargar();
-      })),
+      MaterialPageRoute(
+        builder: (_) => NuevaMarcaScreen(
+          sesion: widget.sesion,
+          pr: pr,
+          username: _d?['username'] ?? '',
+          alGuardar: (v) async {
+            await _guardar({'accion': 'marca', 'pruebaId': pr['id'], 'username': _d?['username'], 'valor': v, 'fecha': Fechas.iso(Fechas.hoy())});
+            await _cargar();
+          },
+        ),
+      ),
     );
     if (ok == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marca guardada')));
   }
@@ -951,7 +1038,7 @@ class _FichaDeportivaScreenState extends State<FichaDeportivaScreen> {
       // Gestionar la lista de habilidades desde la ficha (Victor, 2026-11-21:
       // salió el botón Habilidades de Equipo).
       appBar: barraCoach(
-        widget.username == null ? 'Mi ficha deportiva' : (widget.nombre ?? 'Ficha deportiva'),
+        widget.username == null ? 'Mi progreso' : 'Progreso de ${widget.nombre ?? 'la persona'}',
         acciones: [
           if (_puedeEditar)
             IconButton(
@@ -1260,9 +1347,11 @@ class _CoachesScreenState extends State<CoachesScreen> {
     }
   }
 
-Future<void> _nombrar() async {
+  Future<void> _nombrar() async {
     final elegida = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(builder: (_) => NombrarCoachScreen(sesion: s, coaches: _l ?? const [])),
+      MaterialPageRoute(
+        builder: (_) => NombrarCoachScreen(sesion: s, coaches: _l ?? const []),
+      ),
     );
     if (elegida == null || !mounted) return;
     final eq = await elegirEquiposCoach(context, s, const []);
@@ -1371,7 +1460,9 @@ class FilaSerCoach extends StatelessWidget {
 
   Future<void> _pedir(BuildContext context) async {
     final mensaje = TextEditingController();
-    final ok = await abrirFormulario<bool>(context, builder: (c) => Padding(
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (c) => Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1679,7 +1770,9 @@ class _PruebasCoachState extends State<_PruebasCoach> {
     final personas = <String>{
       ...[for (final u in (x?['personas'] as List? ?? const [])) '$u'],
     };
-    final ok = await abrirFormulario<bool>(context, builder: (c) => StatefulBuilder(
+    final ok = await abrirFormulario<bool>(
+      context,
+      builder: (c) => StatefulBuilder(
         builder: (c, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(c).bottom),
           child: SingleChildScrollView(
@@ -2476,11 +2569,7 @@ class _BloqueCoachScreenState extends State<BloqueCoachScreen> {
 
   void _guardar() {
     if (titulo.text.trim().isEmpty) return;
-    Navigator.of(context).pop({
-      'titulo': titulo.text.trim(),
-      'detalle': detalle.text.trim(),
-      'minutos': minutos,
-    });
+    Navigator.of(context).pop({'titulo': titulo.text.trim(), 'detalle': detalle.text.trim(), 'minutos': minutos});
   }
 
   @override
@@ -2659,9 +2748,11 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
   Widget build(BuildContext context) {
     final ya = {
       for (final c in widget.coaches)
-      if (c['estado'] == 'aprobado') c['username'],
+        if (c['estado'] == 'aprobado') c['username'],
     };
-    final filtrados = _personas.where((x) => !ya.contains(x['nombre']) && '${x['nombreDerby']} ${x['nombre']}'.toLowerCase().contains(_query.toLowerCase())).toList();
+    final filtrados = _personas
+        .where((x) => !ya.contains(x['nombre']) && '${x['nombreDerby']} ${x['nombre']}'.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -2701,6 +2792,23 @@ class _NombrarCoachScreenState extends State<NombrarCoachScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Ícono en recuadro con el degradado de Entrenamiento.
+class IconoRecuadroCoach extends StatelessWidget {
+  const IconoRecuadroCoach({super.key, required this.icono});
+  final IconData icono;
+
+  @override
+  Widget build(BuildContext context) {
+    final (degradado, sobre) = PivotPaleta.seccion('entrenamientos', Theme.of(context).brightness);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(gradient: degradado, borderRadius: BorderRadius.circular(PivotRadios.chip + 2)),
+      child: Icon(icono, color: sobre),
     );
   }
 }

@@ -79,7 +79,10 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(equipo == null ? 'Pago a coaches de la liga' : 'Pago a coaches de $equipo', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              Text(
+                equipo == null ? 'Pago a coaches de la liga' : 'Pago a coaches de $equipo',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               Text(
                 equipo == null
@@ -111,13 +114,20 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                   TextField(
                     controller: pct,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Porcentaje de lo cobrado', suffixText: '%', helperText: 'De cada cuota y clase pagada, esta parte va a lxs coaches.'),
+                    decoration: const InputDecoration(
+                      labelText: 'Porcentaje de lo cobrado',
+                      suffixText: '%',
+                      helperText: 'De cada cuota y clase pagada, esta parte va a lxs coaches.',
+                    ),
                   )
                 else
                   TextField(
                     controller: monto,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Monto por entrenamiento', helperText: 'Lo que cobra cada coach por entrenamiento dado a horario.'),
+                    decoration: const InputDecoration(
+                      labelText: 'Monto por entrenamiento',
+                      helperText: 'Lo que cobra cada coach por entrenamiento dado a horario.',
+                    ),
                   ),
               ],
               const SizedBox(height: 20),
@@ -183,7 +193,10 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                 onChanged: (v) => set(() => cuenta = v ?? cuenta),
               ),
               const SizedBox(height: 12),
-              TextField(controller: nota, decoration: const InputDecoration(labelText: 'Concepto')),
+              TextField(
+                controller: nota,
+                decoration: const InputDecoration(labelText: 'Concepto'),
+              ),
               const SizedBox(height: 20),
               FilledButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Registrar el pago')),
             ],
@@ -204,7 +217,14 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
       final r = await s.api.post('adminTesoreria', {
         'adminToken': s.adminToken,
         'accion': 'registrarSaldo',
-        'datos': jsonEncode({'username': d['username'], 'tipo': 'devolucion', 'monto': m, 'cuentaId': cuenta, 'concepto': concepto.isEmpty ? 'Pago a coaches' : concepto, 'pagoCoach': true}),
+        'datos': jsonEncode({
+          'username': d['username'],
+          'tipo': 'devolucion',
+          'monto': m,
+          'cuentaId': cuenta,
+          'concepto': concepto.isEmpty ? 'Pago a coaches' : concepto,
+          'pagoCoach': true,
+        }),
       });
       if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo registrar.'}');
       if (mounted) _aviso('Pago registrado');
@@ -225,10 +245,21 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
   Future<void> _desdeCoach(String username, String nombre) async {
     final coaches = Map<String, dynamic>.from(_regla['coaches'] as Map? ?? const {});
     final actual = DateTime.tryParse('${(coaches[username] as Map?)?['desde'] ?? ''}') ?? DateTime.now();
-    final d = await showDatePicker(context: context, initialDate: actual, firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 365)), helpText: '¿Desde cuándo cobra $nombre?');
+    final d = await showDatePicker(
+      context: context,
+      initialDate: actual,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: '¿Desde cuándo cobra $nombre?',
+    );
     if (d == null) return;
     final iso = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    await _cambiar((r) => r['coaches'] = {...coaches, username: {'desde': iso}});
+    await _cambiar(
+      (r) => r['coaches'] = {
+        ...coaches,
+        username: {'desde': iso},
+      },
+    );
   }
 
   @override
@@ -241,7 +272,10 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
     final equipos = [for (final e in (r?['equipos'] as List? ?? const [])) '$e'];
     final porEquipo = Map<String, dynamic>.from(regla['porEquipo'] as Map? ?? const {});
     final coachesRegla = Map<String, dynamic>.from(regla['coaches'] as Map? ?? const {});
-    final nombres = {for (final m in meses) for (final c in (m['coaches'] as List? ?? const [])) '${c['username']}': '${c['nombre']}'};
+    final nombres = {
+      for (final m in meses)
+        for (final c in (m['coaches'] as List? ?? const [])) '${c['username']}': '${c['nombre']}',
+    };
     for (final t in totales) {
       nombres['${t['username']}'] = '${t['nombre']}';
     }
@@ -267,10 +301,19 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                     titulo: 'Cómo se calcula',
                     texto: 'Cada mes se junta la parte de lxs coaches de lo que pagaron las personas (cuotas del mes y clases) y se reparte por entrenamiento dado.',
                     pasos: [
-                      (Icons.check_circle_outline_rounded, 'Cada entrenamiento se divide entre lxs coaches que estuvieron a horario. Quien llegó tarde cobra la mitad de su parte.'),
+                      (
+                        Icons.check_circle_outline_rounded,
+                        'Cada entrenamiento se divide entre lxs coaches que estuvieron a horario. Quien llegó tarde cobra la mitad de su parte.',
+                      ),
                       (Icons.event_busy_outlined, 'Entrenamientos cancelados o sin coaches en la lista no se pagan: esa parte queda para el equipo.'),
-                      (Icons.person_add_alt_outlined, 'Un coach cobra desde la fecha en que empezó; si entra a mitad de mes, cobra solo los entrenamientos que dio.'),
-                      (Icons.account_balance_wallet_outlined, 'Al cerrar cada mes, lo de cada coach queda en Saldos como "El equipo le debe". Nada sale de una cuenta hasta que se registra el pago.'),
+                      (
+                        Icons.person_add_alt_outlined,
+                        'Un coach cobra desde la fecha en que empezó; si entra a mitad de mes, cobra solo los entrenamientos que dio.',
+                      ),
+                      (
+                        Icons.account_balance_wallet_outlined,
+                        'Al cerrar cada mes, lo de cada coach queda en Saldos como "El equipo le debe". Nada sale de una cuenta hasta que se registra el pago.',
+                      ),
                     ],
                   ),
                   GrupoAjustes(
@@ -333,14 +376,19 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                             icono: Icons.sports_rounded,
                             seccion: 'entrenamientos',
                             titulo: nombres[u] ?? u,
-                            valor: (coachesRegla[u] as Map?)?['desde'] == null ? 'Desde que lo nombraron coach' : 'Desde el ${_fecha('${(coachesRegla[u] as Map)['desde']}')}',
+                            valor: (coachesRegla[u] as Map?)?['desde'] == null
+                                ? 'Desde que lo nombraron coach'
+                                : 'Desde el ${_fecha('${(coachesRegla[u] as Map)['desde']}')}',
                             alTocar: () => _desdeCoach(u, nombres[u] ?? u),
                           ),
                       ],
                     ),
                   if ((r['deuda'] as List? ?? const []).isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('SE LES DEBE HOY', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario)),
+                    Text(
+                      'SE LES DEBE HOY',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                    ),
                     const SizedBox(height: 4),
                     for (final d in [for (final x in (r['deuda'] as List)) Map<String, dynamic>.from(x as Map)])
                       ListTile(
@@ -352,7 +400,10 @@ class _PagoCoachesScreenState extends State<PagoCoachesScreen> {
                       ),
                   ],
                   const SizedBox(height: 8),
-                  Text('${r['anio']}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario)),
+                  Text(
+                    '${r['anio']}',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
+                  ),
                   const SizedBox(height: 8),
                   for (final t in totales)
                     ListTile(

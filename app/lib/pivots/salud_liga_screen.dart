@@ -43,7 +43,9 @@ class _SaludLigaScreenState extends State<SaludLigaScreen> {
     final nombre = TextEditingController(text: actual ?? '');
     final tel = TextEditingController(text: actual == null ? '' : (_tels[actual] ?? ''));
     final fija = actual == _fija;
-    final r = await abrirFormulario<String>(context, builder: (h) => SafeArea(
+    final r = await abrirFormulario<String>(
+      context,
+      builder: (h) => SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(h).bottom),
           child: Column(

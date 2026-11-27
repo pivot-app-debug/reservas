@@ -132,24 +132,26 @@ class _ListaHabilidadesState extends State<_ListaHabilidades> {
   /// Nueva o editar. [nivelInicial] = desplegable desde el que se agrega.
   Future<void> editar([Map<String, dynamic>? h, String? categoria, String? nivelInicial]) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => EditarHabilidadScreen(
-        sesion: widget.sesion,
-        habilidad: h,
-        categoria: categoria,
-        nivelInicial: nivelInicial,
-        alGuardar: (resultado) async {
-          await widget.sesion.api.post('coachGuardar', {
-            'accion': 'habilidad',
-            'id': h?['id'],
-            'nombre': resultado['nombre'],
-            'categoria': resultado['categoria'],
-            'activa': resultado['activa'],
-            'nivel': resultado['nivel'],
-          });
-          setState(() => _abiertos.add(resultado['nivel']));
-          _cargar();
-        },
-      )),
+      MaterialPageRoute(
+        builder: (_) => EditarHabilidadScreen(
+          sesion: widget.sesion,
+          habilidad: h,
+          categoria: categoria,
+          nivelInicial: nivelInicial,
+          alGuardar: (resultado) async {
+            await widget.sesion.api.post('coachGuardar', {
+              'accion': 'habilidad',
+              'id': h?['id'],
+              'nombre': resultado['nombre'],
+              'categoria': resultado['categoria'],
+              'activa': resultado['activa'],
+              'nivel': resultado['nivel'],
+            });
+            setState(() => _abiertos.add(resultado['nivel']));
+            _cargar();
+          },
+        ),
+      ),
     );
     if (ok == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardado')));
   }
@@ -554,7 +556,7 @@ class _MarcarPersonasState extends State<_MarcarPersonas> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Ficha deportiva',
+                      tooltip: 'Progreso',
                       icon: const Icon(Icons.badge_outlined),
                       onPressed: () async {
                         await Navigator.of(context).push(_ruta(FichaDeportivaScreen(sesion: s, username: '${x['username']}', nombre: '${x['nombre']}')));
@@ -889,7 +891,14 @@ class _ComentariosScreenState extends State<_ComentariosScreen> {
 /// Subsección para crear o editar una habilidad.
 /// Reemplaza el bottom sheet con campos de texto para evitar cierres accidentales al escribir.
 class EditarHabilidadScreen extends StatefulWidget {
-  const EditarHabilidadScreen({super.key, required this.sesion, required this.habilidad, required this.categoria, required this.nivelInicial, required this.alGuardar});
+  const EditarHabilidadScreen({
+    super.key,
+    required this.sesion,
+    required this.habilidad,
+    required this.categoria,
+    required this.nivelInicial,
+    required this.alGuardar,
+  });
   final Sesion sesion;
   final Map<String, dynamic>? habilidad;
   final String? categoria;
@@ -935,12 +944,7 @@ class _EditarHabilidadScreenState extends State<EditarHabilidadScreen> {
       });
       if (r['exito'] == false) throw ApiException('${r['error']}');
       if (!mounted) return;
-      widget.alGuardar({
-        'nombre': nombre.text.trim(),
-        'categoria': cat.text.trim(),
-        'activa': activa,
-        'nivel': nivel,
-      });
+      widget.alGuardar({'nombre': nombre.text.trim(), 'categoria': cat.text.trim(), 'activa': activa, 'nivel': nivel});
       Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));

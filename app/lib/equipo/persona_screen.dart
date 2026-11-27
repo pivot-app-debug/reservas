@@ -215,9 +215,10 @@ class _FichaState extends State<_Ficha> {
                   ),
                   if (yo || repo.esAdmin || repo.sesion.esCoach)
                     FilaAjuste(
-                      icono: Icons.sports_score_rounded,
+                      // "Mi progreso" (Victor, 2026-11-26: antes Ficha deportiva).
+                      icono: Icons.trending_up_rounded,
                       seccion: 'entrenamientos',
-                      titulo: 'Ficha deportiva',
+                      titulo: yo ? 'Mi progreso' : 'Progreso',
                       valor: 'Habilidades y notas',
                       alTocar: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'componentes.dart' show abrirFormulario;
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/tema.dart';
@@ -11,7 +12,9 @@ Future<void> enviarComentarios(BuildContext context) async {
   const whatsapp = '593962773052', correo = 'quindesvolcanicosrd@gmail.com';
   var tipo = 'Sugerencia';
   final texto = TextEditingController();
-  await abrirFormulario<void>(context, builder: (h) => StatefulBuilder(
+  await abrirFormulario<void>(
+    context,
+    builder: (h) => StatefulBuilder(
       builder: (h, set) {
         final p = h.pivot;
         final listo = texto.text.trim().isNotEmpty;

@@ -110,7 +110,10 @@ class _InventarioScreenState extends State<InventarioScreen> {
         titulo: 'Cómo funciona Inventario',
         texto: 'Aquí está todo lo que es de la liga: equipamiento para prestar, botiquín e insumos, cada uno en su lista.',
         pasos: [
-          (Icons.rule_rounded, 'En "Reglas" decides, por equipo, si el equipamiento se presta, solo en casos excepcionales o no se presta. Sin reglas, se presta solo en casos excepcionales.'),
+          (
+            Icons.rule_rounded,
+            'En "Reglas" decides, por equipo, si el equipamiento se presta, solo en casos excepcionales o no se presta. Sin reglas, se presta solo en casos excepcionales.',
+          ),
           (Icons.notifications_active_outlined, 'Los pedidos excepcionales te llegan para aprobar o rechazar; los préstamos activos aparecen abajo.'),
           (Icons.assignment_ind_outlined, 'Con "Retenido" registras que alguien se llevó algo. La app le pregunta cada cierto tiempo si ya lo devolvió.'),
           (Icons.medical_services_outlined, 'En el botiquín, "Se usó" descuenta lo que se gastó para saber qué reponer.'),
@@ -120,7 +123,10 @@ class _InventarioScreenState extends State<InventarioScreen> {
     final (titulo, como) = switch (repo.reglaPrestamo) {
       'si' => ('Se presta', 'Pídelo en "Pedir equipamiento" y úsalo ese mismo día, sin esperar aprobación.'),
       'no' => ('No se presta', 'Por ahora tu equipo no puede pedir equipamiento de la liga.'),
-      _ => ('Solo en casos excepcionales', 'Por ejemplo, si olvidaste el casco o tus rodilleras están mojadas. Pídelo en "Pedir equipamiento" y un Pivot lo aprueba.'),
+      _ => (
+        'Solo en casos excepcionales',
+        'Por ejemplo, si olvidaste el casco o tus rodilleras están mojadas. Pídelo en "Pedir equipamiento" y un Pivot lo aprueba.',
+      ),
     };
     return BannerAyuda(
       clave: 'inventario_persona',
@@ -365,7 +371,10 @@ class _InventarioScreenState extends State<InventarioScreen> {
                       children: [
                         Icon(Icons.playlist_add_rounded, color: p.marcaTexto),
                         const SizedBox(width: 12),
-                        Text('Nueva lista', style: TextStyle(fontWeight: FontWeight.w700, color: p.texto)),
+                        Text(
+                          'Nueva lista',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+                        ),
                       ],
                     ),
                   ),

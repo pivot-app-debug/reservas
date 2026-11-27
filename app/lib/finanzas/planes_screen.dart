@@ -195,7 +195,9 @@ class _EditorPlanState extends State<_EditorPlan> {
   /// Elegir personas con buscador (Victor, 2026-11-17).
   Future<void> _elegirPersonas() async {
     final sel = await Navigator.of(context).push<Set<String>>(
-      MaterialPageRoute(builder: (_) => ElegirPersonasScreen(gente: widget.gente, seleccionadas: _personas, alGuardar: (s) => Navigator.of(context).pop(s))),
+      MaterialPageRoute(
+        builder: (_) => ElegirPersonasScreen(gente: widget.gente, seleccionadas: _personas, alGuardar: (s) => Navigator.of(context).pop(s)),
+      ),
     );
     if (sel != null) {
       setState(() {
@@ -417,10 +419,7 @@ class _ElegirPersonasScreenState extends State<ElegirPersonasScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                 child: SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => widget.alGuardar(sel),
-                    child: Text(sel.isEmpty ? 'Sin personas' : 'Listo (${sel.length})'),
-                  ),
+                  child: FilledButton(onPressed: () => widget.alGuardar(sel), child: Text(sel.isEmpty ? 'Sin personas' : 'Listo (${sel.length})')),
                 ),
               ),
             ),

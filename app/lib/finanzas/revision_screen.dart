@@ -62,7 +62,10 @@ class _RevisionTesoreriaScreenState extends State<RevisionTesoreriaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$titulo · ${filas.length}', style: TextStyle(fontWeight: FontWeight.w800, color: p.texto)),
+              Text(
+                '$titulo · ${filas.length}',
+                style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+              ),
               const SizedBox(height: 4),
               Text(ayuda, style: TextStyle(fontSize: 13, color: p.textoSecundario)),
               const SizedBox(height: 4),
@@ -118,15 +121,10 @@ class _RevisionTesoreriaScreenState extends State<RevisionTesoreriaScreen> {
                         _fila('${x['persona']} · ${x['que']}', _fecha(x['fecha']), plata((x['monto'] as num?) ?? 0)),
                     ],
                   ),
-                  _seccion(
-                    context,
-                    'Cuotas duplicadas',
-                    'La misma persona tiene dos pagos activos del mismo mes. Anula el que sobra.',
-                    [
-                      for (final d in _lista('duplicados'))
-                        _fila('${d['persona']} · ${d['mes']}/${d['anio']}', '${(d['movimientos'] as List? ?? const []).length} pagos del mismo mes'),
-                    ],
-                  ),
+                  _seccion(context, 'Cuotas duplicadas', 'La misma persona tiene dos pagos activos del mismo mes. Anula el que sobra.', [
+                    for (final d in _lista('duplicados'))
+                      _fila('${d['persona']} · ${d['mes']}/${d['anio']}', '${(d['movimientos'] as List? ?? const []).length} pagos del mismo mes'),
+                  ]),
                   _seccion(
                     context,
                     'Anulados que siguen como pagados',
@@ -145,19 +143,14 @@ class _RevisionTesoreriaScreenState extends State<RevisionTesoreriaScreen> {
                         _fila('${c['cuenta']}', '${c['movimientos']} movimientos antes del ${_fecha(c['fechaInicial'])}', plata((c['monto'] as num?) ?? 0)),
                     ],
                   ),
-                  _seccion(
-                    context,
-                    'Deben la cuota y tienen Asistiré',
-                    'Ya no pueden marcar Asistiré nuevos, pero conservan los que ya tenían.',
-                    [
-                      for (final d in _lista('deudoresConAsistire'))
-                        _fila(
-                          '${d['nombre']}',
-                          '${d['asistire']} Asistiré a futuro${(d['anticipada'] as num? ?? 0) > 0 ? ' (${d['anticipada']} por asistencia anticipada)' : ''}',
-                          plata((d['debe'] as num?) ?? 0),
-                        ),
-                    ],
-                  ),
+                  _seccion(context, 'Deben la cuota y tienen Asistiré', 'Ya no pueden marcar Asistiré nuevos, pero conservan los que ya tenían.', [
+                    for (final d in _lista('deudoresConAsistire'))
+                      _fila(
+                        '${d['nombre']}',
+                        '${d['asistire']} Asistiré a futuro${(d['anticipada'] as num? ?? 0) > 0 ? ' (${d['anticipada']} por asistencia anticipada)' : ''}',
+                        plata((d['debe'] as num?) ?? 0),
+                      ),
+                  ]),
                 ],
               ),
             ),

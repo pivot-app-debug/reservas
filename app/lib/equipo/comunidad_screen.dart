@@ -449,7 +449,9 @@ Future<EnlaceComunidad?> mostrarHojaEnlace(BuildContext context, {EnlaceComunida
   final nombre = TextEditingController(text: actual?.nombre ?? '');
   var red = actual?.red ?? 'otro';
   var nombreTocado = actual != null;
-  return abrirFormulario<EnlaceComunidad>(context, builder: (hoja) => StatefulBuilder(
+  return abrirFormulario<EnlaceComunidad>(
+    context,
+    builder: (hoja) => StatefulBuilder(
       builder: (hoja, refrescar) {
         final p = hoja.pivot;
         void alCambiarEnlace(String v) {

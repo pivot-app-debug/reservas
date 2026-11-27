@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-26 (Entrenamiento, etapa 1)
+- Para coaches, la bandeja tiene la pestaña Entrenamiento: el próximo entrenamiento con quién viene y su plan, lo que falta evaluar, "Armar el plan de un entrenamiento" (eligiendo cuál), los planes sin fecha y las herramientas (Habilidades que se evalúan, Pruebas, Coaches).
+- Se fueron los cursos de la sección de coach (siguen en Cursos) y "Ajustes de coach": su único ajuste, avisar novedades a las personas, ahora está a la vista en Entrenamiento.
+- El plan de los próximos eventos se carga por adelantado, así "Plan del evento" aparece al abrir el evento.
+- "Ficha deportiva" ahora se llama "Mi progreso" (o "Progreso de …" en la de otra persona), con otro ícono.
+- Las evaluaciones pendientes salieron de Próximos eventos para quien es coach: están en Entrenamiento.
+
 ## 2026-11-26 (subida de la ronda del 26/11)
 - Subidos los 5 commits del 26/11: Finanzas blindada, pago a coaches con el botón Pagarle, regla de deudas, y los Pivots también pagan.
 - Creada en Supabase la tabla de entrenamientos de enero a junio para el pago a coaches, con el permiso de lectura del servidor que le faltaba.

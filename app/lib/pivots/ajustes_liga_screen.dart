@@ -82,17 +82,19 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   /// Buscador: lleva al ajuste (abriendo la subsección si hace falta) y lo
   /// hace parpadear.
   Future<void> _buscar() async {
-    final e = await Navigator.of(context)
-        .push<EntradaAjuste>(
-          MaterialPageRoute(
-            builder: (_) => BuscadorLigaScreen(
-              tesoreria: sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(sesion),
-              donde: 'la liga',
-              // También los ajustes de cada equipo (QA 2026-11-26).
-              entradas: [...entradasLiga, ...entradasEquipos([for (final t in _equipos ?? const <Map<String, dynamic>>[]) '${t['nombre']}'])],
-            ),
-          ),
-        );
+    final e = await Navigator.of(context).push<EntradaAjuste>(
+      MaterialPageRoute(
+        builder: (_) => BuscadorLigaScreen(
+          tesoreria: sesion.tieneArea('finanzas') && FuncionesLiga.finanzas(sesion),
+          donde: 'la liga',
+          // También los ajustes de cada equipo (QA 2026-11-26).
+          entradas: [
+            ...entradasLiga,
+            ...entradasEquipos([for (final t in _equipos ?? const <Map<String, dynamic>>[]) '${t['nombre']}']),
+          ],
+        ),
+      ),
+    );
     if (e == null || !mounted) return;
     // Finanzas está en Ajustes → Herramientas de la liga (Victor, 2026-11-19).
     if (e.id == 'tesoreria') {
@@ -257,7 +259,8 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                 // Liga recién creada: lo que conviene hacer primero.
                 PrimerosPasos(
                   pasos: [
-                    if (_pivot) ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
+                    if (_pivot)
+                      ('invitar', Icons.qr_code_2_rounded, 'Invita a tu gente con el enlace de cada equipo', () => _abrir(CategoriasScreen(sesion: sesion))),
                     ('reglas', Icons.rule_rounded, 'Revisa las reglas de la liga: cuota, asistencia y estados', () => _abrir(ReglasScreen(sesion: sesion))),
                     ('pivots', Icons.group_add_rounded, 'Suma otro Pivot y reparte las áreas', () => _abrir(PivotsScreen(sesion: sesion))),
                   ],

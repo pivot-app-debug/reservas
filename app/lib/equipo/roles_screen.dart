@@ -42,16 +42,16 @@ class _RolesScreenState extends State<RolesScreen> {
   static String _personas(int n) => n == 1 ? '1 persona' : '$n personas';
 
   Future<void> _crear() async {
-    final n = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => EditarRolScreen(repo: repo)),
-    );
+    final n = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => EditarRolScreen(repo: repo)));
     if (n == null || n.isEmpty || !mounted) return;
     await _hacer('crear', nombre: n, ok: 'Rol creado');
   }
 
   Future<void> _renombrar(String r) async {
     final n = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => EditarRolScreen(repo: repo, actual: r)),
+      MaterialPageRoute(
+        builder: (_) => EditarRolScreen(repo: repo, actual: r),
+      ),
     );
     if (n == null || n.isEmpty || n == r || !mounted) return;
     await _hacer('renombrar', nombre: r, nuevo: n, ok: 'Rol renombrado');
@@ -205,10 +205,7 @@ class _EditarRolScreenState extends State<EditarRolScreen> {
                 onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
               ),
               const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(ctl.text.trim()),
-                child: const Text('Guardar'),
-              ),
+              FilledButton(onPressed: () => Navigator.of(context).pop(ctl.text.trim()), child: const Text('Guardar')),
             ],
           ),
         ),

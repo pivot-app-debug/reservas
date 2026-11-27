@@ -15,6 +15,8 @@ import 'core/tour.dart';
 import 'ajustes/ajustes_screen.dart';
 import 'core/aviso_sin_conexion.dart';
 import 'equipo/equipo_repo.dart';
+import 'coach/coach_screen.dart' show PlanEnEvento;
+import 'eventos/tipos_evento.dart' show kTipoSocial;
 import 'equipo/avisos_liga.dart';
 import 'equipo/equipo_screen.dart';
 import 'eventos/eventos_repo.dart';
@@ -91,6 +93,16 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       if (!mounted) return;
       AvisosLiga.de(widget.sesion);
       EquipoRepo.de(widget.sesion).cargar();
+      // Plan de los 2 próximos eventos ya cargado (Victor, 2026-11-26: que
+      // "Plan del evento" aparezca al abrir el evento, sin esperar).
+      final hoy = Fechas.hoy();
+      final prox = [
+        for (final e in widget.repo.eventos)
+          if (e.tipo != kTipoSocial && !e.cancelado && !e.finalizado && !e.fecha.isBefore(hoy)) e,
+      ]..sort((a, b) => a.fecha.compareTo(b.fecha));
+      for (final e in prox.take(2)) {
+        PlanEnEvento.precargar(widget.sesion, e.id).ignore();
+      }
     });
   }
 
