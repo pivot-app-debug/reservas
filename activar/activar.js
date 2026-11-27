@@ -386,7 +386,7 @@ function actFinalizarQuindes() {
     setTimeout(function() {
       _exitoEl.style.opacity = '0';
       setTimeout(function() {
-        window.location.href = 'https://app.quindesvolcanicos.com?nuevx=1&nombre=' + encodeURIComponent(G.nombre) + '&patines=no&protec=No&token=' + encodeURIComponent(G.idToken||'');
+        window.location.href = 'https://pivot-d65f4.web.app?nuevx=1&nombre=' + encodeURIComponent(G.nombre) + '&patines=no&protec=No&token=' + encodeURIComponent(G.idToken||'');
       }, 400);
     }, 2600);
   }, function(e) {
@@ -428,7 +428,7 @@ function actFinalizar() {
     setTimeout(function() {
       _exitoEl.style.opacity = '0';
       setTimeout(function() {
-        window.location.href = 'https://app.quindesvolcanicos.com?nuevx=1&nombre=' + encodeURIComponent(G.nombre) + '&patines=' + (patines==='Sí'?'si':'no') + '&protec=' + encodeURIComponent(protec || 'No') + (talla?'&talla='+encodeURIComponent(talla):'') + '&token=' + encodeURIComponent(G.idToken||'');
+        window.location.href = 'https://pivot-d65f4.web.app?nuevx=1&nombre=' + encodeURIComponent(G.nombre) + '&patines=' + (patines==='Sí'?'si':'no') + '&protec=' + encodeURIComponent(protec || 'No') + (talla?'&talla='+encodeURIComponent(talla):'') + '&token=' + encodeURIComponent(G.idToken||'');
       }, 400);
     }, 2600);
   }, function(e) {

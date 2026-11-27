@@ -22,7 +22,7 @@ const ONESIGNAL_API_KEY = Deno.env.get('ONESIGNAL_API_KEY') ?? '';
 // notifications (sendPush(), más abajo). Configurable vía secret para no
 // hardcodear si algún día cambia de dominio; el literal es el dominio real
 // de producción (mismo usado ya en chrome_web_icon de adminEnviarPush()).
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://app.quindesvolcanicos.com';
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://pivot-d65f4.web.app';
 // Header x-cron-secret que debe traer cualquier llamada a `action:'cronDiario'`
 // (pg_cron -> net.http_post, ver supabase/migrations) -- sin este secret
 // configurado, cronDiario queda inalcanzable (falla cerrado, no abierto).
@@ -12719,7 +12719,7 @@ async function adminEnviarPush(params: Record<string, any>): Promise<Record<stri
   const payload: Record<string, any> = {
     app_id: ONESIGNAL_APP_ID, target_channel: 'push',
     headings: { es: titulo, en: titulo }, contents: { es: mensaje, en: mensaje },
-    chrome_web_icon: 'https://app.quindesvolcanicos.com/icons/icon-192B.png',
+    chrome_web_icon: 'https://pivot-d65f4.web.app/icons/icon-192B.png',
   };
   const destinoArr = destino ? (Array.isArray(destino) ? destino : [destino]) : [];
   const destinoUnico = [...new Set(destinoArr)];

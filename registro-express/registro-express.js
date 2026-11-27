@@ -73,7 +73,7 @@ function reMostrarPaso(idx, desdeHistorial) {
 }
 
 function rePasoAnterior() {
-  if (_reCurIdx === 0) { window.location.href = 'https://app.quindesvolcanicos.com/#s1'; return; }
+  if (_reCurIdx === 0) { window.location.href = 'https://pivot-d65f4.web.app/#s1'; return; }
   reMostrarPaso(_reCurIdx - 1);
 }
 
@@ -238,7 +238,7 @@ function reEnviar() {
       _reEnviando = false;
       if (res && res.exito) {
         mostrarCargando('¡Listo! Redirigiendo...');
-        var url = 'https://app.quindesvolcanicos.com/?registro=1&token=' + encodeURIComponent(res.token) + '&tipo=' + encodeURIComponent(_reTipoPago);
+        var url = 'https://pivot-d65f4.web.app/?registro=1&token=' + encodeURIComponent(res.token) + '&tipo=' + encodeURIComponent(_reTipoPago);
         if (_reTipoPago === 'clase') url += '&fechas=' + encodeURIComponent(JSON.stringify(_reFechas));
         window.location.href = url;
       } else {

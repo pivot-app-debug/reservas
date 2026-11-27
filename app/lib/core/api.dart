@@ -16,7 +16,7 @@ class ApiConfig {
   /// en `_verificarGoogleToken()`): el idToken nativo debe tener este `aud`.
   static const googleWebClientId = '632992894668-gnbb5cclsmfdcnve0g34kmue1c72h73q.apps.googleusercontent.com';
 
-  static const webAppUrl = 'https://app.quindesvolcanicos.com';
+  static const webAppUrl = 'https://pivot-d65f4.web.app';
 }
 
 class ApiException implements Exception {

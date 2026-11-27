@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (web en Firebase)
+- La web se publica sola en Firebase Hosting con cada cambio (antes quedaba trabada en la versión 132).
+- Nuevo dominio de la web: pivot-d65f4.web.app. Los enlaces de invitación, cursos, avisos y páginas de inscripción usan el nuevo dominio; app.quindesvolcanicos.com redirige ahí.
+
 ## 2026-11-27 (Entreno nuevo y niveles de habilidades)
 - Entreno rediseñado: Mi progreso grande arriba (tu nivel, la barra de lo logrado en el nivel que estás, cuánto te falta, lo que trabajas y lo último que te dejaron), los cursos en un carrusel y los próximos entrenamientos. Para entrenadorxs: Mi progreso más compacto, el próximo entrenamiento con su plan y lo que falta evaluar, los cursos y los planes; Habilidades, Pruebas, Entrenadorxs y Notificaciones son íconos en la barra de arriba.
 - Niveles de habilidades propios de la liga: además de básicas y avanzadas se pueden crear otros (por ejemplo intermedias), ordenarlos y elegir cuándo se completa cada uno (un porcentaje, todas o una de sus habilidades). Las dos de siempre quedan con la misma regla, así que nadie cambió de nivel.
