@@ -95,9 +95,9 @@ class GrillaAtajos extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Si queda una sola, ocupa todo el ancho.
                   Expanded(child: tarjeta(atajos[i])),
-                  const SizedBox(width: 10),
-                  Expanded(child: i + 1 < atajos.length ? tarjeta(atajos[i + 1]) : const SizedBox.shrink()),
+                  if (i + 1 < atajos.length) ...[const SizedBox(width: 10), Expanded(child: tarjeta(atajos[i + 1]))],
                 ],
               ),
             ),

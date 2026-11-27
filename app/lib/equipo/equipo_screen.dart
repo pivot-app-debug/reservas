@@ -2,7 +2,6 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../core/atajos_color.dart';
 import '../finanzas/tesoreria_repo.dart' show TesoreriaRepo, plata;
-import 'inventario_modelos.dart' show InventarioRepo;
 import '../core/navegacion.dart';
 import '../core/deporte.dart';
 
@@ -88,7 +87,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   };
 
   // Lo que hay adentro de cada atajo, para verlo sin entrar.
-  int? _enlaces, _prestamos;
+  int? _enlaces;
   num? _totalCuentas;
 
   Future<void> _cargarAtajos() async {
@@ -96,10 +95,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     final c = ComunidadRepo.de(s);
     c.cargar().then((_) {
       if (mounted) setState(() => _enlaces = c.enlaces.length);
-    }, onError: (_) {});
-    final inv = InventarioRepo(s);
-    inv.cargar().then((_) {
-      if (mounted) setState(() => _prestamos = inv.prestamos.where((x) => x.activo && (inv.esPivot || x.mio)).length);
     }, onError: (_) {});
     if (_atajos().contains(PestanaLiga.finanzas)) {
       TesoreriaRepo(s).accion('resumen').then((r) {
@@ -109,7 +104,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   List<AtajoColor> _atajosColor() => [
-    for (final x in _atajos())
+    for (final x in _atajos().where((x) => x == PestanaLiga.redes || x == PestanaLiga.finanzas))
       AtajoColor(
         icono: _iconoLiga(x),
         seccion: switch (x) {
@@ -123,10 +118,6 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
         detalle: switch (x) {
           PestanaLiga.redes =>
             _enlaces == null ? null : (_enlaces == 0 ? 'Grupos y redes de la liga' : (_enlaces == 1 ? '1 grupo o red' : '$_enlaces grupos y redes')),
-          PestanaLiga.inventario =>
-            _prestamos == null
-                ? null
-                : (_prestamos == 0 ? 'Equipamiento de la liga' : '$_prestamos ${_prestamos == 1 ? 'préstamo activo' : 'préstamos activos'}'),
           PestanaLiga.finanzas => _totalCuentas == null ? null : '${plata(_totalCuentas!)} en cuentas',
           _ => 'Reglas, cuotas y equipos',
         },
@@ -179,6 +170,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   void _abrir(Integrante p) {
+    _focoBusqueda.unfocus(); // al volver no se reabre el teclado
     _avisos.verPersona(p);
     PersonaScreen.abrir(context, repo, p.username);
   }
@@ -205,6 +197,20 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           toolbarHeight: 64,
           titleSpacing: 12,
           title: _buscador(p),
+          // Inventario y Ajustes se abren menos: íconos al lado del buscador
+          // (Victor, 2026-11-27).
+          actions: [
+            ListenableBuilder(
+              listenable: _avisos,
+              builder: (context, _) => IconButton(
+                tooltip: 'Inventario',
+                onPressed: () => _abrirAtajo(PestanaLiga.inventario),
+                icon: Badge(isLabelVisible: _avisos.inventario, smallSize: 9, backgroundColor: p.marca, child: const Icon(Symbols.inventory_2_rounded)),
+              ),
+            ),
+            if (_pivot) IconButton(tooltip: 'Ajustes de la liga', onPressed: () => _abrirAtajo(PestanaLiga.miLiga), icon: const Icon(Symbols.settings_rounded)),
+            const SizedBox(width: 4),
+          ],
         ),
         body: _comunidad(context, p),
       ),
@@ -267,6 +273,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
       focusNode: _focoBusqueda,
       // Sin foco automático (bug 2026-11-27: al volver de una sección se abría el buscador).
       textInputAction: TextInputAction.search,
+      onTapOutside: (_) => _focoBusqueda.unfocus(),
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
         hintText: 'Buscar en la liga',
@@ -634,6 +641,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   }
 
   void _abrirFiltros() {
+    _focoBusqueda.unfocus();
     showModalBottomSheet<void>(
       useRootNavigator: true,
       context: context,

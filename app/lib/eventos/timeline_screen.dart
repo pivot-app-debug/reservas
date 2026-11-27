@@ -760,21 +760,26 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
                           final total = alto + MediaQuery.paddingOf(context).top;
                           if ((total - _altoCabecera).abs() > 0.5) {
                             setState(() => _altoCabecera = total);
-                            if (_saltoInicialHecho) WidgetsBinding.instance.addPostFrameCallback((_) => _saltoAHoy());
+                            if (_saltoInicialHecho && !_buscando) WidgetsBinding.instance.addPostFrameCallback((_) => _saltoAHoy());
                           }
                         },
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Solo fundido (Victor, 2026-11-27: con SizeTransition las dos
+                            // barras se encogían a la vez y la cabecera daba un salto).
                             AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              transitionBuilder: (c, a) => FadeTransition(
-                                opacity: a,
-                                child: SizeTransition(sizeFactor: a, alignment: Alignment.topCenter, child: c),
-                              ),
+                              duration: const Duration(milliseconds: 200),
+                              layoutBuilder: (actual, previos) => Stack(alignment: Alignment.topCenter, children: [...previos, ?actual]),
+                              transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
                               child: _buscando ? _barraBusqueda(context) : _barraNormal(context),
                             ),
-                            if (!_buscando) _cabeceraTareas(context),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: _buscando ? const SizedBox(width: double.infinity) : _cabeceraTareas(context),
+                            ),
                           ],
                         ),
                       ),
@@ -922,18 +927,6 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
               return const SizedBox.shrink();
             },
           ),
-          // Tareas junto a la bandeja, con cuántas hay para tomar (Victor, 2026-11-27).
-          IconButton(
-            key: _kTareas,
-            tooltip: _tareas.disponibles.isEmpty ? 'Tareas' : 'Tareas (${_tareas.disponibles.length} para tomar)',
-            icon: Badge(
-              isLabelVisible: _tareas.disponibles.isNotEmpty,
-              backgroundColor: p.marca,
-              label: Text('${_tareas.disponibles.length}'),
-              child: const Icon(Symbols.checklist, weight: 600),
-            ),
-            onPressed: _abrirTablero,
-          ),
           IconButton(
             key: _kBandeja,
             tooltip: _bandeja.hayNovedades ? 'Novedades (hay algo nuevo)' : 'Novedades',
@@ -946,6 +939,18 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
               child: const Icon(Symbols.inbox, weight: 600),
             ),
             onPressed: () => _abrirActividad(),
+          ),
+          // Tareas después de la bandeja, con cuántas hay para tomar (Victor, 2026-11-27).
+          IconButton(
+            key: _kTareas,
+            tooltip: _tareas.disponibles.isEmpty ? 'Tareas' : 'Tareas (${_tareas.disponibles.length} para tomar)',
+            icon: Badge(
+              isLabelVisible: _tareas.disponibles.isNotEmpty,
+              backgroundColor: p.marca,
+              label: Text('${_tareas.disponibles.length}'),
+              child: const Icon(Symbols.checklist, weight: 600),
+            ),
+            onPressed: _abrirTablero,
           ),
           IconButton(
             key: _kFiltros,

@@ -931,10 +931,17 @@ class _EquipoScreenState extends State<_EquipoScreen> {
   /// Reglas de la liga (puntos y qué cuenta como clase de este equipo).
   Map<String, dynamic>? _rl;
 
+  /// Premios por asistir que aplican a este equipo (racha, % de asistencia…),
+  /// para explicarlos en su desplegable (Victor, 2026-11-27).
+  List<Map<String, dynamic>> _premios = const [];
+
   @override
   void initState() {
     super.initState();
     if (!widget.soloLectura) _cargarReglas();
+    s.api.get('getRecompensasEquipo', {'equipo': _nombre}).then((r) {
+      if (mounted && r['exito'] == true) setState(() => _premios = [for (final x in (r['reglas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)]);
+    }, onError: (_) {});
   }
 
   Future<void> _cargarReglas() async {
@@ -977,8 +984,33 @@ class _EquipoScreenState extends State<_EquipoScreen> {
 
     // Desplegable de cómo se paga en este equipo, con sus valores (Victor, QA 2026-11-26).
     final dia = porMes ? ConfigEquipo(c, _nombre).diaFechaLimite : 0;
+    // Desplegables que explican cada regla en su sección (Victor, 2026-11-27).
+    final r = _Regla.de(t);
+    final curso = '${(t['requisitos'] as Map?)?['cursoNombre'] ?? ''}';
+    final recompensa = porMes ? ConfigEquipo(c, _nombre).recompensaPago : const <String, dynamic>{};
+    final textoPremioPago = textoRecompensa(recompensa);
+    final pe = (_rl?['puntosEquipos'] as Map?)?[_nombre] as Map?;
     return [
       const SizedBox(height: 8),
+      if (!_piso)
+        BannerAyuda(
+          clave: 'equipo_subir_$_nombre',
+          titulo: 'Cómo se sube o baja de $_nombre',
+          texto: 'Así se entra, se sigue y se sale de $_nombre según sus reglas.',
+          pasos: [
+            (Icons.verified_outlined, 'Para seguir en $_nombre: ${r.texto}.'),
+            (Icons.trending_up_rounded, 'Para subir desde $_nombreDebajo: cumplirlo ${r.textoSubir.replaceAll(' cumpliéndolo', '')}.'),
+            (
+              Icons.trending_down_rounded,
+              r.gracia == 0
+                  ? 'Si se deja de cumplir, se baja a $_nombreDebajo en el siguiente cálculo.'
+                  : 'Si se deja de cumplir, hay ${textoPlazo(r.gracia, r.graciaUnidad)} para ponerse al día; si no, se baja a $_nombreDebajo.',
+            ),
+            if (propio.isNotEmpty) (Icons.roller_skating_outlined, 'Equipamiento: hay que tener propio $propio.'),
+            if (curso.isNotEmpty) (Icons.school_outlined, 'Curso: hay que tener aprobado $curso.'),
+            (Icons.event_repeat_rounded, 'Los cambios de equipo se aplican en la fecha que fija la liga.'),
+          ],
+        ),
       BannerAyuda(
         clave: 'equipo_pagos_$_nombre',
         titulo: 'Cómo se paga en $_nombre',
@@ -1002,6 +1034,12 @@ class _EquipoScreenState extends State<_EquipoScreen> {
         ],
       ),
       const _Seccion('PAGOS'),
+      if (porMes && recompensa['activa'] != false && textoPremioPago.isNotEmpty)
+        BannerAyuda(
+          clave: 'equipo_premio_pago_$_nombre',
+          titulo: 'Premio por pagar a tiempo',
+          texto: 'Si pagas la cuota del mes hasta el día $dia recibes $textoPremioPago. Se da solo cuando se aprueba el pago.',
+        ),
       _Fila(
         icono: Icons.payments_outlined,
         titulo: 'Cobros',
@@ -1098,6 +1136,21 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       ),
       const SizedBox(height: 8),
       const _Seccion('PUNTOS Y CLASES'),
+      if (pe != null)
+        BannerAyuda(clave: 'equipo_puntos_$_nombre', titulo: 'Cómo se ganan puntos en $_nombre', texto: textoPuntosVersion((pe['actual'] as Map?) ?? const {})),
+      if (_premios.isNotEmpty)
+        BannerAyuda(
+          clave: 'equipo_premios_$_nombre',
+          titulo: 'Premios por asistir',
+          texto: _premios.length == 1 ? 'En $_nombre hay un premio por asistencia.' : 'En $_nombre hay ${_premios.length} premios por asistencia.',
+          pasos: [
+            for (final x in _premios)
+              (
+                Icons.local_fire_department_outlined,
+                '${x['nombre']}: por ${x['condicionTexto']}, ${x['premioTexto']}${x['deLaLiga'] == true ? ' (de toda la liga)' : ''}.',
+              ),
+          ],
+        ),
       _Fila(
         icono: Icons.star_outline_rounded,
         titulo: 'Puntos por asistencia',
@@ -1126,6 +1179,12 @@ class _EquipoScreenState extends State<_EquipoScreen> {
       ),
       const SizedBox(height: 8),
       const _Seccion('DE TODA LA LIGA'),
+      if (t['califica_fondos_viaje'] == true)
+        BannerAyuda(
+          clave: 'equipo_fondos_$_nombre',
+          titulo: 'Fondos de viaje',
+          texto: 'Quienes están en $_nombre participan de los fondos de viaje: cuando la liga viaja a un torneo, aporta parte del costo según sus reglas.',
+        ),
       _Fila(
         icono: Icons.rule_folder_outlined,
         titulo: 'Reglas de la liga',
@@ -1392,10 +1451,13 @@ class _EquipoScreenState extends State<_EquipoScreen> {
     // Bug del QA (2026-11-26): solo miraba las filas sueltas, así que en la
     // vista de solo lectura (todo dentro de _SoloLectura/Column) nunca
     // encontraba nada. Ahora busca también dentro de esos contenedores.
-    final filas = <_Fila>[];
+    // También los desplegables que explican las reglas (2026-11-27).
+    final filas = <(Widget, String)>[];
     void juntar(Widget w) {
       if (w is _Fila) {
-        filas.add(w);
+        filas.add((w, '${w.titulo} ${w.texto}'));
+      } else if (w is BannerAyuda) {
+        filas.add((w, '${w.titulo} ${w.texto} ${w.pasos.map((x) => x.$2).join(' ')}'));
       } else if (w is _SoloLectura) {
         juntar(w.child);
       } else if (w is Column) {
@@ -1409,8 +1471,8 @@ class _EquipoScreenState extends State<_EquipoScreen> {
 
     hijos.forEach(juntar);
     final l = <Widget>[
-      for (final h in filas)
-        if (palabras.every(_plano('${h.titulo} ${h.texto}').contains)) h,
+      for (final (h, texto) in filas)
+        if (palabras.every(_plano(texto).contains)) h,
     ];
     if (l.isNotEmpty) {
       return widget.soloLectura
@@ -1461,6 +1523,8 @@ class _EquipoScreenState extends State<_EquipoScreen> {
                   key: const ValueKey('b'),
                   controller: _ctlQ,
                   autofocus: widget.buscar == null,
+                  textInputAction: TextInputAction.search,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   onChanged: (v) => setState(() => _q = v),
                   decoration: InputDecoration(hintText: 'Buscar en $_nombre', border: InputBorder.none, filled: false),
                 ),

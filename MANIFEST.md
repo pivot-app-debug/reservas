@@ -23,6 +23,13 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Entrenamiento (entrenadorxs): sin «Llevas…», `MiEstimado` (getMiPagoCoach) arriba, «Habilidades», «Armar un plan» = `ArmarPlanScreen` (2 pasos: entrenamiento → para quién: toda la liga, equipo o nivel). Planes por nivel: `equipo = 'nivel:sin|basicas|avanzadas'` (`paraPlan()`); el servidor deja guardarlos a cualquier entrenadorx y los muestra compartidos a quien tiene ese nivel (`_nivelPersona`).
 - Notificaciones de entrenador (`coach/notificaciones_entrenador_screen.dart`): resumen de los lunes, por persona (`coaches.sin_avisos text[]`, `coachGuardar` accion `avisosPersona`), `EnviarAvisoEntrenadorScreen` (accion `enviarAviso`, tipo `aviso_entrenador`) y lo que te llega (`coach_por_evaluar`, `coach_pedido_plan`, `cambios_asistencia`). Catálogo: `aviso_entrenador`, `novedades_progreso` (antes el lunes usaba `solicitud_resuelta`), y `soloCoach` (ocultos en Mi perfil → Notificaciones). `_avisosEntrenadorxs()` en `cronDiario`.
 
+## Ajustes del 27/11 (madrugada)
+- Liga: actions Inventario (punto) y Ajustes (Pivot); grilla solo redes y finanzas. `GrillaAtajos`: una sola en la última fila ocupa todo el ancho.
+- Calendario: orden Novedades → Tareas; `AnimatedSwitcher` de la cabecera solo con fundido (la `SizeTransition` doble hacía saltar la cabecera) y `_cabeceraTareas` en `AnimatedSize`; no salta a hoy mientras se busca.
+- Mi perfil: título del AppBar = campo de búsqueda (abre `_buscar`); `MiEstimado` aquí con texto explicado; `FilaSerCoach` solo si no eres entrenadorx.
+- `NotificacionesEntrenadorScreen`: solo el aviso semanal y lo que te llega (se quitó `EnviarAvisoEntrenadorScreen`; el servidor conserva `enviarAviso` y `avisosPersona`).
+- Equipo (`_reglasDelEquipo`): `BannerAyuda` de subir/bajar, premio por pagar a tiempo, puntos, premios por asistir (`getRecompensasEquipo`, nuevo, con token de persona) y fondos de viaje. `_filtrar` también busca en `BannerAyuda`.
+
 ## Liga B, Tareas en el Calendario y Entreno (2026-11-27)
 - `core/atajos_color.dart`: `AtajoColor(seccion:)` + `GrillaAtajos` (2 columnas, recuadro con el degradado de `PivotPaleta.seccion(seccion)`, ícono Material Symbols redondeado y lleno, título y detalle). Liga: redes, mantenimiento, reservas, organizacion. Entreno: entrenamientos, reservas, redes, mantenimiento, organizacion, notificaciones.
 - Liga: el `TextField` de búsqueda es el título del AppBar; primer sliver = grilla (`_atajosColor`, datos de ComunidadRepo, InventarioRepo y `adminTesoreria resumen.total`).

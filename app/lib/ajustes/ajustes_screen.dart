@@ -1,3 +1,5 @@
+import '../coach/mi_estimado.dart';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -101,8 +103,34 @@ class _AjustesScreenState extends State<AjustesScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: Text('Mi perfil', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        actions: [IconButton(tooltip: 'Buscar un ajuste', onPressed: _buscar, icon: const Icon(Icons.search_rounded))],
+        // Buscador a todo el ancho de la barra (Victor, 2026-11-27).
+        toolbarHeight: 64,
+        titleSpacing: 12,
+        title: Semantics(
+          button: true,
+          label: 'Buscar un ajuste',
+          child: Material(
+            color: context.pivot.tarjeta,
+            borderRadius: BorderRadius.circular(PivotRadios.chip),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _buscar,
+              child: SizedBox(
+                height: 48,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 14),
+                    Icon(Icons.search_rounded, color: context.pivot.textoSecundario),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Buscar en Mi perfil', style: t.bodyLarge?.copyWith(color: context.pivot.textoSecundario)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([sesion, eventos]),
@@ -125,6 +153,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
 
               BannerAvisos(api: sesion.api),
               if (conFicha) MiPerfilEditable(sesion: sesion),
+              // Lo que llevas como entrenadorx este mes (Victor, 2026-11-27: antes en Entreno).
+              if (sesion.esCoach) MiEstimado(sesion: sesion),
               // Herramientas de la liga salió de Mi perfil (Victor, 2026-11-22):
               // todo está en Liga; los interruptores, en Mi Liga.
 
@@ -191,7 +221,8 @@ class _AjustesScreenState extends State<AjustesScreen> {
                       valor: 'Qué avisos recibes',
                       alTocar: () => SubAjustes.abrir(context, NotificacionesScreen(sesion: sesion)),
                     ),
-                  if (conFicha) FilaSerCoach(sesion: sesion),
+                  // Dejar de ser entrenadorx está solo en Entreno (Victor, 2026-11-27).
+                  if (conFicha && sesion.coachEstado != 'aprobado') FilaSerCoach(sesion: sesion),
                   FilaAjuste(
                     icono: Icons.manage_accounts_rounded,
                     seccion: 'cuenta',

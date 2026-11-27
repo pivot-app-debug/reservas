@@ -56,17 +56,17 @@ class _MiEstimadoState extends State<MiEstimado> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Este mes llevas ${plata(monto)}',
+                              'Como entrenadorx, este mes llevas ${plata(monto)}',
                               style: TextStyle(fontWeight: FontWeight.w800, color: p.sobreSuave),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              [
-                                horario == 1 ? '1 entrenamiento a horario' : '$horario entrenamientos a horario',
-                                if (tarde > 0) tarde == 1 ? '1 con retraso' : '$tarde con retraso',
-                                'es un estimado: cambia con los pagos del mes',
-                              ].join(' · '),
-                              style: TextStyle(fontSize: 12.5, color: p.sobreSuave),
+                              // Con contexto (Victor, 2026-11-27): de dónde sale el número.
+                              'Es tu parte de lo que la liga cobra este mes, según la regla de Pago a entrenadorxs: '
+                              '${horario == 1 ? '1 entrenamiento a horario' : '$horario entrenamientos a horario'}'
+                              '${tarde > 0 ? (tarde == 1 ? ' y 1 con retraso' : ' y $tarde con retraso') : ''}. '
+                              'Es un estimado: cambia con los pagos que entren hasta fin de mes.',
+                              style: TextStyle(fontSize: 12.5, height: 1.3, color: p.sobreSuave),
                             ),
                           ],
                         ),

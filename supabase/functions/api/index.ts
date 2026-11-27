@@ -14343,6 +14343,20 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
           }),
         });
       }
+      // Recompensas por asistencia que aplican a un equipo, para explicarlas
+      // dentro del equipo (Victor, 2026-11-27). Solo nombre y textos.
+      case 'getRecompensasEquipo': {
+        const yo = await _validarToken(String(params.token ?? ''));
+        if (!yo) return json({ error: 'Sesión inválida.' }, 401);
+        const equipo = String(params.equipo ?? '');
+        const { data: reglas } = await supabase.from('reglas_recompensa').select('nombre, activa, equipo, condicion, premio')
+          .is('eliminada_en', null).eq('activa', true).order('creada_en', { ascending: true });
+        return json({
+          exito: true,
+          reglas: (reglas ?? []).filter((r: any) => !r.equipo || r.equipo === equipo)
+            .map((r: any) => ({ nombre: r.nombre, condicionTexto: _textoCondicion(r.condicion), premioTexto: _textoRecompensa(r.premio), deLaLiga: !r.equipo })),
+        });
+      }
       case 'getTiers': {
         const adminEmail = await _validarAdminToken(params.adminToken);
         if (!adminEmail) return json({ error: 'Sesión admin inválida.' }, 401);

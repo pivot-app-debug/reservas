@@ -18,7 +18,6 @@ import '../eventos/detalle_screen.dart' show DetalleScreen;
 import 'por_evaluar.dart';
 import 'armar_plan_screen.dart';
 import 'notificaciones_entrenador_screen.dart';
-import 'mi_estimado.dart';
 import '../core/atajos_color.dart';
 import 'prueba_en_vivo.dart';
 import '../equipo/habilidades_screen.dart';
@@ -186,7 +185,6 @@ class _CoachScreenState extends State<CoachScreen> {
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                   children: [
-                    MiEstimado(sesion: s),
                     // Atajos de color como en Liga (Victor, 2026-11-27).
                     const SizedBox(height: 8),
                     _atajos(context),
@@ -271,7 +269,6 @@ class _CoachScreenState extends State<CoachScreen> {
     final pruebas = (_d?['pruebas'] as List?)?.length;
     final pendientes = [for (final x in (_d?['pendientes'] as List? ?? const [])) x as Map]
         .fold<int>(0, (a, x) => a + (((x['total'] as num?) ?? 0) - ((x['evaluados'] as num?) ?? 0)).toInt());
-    final callados = (_d?['sinAvisos'] as List? ?? const []).length;
     return GrillaAtajos(
       atajos: [
         ...widget.atajosExtra,
@@ -303,7 +300,7 @@ class _CoachScreenState extends State<CoachScreen> {
             icono: Symbols.notifications_active_rounded,
             seccion: 'notificaciones',
             titulo: 'Notificaciones',
-            detalle: callados == 0 ? 'Avisos a tus personas y los tuyos' : '$callados ${callados == 1 ? 'persona sin' : 'personas sin'} tus avisos',
+            detalle: _d?['avisarNovedades'] == false ? 'Aviso semanal apagado' : 'Aviso semanal de progreso y los tuyos',
             alTocar: () => _abrir(
               NotificacionesEntrenadorScreen(
                 sesion: s,
