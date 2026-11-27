@@ -172,24 +172,9 @@ function _pwaInstalarDirecto() {
 // y con el propio prompt nativo del navegador. Idempotente: puede llamarse
 // más de una vez por sesión (login fresco Y restauración de sesión) sin
 // duplicar nada -- si el permiso ya está concedido, no hace nada.
-function _verificarNotificaciones() {
-  if (!esStandalone()) return;
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') return;
-  var gate = document.getElementById('notif-gate');
-  if (!gate) return;
-  gate.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  var denegado = document.getElementById('notif-gate-denegado');
-  var btn = gate.querySelector('.notif-gate-btn');
-  if (Notification.permission === 'denied') {
-    if (denegado) denegado.style.display = 'block';
-    if (btn) btn.style.display = 'none';
-  } else {
-    if (denegado) denegado.style.display = 'none';
-    if (btn) btn.style.display = 'block';
-  }
-}
+// OneSignal dado de baja (2026-11-27): la web vieja ya no recibe avisos,
+// así que no se pide el permiso. Los avisos llegan en la web nueva.
+function _verificarNotificaciones() {}
 
 function _cerrarNotifGate() {
   var gate = document.getElementById('notif-gate');
@@ -215,69 +200,7 @@ function _notifActivarMostrarDenegado() {
   _notifActivarTerminar();
 }
 
-function _activarNotificaciones() {
-  var btn = _notifActivarBtn();
-  if (btn) { btn.disabled = true; btn.textContent = 'Activando...'; }
-
-  if (!('Notification' in window)) { _cerrarNotifGate(); return; }
-  if (Notification.permission === 'granted') { _cerrarNotifGate(); _notifActivarTerminar(); return; }
-  if (Notification.permission === 'denied') { _notifActivarMostrarDenegado(); return; }
-
-  // Fallback nativo -- pide el permiso directo al navegador, SIN pasar por
-  // OneSignal. No deja el dispositivo en el estado óptimo (permiso
-  // concedido pero sin `PushSubscription.optIn()` -- OneSignal no va a
-  // saber de este dispositivo hasta que su SDK cargue de verdad en una
-  // visita futura, `vincularPush()`/js/pwa.js ya reintenta eso en cada
-  // login), pero es preferible a dejar a la persona encerrada para siempre
-  // detrás de este gate -- no tiene botón de cierre propio.
-  function fallbackNativo() {
-    Notification.requestPermission().then(function(permiso) {
-      if (permiso === 'granted') { _cerrarNotifGate(); _notifActivarTerminar(); return; }
-      if (permiso === 'denied') { _notifActivarMostrarDenegado(); return; }
-      _notifActivarTerminar();
-    }).catch(_notifActivarTerminar);
-  }
-
-  // Timeout de seguridad: si el SDK de OneSignal nunca terminó de cargar
-  // (bloqueado por un ad-blocker -- su CDN es de los dominios más comunes
-  // en esas listas -- o sin red hacia ahí), `OneSignalDeferred.push()` de
-  // abajo JAMÁS ejecuta su callback y el botón quedaría "Activando..." para
-  // siempre, con la persona encerrada detrás de un gate bloqueante sin
-  // ningún botón de cierre. `yaResolvio` evita que el timeout y la
-  // resolución real de OneSignal (si igual llega tarde) se pisen entre sí.
-  var yaResolvio = false;
-  var timeoutFallback = setTimeout(function() {
-    if (yaResolvio) return;
-    yaResolvio = true;
-    fallbackNativo();
-  }, 4000);
-
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(function(OneSignal) {
-    if (yaResolvio) return;
-    OneSignal.Notifications.requestPermission().then(function(granted) {
-      if (yaResolvio) return;
-      yaResolvio = true;
-      clearTimeout(timeoutFallback);
-      if (granted) {
-        OneSignal.User.PushSubscription.optIn().catch(function(){});
-        _cerrarNotifGate();
-        _notifActivarTerminar();
-        return;
-      }
-      _notifActivarMostrarDenegado();
-    }).catch(function() {
-      if (yaResolvio) return;
-      yaResolvio = true;
-      clearTimeout(timeoutFallback);
-      // El propio navegador (no OneSignal) es el que puede rechazar/fallar
-      // el prompt -- probá igual el camino nativo antes de rendirte del
-      // todo (puede que OneSignal.Notifications.requestPermission() haya
-      // fallado por un motivo propio de su SDK, no del permiso en sí).
-      fallbackNativo();
-    });
-  });
-}
+function _activarNotificaciones() { _cerrarNotifGate(); }
 
 // Intenta llevar a la persona directo a los ajustes de notificaciones del
 // sitio -- Android/Chrome soporta un intent especial para eso; iOS no tiene
@@ -417,173 +340,17 @@ function _ajSetToggleOn(cb, on) {
   cb.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
+// OneSignal dado de baja (2026-11-27): la web vieja ya no recibe avisos.
+// `activarPush` lleva a la web nueva; `vincularPush` queda vacía porque la
+// llaman js/auth.js y js/admin.js al iniciar sesión.
 function activarPush() {
-  if (!navegadorRecomendado()) return;
-  var ua = navigator.userAgent;
-  var esIOS = /iPhone|iPad|iPod/.test(ua);
-  if (esIOS && !esStandalone()) { mostrarModalNavegador('ios-instalar'); return; }
-  if (!('Notification' in window)) {
-    mostrarToast('Tu navegador no soporta notificaciones. Usa Chrome, Edge o Firefox en Android/desktop.', 'error');
-    return;
-  }
-  if (Notification.permission === 'denied') {
-    mostrarToast('Las notificaciones están bloqueadas. Ve a Configuración del navegador → Notificaciones y permite este sitio.', 'error');
-    return;
-  }
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    try {
-      var granted = await OneSignal.Notifications.requestPermission();
-      if (granted) {
-        await OneSignal.User.PushSubscription.optIn().catch(function(){});
-        document.getElementById('notif-banner').style.display = 'none';
-        localStorage.setItem('notif_dismiss', '1');
-      }
-    } catch(e) { console.log('OS activar:', e); }
-  });
+  var b = document.getElementById('notif-banner');
+  if (b) b.style.display = 'none';
+  localStorage.setItem('notif_dismiss', '1');
+  mostrarToast('Los avisos llegan en la web nueva: pivot-d65f4.web.app');
 }
 
-// Autorreparación de la suscripción push (pedido explícito, "instalar y
-// aceptar notificaciones una vez debe bastar para siempre" -- caso real:
-// permiso del navegador en 'granted' pero la suscripción de OneSignal se
-// pierde -- `optedIn:false`/`token` vacío, confirmado contra la API real de
-// OneSignal, ver MANIFEST.md) -- si el permiso ya está concedido pero la
-// suscripción no está activa o no tiene token, reintenta `optIn()` sola y en
-// silencio, sin ninguna UI. Se llama al terminar cada `vincularPush()` Y de
-// nuevo cada vez que la propia suscripción cambia (`addEventListener('change', ...)`
-// más abajo) -- cubre tanto el momento del login/restauración como cualquier
-// invalidación posterior durante la misma sesión.
-function _oneSignalAutorreparar(OneSignal) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  var sub = OneSignal.User.PushSubscription;
-  if (!sub.optedIn || !sub.token) {
-    console.log('[VP] autorreparación: suscripción sin token/optedIn, reintentando optIn()');
-    sub.optIn().catch(function(){});
-  }
-}
-
-// Clasifica el estado real de la suscripción push de ESTE dispositivo --
-// mismas 4 categorías que ya usa el servidor (equipo.push_estado, ver
-// PUSH_ESTADOS_VALIDOS/supabase/functions/api/index.ts), extraído a su
-// propia función para que `_reportarEstadoPush()` (reporte al servidor) Y
-// la sección Ajustes → Notificaciones (`_ajEstadoPushTexto()`/js/perfil.js,
-// lectura en vivo para mostrarle el estado a la propia persona) usen
-// exactamente el mismo criterio sin duplicarlo.
-function _calcularEstadoPush(OneSignal) {
-  var perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
-  if (perm === 'denied') return 'bloqueado';
-  if (perm !== 'granted') return 'sin_permiso';
-  var sub = OneSignal.User.PushSubscription;
-  return (sub.optedIn && sub.token) ? 'activo' : 'sin_suscripcion';
-}
-
-// Lee el estado actual vía OneSignalDeferred y lo pasa a `cb(estado)` --
-// usado por Ajustes → Notificaciones para mostrar el estado del
-// dispositivo sin duplicar el acceso a `OneSignal.User.PushSubscription`.
-function _oneSignalEstadoActual(cb) {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(function(OneSignal) { cb(_calcularEstadoPush(OneSignal)); });
-}
-
-// Reporta al backend el estado real de la suscripción push de ESTA cuenta
-// (equipo.push_estado/push_actualizado, ver migración + acción
-// `reportarEstadoPush`/supabase/functions/api/index.ts) -- alimenta la
-// sección "Notificaciones del equipo" de Mi Liga. Solo con `_token` propio
-// (cuenta con fila en `equipo`, mismo criterio que el resto de acciones
-// gateadas por token de esta app) -- una cuenta admin "pura" sin fila no
-// tiene dónde guardar este estado, se omite en silencio. Best-effort, sin
-// onSuccess/onError reales -- un reporte que falla no debe interrumpir nada.
-function _reportarEstadoPush(OneSignal) {
-  if (typeof _token === 'undefined' || !_token) return;
-  var estado = _calcularEstadoPush(OneSignal);
-  // 1 reintento a los 4s si la 1ra falla (red inestable al abrir -- caso
-  // real observado: reporte perdido en silencio pese a que el login/optIn
-  // de arriba sí llegó a buen puerto) -- nunca más de 1, no hace falta un
-  // reintento infinito para un reporte best-effort que de todas formas se
-  // vuelve a mandar en la próxima apertura/evento `change`.
-  api({ action: 'reportarEstadoPush', estado: estado }, function(){}, function() {
-    setTimeout(function() {
-      api({ action: 'reportarEstadoPush', estado: estado }, function(){}, function(){});
-    }, 4000);
-  });
-}
-
-// Listener único de cambio de suscripción (idempotente -- `vincularPush()`
-// puede correr más de una vez por carga de página, ej. login + restauración
-// de sesión compitiendo, y no debe acumular listeners duplicados). Vive acá,
-// no dentro de `vincularPush()`, para que un solo flag de módulo baste sin
-// importar desde qué call site se disparó primero.
-var _pushListenerDeCambioActivo = false;
-function _oneSignalEscucharCambios(OneSignal) {
-  if (_pushListenerDeCambioActivo) return;
-  _pushListenerDeCambioActivo = true;
-  OneSignal.User.PushSubscription.addEventListener('change', function() {
-    console.log('[VP] push subscription change -- optedIn:', OneSignal.User.PushSubscription.optedIn, 'con token:', !!OneSignal.User.PushSubscription.token);
-    _oneSignalAutorreparar(OneSignal);
-    _reportarEstadoPush(OneSignal);
-  });
-}
-
-// Único punto de vinculación de identidad OneSignal de toda la app --
-// `externalId` SIEMPRE el username real (`E.nombre`), salvo la única
-// excepción documentada (cuenta admin sin fila propia en `equipo`, ver
-// call sites en js/auth.js/js/admin.js, que pasan 'admin_'+email acá
-// directo) -- un solo `OneSignal.login()` por apertura, nunca 2 identidades
-// compitiendo por la misma suscripción (bug real corregido: antes el login
-// de usuarix y el de "admin_"+email se pisaban entre sí en cuentas que son
-// las 2 cosas, dejando la suscripción vieja huérfana -- `enabled:false`,
-// token vacío -- y la nueva sin re-vincular hasta el próximo login fresco).
-// `esAdmin` (bool) reemplaza al login separado con 'admin_'+email que hacía
-// esto mismo antes: ahora es un tag (`es_admin`), así una sola identidad
-// puede ser destinataria tanto de los envíos "a esta persona" como de los
-// envíos "a todos los admins" (filtro por tag, ver _adminOneSignalAliases()
-// y sendPush() en supabase/functions/api/index.ts).
-function vincularPush(externalId, esAdmin) {
-  console.log('[VP] vincularPush llamado con:', externalId, 'esAdmin:', !!esAdmin);
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    console.log('[VP] callback ejecutado, externalId:', externalId);
-    try { await OneSignal.Notifications.requestPermission(); } catch(eReq) { console.warn('[VP] requestPermission:', eReq.message); }
-    try {
-      await OneSignal.User.PushSubscription.optIn().catch(function(){});
-      if (externalId) await OneSignal.login(externalId);
-      if (esAdmin) { OneSignal.User.addTag('es_admin', '1').catch(function(){}); }
-      else { OneSignal.User.removeTag('es_admin').catch(function(){}); }
-      console.log('[VP] login OK, optedIn:', OneSignal.User.PushSubscription.optedIn);
-
-      var perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
-      if (perm === 'granted') {
-        var b = document.getElementById('notif-banner');
-        if (b) b.style.display = 'none';
-        _oneSignalAutorreparar(OneSignal);
-      } else if (perm === 'denied') {
-        // Instrucciones breves, una sola vez por sesión de navegador --
-        // evita repetir el mismo toast en cada login/restauración mientras
-        // la persona no haya cambiado el permiso. El gate bloqueante
-        // (#notif-gate, _verificarNotificaciones()/js/pwa.js) ya cubre este
-        // mismo caso dentro de la PWA instalada; este toast cubre el resto
-        // (navegador normal, restauración de sesión sin pasar por el gate).
-        if (!sessionStorage.getItem('_pushDenegadoAvisado')) {
-          sessionStorage.setItem('_pushDenegadoAvisado', '1');
-          if (typeof mostrarToast === 'function') {
-            mostrarToast('Las notificaciones están bloqueadas para Pivot. Ve a Configuración del navegador → Notificaciones y permítelas para recibir avisos.', 'error');
-          }
-        }
-      }
-      // 'default': el navegador ya mostró su prompt nativo vía
-      // `requestPermission()` arriba (o lo mostrará el gate existente,
-      // #notif-gate/#notif-banner) -- nada más que hacer acá.
-
-      _oneSignalEscucharCambios(OneSignal);
-      _reportarEstadoPush(OneSignal);
-    } catch(e) { console.warn('OneSignal vincularPush:', e.message); console.error('vincularPush error:', e); }
-  });
-}
-
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(function(OneSignal) {
-  OneSignal.init({ appId: 'f434ccdc-bcca-40b6-bb64-16b662b8b0d9' });
-});
+function vincularPush() {}
 
 // Modal de instalación post-login (reemplaza al gate bloqueante _verificarPwa(),
 // desactivado en window.onload/js/auth.js) -- se llama desde

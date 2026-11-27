@@ -57,7 +57,6 @@ jobs:
           for d in inscripcion registro-express activar css js shared vieja nueva; do
             [ -d "$d" ] && cp -r "$d" app/build/web/ || true
           done
-          [ -f OneSignalSDKWorker.js ] && cp OneSignalSDKWorker.js app/build/web/ || true
 
       - name: Publicar en Firebase Hosting
         if: ${{ env.FIREBASE_SA != '' }}

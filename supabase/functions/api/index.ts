@@ -16,12 +16,10 @@ const GOOGLE_CLIENT_ID = '632992894668-gnbb5cclsmfdcnve0g34kmue1c72h73q.apps.goo
 const ADMIN_PRINCIPAL  = 'victordbh@gmail.com';
 
 
-const ONESIGNAL_APP_ID  = Deno.env.get('ONESIGNAL_APP_ID')  ?? '';
-const ONESIGNAL_API_KEY = Deno.env.get('ONESIGNAL_API_KEY') ?? '';
 // URL pública de la SPA -- destino de los `url`/`web_buttons` de las push
 // notifications (sendPush(), más abajo). Configurable vía secret para no
 // hardcodear si algún día cambia de dominio; el literal es el dominio real
-// de producción (mismo usado ya en chrome_web_icon de adminEnviarPush()).
+// de producción.
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://pivot-d65f4.web.app';
 // Header x-cron-secret que debe traer cualquier llamada a `action:'cronDiario'`
 // (pg_cron -> net.http_post, ver supabase/migrations) -- sin este secret
@@ -302,7 +300,7 @@ const ACCIONES_SOLO_PIVOTS = new Set([
   'adminGetVenues', 'adminCrearVenue', 'adminEditarVenue', 'adminEliminarVenue',
   'adminGetEquipamiento', 'adminGuardarEquipamiento', 'adminGetTareasActivas', 'adminBuscarPersonasParaEvento',
   'adminGetEstadoPagosMes', 'adminGetPagosAnual', 'adminGetBalanceFinanciero', 'adminGetUsuarios',
-  'adminGetCandidatosAdmin', 'adminGetRosterEquipo', 'adminGetQueLlevar', 'adminEnviarPush',
+  'adminGetCandidatosAdmin', 'adminGetRosterEquipo', 'adminGetQueLlevar',
       'adminGetAdmins', 'adminGetReservas', 'adminGetSolicitudesPago', 'adminResolverSolicitudPago', 'adminGetTareasPendientesValidacion',
 ]);
 
@@ -326,7 +324,7 @@ for (const [area, acciones] of Object.entries({
   inventario: ['adminInventarioLista', 'adminPrestamo', 'adminReglaPrestamo', 'adminGuardarEquipamiento'],
   tareas: ['adminCrearTarea', 'adminEditarTarea', 'adminEliminarTarea', 'adminArchivarTarea', 'adminEliminarTareaArchivada', 'adminValidarTarea', 'adminDesvalidarTarea',
     'adminEditarAsignacionesTarea', 'adminCrearTareaRecurrente', 'adminEditarTareaRecurrente', 'adminEstadoTareaRecurrente', 'adminAplicarTareaRecurrenteHistorico'],
-        liga: ['adminSubirLogo', 'adminGuardarConfigLiga', 'adminGuardarComunidad', 'adminAgregarAdmin', 'adminQuitarAdmin', 'adminEnviarPush', 'adminEnviarAviso', 'adminAvisosProgramados', 'adminGetEstadoPush'],
+        liga: ['adminSubirLogo', 'adminGuardarConfigLiga', 'adminGuardarComunidad', 'adminAgregarAdmin', 'adminQuitarAdmin', 'adminEnviarAviso', 'adminAvisosProgramados', 'adminGetEstadoPush'],
 })) for (const a of acciones) AREA_DE_ACCION[a] = area;
 
 /** Áreas de un Pivot por email (todas si es el principal, el sistema o no tiene límite). */
@@ -11573,17 +11571,6 @@ async function adminGetQueLlevar(): Promise<any[]> {
 
 // ─── Acciones: push ───────────────────────────────────────────────────────────
 
-// Segmento real de OneSignal (TODA suscripción push registrada) -- usado
-// SOLO por adminEnviarPush() (envío manual "a todos", bypasea preferencias
-// a propósito, ver esa función) -- el resto de los envíos (sendPush(), abajo)
-// ya no usa segmentos desde que existen las preferencias por persona (ver
-// más abajo): "a todo el equipo" ahora es "a cada username que lo tenga
-// activado", no un segmento ciego de OneSignal. 'All' (el literal que
-// usaba este archivo antes) NO es un segmento que exista en este proyecto
-// de OneSignal (confirmado contra la API real) -- 'Total Subscriptions' es
-// el único que existe acá sin crear uno nuevo a mano.
-const ONESIGNAL_SEGMENTO_TODOS = 'Total Subscriptions';
-
 // ─── Catálogo único de tipos de notificación (pedido explícito, ver
 // MANIFEST.md sección push) ─────────────────────────────────────────────────
 // Fuente de verdad ÚNICA de qué notificaciones existen -- ni el frontend
@@ -11865,35 +11852,15 @@ async function eliminarDispositivoPush(params: Record<string, any>): Promise<Rec
   return { exito: true };
 }
 
-// Helper genérico de push automáticas (a diferencia de adminEnviarPush(),
-// que es el envío MANUAL desde el panel admin, con su propio payload/target
-// -- este helper no se reusa ahí para no tocar ese flujo ya en producción).
-// Mismo endpoint/convención de auth que ya usa adminEnviarPush() (API v2,
-// sin app_id en la URL, target_channel:'push') -- confirmado funcionando,
-// se reusa tal cual en vez del v1 (`onesignal.com/api/v1/...`, deprecado).
-// Best-effort a propósito: un push que falla nunca debe tumbar la acción
-// real (crear evento, marcar RSVP, etc.) que lo disparó -- un error de
-// OneSignal (status != 2xx) se loguea con console.error (status + body),
-// sin bloquear ni reintentar nada acá.
-// `headings`/`contents` solo exigen 'es' -- si falta 'en', sendPush() lo
-// rellena con el mismo texto en español (notificaciones en ambos idiomas
-// sin traducir de verdad -- esta app es 100% en español, 'en' es solo para
-// que OneSignal no caiga a un default propio en dispositivos con el idioma
-// del sistema en inglés).
-// `include_external_user_ids` (NO `include_aliases.external_id`, que no
-// entrega en este proyecto de OneSignal, ver MANIFEST.md sección push).
-// `tipo` es OBLIGATORIO y se valida contra `CATALOGO_NOTIFICACIONES` --
-// ninguna notificación sin registrar llega a mandarse (`console.error` y
-// return temprano). `broadcastEquipo:true` reemplaza al segmento de antes:
-// resuelve TODO `equipo.username` acá mismo y filtra por preferencia del
-// `tipo` (`_personaQuierePush()`) -- `excluirUsernames` saca, además, a
-// quien no debe recibir su propio aviso (ej. la persona de un cumpleaños).
-// Con `include_external_user_ids` ya armado por el caller (ej. solo quien
-// marcó 'Asistiré'), igual se vuelve a filtrar por preferencia acá -- un
-// username sin fila en `equipo` (alias 'admin_'+email de un admin puro,
-// ver `_adminDestinatariosPush()`) no tiene preferencia que mirar y se
-// manda igual. Lotes de 1000 (OneSignal acepta hasta 2000 por request) --
-// "en lotes si hace falta", pedido explícito.
+// Helper genérico de push (sendPush(), más abajo): manda por Firebase Cloud
+// Messaging a los dispositivos de `dispositivos_push` (app Android y web
+// Flutter). Best-effort: un push que falla nunca tumba la acción real que
+// lo disparó. `tipo` es OBLIGATORIO y se valida contra
+// `CATALOGO_NOTIFICACIONES`. `broadcastEquipo:true` resuelve todo
+// `equipo.username` y filtra por preferencia del `tipo`
+// (`_personaQuierePush()`); `excluirUsernames` saca a quien no debe recibir
+// su propio aviso. Con `include_external_user_ids` (nombre heredado: lista
+// de usernames) armado por quien llama, igual se filtra por preferencia.
 // ─── Palabras según pronombres (Victor, 2026-11-16) ──────────────────────
 // Solo Ella → a ("Lesionada"); solo Él → o; solo Elle → e; varios o ninguno
 // → x. Solo en textos para o sobre una persona. Misma lista que la app
@@ -12005,46 +11972,13 @@ async function sendPush(payload: {
   }
   if (!destinatarios.length) return;
 
-  // App Android nativa (2026-11-06): quien tenga la app instalada recibe
-  // por Firebase Cloud Messaging; el resto (web/iPhone) por OneSignal.
-  // Sin FCM_SERVICE_ACCOUNT configurado, todo sigue por OneSignal.
-  if (FCM_SERVICE_ACCOUNT) {
-    const tokensPorUsuario = await _tokensFcmDe(destinatarios);
-    const conApp = destinatarios.filter((u) => tokensPorUsuario.has(u));
-    if (conApp.length) {
-      await _enviarFcm(conApp.flatMap((u) => tokensPorUsuario.get(u)!), payload);
-      destinatarios = destinatarios.filter((u) => !tokensPorUsuario.has(u));
-      if (!destinatarios.length) return;
-    }
-  }
-  if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) return;
-
-  const headings = { es: payload.headings.es, en: payload.headings.en ?? payload.headings.es };
-  const contents = { es: payload.contents.es, en: payload.contents.en ?? payload.contents.es };
-  const BATCH = 1000;
-  for (let i = 0; i < destinatarios.length; i += BATCH) {
-    const lote = destinatarios.slice(i, i + BATCH);
-    const body: Record<string, any> = {
-      app_id: ONESIGNAL_APP_ID,
-      target_channel: 'push',
-      include_external_user_ids: lote,
-      headings, contents,
-    };
-    if (payload.url) body.url = payload.url;
-    if (payload.web_buttons) body.web_buttons = payload.web_buttons;
-    if (payload.data) body.data = payload.data;
-    try {
-      const resp = await fetch('https://api.onesignal.com/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ONESIGNAL_API_KEY },
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) {
-        const errBody = await resp.text().catch(() => '');
-        console.error('sendPush: OneSignal respondió', resp.status, errBody, 'tipo:', payload.tipo);
-      }
-    } catch (e) { console.error('sendPush: fetch falló', (e as Error).message ?? e, 'tipo:', payload.tipo); }
-  }
+  // Todos los avisos van por Firebase Cloud Messaging (app Android y web
+  // Flutter, tokens en `dispositivos_push`). OneSignal se dio de baja el
+  // 2026-11-27: quien no tiene token no recibe push hasta aceptar los avisos.
+  if (!FCM_SERVICE_ACCOUNT) return;
+  const tokensPorUsuario = await _tokensFcmDe(destinatarios);
+  const conApp = destinatarios.filter((u) => tokensPorUsuario.has(u));
+  if (conApp.length) await _enviarFcm(conApp.flatMap((u) => tokensPorUsuario.get(u)!), payload);
 }
 
 const DIAS_ES  = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -12600,29 +12534,6 @@ async function pushSolicitudPendiente(params: Record<string, any>): Promise<Reco
   return { exito: true };
 }
 
-const PUSH_ESTADOS_VALIDOS = ['activo', 'sin_permiso', 'bloqueado', 'sin_suscripcion'];
-
-// Reporte de estado real de la suscripción push de esta cuenta -- llamada
-// por el frontend en cada apertura con sesión iniciada, tras intentar
-// login/autorreparación de OneSignal (`_reportarEstadoPush()`/js/pwa.js,
-// ver MANIFEST.md sección push). Alimenta `equipo.push_estado`/
-// `push_actualizado` (migración `push_estado_equipo`), que a su vez
-// alimenta la sección "Notificaciones del equipo" de Mi Liga
-// (adminGetEstadoPush(), más abajo). Gateada por `token` propio -- nunca
-// confía en un `username` del body (mismo criterio que el resto de
-// acciones de este archivo).
-async function reportarEstadoPush(params: Record<string, any>): Promise<Record<string, any>> {
-  const username = await _validarToken(params.token);
-  if (!username) return { exito: false, error: 'Sesión inválida.' };
-  const estado = String(params.estado ?? '');
-  if (!PUSH_ESTADOS_VALIDOS.includes(estado)) return { exito: false, error: 'Estado inválido.' };
-  const { error } = await supabase.from('equipo')
-    .update({ push_estado: estado, push_actualizado: new Date().toISOString() })
-    .eq('username', username);
-  if (error) return { exito: false, error: error.message };
-  return { exito: true };
-}
-
 // Estado de push de todo el equipo activo, para la sección "Notificaciones
 // del equipo" de Mi Liga -- admin-only. `EQUIPO_ACTIVO_FILTRO` (arriba, ya
 // usado por cronRecordatorio1Dia()/pushAsistenciaCambio()) excluye
@@ -12632,28 +12543,25 @@ async function adminGetEstadoPush(params: Record<string, any>): Promise<Record<s
   const adminEmail = await _validarAdminToken(params.adminToken);
   if (!adminEmail) return { exito: false, error: 'Sesión admin inválida.' };
   const { data, error } = await supabase.from('equipo')
-    .select('username, nombre_derby, foto_perfil, estado_miembro, push_estado, push_actualizado')
+    .select('username, nombre_derby, foto_perfil, estado_miembro')
     .is('eliminado_en', null)
     .order('username');
     if (error) return { exito: false, error: error.message };
   const activos = (data ?? []).filter((r: any) => EQUIPO_ACTIVO_FILTRO(r));
-  // App Android: tiene al menos un dispositivo registrado (FCM).
+  // Recibe avisos: tiene al menos un dispositivo registrado (FCM, app o web).
   const conApp = await _tokensFcmDe(activos.map((r: any) => r.username));
   const personas = activos
     .map((r: any) => ({
       username: r.username,
       nombreDerby: r.nombre_derby || r.username,
       fotoPerfil: r.foto_perfil || '',
-      pushEstado: r.push_estado || null,
-      pushActualizado: r.push_actualizado || null,
       app: conApp.has(r.username),
     }));
   return { exito: true, personas };
 }
 
 // ─── Avisos de los Pivots (Victor, 2026-11-14) ──────────────────────────────
-// Reemplazo de adminEnviarPush para la app: llega por la app (FCM) y por la
-// web (OneSignal) vía sendPush. `destino` = 'todos' o lista de usernames.
+// Avisos de Pivots: llegan por Firebase (app y web) vía sendPush. `destino` = 'todos' o lista de usernames.
 // Con `enviarEn` futuro queda en `avisos_programados` y lo manda el cron de
 // cada 10 minutos (`_enviarAvisosProgramados`).
 async function _mandarAviso(titulo: string, mensaje: string, destino: unknown): Promise<void> {
@@ -12712,40 +12620,7 @@ async function _enviarAvisosProgramados(): Promise<void> {
   }
 }
 
-async function adminEnviarPush(params: Record<string, any>): Promise<Record<string, any>> {
-  const { titulo, mensaje, destino, sendAfter } = params;
-  if (!titulo || !mensaje) return { exito: false, error: 'Falta título o mensaje.' };
-  if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) return { exito: false, error: 'OneSignal no configurado.' };
-  const payload: Record<string, any> = {
-    app_id: ONESIGNAL_APP_ID, target_channel: 'push',
-    headings: { es: titulo, en: titulo }, contents: { es: mensaje, en: mensaje },
-    chrome_web_icon: 'https://pivot-d65f4.web.app/icons/icon-192B.png',
-  };
-  const destinoArr = destino ? (Array.isArray(destino) ? destino : [destino]) : [];
-  const destinoUnico = [...new Set(destinoArr)];
-  if (destinoUnico.length > 0 && !(destinoUnico.length === 1 && destinoUnico[0] === 'todos')) {
-    // Bug real corregido (ver sendPush() más arriba para el detalle
-    // completo) -- `include_aliases` no entrega en este proyecto de
-    // OneSignal; un envío manual a un destinatario puntual (no "todos")
-    // fallaba acá. `include_external_user_ids` (legado) sí funciona.
-    payload.include_external_user_ids = destinoUnico;
-  } else {
-    payload.included_segments = [ONESIGNAL_SEGMENTO_TODOS];
-  }
-  if (sendAfter) payload.send_after = sendAfter;
-  console.log('OneSignal key presente:', !!Deno.env.get('ONESIGNAL_API_KEY'), 'App ID presente:', !!Deno.env.get('ONESIGNAL_APP_ID'));
-  const resp = await fetch('https://api.onesignal.com/notifications', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ONESIGNAL_API_KEY },
-    body: JSON.stringify(payload),
-  });
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok || body.errors) return { exito: false, error: JSON.stringify(body.errors ?? body) };
-  return { exito: true, id: body.id ?? '' };
-}
-
-// Aviso BROADCAST (`included_segments:['Total Subscriptions']`, TODA
-// suscripción push registrada en OneSignal, sin distinguir equipo/admin/rol)
-// de un cambio de asistencia de un usuario -- complementa a
+// Aviso de un cambio de asistencia de un usuario -- complementa a
 // pushAsistenciaCambio() (arriba), que en cambio avisa solo al EQUIPO ACTIVO
 // (alias por username, tabla `equipo`, excluyendo a quien cambió, filtrado
 // por EQUIPO_ACTIVO_FILTRO). Llamada desde js/eventos.js
@@ -12776,7 +12651,6 @@ async function _notificarCambioAsistenciaCore(username: string, idEventoRaw: unk
   const estadoAnterior = _estadoAsistenciaVacio(estadoAnteriorRaw) ? '' : String(estadoAnteriorRaw).trim();
   if (!idEvento || _estadoAsistenciaVacio(estadoNuevo)) return { exito: false };
   if (estadoAnterior === estadoNuevo) return { exito: true };
-  if (!ONESIGNAL_APP_ID || !ONESIGNAL_API_KEY) return { exito: false };
   const [{ data: ev }, { data: quien }] = await Promise.all([
     supabase.from('asistencias').select('fecha, tipo_evento').eq('id_evento', idEvento).maybeSingle(),
     supabase.from('equipo').select('username, nombre_derby, email').eq('username', username).maybeSingle(),
@@ -12877,22 +12751,11 @@ async function pushEventoCreado(params: Record<string, any>): Promise<Record<str
   const contents = { es: `${_horaEs(hora)} · ${lugar || ''}` };
   const alcance = await _alcanceDeParams(params);
 
-  // Con idEvento -- RSVP directo desde los 2 botones de acción, respondiendo
-  // en BACKGROUND (sin abrir la app, ver OneSignalSDKWorker.js) vía un token
-  // firmado POR PERSONA (_firmarTokenAccion arriba). Eso exige 1 llamada a
-  // OneSignal POR PERSONA -- a diferencia de cualquier otro sendPush() de
-  // este archivo (1 sola llamada broadcast, `broadcastEquipo:true`), el
-  // campo `data` de la API de OneSignal es compartido por TODA la llamada,
-  // no hay forma de variarlo por destinatario dentro de un mismo POST.
-  // `url: '_osp=do_not_open'` en cada botón (magic string documentado por
-  // OneSignal, Chrome/Firefox -- no soportado en Safari, ahí cae al default
-  // de abrir esa "url" literal) para que el handler default de OneSignal no
-  // abra ventana en esos 2 botones -- el clic en el CUERPO sigue abriendo
-  // la app normal (`url` de más arriba, sin tocar). Best-effort por persona
-  // (Promise.allSettled, nunca tumba el resto ni la acción real de crear el
-  // evento) -- mismo espíritu que sendPush(); cada llamada individual ya
-  // filtra por preferencia (`sendPush()`, arriba), así que alguien con
-  // `evento_creado` desactivado tampoco recibe el botón de RSVP.
+  // Con idEvento -- RSVP directo desde los 2 botones de acción del aviso
+  // (record-attendance, sin abrir la app) con un token firmado POR PERSONA
+  // (_firmarTokenAccion arriba): por eso un sendPush() por persona, cada
+  // uno con su `data`. Best-effort (Promise.allSettled); cada envío filtra
+  // por preferencia, así que quien desactivó `evento_creado` no lo recibe.
   if (idEvento && PUSH_TOKEN_SECRET) {
     const { data: equipoRows } = await supabase.from('equipo').select('username').is('eliminado_en', null);
     // Solo a quien le corresponde el evento (sin firmar tokens de más).
@@ -14374,7 +14237,6 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'getEstadisticasPersona':         return json(await getEstadisticasPersona(params));
       case 'adminGetQueLlevar':              return json(await adminGetQueLlevar());
       // Push
-            case 'adminEnviarPush':               return json(await adminEnviarPush(params));
       case 'adminEnviarAviso':              return json(await adminEnviarAviso(params));
       case 'adminAvisosProgramados':        return json(await adminAvisosProgramados(params));
       case 'notificarCambioAsistenciaInterno': {
@@ -14415,7 +14277,6 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       // Push disparados por el frontend (gateados por _validarToken, no admin)
       case 'pushAsistenciaCambio':          return json(await pushAsistenciaCambio(params));
       case 'pushSolicitudPendiente':        return json(await pushSolicitudPendiente(params));
-      case 'reportarEstadoPush':            return json(await reportarEstadoPush(params));
       case 'adminGetEstadoPush':            return json(await adminGetEstadoPush(params));
       case 'getCatalogoNotificaciones':      return json(await getCatalogoNotificaciones());
       case 'getPreferenciasPush':           return json(await getPreferenciasPush(params));

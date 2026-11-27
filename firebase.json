@@ -35,7 +35,7 @@
         ]
       },
       {
-        "source": "**/@(flutter_bootstrap.js|flutter.js|flutter_service_worker.js|firebase-messaging-sw.js|OneSignalSDKWorker.js)",
+        "source": "**/@(flutter_bootstrap.js|flutter.js|flutter_service_worker.js|firebase-messaging-sw.js)",
         "headers": [
           {
             "key": "Cache-Control",

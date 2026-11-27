@@ -382,16 +382,8 @@ class _EstadoAvisosScreenState extends State<EstadoAvisosScreen> {
     }
   }
 
-  /// (llega, texto) según la app Android o el estado de la web.
-  (bool, String) _estado(Map<String, dynamic> x) {
-    if (x['app'] == true) return (true, 'Recibe en la app');
-    return switch ('${x['pushEstado']}') {
-      'activo' => (true, 'Recibe en la web'),
-      'sin_permiso' => (false, 'No dio permiso en la web'),
-      'bloqueado' => (false, 'Las bloqueó en el navegador'),
-      _ => (false, 'No las activó'),
-    };
-  }
+  /// (llega, texto): recibe si tiene la app o la web con los avisos activados.
+  (bool, String) _estado(Map<String, dynamic> x) => x['app'] == true ? (true, 'Recibe avisos') : (false, 'No activó los avisos');
 
   @override
   Widget build(BuildContext context) {
