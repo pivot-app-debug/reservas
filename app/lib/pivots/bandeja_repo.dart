@@ -108,6 +108,32 @@ class BandejaRepo extends ChangeNotifier {
     return '${n['tipo']}:${h.toRadixString(36)}';
   }
 
+  /// Pagos sin terminar descartados (Victor, 2026-11-28): por persona y
+  /// momento, así uno nuevo de la misma persona vuelve a aparecer.
+  final _sinTerminarDescartados = <String>{};
+  bool _sinTerminarLeidos = false;
+  static String claveSinTerminar(Map<String, dynamic> x) => '${x['nombre']}|${x['desde']}';
+
+  Future<void> _leerSinTerminar() async {
+    if (_sinTerminarLeidos) return;
+    _sinTerminarLeidos = true;
+    try {
+      final pr = await SharedPreferences.getInstance();
+      _sinTerminarDescartados.addAll(pr.getStringList('bandeja.sinTerminar.${sesion.nombre}') ?? const []);
+    } catch (_) {}
+  }
+
+  Future<void> descartarSinTerminar(Map<String, dynamic> x) async {
+    _sinTerminarDescartados.add(claveSinTerminar(x));
+    sinTerminar = [...sinTerminar]..remove(x);
+    notifyListeners();
+    try {
+      final pr = await SharedPreferences.getInstance();
+      final l = _sinTerminarDescartados.toList();
+      await pr.setStringList('bandeja.sinTerminar.${sesion.nombre}', l.length > 200 ? l.sublist(l.length - 200) : l);
+    } catch (_) {}
+  }
+
   /// Quita un aviso "Del equipo" y recuerda que ya se descartó.
   Future<void> descartarNovedad(Map<String, dynamic> n) async {
     final k = claveNovedad(n);
@@ -227,7 +253,10 @@ class BandejaRepo extends ChangeNotifier {
   void usarDatos(Map<String, dynamic> r) => _leer(r);
 
   void _leer(Map<String, dynamic> r) {
-    sinTerminar = [for (final x in (r['sinTerminar'] as List? ?? const [])) (x as Map).cast<String, dynamic>()];
+    sinTerminar = [
+      for (final x in (r['sinTerminar'] as List? ?? const []))
+        if (!_sinTerminarDescartados.contains(claveSinTerminar((x as Map).cast<String, dynamic>()))) x.cast<String, dynamic>(),
+    ];
     List<Pedido> lista(String k, TipoPedido t) => [
       for (final x in (r[k] as List? ?? const []))
         if (x is Map<String, dynamic>) Pedido(t, x),
@@ -257,6 +286,7 @@ class BandejaRepo extends ChangeNotifier {
     try {
       final r = await _api.get('adminBandeja', {'adminToken': sesion.adminToken});
       if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar.'}');
+      await _leerSinTerminar();
       _leer(r);
     } catch (e) {
       error = e is ApiException ? e.message : 'No se pudieron cargar las notificaciones. Revisa tu conexión.';

@@ -615,6 +615,12 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
                       ].join(' · '),
                     ),
                     onTap: () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${x['nombre']}'),
+                    // Se puede quitar, como los avisos del equipo (Victor, 2026-11-28).
+                    trailing: IconButton(
+                      tooltip: 'Quitar',
+                      icon: Icon(Icons.close_rounded, size: 20, color: context.pivot.textoSecundario),
+                      onPressed: () => repo.descartarSinTerminar(x),
+                    ),
                   ),
                 ),
               );
