@@ -34,6 +34,11 @@ class MiProgresoHero extends StatelessWidget {
       break;
     }
     final falta = (total - ok).clamp(0, total);
+    // Niveles ya completos, en orden.
+    final completos = [
+      for (final n in NivelesCoach.lista)
+        if (logros.contains(n.clave)) n,
+    ];
     final enProceso = habs.where((h) => h['nivel'] == 'proceso').map((h) => '${h['nombre']}').toList();
     final pruebas = [for (final x in (d?['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
     final ultima = pruebas.where((x) => x['mejor'] != null).firstOrNull;
@@ -68,9 +73,37 @@ class MiProgresoHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('MI PROGRESO', style: st(12.5, FontWeight.w800, 0.9)),
+                    // El título es el nivel en el que estás trabajando; los
+                    // completos van como logro debajo (QA 2026-11-27: decía
+                    // «Habilidades básicas» y parecía que seguías en básicas).
+                    Text(actual == null ? 'MI PROGRESO' : 'MI PROGRESO · TRABAJANDO EN', style: st(12.5, FontWeight.w800, 0.9)),
                     const SizedBox(height: 4),
-                    Text(d == null ? ' ' : (nivelesCoach['${d['nivel'] ?? 'sin'}'] ?? 'Aprendiendo lo básico'), style: st(compacto ? 20 : 24, FontWeight.w900)),
+                    Text(
+                      d == null ? ' ' : (actual?.nombre ?? nivelesCoach['${d['nivel'] ?? 'sin'}'] ?? 'Aprendiendo lo básico'),
+                      style: st(compacto ? 20 : 24, FontWeight.w900),
+                    ),
+                    if (d != null && completos.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final n in completos)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(color: sobre.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_rounded, size: 15, color: sobre),
+                                  const SizedBox(width: 5),
+                                  Text('${n.nombre} completas', style: st(12, FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                     if (d != null && actual != null) ...[
                       const SizedBox(height: 12),
                       ClipRRect(
@@ -86,7 +119,9 @@ class MiProgresoHero extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Expanded(child: Text('Siguiente: ${actual.nombre} · $ok de $total', style: st(13, FontWeight.w700))),
+                          Expanded(
+                            child: Text(ok == 1 ? '1 de $total habilidades logradas' : '$ok de $total habilidades logradas', style: st(13, FontWeight.w700)),
+                          ),
                           Text('${total == 0 ? 0 : (ok * 100 / total).round()} %', style: st(13, FontWeight.w700)),
                         ],
                       ),
@@ -95,7 +130,7 @@ class MiProgresoHero extends StatelessWidget {
                         falta == 0
                             ? 'Ya casi: falta que el equipo técnico lo marque.'
                             // Con el nombre del nivel: antes parecía que faltaban básicas (QA 2026-11-27).
-                            : 'Te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'} para completar ${actual.nombre}.',
+                            : 'Te ${falta == 1 ? 'falta 1 habilidad' : 'faltan $falta habilidades'} para completar este nivel.',
                         style: st(14),
                       ),
                     ] else if (d != null) ...[

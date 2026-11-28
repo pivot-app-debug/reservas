@@ -23,7 +23,7 @@ App de gestión de un equipo de patinaje/derby (Mirlxs): reservas de clases/mens
 - Vista de un equipo: `_bannerSubir()` arriba de todo; «Cómo se paga» dentro de PAGOS antes del premio; «Cómo se ganan puntos» con asistencia y tareas; sin «Hoy lo cumplen».
 - Finanzas: botones «Usé del equipo» y «Devolví al equipo».
 - Calendario: el «+» vuelve a tener «Crear un evento» (Pivots) o «Crear una fiesta» (`puedeCrearSocial`), con `_crearEvento` → `_alCrearEvento`/`_alCrearSocial`.
-- `MiProgresoHero`: «Siguiente: <nivel>» y «Te faltan N habilidades para completar <nivel>».
+- `MiProgresoHero`: título = nivel en el que trabajas («MI PROGRESO · TRABAJANDO EN»), «N de M habilidades logradas», «Te faltan N para completar este nivel» y chips «✓ <nivel> completas» con los niveles ya completos.
 - Inactividad: `equipo.vuelta_en` (migración `*_equipo_vuelta_en.sql`) se anota al volver a Activx desde De viaje, Lesionadx o una ausencia con motivo (`_camposSalidaEstado`); `_ultimaAsistenciaRealPorUsuario()` usa la más reciente entre la última asistencia real y la vuelta, así nadie pasa a Inactivx al volver de un viaje largo.
 
 ## Cursos: pre-armados, reanudar, personas por nivel; planes por persona (2026-11-27)

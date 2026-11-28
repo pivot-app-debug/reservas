@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (Mi progreso más claro)
+- Mi progreso muestra arriba el nivel en el que estás trabajando («Trabajando en: Habilidades avanzadas»), cuántas habilidades lograste de ese nivel y, debajo, los niveles que ya completaste («✓ Habilidades básicas completas»).
+
 ## 2026-11-27 (equipo técnico abierto)
 - Quien está en el equipo técnico también puede sumar gente y cambiar sus equipos; aprobar pedidos y quitar a alguien sigue siendo de los Pivots.
 - Bench también es equipo técnico: quien lo elige en sus roles pide sumarse, como con Coach. En las tarjetas se ve la función (por ejemplo, Bench).
