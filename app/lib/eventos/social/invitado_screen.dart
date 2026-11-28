@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api.dart';
+import '../../core/banner_ayuda.dart';
 import '../../core/cargando.dart';
 import '../../core/fechas.dart';
 import '../../core/monedas_mundo.dart';
@@ -151,6 +152,21 @@ class _InvitadoSocialScreenState extends State<InvitadoSocialScreen> {
           padding: EdgeInsets.fromLTRB(0, 4, 0, 32 + MediaQuery.paddingOf(context).bottom),
           children: [
             _encabezado(e),
+            // Mini guía para quien llega por invitación (QA 2026-11-27).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: BannerAyuda(
+                clave: 'invitado_social',
+                titulo: '¿Cómo funciona tu invitación?',
+                texto: 'Aquí tienes todo lo de la fiesta en un solo lugar. No necesitas crear una cuenta.',
+                pasos: [
+                  (Icons.event_available_outlined, 'Arriba ves la fecha, el lugar y cómo llegar.'),
+                  if (e.modulo('comida')) (Icons.restaurant_outlined, 'En «Qué lleva cada quien» eliges qué vas a llevar.'),
+                  if (e.modulo('amigoSecreto') || e.modulo('regaloRobado')) (Icons.redeem_outlined, 'En los juegos de regalos ves tu parte y el presupuesto.'),
+                  (Icons.refresh_rounded, 'Desliza hacia abajo para ver los cambios más recientes.'),
+                ],
+              ),
+            ),
             if (e.modulo('amigoSecreto')) AmigoSecretoTarjeta(repo: _repo, estado: e, alCambiar: _cargar, simbolo: simbolo),
             if (e.modulo('regaloRobado')) RegaloRobadoTarjeta(estado: e, simbolo: simbolo, repo: _repo, alCambiar: _cargar),
             if (e.modulo('comida')) ComidaTarjeta(repo: _repo, estado: e, alCambiar: _cargar),

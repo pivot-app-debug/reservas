@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (tanda 1 del QA)
+- Novedades: sin la tarjeta «¿Viene algo nuevo?»; los pagos por revisar van primero. La pestaña Entreno pasa a llamarse Progreso. El equipo técnico va arriba y cada persona abre su propia subsección.
+- Mi perfil: el buscador tiene la misma forma que el del Calendario y, al elegir un dato del perfil, la fila parpadea. Sin tour en Mi Liga.
+- Buscador de Liga: entiende fechas («15 de abril», «15/4»), pronombres («ella», «él», «elle») y el nombre de cualquier equipo.
+- Ficha: «Funciones de Pivot» es un solo botón que abre su subsección.
+- Fiestas: quien entra con una invitación ve una mini guía de cómo funciona.
+- Saludos de fin de año que no se pueden apagar: «Feliz Navidad» el día del último entrenamiento antes del 25 de diciembre y las gracias el día después del último entrenamiento del año.
+
 ## 2026-11-27 (Mi progreso más claro)
 - Mi progreso muestra arriba el nivel en el que estás trabajando («Trabajando en: Habilidades avanzadas»), cuántas habilidades lograste de ese nivel y, debajo, los niveles que ya completaste («✓ Habilidades básicas completas»).
 

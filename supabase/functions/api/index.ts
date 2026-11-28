@@ -11700,7 +11700,8 @@ async function adminGetQueLlevar(): Promise<any[]> {
 // `soloAdmin:true` -- categoría que solo tiene efecto real para cuentas
 // admin (el frontend la oculta para el resto, pero el toggle igual se
 // guarda si alguien llega a tocarlo, sin efecto práctico).
-type CatalogoNotifEntry = { clave: string; nombre: string; descripcion: string; categoria: string; soloAdmin?: boolean; soloCoach?: boolean };
+// `fijo:true` -- no se puede apagar ni aparece en Ajustes (saludos de fin de año, Victor 2026-11-27).
+type CatalogoNotifEntry = { clave: string; nombre: string; descripcion: string; categoria: string; soloAdmin?: boolean; soloCoach?: boolean; fijo?: boolean };
 const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'recordatorio_1h', nombre: 'Recordatorio 1 hora antes', descripcion: 'Si marcaste "Asistiré", te avisamos cuando falta 1 hora.', categoria: 'Entrenamientos' },
   { clave: 'recordatorio_1dia', nombre: 'Recordatorio del día anterior', descripcion: 'Te preguntamos si vas, si todavía no respondiste.', categoria: 'Entrenamientos' },
@@ -11732,12 +11733,14 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
   { clave: 'tarea_revisada', nombre: 'Revisión de tus tareas', descripcion: 'Cuando admins aprueban o devuelven una tarea que enviaste.', categoria: 'Tareas' },
     { clave: 'aviso_pivots', nombre: 'Avisos de los Pivots', descripcion: 'Mensajes que los Pivots envían al equipo.', categoria: 'Equipo' },
   { clave: 'social', nombre: 'Sociales y fiestas', descripcion: 'Amigo secreto listo, lo que te falta completar, tu evento aprobado o con cambios y mensajes para ti.', categoria: 'Equipo' },
+  { clave: 'saludo_fin_anio', nombre: 'Saludos de fin de año', descripcion: 'Feliz Navidad en el último entrenamiento antes del 25 y las gracias al terminar el año.', categoria: 'Equipo', fijo: true },
   { clave: 'avisos_admin', nombre: 'Avisos para admins', descripcion: 'Resumen antes del entrenamiento, bajas de última hora, solicitudes pendientes y cambios de reservas.', categoria: 'Administración', soloAdmin: true },
 ];
 const CATALOGO_CLAVES = new Set(CATALOGO_NOTIFICACIONES.map((c) => c.clave));
+const CLAVES_FIJAS = new Set(CATALOGO_NOTIFICACIONES.filter((c) => c.fijo).map((c) => c.clave));
 
 async function getCatalogoNotificaciones(): Promise<Record<string, any>> {
-  return { exito: true, tipos: CATALOGO_NOTIFICACIONES };
+  return { exito: true, tipos: CATALOGO_NOTIFICACIONES.filter((c) => !c.fijo) };
 }
 
 // ─── Preferencias de notificación por persona (migración
@@ -11749,6 +11752,7 @@ async function getCatalogoNotificaciones(): Promise<Record<string, any>> {
 // agregada al catálogo no deja a nadie afuera retroactivamente, nadie tiene
 // que "activarla" a mano.
 function _personaQuierePush(row: { push_notificaciones_activas?: boolean | null; push_preferencias?: Record<string, boolean> | null } | null | undefined, tipo: string): boolean {
+  if (CLAVES_FIJAS.has(tipo)) return true;
   if (!row) return true; // sin fila en `equipo` (ej. admin puro) -- no hay dónde guardar una preferencia, se manda igual
   if (row.push_notificaciones_activas === false) return false;
   const prefs = row.push_preferencias || {};
@@ -13151,6 +13155,32 @@ async function adminEliminarTemporadaDescanso(params: Record<string, any>): Prom
 // supabase/migrations/*_cron_notificaciones_diarias.sql) vía net.http_post
 // con el header `x-cron-secret` -- validado en el router (Deno.serve), no
 // acá, porque necesita leer `req.headers`, no `params`.
+// Saludos de fin de año (Victor, QA 2026-11-27), no se pueden apagar:
+// - El día del último entrenamiento antes del 25 de diciembre: Feliz Navidad.
+// - El día después del último entrenamiento del año: las gracias.
+// Una sola vez por año (push_enviados con id 'navidad-AAAA' / 'gracias-AAAA').
+async function _saludosFinDeAnio(): Promise<void> {
+  const hoy = _hoyEcuadorISO(), ayer = _fechaEcuadorMasDias(-1);
+  const hayEntreno = async (desde: string, hasta: string) => {
+    const { data } = await supabase.from('asistencias').select('id_evento').eq('tipo_evento', 'Entrenamiento')
+      .gte('fecha', desde).lte('fecha', hasta)
+      .not('estado', 'in', '("Evento Cancelado","No se entrena","Eliminado")').limit(1);
+    return (data ?? []).length > 0;
+  };
+  const enviar = async (id: string, titulo: string, texto: string) => {
+    if (!(await _marcarPushEnviado('saludo_fin_anio', id, '*'))) return;
+    await sendPush({ tipo: 'saludo_fin_anio', broadcastEquipo: true, headings: { es: titulo }, contents: { es: texto }, url: APP_URL + '/?tab=eventos' });
+  };
+  const anio = hoy.slice(0, 4);
+  if (hoy.slice(5, 7) === '12' && hoy <= `${anio}-12-24` && (await hayEntreno(hoy, hoy)) && !(await hayEntreno(_fechaEcuadorMasDias(1), `${anio}-12-24`))) {
+    await enviar(`navidad-${anio}`, '🎄 ¡Feliz Navidad!', 'Hoy es el último entrenamiento antes de Navidad. Que pases unas fiestas lindas junto a quienes quieres.');
+  }
+  const anioAyer = ayer.slice(0, 4);
+  if (['11', '12'].includes(ayer.slice(5, 7)) && (await hayEntreno(ayer, ayer)) && !(await hayEntreno(hoy, `${anioAyer}-12-31`))) {
+    await enviar(`gracias-${anioAyer}`, '💛 ¡Gracias por este año!', `Fue un gusto entrenar contigo en ${anioAyer}. Descansa, recarga energía y nos vemos el próximo año.`);
+  }
+}
+
 async function cronDiario(): Promise<Record<string, any>> {
   // Evento social: aviso del día antes (amigo secreto / regalo robado).
     try { await cronSocialRecordatorios(_depsSocial()); } catch (e) { console.error('[social] recordatorio:', e); }
@@ -13175,6 +13205,7 @@ async function cronDiario(): Promise<Record<string, any>> {
     await _guardarPagoCoaches(a);
   } catch (e) { console.error('[coaches] pago:', e); }
     try { await _cronCorteEquipos(); } catch (e) { console.error('[equipos] corte:', e); }
+  try { await _saludosFinDeAnio(); } catch (e) { console.error('[fin de año] saludos:', e); }
   // Avisos del equipo ya enviados o cancelados: se borran a los 30 días para
   // no ocupar la base (Victor, 2026-11-16). Los programados no se tocan.
   try {

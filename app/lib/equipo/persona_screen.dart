@@ -249,9 +249,20 @@ class _FichaState extends State<_Ficha> {
               // También en tu propia ficha: un Pivot puede registrar su pago.
               if (repo.esAdmin) ...[
                 const SizedBox(height: 18),
+                // Un solo botón que abre la subsección (QA 2026-11-27).
                 KeyedSubtree(
                   key: _kPivot,
-                  child: _Administracion(repo: repo, p: p),
+                  child: GrupoAjustes(
+                    filas: [
+                      FilaAjuste(
+                        icono: Icons.admin_panel_settings_outlined,
+                        seccion: 'organizacion',
+                        titulo: 'Funciones de Pivot',
+                        valor: 'Equipo, estado, pagos, permisos y más',
+                        alTocar: () => SubAjustes.abrir<void>(context, _FuncionesPivotScreen(repo: repo, username: p.username)),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -323,6 +334,31 @@ class _Accion extends StatelessWidget {
 }
 
 /// Sección de administración (solo admins; web `_eqAdminBloqueHtml()`).
+/// Subsección con las funciones de Pivot de una persona; se actualiza sola
+/// cuando cambia algo (equipo, estado…).
+class _FuncionesPivotScreen extends StatelessWidget {
+  const _FuncionesPivotScreen({required this.repo, required this.username});
+  final EquipoRepo repo;
+  final String username;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: repo,
+    builder: (context, _) {
+      final p = repo.persona(username);
+      return Scaffold(
+        appBar: AppBar(title: Text(p == null ? 'Funciones de Pivot' : 'Funciones de Pivot · ${p.nombreMostrar}')),
+        body: p == null
+            ? const SizedBox.shrink()
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [_Administracion(repo: repo, p: p)],
+              ),
+      );
+    },
+  );
+}
+
 class _Administracion extends StatefulWidget {
   const _Administracion({required this.repo, required this.p});
   final EquipoRepo repo;
@@ -643,19 +679,7 @@ class _AdministracionState extends State<_Administracion> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Título para encontrarla (Victor, 2026-11-13: no la veía).
-                Row(
-                  children: [
-                    Icon(Icons.admin_panel_settings_outlined, size: 20, color: pal.marcaTexto),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Funciones de Pivot',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: pal.texto),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('Solo las ven los Pivots: pagos, Equipo, permisos y más.', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
+                Text('Solo las ven los Pivots.', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
                 const SizedBox(height: 14),
                 Text('Equipo', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
                 const SizedBox(height: 6),
