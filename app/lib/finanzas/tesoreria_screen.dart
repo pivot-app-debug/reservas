@@ -20,6 +20,7 @@ import '../equipo/equipo_repo.dart';
 import '../eventos/widgets_comunes.dart';
 import '../sesion/sesion.dart';
 import '../pivots/categorias_screen.dart' show cambiarFondosViaje;
+import 'cierre_anual_screen.dart';
 import 'cobros_screen.dart';
 import 'revision_screen.dart';
 import 'cobros_programados_screen.dart';
@@ -129,6 +130,9 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   Map<String, dynamic>? _r;
   String? _error_;
 
+  /// En enero: si el año anterior sigue sin cerrar (Victor, 2026-11-27).
+  bool _cierrePendiente = false;
+
   /// Personas con saldo (debe o a favor) para las tarjetas del inicio.
   List<Map<String, dynamic>> _saldos = const [];
 
@@ -145,8 +149,10 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
     try {
       final rF = repo.accion('resumen');
       final sF = repo.accion('saldos').then<Map<String, dynamic>?>((x) => x).catchError((Object _) => null);
+      final cF = Fechas.hoy().month == 1 ? repo.accion('cierre').then<bool>((x) => x['cerrado'] == null).catchError((Object _) => false) : Future.value(false);
       final r = await rF;
       final s = await sF;
+      _cierrePendiente = await cF;
       if (mounted) {
         setState(() {
           _r = r;
@@ -519,7 +525,30 @@ class _TesoreriaScreenState extends State<TesoreriaScreen> {
   List<Widget> _contenido(BuildContext context, Map<String, dynamic> r, PivotPaleta p) {
     final mes = (r['mes'] as Map?) ?? const {};
     final saldos = (r['saldos'] as Map?) ?? const {};
+    final anioCierre = Fechas.hoy().year - 1;
     return [
+      // Cierre anual: solo en enero y mientras no esté cerrado; si no se
+      // cierra, en febrero desaparece y todo sigue acumulándose.
+      AnimatedSize(
+        duration: const Duration(milliseconds: 250),
+        child: !_cierrePendiente
+            ? const SizedBox(width: double.infinity)
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(Icons.lock_clock_outlined, color: p.marcaTexto),
+                    title: Text('Cerrar las cuentas de $anioCierre', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: const Text('Revisa el año en cuatro pasos y ciérralo. Tienes todo enero.'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      await SubAjustes.abrir<void>(context, CierreAnualScreen(repo: repo, anio: anioCierre));
+                      await _cargar();
+                    },
+                  ),
+                ),
+              ),
+      ),
       // Los movimientos se abren desde aquí (Victor, 2026-11-18): ya no hay
       // lista de últimos movimientos en la portada.
       Resaltable(

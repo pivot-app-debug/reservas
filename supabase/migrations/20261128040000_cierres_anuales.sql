@@ -1,4 +1,4 @@
--- Cierre anual de cuentas (Victor, 2026-11-27). Pendiente de aplicar.
+-- Cierre anual de cuentas (Victor, 2026-11-27).
 create table if not exists public.cierres_anuales (
   id uuid primary key default gen_random_uuid(),
   liga_id uuid not null default coalesce(liga_actual(), '00000000-0000-4000-8000-00000000c0de'::uuid),

@@ -7328,9 +7328,33 @@ function _periodoDeMovimiento(m: Record<string, any>): { mes: number; anio: numb
 }
 
 /** Registra un movimiento (solo si hay cuentas creadas, para no ensuciar antes de empezar). */
+// ─── Cierre anual (Victor, 2026-11-27) ──────────────────────────────────────
+// Un año cerrado queda con candado: no se registran, anulan ni corrigen
+// movimientos con fecha de ese año. Lo automático que llega tarde (un pago de
+// diciembre aprobado en enero) entra el 1 de enero del primer año abierto.
+async function _aniosCerrados(): Promise<Set<number>> {
+  const { data, error } = await supabase.from('cierres_anuales').select('anio');
+  if (error) { console.error('[cierre] lectura:', error.message); return new Set(); }
+  return new Set((data ?? []).map((r: any) => Number(r.anio)));
+}
+async function _anioCerrado(fecha: unknown): Promise<boolean> {
+  const a = Number(String(fecha ?? '').slice(0, 4));
+  return !!a && (await _aniosCerrados()).has(a);
+}
+
 async function _registrarMovimiento(m: Record<string, any>): Promise<string | null> {
   const { count } = await supabase.from('tesoreria_cuentas').select('id', { count: 'exact', head: true });
   if (!count) return null;
+  {
+    const cerrados = await _aniosCerrados();
+    let a = Number(String(m.fecha ?? '').slice(0, 4));
+    if (a && cerrados.has(a)) {
+      const original = a;
+      while (cerrados.has(a)) a++;
+      m.fecha = `${a}-01-01`;
+      m.descripcion = `${m.descripcion ? m.descripcion + ' ' : ''}(del ${original}, ya cerrado)`.slice(0, 300);
+    }
+  }
   if (m.origen && m.origen_id) {
     const { data: ya } = await supabase.from('tesoreria_movimientos').select('id').eq('origen', m.origen).eq('origen_id', String(m.origen_id)).eq('anulado', false).maybeSingle();
     if (ya) return ya.id;
@@ -7352,7 +7376,7 @@ async function _registrarMovimiento(m: Record<string, any>): Promise<string | nu
   return data.id;
 }
 
-async function _saldosCuentas(): Promise<any[]> {
+async function _saldosCuentas(hasta?: string): Promise<any[]> {
   const [{ data: cuentas }, movs, { data: conc }] = await Promise.all([
     supabase.from('tesoreria_cuentas').select('*').order('orden').order('created_at'),
     _paginado((a, b) => supabase.from('tesoreria_movimientos').select('tipo, monto, cuenta_id, cuenta_destino_id, fecha').eq('anulado', false).range(a, b)),
@@ -7361,7 +7385,7 @@ async function _saldosCuentas(): Promise<any[]> {
   return (cuentas ?? []).map((c: any) => {
     let saldo = Number(c.saldo_inicial) || 0;
     for (const m of movs) {
-      if (m.fecha < c.fecha_inicial) continue;
+      if (m.fecha < c.fecha_inicial || (hasta && m.fecha > hasta)) continue;
       const v = Number(m.monto) || 0;
       if (m.tipo === 'ingreso' && m.cuenta_id === c.id) saldo += v;
       if (m.tipo === 'egreso' && m.cuenta_id === c.id) saldo -= v;
@@ -7912,6 +7936,7 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
   }
 
   if (accion === 'registrar') {
+    if (await _anioCerrado(fechaOk(d.fecha) ?? hoy)) return { exito: false, error: `Las cuentas de ${String(d.fecha).slice(0, 4)} ya están cerradas. Usa una fecha de este año.` };
     const tipo = ['ingreso', 'egreso', 'transferencia'].includes(String(d.tipo)) ? String(d.tipo) : '';
     const monto = _num2(Number(d.monto));
     if (!tipo) return { exito: false, error: 'Tipo inválido.' };
@@ -8016,6 +8041,7 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     const { data: m } = await supabase.from('tesoreria_movimientos').select('*').eq('id', d.id).maybeSingle();
     if (!m) return { exito: false, error: 'No se encontró el movimiento.' };
     if (m.anulado) return { exito: false, error: 'Ya estaba anulado.' };
+    if (await _anioCerrado(m.fecha)) return { exito: false, error: `Las cuentas de ${String(m.fecha).slice(0, 4)} ya están cerradas: este movimiento no se puede cambiar.` };
     const motivo = String(d.motivo ?? '').trim().slice(0, 200) || (accion === 'corregir' ? 'Corrección' : 'Anulado');
     await supabase.from('tesoreria_movimientos').update({ anulado: true, anulado_por: email, anulado_en: new Date().toISOString(), motivo_anulacion: motivo }).eq('id', m.id);
     // Corregir crea el reemplazo enseguida, así que el origen sigue vivo; anular lo cancela.
@@ -8148,6 +8174,49 @@ async function adminTesoreria(params: Record<string, any>): Promise<Record<strin
     return { exito: true };
   }
 
+  // Cierre anual: revisión, equipo técnico, saldos, resumen y candado.
+  if (accion === 'cierre' || accion === 'cerrarAnio') {
+    const anio = Number(d.anio) || Number(hoy.slice(0, 4)) - 1;
+    if (anio >= Number(hoy.slice(0, 4))) return { exito: false, error: 'Solo se cierra un año que ya terminó.' };
+    const fin = `${anio}-12-31`, ini = `${anio}-01-01`;
+    const { data: ya } = await supabase.from('cierres_anuales').select('*').eq('anio', anio).maybeSingle();
+    if (ya) return { exito: true, anio, cerrado: { en: ya.cerrado_en, por: ya.cerrado_por }, resumen: ya.resumen };
+    const [cuentasFin, cuentasHoy, movs, saldos, coaches] = await Promise.all([
+      _saldosCuentas(fin), _saldosCuentas(),
+      _paginado((a, b) => supabase.from('tesoreria_movimientos').select('fecha, tipo, monto, categoria').eq('anulado', false).in('tipo', ['ingreso', 'egreso']).gte('fecha', ini).lte('fecha', fin).range(a, b)),
+      adminTesoreria({ ...params, accion: 'saldos' }),
+      adminPagoCoaches({ adminToken: params.adminToken, anio }),
+    ]);
+    const meses: Record<string, { ingresos: number; egresos: number }> = {};
+    const porCat: Record<string, { ingresos: number; egresos: number }> = {};
+    let ingresos = 0, egresos = 0;
+    for (const m of movs) {
+      const v = Number(m.monto) || 0, k = String(m.fecha).slice(0, 7), c = String(m.categoria || 'otro');
+      const x = meses[k] ??= { ingresos: 0, egresos: 0 }, y = porCat[c] ??= { ingresos: 0, egresos: 0 };
+      if (m.tipo === 'ingreso') { ingresos += v; x.ingresos = _num2(x.ingresos + v); y.ingresos = _num2(y.ingresos + v); }
+      else { egresos += v; x.egresos = _num2(x.egresos + v); y.egresos = _num2(y.egresos + v); }
+    }
+    const conciliadaHoy: Record<string, any> = {}; cuentasHoy.forEach((c) => { conciliadaHoy[c.id] = c.conciliacion; });
+    const cuentas = cuentasFin.filter((c) => c.activa || c.saldo !== 0).map((c) => ({
+      id: c.id, nombre: c.nombre, saldo: c.saldo, conciliada: !!conciliadaHoy[c.id] && String(conciliadaHoy[c.id].fecha) >= `${anio}-12-01`,
+    }));
+    const personas = (saldos.personas ?? []) as any[];
+    const tecnico = ((coaches.deuda ?? []) as any[]).filter((x) => x.seLeDebe > 0);
+    const resumen = {
+      anio, ingresos: _num2(ingresos), egresos: _num2(egresos), resultado: _num2(ingresos - egresos),
+      saldoFinal: _num2(cuentas.reduce((t, c) => t + c.saldo, 0)), cuentas, meses, categorias: porCat,
+      deben: personas.filter((p) => p.saldo < 0).map((p) => ({ nombre: p.nombre, saldo: p.saldo })),
+      aFavor: personas.filter((p) => p.saldo > 0).map((p) => ({ nombre: p.nombre, saldo: p.saldo })),
+      tecnico: tecnico.map((x) => ({ nombre: x.nombre, monto: x.seLeDebe })),
+    };
+    if (accion === 'cierre') return { exito: true, anio, cerrado: null, disponible: hoy.slice(5, 7) === '01', resumen };
+    if (!(await _areasDe(email)).includes('finanzas')) return { exito: false, error: 'Solo un Pivot de Finanzas puede cerrar las cuentas.' };
+    const { error } = await supabase.from('cierres_anuales').insert({ anio, cerrado_por: email, resumen });
+    if (error) return { exito: false, error: error.code === '23505' ? `Las cuentas de ${anio} ya estaban cerradas.` : 'No se pudo cerrar. Intenta de nuevo.' };
+    await _registrarAjuste('cierre_anual', null, anio, email);
+    return { exito: true, anio, cerrado: { en: new Date().toISOString(), por: email }, resumen };
+  }
+
   if (accion === 'transparencia') {
     const v = d.activa === true || d.activa === 'true';
     await supabase.from('config_app').upsert({ key: 'tesoreria_transparencia', value: v ? 'true' : 'false' }, { onConflict: 'liga_id,key' });
@@ -8233,7 +8302,10 @@ async function getTransparencia(params: Record<string, any>): Promise<Record<str
     else { x.egresos = _num2(x.egresos + Number(m.monto)); x.gastos[m.categoria] = _num2((x.gastos[m.categoria] ?? 0) + Number(m.monto)); }
   }
   const cuentas = await _saldosCuentas();
-  return { exito: true, activa: true, total: _num2(cuentas.filter((c) => c.activa).reduce((s, c) => s + c.saldo, 0)), meses };
+  // Cierres anuales: solo totales, nunca datos de personas.
+  const { data: cierres } = await supabase.from('cierres_anuales').select('anio, cerrado_en, resumen').order('anio', { ascending: false });
+  const cierresPublicos = (cierres ?? []).map((c: any) => ({ anio: c.anio, cerradoEn: c.cerrado_en, ingresos: c.resumen?.ingresos ?? 0, egresos: c.resumen?.egresos ?? 0, resultado: c.resumen?.resultado ?? 0, saldoFinal: c.resumen?.saldoFinal ?? 0, categorias: c.resumen?.categorias ?? {} }));
+  return { exito: true, activa: true, total: _num2(cuentas.filter((c) => c.activa).reduce((s, c) => s + c.saldo, 0)), meses, cierres: cierresPublicos };
 }
 
 // ─── Acciones: pagos ──────────────────────────────────────────────────────────
@@ -13181,6 +13253,19 @@ async function _saludosFinDeAnio(): Promise<void> {
   }
 }
 
+// 1 de enero: a los Pivots de Finanzas, que cierren las cuentas del año anterior.
+async function _recordarCierreAnual(): Promise<void> {
+  const hoy = _hoyEcuadorISO();
+  if (hoy.slice(5) !== '01-01') return;
+  const anio = Number(hoy.slice(0, 4)) - 1;
+  if ((await _aniosCerrados()).has(anio)) return;
+  if (!(await _marcarPushEnviado('avisos_admin', `cierre-${anio}`, '*'))) return;
+  await sendPush({
+    tipo: 'avisos_admin', include_external_user_ids: await _adminDestinatariosPush(undefined, 'finanzas'),
+    headings: { es: '🎉 ¡Feliz año!' }, contents: { es: `Recuerda cerrar las cuentas de ${anio} en Finanzas. Tienes todo enero para hacerlo.` }, url: APP_URL + '/',
+  });
+}
+
 async function cronDiario(): Promise<Record<string, any>> {
   // Evento social: aviso del día antes (amigo secreto / regalo robado).
     try { await cronSocialRecordatorios(_depsSocial()); } catch (e) { console.error('[social] recordatorio:', e); }
@@ -13206,6 +13291,7 @@ async function cronDiario(): Promise<Record<string, any>> {
   } catch (e) { console.error('[coaches] pago:', e); }
     try { await _cronCorteEquipos(); } catch (e) { console.error('[equipos] corte:', e); }
   try { await _saludosFinDeAnio(); } catch (e) { console.error('[fin de año] saludos:', e); }
+  try { await _recordarCierreAnual(); } catch (e) { console.error('[cierre] recordatorio:', e); }
   // Avisos del equipo ya enviados o cancelados: se borran a los 30 días para
   // no ocupar la base (Victor, 2026-11-16). Los programados no se tocan.
   try {

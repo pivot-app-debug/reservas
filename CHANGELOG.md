@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (cierre anual de cuentas)
+- En enero, Finanzas muestra «Cerrar las cuentas de AAAA». Cualquier Pivot de Finanzas lo revisa en cuatro pasos (revisión de cuentas al 31 de diciembre, lo que se le debe al equipo técnico, saldos de personas y resumen con Excel) y lo cierra con candado. No se puede reabrir.
+- Un año cerrado no admite movimientos nuevos, anulaciones ni correcciones. Si llega algo automático con fecha de ese año (un pago aprobado tarde), entra el 1 de enero siguiente con la nota «(del AAAA, ya cerrado)».
+- La deuda con el equipo técnico y los saldos de cada persona pasan al año nuevo. Si no se cierra en enero, la tarjeta desaparece y todo sigue acumulándose.
+- El 1 de enero llega a los Pivots de Finanzas «🎉 ¡Feliz año! Recuerda cerrar las cuentas…». Con la transparencia activa, el resumen (solo totales) se incluye en `getTransparencia`.
+
 ## 2026-11-27 (tanda 1 del QA)
 - Novedades: sin la tarjeta «¿Viene algo nuevo?»; los pagos por revisar van primero. La pestaña Entreno pasa a llamarse Progreso. El equipo técnico va arriba y cada persona abre su propia subsección.
 - Mi perfil: el buscador tiene la misma forma que el del Calendario y, al elegir un dato del perfil, la fila parpadea. Sin tour en Mi Liga.
