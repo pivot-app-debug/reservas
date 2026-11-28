@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (Liga más limpia)
+- Liga: sin los botones con borde al final de cada sección. La acción va en el encabezado de la sección abierta: ícono de ajustes para Gestionar (Pivots), de archivadas en Inactivxs y flecha › para ver el equipo. «Crear equipo» queda en Equipos y puntos.
+
 ## 2026-11-28 (ajustes de Progreso)
 - El carrusel del equipo técnico ya no parpadea al hacer scroll: queda siempre visible.
 - El asistente de armar plan, abierto desde un entrenamiento, se cierra con atrás en lugar de volver a la lista de fechas. Lo mismo con «Agregar» en Habilidades: al volver se sale directo a Progreso.

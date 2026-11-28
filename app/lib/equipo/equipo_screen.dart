@@ -21,7 +21,7 @@ import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
 import '../coach/coach_screen.dart' show CoachScreen, CoachesScreen;
 import '../eventos/eventos_repo.dart';
 import '../finanzas/tesoreria_screen.dart';
-import '../pivots/categorias_screen.dart' show VerEquipoScreen, NuevoEquipoScreen;
+import '../pivots/categorias_screen.dart' show VerEquipoScreen;
 import '../pivots/ajustes_liga_screen.dart' show AjustesLigaScreen;
 import '../pivots/archivadas_screen.dart' show ArchivadasScreen;
 import '../pivots/pivots_screen.dart' show PivotsScreen;
@@ -482,50 +482,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     onTap: () => _abrir(x),
   );
 
-  /// Botones al final de cada sección (Victor, QA 2026-11-26): tocar el
-  /// título se veía poco, así que cada lista termina con "Gestionar …" y, en
-  /// los equipos, "Crear equipo" al lado (solo Pivots).
-  Widget _accionesSeccion(String g) {
-    final s = repo.sesion;
-    final esEquipo = g != 'Inactivxs' && g != 'Coaches' && g != 'Pivots';
-    final String? texto = switch (g) {
-      'Inactivxs' => _pivot ? 'Personas archivadas' : null,
-      'Coaches' => _seEntra('Coaches') ? (_pivot ? 'Gestionar equipo técnico' : 'Ver equipo técnico') : null,
-      'Pivots' => _pivot ? 'Gestionar Pivots' : null,
-      _ => _pivot ? 'Gestionar $g' : 'Ver $g',
-    };
-    if (texto == null) return const SizedBox(height: 8);
-    final gestionar = OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-      onPressed: () => _entrar(g),
-      icon: Icon(esEquipo && _pivot ? Icons.tune_rounded : (g == 'Inactivxs' ? Icons.inventory_outlined : Icons.chevron_right_rounded), size: 20),
-      label: Text(texto, maxLines: 1, overflow: TextOverflow.ellipsis),
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      // Uno encima del otro: con un nombre de equipo largo, lado a lado se cortaban (QA 2026-11-27).
-      child: esEquipo && _pivot
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                gestionar,
-                const SizedBox(height: 8),
-                SizedBox(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                    onPressed: () async {
-                      await SubAjustes.abrir<void>(context, NuevoEquipoScreen(sesion: s));
-                      if (mounted) repo.cargar(forzar: true);
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 20),
-                    label: const Text('Crear equipo', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-              ],
-            )
-          : gestionar,
-    );
-  }
+  /// Sin botones al final (QA 2026-11-28: hacían ruido visual): la acción
+  /// de cada sección es el ícono del encabezado; «Crear equipo» vive en
+  /// Equipos y puntos.
+  Widget _accionesSeccion(String g) => const SizedBox(height: 8);
 
   /// Encabezado del acordeón: tarjeta con nombre, cantidad y flecha.
   /// Tocar la abierta no hace nada (siempre queda una abierta).
@@ -585,10 +545,13 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                           opacity: a,
                           child: RotationTransition(turns: Tween(begin: 0.75, end: 1.0).animate(a), child: c),
                         ),
+                        // Abierta: ícono de la acción (gestionar, archivadas o ver).
                         child: Icon(
-                          abierta && _seEntra(titulo) ? Icons.chevron_right_rounded : (abierta ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                          abierta && _seEntra(titulo)
+                              ? (_pivot ? (titulo == 'Inactivxs' ? Icons.inventory_2_outlined : Icons.tune_rounded) : Icons.chevron_right_rounded)
+                              : (abierta ? Icons.expand_less_rounded : Icons.expand_more_rounded),
                           key: ValueKey('${abierta && _seEntra(titulo)}-$abierta'),
-                          color: abierta && _seEntra(titulo) ? p.texto : p.textoSecundario,
+                          color: abierta && _seEntra(titulo) ? p.marcaTexto : p.textoSecundario,
                         ),
                       ),
                     ],
