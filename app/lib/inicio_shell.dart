@@ -1,6 +1,9 @@
 import 'pivots/bandeja_repo.dart' show BandejaRepo;
 
 import 'package:flutter/material.dart';
+
+import 'reservas/comprobante.dart' show recordarComprobante;
+
 import 'package:flutter/services.dart';
 
 import 'liga/directorio_screen.dart';
@@ -125,6 +128,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     if (!mounted) return;
     // Pantalla de pago si la liga bloquea a quien debe (Victor, 2026-11-26).
     await PantallaDeuda.siCorresponde(context, widget.repo);
+    if (!mounted) return;
+    // Pago sin comprobante: se insiste cada vez que abre la app (Victor, 2026-11-28).
+    await recordarComprobante(context, widget.repo);
     if (!mounted) return;
     // Cambio de equipo por ver (Victor, 2026-11-16).
     await mostrarAvisoCambioEquipo(context, widget.sesion);

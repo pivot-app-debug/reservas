@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../eventos/eventos_repo.dart';
 import 'reservas_repo.dart';
 
 /// Elige la captura del pago y la sube a esas reservas (Victor, 2026-11-14).
@@ -105,5 +106,62 @@ class ComprobanteFaltante extends StatelessWidget {
               ),
             ),
     );
+  }
+}
+
+/// Insistir con el comprobante (Victor, 2026-11-28): cada vez que se abre la
+/// app, si hay un pago sin comprobante, se avisa que sin él no se aprueba.
+Future<void> recordarComprobante(BuildContext context, EventosRepo eventos) async {
+  if (eventos.cuota == null) {
+    try {
+      await eventos.recargarCuota();
+    } catch (_) {
+      return;
+    }
+  }
+  final c = eventos.cuota;
+  if (c == null || !context.mounted) return;
+  final faltan = ReservasRepo.activas(c).where((r) => r.faltaComprobante && r.id.isNotEmpty).toList();
+  if (faltan.isEmpty) return;
+  final p = context.pivot;
+  final si = await showModalBottomSheet<bool>(
+    useRootNavigator: true,
+    context: context,
+    showDragHandle: true,
+    builder: (h) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 40, color: p.marcaTexto),
+            const SizedBox(height: 10),
+            Text(
+              faltan.length == 1 ? 'Falta tu comprobante' : 'Faltan ${faltan.length} comprobantes',
+              textAlign: TextAlign.center,
+              style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${faltan.map((r) => r.titulo).join(' · ')}. Si no adjuntas la captura del pago, tu pago no se aprobará.',
+              textAlign: TextAlign.center,
+              style: TextStyle(height: 1.4, color: p.texto),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(h).pop(true),
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: const Text('Adjuntar comprobante'),
+            ),
+            TextButton(onPressed: () => Navigator.of(h).pop(false), child: const Text('Más tarde')),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (si != true || !context.mounted) return;
+  if (await subirComprobante(context, ReservasRepo(eventos.sesion), [for (final r in faltan) r.id])) {
+    await eventos.recargarCuota();
   }
 }

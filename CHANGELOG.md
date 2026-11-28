@@ -2,6 +2,10 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (comprobante más insistente)
+- Cada vez que se abre la app, si hay un pago sin comprobante, aparece «Falta tu comprobante» con lo que falta y «Si no adjuntas la captura del pago, tu pago no se aprobará», con el botón para adjuntarlo.
+- Los avisos de comprobante llegan a las 2 horas y después cada 12 horas (hasta 5) y dicen que sin comprobante el pago no se aprobará. Quien ya está con Asistiré lo mantiene.
+
 ## 2026-11-28 (formularios de fiestas)
 - En fiestas y eventos sociales, los formularios con campos de texto (agregar algo para llevar, consumo por persona, tarjetas y juegos) se abren como subsección en lugar de bottom sheet. Los que solo tienen opciones siguen como bottom sheet.
 

@@ -7560,23 +7560,24 @@ async function _descartarSinComprobante(ahora = Date.now()): Promise<void> {
   }
 }
 
-/** Cada hora: recuerda el comprobante a las 2 h y al día siguiente; borra imágenes de más de 30 días. */
+/** Cada hora: recuerda el comprobante a las 2 h y después cada 12 h (hasta 5 veces,
+ *  Victor 2026-11-28: más insistente); borra imágenes de más de 30 días. */
 async function _recordarComprobantes(ahora: number): Promise<void> {
   try { await _descartarSinComprobante(ahora); } catch (e) { console.error('[comprobantes] descartar:', e); }
   // Las que ya tienen plazo de 24 h (las pidió un Pivot) no reciben estos avisos.
   const { data } = await supabase.from('reservas').select('id, nombre_usuario, tipo, mes_texto, created_at, comprobante_avisos, comprobante_ultimo_aviso')
-    .eq('estado', 'Pendiente').gt('monto', 0).is('comprobante_subido_en', null).is('comprobante_limite', null).gte('created_at', COMPROBANTES_DESDE).lt('comprobante_avisos', 2);
+    .eq('estado', 'Pendiente').gt('monto', 0).is('comprobante_subido_en', null).is('comprobante_limite', null).gte('created_at', COMPROBANTES_DESDE).lt('comprobante_avisos', 5);
   // Una sola notificación por persona aunque tenga varias reservas.
   const porPersona: Record<string, any[]> = {};
   for (const r of data ?? []) {
     const n = Number(r.comprobante_avisos) || 0;
-    const desde = n === 0 ? Date.parse(r.created_at) + 2 * 3600e3 : Date.parse(r.comprobante_ultimo_aviso ?? r.created_at) + 22 * 3600e3;
+    const desde = n === 0 ? Date.parse(r.created_at) + 2 * 3600e3 : Date.parse(r.comprobante_ultimo_aviso ?? r.created_at) + 12 * 3600e3;
     if (ahora >= desde) (porPersona[r.nombre_usuario] ??= []).push(r);
   }
   for (const [u, rs] of Object.entries(porPersona)) {
     const una = rs.length === 1;
     await sendPush({ tipo: 'comprobante_pendiente', include_external_user_ids: [u], headings: { es: 'Falta tu comprobante' },
-      contents: { es: una ? `Sube el comprobante de ${rs[0].tipo === 'mensual' ? `tu mensualidad ${rs[0].mes_texto ?? ''}`.trim() : 'tu suscripción a la clase'} para que un Pivot pueda confirmarla.` : `Sube el comprobante de tus ${rs.length} suscripciones para que un Pivot pueda confirmarlas.` },
+      contents: { es: una ? `Sube el comprobante de ${rs[0].tipo === 'mensual' ? `tu mensualidad ${rs[0].mes_texto ?? ''}`.trim() : 'tu suscripción a la clase'}. Si no lo adjuntas, tu pago no se aprobará.` : `Sube el comprobante de tus ${rs.length} suscripciones. Si no lo adjuntas, tus pagos no se aprobarán.` },
       url: APP_URL }).catch(() => {});
     for (const r of rs) await supabase.from('reservas').update({ comprobante_avisos: (Number(r.comprobante_avisos) || 0) + 1, comprobante_ultimo_aviso: new Date(ahora).toISOString() }).eq('id', r.id);
   }
