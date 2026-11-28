@@ -220,6 +220,34 @@
     </div>
   </div>
 
+  <!-- ── PASO FUNCIÓN: Personal de liga (Victor, 2026-11-27) ── -->
+  <div class="insc-step" id="insc-step-funcion">
+    <div class="insc-scroll">
+      <h2>¿Cuál es tu función en la liga?</h2>
+      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:16px;line-height:1.6;">Entras como Personal de liga: no pagas cuota, no sumas puntos y puedes confirmar tu asistencia a los entrenamientos.</p>
+      <div class="equip-pills-bin" id="insc-funcion-pills">
+        <div class="equip-pill-bin" data-val="Bench" onclick="inscSelBin(this,'insc-funcion-pills')">
+          <span class="material-symbols-outlined equip-pill-ico">event_seat</span>
+          <span class="equip-pill-label">Bench</span>
+        </div>
+        <div class="equip-pill-bin" data-val="Coach" onclick="inscSelBin(this,'insc-funcion-pills')">
+          <span class="material-symbols-outlined equip-pill-ico">sports</span>
+          <span class="equip-pill-label">Coach</span>
+        </div>
+        <div class="equip-pill-bin" data-val="NSO" onclick="inscSelBin(this,'insc-funcion-pills')">
+          <span class="material-symbols-outlined equip-pill-ico">timer</span>
+          <span class="equip-pill-label">NSO</span>
+        </div>
+        <div class="equip-pill-bin" data-val="SO" onclick="inscSelBin(this,'insc-funcion-pills')">
+          <span class="material-symbols-outlined equip-pill-ico">sports_score</span>
+          <span class="equip-pill-label">SO</span>
+        </div>
+      </div>
+      <div class="error-msg" id="err-pfuncion"></div>
+      <div class="cta-footer-spacer"></div>
+    </div>
+  </div>
+
   <!-- ── PASO 5B: Talla ── -->
   <div class="insc-step" id="insc-step-5b">
     <div class="insc-scroll">
@@ -421,6 +449,9 @@
 </div>
 <div class="cta-footer-fixed" id="cta-footer-insc-step-5a">
   <button class="btn btn-outline" onclick="inscContinuar5a()">Continuar <span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;">arrow_forward</span></button>
+</div>
+<div class="cta-footer-fixed" id="cta-footer-insc-step-funcion">
+  <button class="btn btn-outline" onclick="inscContinuarFuncion()">Continuar <span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;">arrow_forward</span></button>
 </div>
 <div class="cta-footer-fixed" id="cta-footer-insc-step-5b">
   <button class="btn btn-outline" onclick="inscContinuar5b()">Continuar <span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;">arrow_forward</span></button>

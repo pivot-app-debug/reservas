@@ -4,7 +4,6 @@ import '../ajustes/componentes.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import '../coach/coach_screen.dart';
 import '../core/pronombres.dart';
 import '../core/sincroniza.dart';
 
@@ -175,7 +174,7 @@ class _FichaState extends State<_Ficha> {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  Etiqueta(texto: p.categoria),
+                  Etiqueta(texto: p.personalLiga ? p.etiquetaPersonal : p.categoria),
                   if (estado != null) Etiqueta(texto: estado.texto),
                 ],
               ),
@@ -203,29 +202,13 @@ class _FichaState extends State<_Ficha> {
                 ),
               ],
               const SizedBox(height: 18),
+              // Estadísticas cortas a la vista; al tocarlas, la vista detallada.
+              // Mi progreso salió de la ficha (QA 2026-11-27): vive en Progreso.
+              _ResumenStats(p: p, alTocar: () => EstadisticasScreen.abrir(context, repo, p)),
+              const SizedBox(height: 12),
               GrupoAjustes(
                 titulo: 'EN EL EQUIPO',
                 filas: [
-                  FilaAjuste(
-                    icono: Icons.insights_rounded,
-                    seccion: 'reservas',
-                    titulo: 'Estadísticas',
-                    valor: 'Asistencia y puntos',
-                    alTocar: () => EstadisticasScreen.abrir(context, repo, p),
-                  ),
-                  if (yo || repo.esAdmin || repo.sesion.esCoach)
-                    FilaAjuste(
-                      // "Mi progreso" (Victor, 2026-11-26: antes Ficha deportiva).
-                      icono: Icons.trending_up_rounded,
-                      seccion: 'entrenamientos',
-                      titulo: yo ? 'Mi progreso' : 'Progreso',
-                      valor: 'Habilidades y notas',
-                      alTocar: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => FichaDeportivaScreen(sesion: repo.sesion, username: yo ? null : p.username, nombre: p.nombreMostrar),
-                        ),
-                      ),
-                    ),
                   if (p.fechaIngreso != null)
                     // "En la liga": la persona puede cambiar de equipo (Victor, 2026-11-17).
                     FilaAjuste(icono: Icons.event_available_rounded, seccion: 'ingreso', titulo: 'En la liga desde', valor: Fechas.corta(p.fechaIngreso!)),
@@ -644,6 +627,19 @@ class _AdministracionState extends State<_Administracion> {
     await _hacer(() => widget.repo.cambiarEstado(p, e), 'Estado actualizado');
   }
 
+  Future<void> _cambiarPersonal(bool si) async {
+    final p = widget.p;
+    final ok = await _confirmar(
+      si ? '¿Pasar a Personal de liga?' : '¿Quitar de Personal de liga?',
+      si
+          ? '${p.nombreMostrar} deja de estar en un equipo, no paga cuota y no suma puntos. Sus puntos ya ganados no cambian.'
+          : '${p.nombreMostrar} vuelve a su equipo, a pagar cuota y a sumar puntos.',
+      si ? 'Pasar' : 'Quitar',
+    );
+    if (!ok) return;
+    await _hacer(() => widget.repo.cambiarPersonalLiga(p, si), si ? 'Ahora es Personal de liga' : 'Ya no es Personal de liga');
+  }
+
   Future<bool> _confirmar(String titulo, String texto, String si) async {
     final r = await showDialog<bool>(
       context: context,
@@ -680,7 +676,17 @@ class _AdministracionState extends State<_Administracion> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Solo las ven los Pivots.', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
+                // Personal de liga (Victor, 2026-11-27): sin equipo, cuota ni puntos.
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: p.personalLiga,
+                  onChanged: _ocupado ? null : _cambiarPersonal,
+                  secondary: Icon(Icons.badge_outlined, color: pal.marcaTexto),
+                  title: const Text('Personal de liga', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('No juega: sin equipo, sin cuota y sin puntos. Puede confirmar asistencia.'),
+                ),
+                const SizedBox(height: 6),
                 Text('Equipo', style: TextStyle(fontSize: 13, color: pal.textoSecundario)),
                 const SizedBox(height: 6),
                 // Equipos de la liga, no fijos (Victor, 2026-11-17).
@@ -1048,6 +1054,67 @@ class _HojaAsistenciaExternaState extends State<_HojaAsistenciaExterna> {
             child: const Text('Registrar'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Asistencia, puntos y racha en una tarjeta (QA 2026-11-27).
+class _ResumenStats extends StatelessWidget {
+  const _ResumenStats({required this.p, required this.alTocar});
+  final Integrante p;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = context.pivot;
+    Widget dato(String valor, String etiqueta) => Expanded(
+      child: Column(
+        children: [
+          Text(
+            valor,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: pal.texto),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            etiqueta,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: pal.textoSecundario),
+          ),
+        ],
+      ),
+    );
+    final pts = p.puntos % 1 == 0 ? p.puntos.toInt().toString() : p.puntos.toStringAsFixed(1);
+    return Material(
+      color: pal.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: alTocar,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  dato(p.asistenciaPct == null ? '—' : '${p.asistenciaPct}%', 'Asistencia este mes'),
+                  if (!p.personalLiga) ...[dato(pts, 'Puntos este mes'), dato('${p.racha}', p.racha == 1 ? 'Mes de racha' : 'Meses de racha')],
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Ver estadísticas',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: pal.marcaTexto),
+                  ),
+                  Icon(Icons.chevron_right_rounded, size: 18, color: pal.marcaTexto),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

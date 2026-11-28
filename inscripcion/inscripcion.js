@@ -12,6 +12,14 @@ var G = { email:'', idToken:'', nombre:'', foto:'', fotoGoogle:'', fechaNac:'', 
 var _INSC_STEPS = ['insc-step-1','insc-step-3','insc-step-4','insc-step-5a','insc-step-5b','insc-step-5c','insc-step-6'];
 var _INSC_TITLES = ['Crear cuenta','Crear cuenta','Crear cuenta','Crear cuenta','Crear cuenta','Crear cuenta','Crear cuenta'];
 var _inscCurIdx = 0;
+// Enlace de Personal de liga (Victor, 2026-11-27): ?personal=<código>. Sin
+// pasos de equipamiento; en su lugar se elige la función.
+var _INSC_PERSONAL = new URLSearchParams(window.location.search).get('personal') || '';
+if (_INSC_PERSONAL) _INSC_STEPS = ['insc-step-1','insc-step-3','insc-step-4','insc-step-funcion','insc-step-6'];
+function inscContinuarFuncion() {
+  if (!document.querySelector('#insc-funcion-pills .equip-pill-bin.sel-no')) { errMsg('err-pfuncion', 'Elige tu función.'); return; }
+  inscMostrarPaso(_INSC_STEPS.indexOf('insc-step-6'));
+}
 var _inscVinoConToken = false;
 var _inscNecesitaPatines = false;
 var _inscWpUnido = false;
@@ -423,7 +431,7 @@ function inscContinuar4() {
   var min = _inscPrefijoSel ? _inscPrefijoSel.min : 7;
   var max = _inscPrefijoSel ? _inscPrefijoSel.max : 15;
   if (tel.length < min || tel.length > max) { errMsg('err-p4', 'Número inválido para ' + (_inscPrefijoSel ? _inscPrefijoSel.pais : 'este país') + '.'); return; }
-  inscMostrarPaso(_INSC_STEPS.indexOf('insc-step-5a'));
+  inscMostrarPaso(_INSC_STEPS.indexOf(_INSC_PERSONAL ? 'insc-step-funcion' : 'insc-step-5a'));
 }
 
 /* ── Bottom sheet prefijo ────────────────────── */
@@ -624,7 +632,9 @@ function inscEnviar() {
       fechaPublica:G.fechaPublica || 'No', edadPublica:G.edadPublica || 'No',
       mayorEdad:G.mayorEdad, pinHash:pinHash||'',
       // Enlace de invitación de un equipo (Mi Liga): ?equipo=<código>.
-      equipo:new URLSearchParams(window.location.search).get('equipo')||''
+      equipo:new URLSearchParams(window.location.search).get('equipo')||'',
+      personal:_INSC_PERSONAL,
+      funcion:(document.querySelector('#insc-funcion-pills .equip-pill-bin.sel-no')||{dataset:{}}).dataset.val||''
     }, function(res) {
       ocultarCargando();
       _inscEnviando = false;

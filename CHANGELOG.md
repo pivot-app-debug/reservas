@@ -2,6 +2,12 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (Personal de liga y ficha)
+- Personal de liga: gente que acompaña a la liga sin jugar (Bench, Coach, NSO, SO). No paga cuota, no suma puntos de asistencia y queda fuera de los cambios de equipo; sí confirma asistencia. En Liga se ve en su lugar de siempre, con la etiqueta «Personal de liga · Bench», y se encuentra buscando «personal».
+- Enlace de invitación propio (Equipos y puntos › Personal de liga). Quien se registra con él no pasa por los pasos de equipamiento y elige su función; con Bench o Coach pide sumarse al equipo técnico. Se puede crear un enlace nuevo, y el anterior deja de funcionar.
+- Un Pivot puede pasar a alguien a Personal de liga, o quitarlo, desde su ficha › Funciones de Pivot.
+- Ficha: Mi progreso salió de la ficha. En su lugar, una tarjeta corta con asistencia, puntos y racha que abre las estadísticas detalladas.
+
 ## 2026-11-27 (comprobante obligatorio y cuentas de la liga)
 - Con transferencia o billetera, la suscripción no se crea sin la foto del pago: «Ya pagué: subir comprobante» pide la captura y recién ahí se suscribe. Con un enlace de pago, al volver a la app se pide la foto. Mientras falte, se ve «Todavía no estás anotado/anotada/anotade: falta tu comprobante» según los pronombres.
 - «Pago en efectivo» no pide foto: un Pivot lo confirma al recibir el dinero.

@@ -368,6 +368,13 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
                   children: [
                     _Seccion('EQUIPOS'),
                     for (final (i, t) in l.indexed) _tarjeta(context, i, t),
+                    // Personal de liga (Victor, 2026-11-27): sin equipo, con su propio enlace.
+                    _Fila(
+                      icono: Icons.badge_outlined,
+                      titulo: 'Personal de liga',
+                      texto: 'Bench, coaches, NSO y SO que no juegan · invitar',
+                      alTocar: () => SubAjustes.abrir<void>(context, PersonalLigaScreen(sesion: s)),
+                    ),
                     const SizedBox(height: 8),
                     _Seccion('REGLAS'),
                     Resaltable(
@@ -2828,4 +2835,135 @@ Future<bool> editarQueCuentaEquipo(BuildContext context, Sesion s, String equipo
       'queCuentaEquipo': {'equipo': equipo, 'tiposCuentan': todo || sel.isEmpty ? null : sel.toList(), 'tardeCuentaClase': tarde},
     }),
   }, 'Guardado');
+}
+
+/// Personal de liga (Victor, 2026-11-27): quien entra con este enlace no
+/// tiene equipo, no paga cuota ni suma puntos y elige su función al
+/// registrarse (Bench, Coach, NSO o SO). Puede confirmar asistencia.
+class PersonalLigaScreen extends StatefulWidget {
+  const PersonalLigaScreen({super.key, required this.sesion});
+  final Sesion sesion;
+
+  @override
+  State<PersonalLigaScreen> createState() => _PersonalLigaScreenState();
+}
+
+class _PersonalLigaScreenState extends State<PersonalLigaScreen> {
+  String? _codigo, _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar('enlace');
+  }
+
+  Future<void> _cargar(String accion) async {
+    try {
+      final r = await widget.sesion.api.post('adminPersonalLiga', {'adminToken': widget.sesion.adminToken, 'accion': accion});
+      if (r['exito'] == false) throw ApiException('${r['error'] ?? 'No se pudo cargar.'}');
+      if (mounted) setState(() => _codigo = '${r['codigo']}');
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiException ? e.message : 'No se pudo cargar. Revisa tu conexión.');
+    }
+  }
+
+  String get _enlace => '${ApiConfig.webAppUrl}/inscripcion/?personal=$_codigo';
+
+  Future<void> _nuevo() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('¿Crear un enlace nuevo?'),
+        content: const Text('El enlace anterior deja de funcionar. Quienes ya se registraron no cambian.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Crear')),
+        ],
+      ),
+    );
+    if (ok == true) await _cargar('nuevoEnlace');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Personal de liga')),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _codigo == null
+            ? (_error == null ? const Esqueleto(forma: FormaEsqueleto.tarjetas, key: ValueKey('c')) : Center(key: const ValueKey('e'), child: Text(_error!)))
+            : ListView(
+                key: const ValueKey('l'),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  const BannerAyuda(
+                    titulo: '¿Quién es Personal de liga?',
+                    texto: 'Gente que acompaña a la liga sin jugar: Bench, coaches, NSO o SO.',
+                    pasos: [
+                      (Icons.money_off_rounded, 'No paga cuota ni suma puntos.'),
+                      (Icons.groups_outlined, 'No está en ningún equipo ni en los cambios de equipo.'),
+                      (Icons.event_available_outlined, 'Puede confirmar su asistencia a los entrenamientos.'),
+                      (Icons.sports_rounded, 'Si elige Bench o Coach, pide sumarse al equipo técnico.'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(gradient: PivotPaleta.degradadoMarca, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Enlace de invitación',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Quien se registra con este enlace entra directo como Personal de liga y elige su función.',
+                          style: TextStyle(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.92)),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(backgroundColor: PivotPaleta.sobreSeccion, foregroundColor: p.marcaTexto),
+                                onPressed: () => SharePlus.instance.share(ShareParams(text: 'Únete a la liga en Pivot como Personal de liga: $_enlace')),
+                                icon: const Icon(Icons.share_rounded),
+                                label: const Text('Compartir'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: PivotPaleta.sobreSeccion,
+                                  side: BorderSide(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.7)),
+                                ),
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: _enlace));
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enlace copiado')));
+                                },
+                                icon: const Icon(Icons.copy_rounded),
+                                label: const Text('Copiar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(onPressed: _nuevo, icon: const Icon(Icons.refresh_rounded), label: const Text('Crear un enlace nuevo')),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Para pasar a alguien que ya está en la liga, abre su ficha › Funciones de Pivot.',
+                    style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
 }

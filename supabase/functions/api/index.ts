@@ -126,6 +126,11 @@ async function _ligaDelPedido(p: Record<string, any>): Promise<string> {
       if (l) return l;
     }
   }
+  // Enlace de Personal de liga (Victor, 2026-11-27).
+  if (typeof p.personal === 'string' && p.personal.trim()) {
+    const l = await fila(s.from('config_app').select('liga_id').eq('key', 'codigo_personal_liga').eq('value', p.personal.trim()));
+    if (l) return l;
+  }
     for (const t of [p.inviteToken, p.token]) {
     if (typeof t === 'string' && t) {
       const l = await fila(s.from('invite_tokens').select('liga_id').eq('token', t));
@@ -175,6 +180,7 @@ function getDatosCompletos(row: Record<string, any> | null): Record<string, any>
     // estuviera en `true` en la base — la lógica de gating en sí ya estaba
     // bien, el dato nunca llegaba.
     exenta_cuota:         row.exenta_cuota          === true,
+    personalLiga:         row.personal_liga         === true,
      solicitudLesionPendiente: row.solicitud_lesion_pendiente === true,
     // Cambio de equipo por ver y pedido de revisión (Victor, 2026-11-16).
     avisoCambioEquipo:    row.aviso_cambio_equipo ?? null,
@@ -2036,11 +2042,28 @@ async function inscribirPersona(params: Record<string, any>): Promise<Record<str
     row.fecha_publica    = fechaPublica === 'Sí' ? 'Sí' : 'No';
     row.edad_publica     = edadPublica  === 'Sí' ? 'Sí' : 'No';
   }
+  // Personal de liga (Victor, 2026-11-27): entra sin cuota ni puntos, con su función.
+  let funcionTecnica = false;
+  const codigoPersonal = String(params.personal ?? '').trim();
+  if (codigoPersonal) {
+    const { data: c } = await supabase.from('config_app').select('value').eq('key', 'codigo_personal_liga').maybeSingle();
+    if (c?.value && c.value === codigoPersonal) {
+      Object.assign(row, _camposPersonalLiga(true), { cupon_disponible: false });
+      const f = FUNCIONES_PERSONAL.find((x) => x === String(params.funcion ?? ''));
+      if (f) {
+        // Coach se suma a sus roles cuando un Pivot lo aprueba; Bench, NSO y SO quedan.
+        row.roles = f === ROL_COACH ? [] : [f];
+        funcionTecnica = ROLES_TECNICOS.includes(f);
+      }
+    }
+  }
 
   const { error } = await supabase.from('equipo').insert(row);
   if (error) return { exito: false, error: error.message };
 
   const token = await _crearToken(nombre);
+  // Bench o Coach: pide sumarse al equipo técnico (lo aprueba un Pivot).
+  if (funcionTecnica) await pedirCoach({ token, mensaje: `Entró como Personal de liga (${String(params.funcion)}).` }).catch(() => {});
   const newRow = await _getEquipoRow(nombre);
   await sendPush({
     tipo: 'integrante_nuevo',
@@ -5223,6 +5246,39 @@ function _notaJson(n: any, quien: Record<string, any>) {
 }
 
 // Persona: pedir ser coach y ver su estado.
+// ─── Personal de liga (Victor, 2026-11-27) ──────────────────────────────────
+// Bench, coaches, NSO o SO que no juegan: sin cuota, sin puntos y fuera de
+// los cambios de equipo (`tier_modo` 'fijo'), pero confirman asistencia.
+const FUNCIONES_PERSONAL = [ROL_COACH, 'Bench', 'NSO', 'SO'];
+function _camposPersonalLiga(si: boolean): Record<string, any> {
+  return si ? { personal_liga: true, exenta_cuota: true, tier_modo: 'fijo' } : { personal_liga: false, exenta_cuota: false, tier_modo: 'auto' };
+}
+
+/** Pivots: enlace de invitación de Personal de liga y cambiar a alguien. */
+async function adminPersonalLiga(params: Record<string, any>): Promise<Record<string, any>> {
+  const email = await _validarAdminToken(String(params.adminToken ?? ''));
+  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  const accion = String(params.accion ?? 'enlace');
+  if (accion === 'enlace' || accion === 'nuevoEnlace') {
+    const { data: c } = await supabase.from('config_app').select('value').eq('key', 'codigo_personal_liga').maybeSingle();
+    let codigo = c?.value as string | undefined;
+    if (!codigo || accion === 'nuevoEnlace') {
+      codigo = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
+      await supabase.from('config_app').upsert({ key: 'codigo_personal_liga', value: codigo }, { onConflict: 'liga_id,key' });
+    }
+    return { exito: true, codigo };
+  }
+  if (accion === 'cambiar') {
+    const nombre = String(params.nombre ?? '');
+    const si = params.personal === true || params.personal === 'true';
+    const { error } = await supabase.from('equipo').update(_camposPersonalLiga(si)).eq('username', nombre);
+    if (error) return { exito: false, error: 'No se pudo guardar.' };
+    await _registrarAjuste('personal_liga', !si, { nombre, personal: si }, email);
+    return { exito: true };
+  }
+  return { exito: false, error: 'Acción inválida.' };
+}
+
 async function pedirCoach(params: Record<string, any>): Promise<Record<string, any>> {
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
@@ -9366,9 +9422,13 @@ async function recalcularPuntosAsistencia(mes: number, anio: number): Promise<{ 
   // Valores por fecha (regla de oro, Victor 2026-11-13: un cambio nunca toca puntos ya ganados).
     const versiones = await _versionesPuntos();
   const eqDe = await _equipoEnMes(versiones);
+  // Personal de liga no suma puntos (Victor, 2026-11-27).
+  const { data: personal } = await supabase.from('equipo').select('username').eq('personal_liga', true);
+  const sinPuntos = new Set((personal ?? []).map((x: any) => String(x.username)));
   const puntosPorUsuario: Record<string, number> = {};
   Object.keys(ultimaPorClave).forEach((clave) => {
     const l = ultimaPorClave[clave];
+    if (sinPuntos.has(l.nombre_usuario)) return;
     const v = _valorMarca(l.estado, l.fecha, versiones, eqDe(l.nombre_usuario, l.fecha));
     if (v) puntosPorUsuario[l.nombre_usuario] = (puntosPorUsuario[l.nombre_usuario] || 0) + v;
   });
@@ -10562,7 +10622,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
   // (token de usuarix, o sin token) recibe el roster SIN esas claves.
   const vistaAdmin = params.adminToken ? !!(await _validarAdminToken(String(params.adminToken))) : false;
   const { data: filas } = await supabase.from('equipo')
-        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible, cupon_descuento, avisos')
+        .select('username, nombre_derby, numero_derby, foto_perfil, categoria, pronombres, prefijo, telefono, email, estado_miembro, solicitud_lesion_pendiente, tier_modo, exenta_cuota, personal_liga, horas_ano, asistencias_ano, total_eventos_ano, termometro_pct, fecha_ingreso, necesita_patines, necesita_protecciones, puntos_anteriores, racha_actual, tier_riesgo_desde, tier_riesgo_hasta, tier_riesgo_objetivo, viaje_desde, viaje_hasta, roles, fecha_nacimiento, fecha_publica, cupon_disponible, cupon_descuento, avisos')
     .is('eliminado_en', null)
     .order('username');
   const personas = filas ?? [];
@@ -10964,6 +11024,7 @@ async function getEquipo(params: Record<string, any> = {}): Promise<Record<strin
     estado: r.estado_miembro ?? 'Activx',
     viajeDesde: r.viaje_desde ?? null, viajeHasta: r.viaje_hasta ?? null,
     tierModo: r.tier_modo ?? 'auto',
+    personalLiga: r.personal_liga === true,
     ...(vistaAdmin ? {
       solicitudLesionPendiente: r.solicitud_lesion_pendiente === true,
             exentaCuota: r.exenta_cuota === true,
@@ -14323,7 +14384,8 @@ async function _rutear(req: Request, paramsPre: Record<string, any>): Promise<Re
       case 'responderCambioEquipo':           return json(await responderCambioEquipo(params));
                                     case 'adminSubirLogo':                  return json(await adminSubirLogo(params));
             case 'adminHistorialAjustes':           return json(await adminHistorialAjustes(params));
-                        case 'adminTesoreria':                  return json(await adminTesoreria(params));
+                        case 'adminPersonalLiga':              return json(await adminPersonalLiga(params));
+      case 'adminTesoreria':                  return json(await adminTesoreria(params));
       case 'adminPagoCoaches':                return json(await adminPagoCoaches(params));
       case 'getMiPagoCoach':                  return json(await getMiPagoCoach(params));
       case 'getMiDeuda':                      return json(await getMiDeuda(params));

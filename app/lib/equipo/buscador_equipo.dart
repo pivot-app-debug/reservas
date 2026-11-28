@@ -202,8 +202,8 @@ class BuscadorEquipo {
     }
 
     // Categoría y estado.
-    if (s == 'quinde' || s == 'quind') return p.categoria == 'Quindes' && !p.inactivx ? ('Quindes', sinOrden) : null;
-    if (s.startsWith('mirlx') || s.startsWith('mirlo')) return p.categoria != 'Quindes' && !p.inactivx ? ('Mirlxs', sinOrden) : null;
+    if (s == 'quinde' || s == 'quind') return p.categoria == 'Quindes' && !p.inactivx && !p.personalLiga ? ('Quindes', sinOrden) : null;
+    if (s.startsWith('mirlx') || s.startsWith('mirlo')) return p.categoria != 'Quindes' && !p.inactivx && !p.personalLiga ? ('Mirlxs', sinOrden) : null;
     if (s == 'viaje' || s == 'viajando') return p.deViaje ? (datosRelevantes(p, hoy).first.texto, sinOrden) : null;
     if (s.startsWith('lesion')) return p.lesionadx ? ('Lesionadx', sinOrden) : null;
     if (s.startsWith('inactiv')) return p.inactivx ? ('Inactivx', sinOrden) : null;
@@ -211,8 +211,10 @@ class BuscadorEquipo {
       final f = p.fechaIngreso;
       return f != null && !f.isAfter(hoy) && Fechas.diasEntre(f, hoy) < 60 ? ('Se unió el ${f.day} de ${_meses[f.month - 1]}', sinOrden) : null;
     }
+    // Personal de liga (Victor, 2026-11-27).
+    if (s == 'personal' || s == 'staff') return p.personalLiga ? (p.etiquetaPersonal, sinOrden) : null;
     // Cualquier otro equipo de la liga, por su nombre.
-    if (t.length >= 3 && !p.inactivx && normalizar(p.categoria).startsWith(t)) return (p.categoria, sinOrden);
+    if (t.length >= 3 && !p.personalLiga && !p.inactivx && normalizar(p.categoria).startsWith(t)) return (p.categoria, sinOrden);
     if (s.startsWith('favorit')) return favs.contains(p.username) ? ('Favorito', sinOrden) : null;
     if (s == 'admin' && esAdmin) return p.esAdminMiembro ? ('Admin', sinOrden) : null;
 

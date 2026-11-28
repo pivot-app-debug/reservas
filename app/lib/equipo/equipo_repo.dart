@@ -203,6 +203,7 @@ class EquipoRepo extends ChangeNotifier {
   Future<void> cambiarAdmin(Integrante p, bool admin) =>
       _admin(admin ? 'adminAgregarAdmin' : 'adminQuitarAdmin', {'email': p.email, if (admin) 'nombre': p.username});
   Future<void> cambiarEstado(Integrante p, String estado) => _admin('adminSetEstadoMiembro', {'nombre': p.username, 'estadoMiembro': estado});
+  Future<void> cambiarPersonalLiga(Integrante p, bool si) => _admin('adminPersonalLiga', {'accion': 'cambiar', 'nombre': p.username, 'personal': si});
   Future<void> archivar(Integrante p) => _admin('adminEliminarUsuario', {'nombre': p.username});
 
   /// Pago de cuota registrado a mano (efectivo, De Una o banco).

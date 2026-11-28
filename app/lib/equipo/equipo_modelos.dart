@@ -62,6 +62,15 @@ class Integrante {
   // Solo llegan con vista admin.
   bool get exentaCuota => m['exentaCuota'] == true;
 
+  /// Personal de liga (Victor, 2026-11-27): no juega, sin cuota ni puntos.
+  bool get personalLiga => m['personalLiga'] == true;
+
+  /// "Personal de liga · NSO" con su función, si la tiene.
+  String get etiquetaPersonal {
+    final f = roles.where((r) => const ['Bench', 'Coach', 'NSO', 'SO'].contains(r)).toList();
+    return f.isEmpty ? 'Personal de liga' : 'Personal de liga · ${f.join(' · ')}';
+  }
+
   /// Clase gratis de bienvenida disponible (solo llega a Pivots).
   bool get cuponDisponible => m['cuponDisponible'] == true;
 
@@ -148,7 +157,7 @@ List<DatoFila> datosRelevantes(Integrante p, DateTime hoy, {String periodo = 'es
   }
   if (p.lesionadx) return [DatoFila(Icons.healing_rounded, conPronombres('Lesionadx', p.pronombres), fijo: true)];
   if (p.fueraConMotivo) return const [DatoFila(Icons.event_busy_rounded, 'Fuera por un tiempo', fijo: true)];
-  final res = <DatoFila>[];
+  final res = <DatoFila>[if (p.personalLiga) DatoFila(Icons.badge_outlined, p.etiquetaPersonal)];
   String enDias(int d) => d == 0 ? 'hoy' : (d == 1 ? 'mañana' : 'en $d días');
   final c = p.proximoCumple(hoy);
   if (c != null) {
