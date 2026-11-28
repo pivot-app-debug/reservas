@@ -13,7 +13,8 @@ import 'equipo_modelos.dart';
 /// Equipo y por el detalle de un evento (tocar un avatar abre la ficha).
 /// Nombre visible de un rol. 'Coach' se guarda así en la base pero se muestra
 /// como Entrenadorx (Victor, 2026-11-26).
-String nombreRol(String r) => r == 'Coach' ? 'Equipo técnico' : r;
+/// Nombre visible de un rol (Victor, 2026-11-28: el rol se llama Coach).
+String nombreRol(String r) => r;
 
 class EquipoRepo extends ChangeNotifier {
   EquipoRepo._(this.sesion) : _usuario = sesion.nombre;

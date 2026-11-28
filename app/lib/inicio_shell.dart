@@ -354,6 +354,11 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
                 onDestinationSelected: (i) {
                   // Tocar la pestaña en la que estás vuelve a su inicio.
                   if (i == indice && _alInicioDePestana()) return;
+                  // Ya en el inicio: sube al principio (QA 2026-11-28).
+                  if (i == indice && i != 0) {
+                    Navegacion.arriba.value = (_actual, Navegacion.arriba.value.$2 + 1);
+                    return;
+                  }
                   if (i == 0 && indice == 0) {
                     _irAHoy.disparar();
                   } else {

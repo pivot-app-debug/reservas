@@ -116,7 +116,7 @@ class MiPerfilEditable extends StatelessWidget {
                               ? (
                                   'Agregar o editar roles',
                                   () {
-                                    Navigator.of(context).pop();
+                                    Navigator.of(context, rootNavigator: true).pop();
                                     SubAjustes.abrir(context, RolesScreen(repo: equipo));
                                   },
                                 )

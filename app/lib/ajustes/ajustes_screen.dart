@@ -6,6 +6,7 @@ import '../core/actualizacion.dart';
 import '../core/datos_pendientes.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/navegacion.dart';
 import '../core/vidrio.dart';
 import '../equipo/equipo_repo.dart';
 import '../equipo/persona_screen.dart';
@@ -45,8 +46,15 @@ class _AjustesScreenState extends State<AjustesScreen> {
   EventosRepo get eventos => widget.eventos;
   final _scroll = ScrollController();
 
+  void _subir() {
+    if (Navegacion.arriba.value.$1 == 'Mi perfil' && _scroll.hasClients) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+    }
+  }
+
   @override
   void dispose() {
+    Navegacion.arriba.removeListener(_subir);
     _scroll.dispose();
     super.dispose();
   }
@@ -94,6 +102,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
     super.initState();
     if (eventos.cuota == null) eventos.recargarCuota();
     NotificacionesScreen.precargar(sesion.api);
+    Navegacion.arriba.addListener(_subir);
     revisarTransparencia(sesion);
   }
 

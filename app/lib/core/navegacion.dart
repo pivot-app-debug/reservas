@@ -19,6 +19,10 @@ class Navegacion {
   /// (`suscribirse:clase:ID`…). La aplica la app y vuelve a null.
   static final pantalla = ValueNotifier<String?>(null);
 
+  /// Tocar la pestaña en la que ya estás, estando en su inicio: sube al
+  /// principio. Lleva la etiqueta de la pestaña y cambia en cada toque.
+  static final arriba = ValueNotifier<(String, int)>(('', 0));
+
   /// Fecha del evento abierto (Victor, 2026-11-22): el ícono del Calendario
   /// muestra ese día mientras se ve el detalle.
   static final diaEvento = ValueNotifier<DateTime?>(null);
