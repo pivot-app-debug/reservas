@@ -2255,6 +2255,13 @@ export async function cronSocialPendientes(deps: DepsSocial): Promise<number> {
         conComida = new Set((aps ?? []).map((a: any) => String(a.clave)));
       }
     }
+    const { data: invs } = await db.from('social_invitados').select('id, nombre, anfitrion').eq('id_evento', ev.id_evento);
+    const invitadosDe = new Map<string, any[]>();
+    for (const i of invs ?? []) {
+      const l = invitadosDe.get(String(i.anfitrion)) ?? [];
+      l.push(i);
+      invitadosDe.set(String(i.anfitrion), l);
+    }
     for (const u of asisten) {
       if (esSecretoPara(cfg, u)) continue;
       const participa = (part ?? []).find((x: any) => x.clave === u)?.amigo !== false;
@@ -2264,6 +2271,13 @@ export async function cronSocialPendientes(deps: DepsSocial): Promise<number> {
       if (amigoAbierto && !participa) pendientes.push(['amigo', 'No participas del amigo secreto. ¿Quieres participar?', cierreAmigo]);
       if (cfg.amigo_secreto && participa && (amigoAbierto || cfg.sorteado_en) && sinDeseos) pendientes.push(['deseos', 'Tu lista de deseos está vacía. ¿La completas para tu amigo secreto?', cierreAmigo ?? ev.fecha]);
       if (haySecciones && !conComida.has(u)) pendientes.push(['comida', 'Todavía no anotas qué llevas al evento. ¿Lo anotas ahora?', ev.fecha]);
+      // +1 de esta persona que no respondió (Victor, 2026-11-28): se le avisa
+      // a quien invitó, una vez por pendiente.
+      for (const inv of invitadosDe.get(u) ?? []) {
+        const quien = String(inv.nombre ?? '').trim();
+        if (!quien) pendientes.push([`inv:${inv.id}:entro`, 'Tu +1 todavía no abre su invitación. ¿Le reenvías el enlace?', ev.fecha]);
+        else if (haySecciones && !conComida.has('inv:' + inv.id)) pendientes.push([`inv:${inv.id}:comida`, `Tu +1 (${quien}) todavía no anota qué lleva. ¿Le recuerdas?`, ev.fecha]);
+      }
       for (const [tipo, texto, cierre] of pendientes) {
         const ya = (avisos ?? []).find((a: any) => a.clave === u && a.tipo === tipo);
         const recordar = ya && !ya.recordado_en && cierre && _restarDias(cierre, 2) === hoy;

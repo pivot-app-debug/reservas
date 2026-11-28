@@ -6,6 +6,7 @@ import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
 import '../core/encabezado_seccion.dart' show TarjetaCrear;
 import '../core/fechas.dart';
 import '../core/navegacion.dart';
+import '../core/tour.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
 import '../cursos/cursos_screen.dart';
@@ -47,7 +48,51 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
     s.addListener(_refrescar);
     Navegacion.entrenamiento.addListener(_irAVista);
     WidgetsBinding.instance.addPostFrameCallback((_) => _irAVista());
+    Navegacion.pestanaActual.addListener(_tour);
     _cargar();
+  }
+
+  /// Tour de Progreso la primera vez que se ve la pestaña (Victor, 2026-11-28).
+  void _tour() {
+    if (Navegacion.pestanaActual.value != 'Progreso') return;
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || Navegacion.pestanaActual.value != 'Progreso' || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      final tecnico = _usaCoach;
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour_progreso_v1',
+        pasos: [
+          PasoTour(
+            clave: ClavesTour.progresoHero,
+            titulo: 'Tu progreso',
+            texto: 'El nivel en el que estás trabajando y cuántas habilidades llevas. Tócalo para ver el detalle.',
+          ),
+          PasoTour(
+            clave: ClavesTour.progresoTecnico,
+            titulo: 'Equipo técnico',
+            texto: 'Quiénes arman los entrenamientos y te evalúan. Toca a una persona para ver con qué equipos trabaja.',
+          ),
+          PasoTour(
+            clave: ClavesTour.progresoProximos,
+            titulo: 'Entrenamientos de la semana',
+            texto: tecnico
+                ? 'Los de los próximos 7 días. «Armar» crea el plan en pasos y «Ver plan» lo muestra aquí mismo.'
+                : 'Los de los próximos 7 días. Si el equipo técnico comparte el plan, lo ves con «Ver plan».',
+          ),
+          PasoTour(
+            clave: ClavesTour.progresoCursos,
+            titulo: 'Cursos',
+            texto: 'Clases en grupo con un objetivo, como aprender a patinar o subir de nivel. Toca uno para inscribirte.',
+          ),
+          if (tecnico)
+            PasoTour(
+              clave: ClavesTour.progresoHabilidades,
+              titulo: 'Habilidades y pruebas',
+              texto: 'La lista de habilidades de la liga y las pruebas para medir el progreso. «Agregar» suma una nueva.',
+            ),
+        ],
+      );
+    });
   }
 
   void _refrescar() {
@@ -104,6 +149,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
   void dispose() {
     s.removeListener(_refrescar);
     Navegacion.entrenamiento.removeListener(_irAVista);
+    Navegacion.pestanaActual.removeListener(_tour);
     _herramienta.dispose();
     super.dispose();
   }
@@ -273,11 +319,14 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               encabezado: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _hero(compacto: true),
-                  EquipoTecnicoSeccion(sesion: s),
+                  KeyedSubtree(key: ClavesTour.progresoHero, child: _hero(compacto: true)),
+                  KeyedSubtree(
+                    key: ClavesTour.progresoTecnico,
+                    child: EquipoTecnicoSeccion(sesion: s),
+                  ),
                 ],
               ),
-              despuesDelProximo: _carrusel(context),
+              despuesDelProximo: KeyedSubtree(key: ClavesTour.progresoCursos, child: _carrusel(context)),
               herramienta: _herramienta,
             )
           : _paraTodxs(context),
@@ -311,8 +360,12 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
-              _hero(),
-              if (_puedeNombrar) EquipoTecnicoSeccion(sesion: s),
+              KeyedSubtree(key: ClavesTour.progresoHero, child: _hero()),
+              if (_puedeNombrar)
+                KeyedSubtree(
+                  key: ClavesTour.progresoTecnico,
+                  child: EquipoTecnicoSeccion(sesion: s),
+                ),
               // Próximos 7 días (si no hay, el que viene) y luego Cursos (QA 2026-11-27).
               if (proximos.isNotEmpty)
                 Padding(
@@ -323,6 +376,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   ),
                 ),
               AnimatedSize(
+                key: ClavesTour.progresoProximos,
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
                 alignment: Alignment.topCenter,
@@ -381,7 +435,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                     label: Text(_verMas ? 'Ver menos' : 'Ver más entrenamientos'),
                   ),
                 ),
-              _carrusel(context),
+              KeyedSubtree(key: ClavesTour.progresoCursos, child: _carrusel(context)),
             ],
           ),
         );

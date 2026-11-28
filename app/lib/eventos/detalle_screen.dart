@@ -1,5 +1,9 @@
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
+
+import '../ajustes/componentes.dart' show SubAjustes;
+import '../ajustes/excepcion_screen.dart' show ExcepcionScreen;
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../coach/coach_screen.dart';
@@ -686,6 +690,15 @@ class _DetalleScreenState extends State<DetalleScreen> {
                 onPressed: () => Navigator.of(h).pop(true),
                 icon: const Icon(Icons.payments_outlined),
                 label: Text('Pagar ${Fechas.mes(e.mes)}'),
+              ),
+              // Situación económica difícil: pedir una excepción (Victor, 2026-11-28).
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(h).pop(false);
+                  SubAjustes.abrir<void>(context, ExcepcionScreen(sesion: repo.sesion));
+                },
+                icon: const Icon(Icons.volunteer_activism_outlined),
+                label: const Text('No puedo pagar: pedir una excepción'),
               ),
               TextButton(onPressed: () => Navigator.of(h).pop(false), child: const Text('Ahora no')),
             ],

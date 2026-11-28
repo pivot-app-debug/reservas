@@ -23,6 +23,10 @@ class Navegacion {
   /// principio. Lleva la etiqueta de la pestaña y cambia en cada toque.
   static final arriba = ValueNotifier<(String, int)>(('', 0));
 
+  /// Etiqueta de la pestaña que se ve ('Calendario', 'Progreso'…): los tours
+  /// de cada pestaña esperan a que se vea por primera vez.
+  static final pestanaActual = ValueNotifier<String>('');
+
   /// Fecha del evento abierto (Victor, 2026-11-22): el ícono del Calendario
   /// muestra ese día mientras se ve el detalle.
   static final diaEvento = ValueNotifier<DateTime?>(null);

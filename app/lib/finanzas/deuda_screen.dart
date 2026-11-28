@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ajustes/excepcion_screen.dart' show ExcepcionScreen;
+
 import '../core/moneda.dart';
 import '../core/tema.dart';
 import '../eventos/eventos_repo.dart';
@@ -140,6 +142,14 @@ class _PantallaDeudaState extends State<PantallaDeuda> {
                 onPressed: _cargando ? null : _revisar,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Ya pagué: revisar de nuevo'),
+              ),
+              const SizedBox(height: 8),
+              // Situación económica difícil (Victor, 2026-11-28).
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ExcepcionScreen(sesion: widget.repo.sesion))),
+                icon: const Icon(Icons.volunteer_activism_outlined),
+                label: const Text('No puedo pagar: pedir una excepción'),
               ),
               const SizedBox(height: 8),
               TextButton(

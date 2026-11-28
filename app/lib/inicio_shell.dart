@@ -304,6 +304,9 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
     ];
     final indice = _indice.clamp(0, destinos.length - 1);
     _actual = destinos[indice].$1.label;
+    if (Navegacion.pestanaActual.value != _actual) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => Navegacion.pestanaActual.value = _actual);
+    }
     _visitadas
       ..add(_actual)
       ..retainWhere((l) => destinos.any((d) => d.$1.label == l));

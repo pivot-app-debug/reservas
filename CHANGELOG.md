@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (tours, inactivxs y +1)
+- Tours guiados la primera vez que se abre Progreso (tu progreso, equipo técnico, entrenamientos de la semana, cursos y, para el equipo técnico, habilidades y pruebas) y Liga (buscador, atajos, inventario según la persona: tallas y pedidos si usa el de la liga, equipamiento de emergencia si usa el propio, y Ajustes de la liga para Pivots).
+- Las personas Inactivx ya no reciben notificaciones de la app, salvo la de su cambio de estado.
+- Donde se pide pagar la cuota (al marcar Asistiré y en la pantalla de deuda) está «No puedo pagar: pedir una excepción».
+- Fiestas: si tu +1 no abrió su invitación o no anotó qué lleva, te llega un aviso (una vez por pendiente).
+- Salud: «Comida» junta la dieta y las restricciones alimentarias, con «¿Para qué sirve?» arriba.
+
 ## 2026-11-28 (cierre de cambios antes del QA)
 - Equipo técnico: sin «Funciones» en la tarjeta ni en la subsección de cada persona (los roles ya se ven en Liga).
 - Mi Liga: vuelve la fila «Equipos y puntos» (crear equipos, enlaces de invitación y Personal de liga) para Pivots.

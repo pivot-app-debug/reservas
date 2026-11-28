@@ -80,19 +80,20 @@ class SaludEmergenciaScreen extends StatelessWidget {
                 valor: vacioComo(s, 'antecedentes', 'Ninguno'),
                 alTocar: () => elegirCampo(context, s, 'antecedentes', 'Antecedentes médicos', _antecedentes, multi: true, otro: true),
               ),
-              FilaAjuste(
-                icono: Icons.restaurant_outlined,
-                titulo: 'Dieta',
-                valor: vacioComo(s, 'dieta', 'Sin restricciones'),
-                alTocar: () => elegirCampo(context, s, 'dieta', 'Dieta', _dietas, otro: true),
-              ),
             ],
           ),
-          // Restricciones alimentarias (Victor, 2026-11-28): se toman en cuenta,
-          // sin tu nombre, en la comida de fiestas y reuniones.
+          // Dieta y restricciones juntas, con la explicación arriba (Victor, 2026-11-28).
           const SizedBox(height: 22),
-          _titulo(context, 'Restricciones alimentarias'),
-          _Restricciones(sesion: s),
+          _titulo(context, 'Comida'),
+          _Restricciones(
+            sesion: s,
+            dieta: FilaAjuste(
+              icono: Icons.restaurant_outlined,
+              titulo: 'Dieta',
+              valor: vacioComo(s, 'dieta', 'Sin dieta especial'),
+              alTocar: () => elegirCampo(context, s, 'dieta', 'Dieta', _dietas, otro: true),
+            ),
+          ),
         ];
       },
     );
@@ -354,8 +355,9 @@ extension on String {
 /// guardan en `comidaEventos.restricciones`. Siempre se usan, sin nombre, en
 /// el aviso de la comida de fiestas; la dieta suma un plato para la persona.
 class _Restricciones extends StatelessWidget {
-  const _Restricciones({required this.sesion});
+  const _Restricciones({required this.sesion, required this.dieta});
   final Sesion sesion;
+  final Widget dieta;
 
   static const _opciones = [
     'Intolerancia a la lactosa',
@@ -383,8 +385,15 @@ class _Restricciones extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const BannerAyuda(
+          clave: 'ayuda.restricciones',
+          titulo: '¿Para qué sirve?',
+          texto: 'En fiestas y reuniones, quien lleva comida ve un aviso con las restricciones de quienes van, sin tu nombre. Tu dieta suma un plato para ti.',
+        ),
+        const SizedBox(height: 10),
         GrupoAjustes(
           filas: [
+            dieta,
             FilaAjuste(
               icono: Icons.no_food_outlined,
               titulo: 'Restricciones alimentarias',
@@ -410,12 +419,6 @@ class _Restricciones extends StatelessWidget {
               },
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-        const BannerAyuda(
-          clave: 'ayuda.restricciones',
-          titulo: '¿Para qué sirve?',
-          texto: 'En fiestas y reuniones, quien lleva comida ve un aviso con las restricciones de quienes van, sin tu nombre. Tu dieta suma un plato para ti.',
         ),
       ],
     );

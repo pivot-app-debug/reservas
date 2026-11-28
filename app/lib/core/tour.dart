@@ -25,6 +25,17 @@ class ClavesTour {
   static final navegacion = GlobalKey(debugLabel: 'tour-navegacion');
   static int destinos = 1;
 
+  // Progreso y Liga (Victor, 2026-11-28).
+  static final progresoHero = GlobalKey(debugLabel: 'tour-progreso-hero');
+  static final progresoTecnico = GlobalKey(debugLabel: 'tour-progreso-tecnico');
+  static final progresoProximos = GlobalKey(debugLabel: 'tour-progreso-proximos');
+  static final progresoCursos = GlobalKey(debugLabel: 'tour-progreso-cursos');
+  static final progresoHabilidades = GlobalKey(debugLabel: 'tour-progreso-habilidades');
+  static final ligaBuscador = GlobalKey(debugLabel: 'tour-liga-buscador');
+  static final ligaAtajos = GlobalKey(debugLabel: 'tour-liga-atajos');
+  static final ligaInventario = GlobalKey(debugLabel: 'tour-liga-inventario');
+  static final ligaAjustes = GlobalKey(debugLabel: 'tour-liga-ajustes');
+
   /// La primera pestaña (Eventos) de la barra inferior.
   static Rect primeraPestana(Rect barra) => Rect.fromLTWH(barra.left, barra.top, barra.width / destinos, barra.height);
 

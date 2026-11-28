@@ -14,6 +14,7 @@ import '../core/sincroniza.dart';
 
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/componentes.dart';
@@ -160,6 +161,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
     super.initState();
     repo.cargar(forzar: repo.personas != null); // al abrir, siempre al día
     _cargarAtajos();
+    Navegacion.pestanaActual.addListener(_tour);
     _reloj = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_scrolleando && mounted) _tick.value++;
     });
@@ -167,6 +169,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
+    Navegacion.pestanaActual.removeListener(_tour);
     _reloj?.cancel();
     _tick.dispose();
     _busqueda.dispose();
@@ -201,7 +204,7 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
           // filtros va en la barra y los atajos en tarjetas debajo.
           toolbarHeight: 64,
           titleSpacing: 12,
-          title: _buscador(p),
+          title: KeyedSubtree(key: ClavesTour.ligaBuscador, child: _buscador(p)),
           // Inventario y Ajustes se abren menos: íconos al lado del buscador
           // (Victor, 2026-11-27).
           // Mismos íconos (y trazo) que el resto de la app (QA 2026-11-27).
@@ -210,12 +213,19 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
               ListenableBuilder(
                 listenable: _avisos,
                 builder: (context, _) => IconButton(
+                  key: ClavesTour.ligaInventario,
                   tooltip: 'Inventario',
                   onPressed: () => _abrirAtajo(PestanaLiga.inventario),
                   icon: Badge(isLabelVisible: _avisos.inventario, smallSize: 9, backgroundColor: p.marca, child: const Icon(Icons.inventory_2_outlined)),
                 ),
               ),
-            if (_pivot) IconButton(tooltip: 'Ajustes de la liga', onPressed: () => _abrirAtajo(PestanaLiga.miLiga), icon: const Icon(Icons.settings_outlined)),
+            if (_pivot)
+              IconButton(
+                key: ClavesTour.ligaAjustes,
+                tooltip: 'Ajustes de la liga',
+                onPressed: () => _abrirAtajo(PestanaLiga.miLiga),
+                icon: const Icon(Icons.settings_outlined),
+              ),
             const SizedBox(width: 4),
           ],
         ),
@@ -273,6 +283,43 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
   );
 
   /// Buscar y filtrar en la barra de Liga.
+  /// Tour de Liga la primera vez que se ve (Victor, 2026-11-28), con el
+  /// equipamiento explicado según cada persona.
+  void _tour() {
+    if (Navegacion.pestanaActual.value != 'Liga') return;
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || Navegacion.pestanaActual.value != 'Liga' || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      final s = repo.sesion;
+      final usaPropio = '${s.datos['necesitaPatines'] ?? ''}' != 'Sí';
+      final equipamiento = usaPropio
+          ? 'Usas tu propio equipamiento: si se te rompió algo o te falta para entrenar, aquí pides equipamiento de emergencia.'
+          : 'Aquí cambias tus tallas o pides lo que necesitas del equipamiento de la liga.';
+      Tour.mostrarSiCorresponde(
+        context,
+        preferencia: 'tour_liga_v1',
+        pasos: [
+          PasoTour(
+            clave: ClavesTour.ligaBuscador,
+            titulo: 'Busca en la liga',
+            texto: 'Por nombre, rol («jammer»), equipo, pronombres o una fecha («15 de abril») para ver cumpleaños.',
+          ),
+          PasoTour(
+            clave: ClavesTour.ligaAtajos,
+            titulo: 'Atajos',
+            texto: _conFinanzas ? 'Los grupos y redes de la liga, y las finanzas.' : 'Los grupos y redes de la liga, y el inventario. $equipamiento',
+          ),
+          if (_conFinanzas)
+            PasoTour(
+              clave: ClavesTour.ligaInventario,
+              titulo: 'Inventario',
+              texto: '$equipamiento${_pivot ? ' Como Pivot, también gestionas el de la liga.' : ''}',
+            ),
+          if (_pivot) PasoTour(clave: ClavesTour.ligaAjustes, titulo: 'Ajustes de la liga', texto: 'Reglas, cuotas, equipos y las funciones de la liga.'),
+        ],
+      );
+    });
+  }
+
   Widget _buscador(PivotPaleta p) => SizedBox(
     height: 48,
     child: TextField(
@@ -355,7 +402,10 @@ class _EquipoScreenState extends State<EquipoScreen> with TickerProviderStateMix
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: ListenableBuilder(
                   listenable: _avisos,
-                  builder: (context, _) => GrillaAtajos(atajos: _atajosColor()),
+                  builder: (context, _) => KeyedSubtree(
+                    key: ClavesTour.ligaAtajos,
+                    child: GrillaAtajos(atajos: _atajosColor()),
+                  ),
                 ),
               ),
             ),

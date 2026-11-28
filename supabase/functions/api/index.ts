@@ -11951,7 +11951,10 @@ async function getCatalogoNotificaciones(): Promise<Record<string, any>> {
 // "activada" (default on, pedido explícito) -- así una notificación nueva
 // agregada al catálogo no deja a nadie afuera retroactivamente, nadie tiene
 // que "activarla" a mano.
-function _personaQuierePush(row: { push_notificaciones_activas?: boolean | null; push_preferencias?: Record<string, boolean> | null } | null | undefined, tipo: string): boolean {
+function _personaQuierePush(row: { push_notificaciones_activas?: boolean | null; push_preferencias?: Record<string, boolean> | null; estado_miembro?: string | null } | null | undefined, tipo: string): boolean {
+  // Inactivxs no reciben avisos de la app (Victor, 2026-11-28), salvo el de
+  // su cambio de estado (por ejemplo, cuando vuelven a estar activxs).
+  if (row?.estado_miembro === 'Inactivx' && tipo !== 'cambio_estado_miembro') return false;
   if (CLAVES_FIJAS.has(tipo)) return true;
   if (!row) return true; // sin fila en `equipo` (ej. admin puro) -- no hay dónde guardar una preferencia, se manda igual
   if (row.push_notificaciones_activas === false) return false;
@@ -12252,7 +12255,7 @@ async function sendPush(payload: {
   const aplicaAlcance = !payload.personal && (TIPOS_PUSH_EVENTO.has(payload.tipo) || !!payload.evento);
   let destinatarios: string[];
   if (payload.broadcastEquipo) {
-    const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).is('eliminado_en', null);
+    const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, estado_miembro' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).is('eliminado_en', null);
     const excluir = new Set(payload.excluirUsernames ?? []);
     destinatarios = (filas ?? [])
       .filter((r: any) => r.username && !excluir.has(r.username) && _personaQuierePush(r, payload.tipo))
@@ -12275,7 +12278,7 @@ async function sendPush(payload: {
     // fila directamente no volvería y `porUsername[u]` quedaría
     // `undefined`, cayendo al MISMO default "sin fila = mandar igual" que
     // un alias admin -- justo lo que no se quiere acá.
-        const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en, pronombres' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).in('username', usernames);
+        const { data: filas } = await supabase.from('equipo').select('username, push_notificaciones_activas, push_preferencias, eliminado_en, pronombres, estado_miembro' + (aplicaAlcance ? ', ' + COLS_ALCANCE : '')).in('username', usernames);
     const porUsername: Record<string, any> = {};
     (filas ?? []).forEach((r: any) => { porUsername[r.username] = r; });
         destinatarios = usernames.filter((u) => !_estaArchivado(porUsername[u]) && _personaQuierePush(porUsername[u], payload.tipo));

@@ -12,6 +12,7 @@ import '../core/esqueleto.dart';
 import '../core/encabezado_seccion.dart' show TarjetaCrear;
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
@@ -230,7 +231,11 @@ class _CoachScreenState extends State<CoachScreen> {
                     // Lo que falta evaluar (antes en Próximos eventos).
                     TarjetasPorEvaluar(sesion: s),
                     // Habilidades y Pruebas bajan a la portada (QA 2026-11-27).
-                    if (widget.encabezado != null) ...[..._habilidades(context), ..._pruebas(context)],
+                    if (widget.encabezado != null)
+                      KeyedSubtree(
+                        key: ClavesTour.progresoHabilidades,
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [..._habilidades(context), ..._pruebas(context)]),
+                      ),
                     ..._sinFecha(context),
                   ],
                 ),
@@ -331,6 +336,7 @@ class _CoachScreenState extends State<CoachScreen> {
     return [
       _titulo(context, lista.length == 1 ? 'PRÓXIMO ENTRENAMIENTO' : 'PRÓXIMOS ENTRENAMIENTOS'),
       AnimatedSize(
+        key: ClavesTour.progresoProximos,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
