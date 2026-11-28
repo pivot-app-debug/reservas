@@ -395,6 +395,20 @@ class ReservasRepo {
       .ignore();
   void finEnCurso() => _api.post('reservaEnCurso', {'accion': 'fin'}).catchError((_) => <String, dynamic>{}).ignore();
 
+  /// Salió a pagar con un enlace: falta la foto del pago (Victor, 2026-11-27).
+  void pagoEnCurso(String medioNombre) =>
+      _api.post('reservaEnCurso', {'accion': 'pago', 'medioNombre': medioNombre}).catchError((_) => <String, dynamic>{}).ignore();
+
+  /// Suscripción a medias de esta persona, si hay (para mostrarla al volver).
+  Future<Map<String, dynamic>?> verEnCurso() async {
+    try {
+      final r = await _api.post('reservaEnCurso', {'accion': 'ver'});
+      return (r['enCurso'] as Map?)?.cast<String, dynamic>();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<({double saldo, double deudaClases})> miSaldoDetalle() async {
     try {
       final r = await _api.get('getMiSaldo');

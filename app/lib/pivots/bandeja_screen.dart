@@ -13,6 +13,7 @@ import '../core/config_liga.dart';
 import '../core/api.dart';
 import '../core/fechas.dart';
 import '../core/tema.dart';
+import '../core/navegacion.dart';
 import '../eventos/widgets_comunes.dart';
 import '../ajustes/ajustes_screen.dart';
 import '../ajustes/componentes.dart';
@@ -94,6 +95,9 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
         SubAjustes.abrir(context, EquipamientoScreen(sesion: s));
       case 'notificaciones':
         SubAjustes.abrir(context, NotificacionesScreen(sesion: s));
+      case 'suscripcion_sin_terminar':
+        // Suscripción a medias (Victor, 2026-11-27): se retoma donde quedó.
+        Navegacion.pantalla.value = r.pantalla ?? 'pagos';
       case 'curso_borrador':
         // Curso a medio armar (Victor, 2026-11-27): abre Cursos y el asistente.
         if (s.adminToken != null) SubAjustes.abrir(context, CursosScreen(sesion: s, reanudar: true)).then((_) => repo.cargarMia());
@@ -588,9 +592,34 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               hijos.add(_TarjetaRecomendacion(r: r, alTocar: () => _abrirRecomendacion(r)));
             }
           }
-          final vacia = hijos.isEmpty && delEquipo.isEmpty && pagos.isEmpty;
+          final vacia = hijos.isEmpty && delEquipo.isEmpty && pagos.isEmpty && repo.sinTerminar.isEmpty;
           // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
           // Para coaches, lo que falta evaluar vive en Entrenamiento (Victor, 2026-11-26).
+          // Pagos sin terminar: quién salió a pagar o dejó la suscripción a medias.
+          if (repo.sinTerminar.isNotEmpty) {
+            pagos.add(_Encabezado(titulo: 'Pagos sin terminar', icono: Icons.hourglass_bottom_rounded, cantidad: repo.sinTerminar.length));
+            for (final x in repo.sinTerminar) {
+              final desde = DateTime.tryParse('${x['desde'] ?? ''}')?.toLocal();
+              final pago = x['pagoEn'] != null;
+              pagos.add(
+                Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: AvatarPersona(nombre: '${x['nombreMostrar']}', foto: '${x['foto'] ?? ''}'),
+                    title: Text('${x['nombreMostrar']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      [
+                        pago ? 'Salió a pagar${'${x['medio']}'.isEmpty ? '' : ' con ${x['medio']}'} y falta el comprobante' : 'Dejó la suscripción a medias',
+                        if ('${x['detalle']}'.isNotEmpty) '${x['detalle']}',
+                        if (desde != null) 'desde el ${Fechas.corta(desde)} a las ${Fechas.hora(desde)}',
+                      ].join(' · '),
+                    ),
+                    onTap: () => PersonaScreen.abrir(context, EquipoRepo.de(repo.sesion), '${x['nombre']}'),
+                  ),
+                ),
+              );
+            }
+          }
           final arriba = <Widget>[...pagos, ...delEquipo, if (!repo.sesion.esCoach) TarjetasPorEvaluar(sesion: repo.sesion)];
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));

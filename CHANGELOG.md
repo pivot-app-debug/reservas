@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-27 (comprobante obligatorio y cuentas de la liga)
+- Con transferencia o billetera, la suscripción no se crea sin la foto del pago: «Ya pagué: subir comprobante» pide la captura y recién ahí se suscribe. Con un enlace de pago, al volver a la app se pide la foto. Mientras falte, se ve «Todavía no estás anotado/anotada/anotade: falta tu comprobante» según los pronombres.
+- «Pago en efectivo» no pide foto: un Pivot lo confirma al recibir el dinero.
+- Avisos de la suscripción a medias: a los 15 minutos y 3 horas antes de la primera clase elegida. También aparece en Novedades para retomarla donde quedó.
+- Bandeja de Pivots (Finanzas): «Pagos sin terminar» con quién salió a pagar o dejó la suscripción a medias.
+- Mi perfil: «Cuentas de la liga» cuando Finanzas activa la transparencia (total, últimos 12 meses y cierres de año; solo totales).
+
 ## 2026-11-27 (cierre anual de cuentas)
 - En enero, Finanzas muestra «Cerrar las cuentas de AAAA». Cualquier Pivot de Finanzas lo revisa en cuatro pasos (revisión de cuentas al 31 de diciembre, lo que se le debe al equipo técnico, saldos de personas y resumen con Excel) y lo cierra con candado. No se puede reabrir.
 - Un año cerrado no admite movimientos nuevos, anulaciones ni correcciones. Si llega algo automático con fecha de ese año (un pago aprobado tarde), entra el 1 de enero siguiente con la nota «(del AAAA, ya cerrado)».

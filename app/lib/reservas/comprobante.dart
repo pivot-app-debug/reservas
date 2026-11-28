@@ -42,6 +42,29 @@ Future<bool> subirComprobante(BuildContext context, ReservasRepo repo, List<Stri
   }
 }
 
+/// Elige la captura del pago sin subirla todavía (Victor, 2026-11-27): la
+/// suscripción con transferencia o billetera no se crea sin la foto.
+Future<List<int>?> elegirFotoPago(BuildContext context) async {
+  final m = ScaffoldMessenger.of(context);
+  final XFile? x;
+  try {
+    x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 72, maxWidth: 1600, maxHeight: 2400);
+  } catch (_) {
+    m.showSnackBar(const SnackBar(content: Text('No pudimos abrir tus fotos. Revisa los permisos de la app.')));
+    return null;
+  }
+  if (x == null) return null;
+  try {
+    return await x.readAsBytes();
+  } finally {
+    if (!kIsWeb) {
+      try {
+        await File(x.path).delete();
+      } catch (_) {}
+    }
+  }
+}
+
 /// Reserva o suscripción pendiente sin comprobante (Victor, 2026-11-19): si un
 /// Pivot lo pidió, muestra "Esperando comprobante" con el plazo de 24 h; en
 /// cualquier caso, el botón para adjuntarlo desde la pantalla de pagos.

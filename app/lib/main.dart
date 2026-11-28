@@ -134,6 +134,7 @@ class _RaizState extends State<_Raiz> {
       _pendiente = a;
       _abrirPendiente();
     });
+    Navegacion.pantalla.addListener(_abrirPantallaPedida);
     // Web: un aviso abre la app con ?evento=<id>[&accion=cancelar] (mismo
     // enlace que usa la web vieja), así funcionan igual al cambiar de dirección.
     if (kIsWeb) {
@@ -168,6 +169,7 @@ class _RaizState extends State<_Raiz> {
   @override
   void dispose() {
     _sub?.cancel();
+    Navegacion.pantalla.removeListener(_abrirPantallaPedida);
     widget.sesion.removeListener(_alCambiarSesion);
     widget.sesion.removeListener(_revisarListo);
     _repo.removeListener(_revisarListo);
@@ -216,6 +218,13 @@ class _RaizState extends State<_Raiz> {
         ),
       );
     });
+  }
+
+  void _abrirPantallaPedida() {
+    final p = Navegacion.pantalla.value;
+    if (p == null) return;
+    Navegacion.pantalla.value = null;
+    _abrirPantalla(p);
   }
 
   void _abrirPantalla(String pantalla) {

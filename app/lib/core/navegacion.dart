@@ -15,6 +15,10 @@ class Navegacion {
   /// Calendario y vuelve a null.
   static final actividad = ValueNotifier<String?>(null);
 
+  /// Abrir una pantalla con el mismo formato que las notificaciones
+  /// (`suscribirse:clase:ID`…). La aplica la app y vuelve a null.
+  static final pantalla = ValueNotifier<String?>(null);
+
   /// Fecha del evento abierto (Victor, 2026-11-22): el ícono del Calendario
   /// muestra ese día mientras se ve el detalle.
   static final diaEvento = ValueNotifier<DateTime?>(null);

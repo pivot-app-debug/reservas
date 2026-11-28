@@ -3280,7 +3280,21 @@ async function adminBandeja(params: Record<string, any>): Promise<Record<string,
   // pueda aprobarlo (nunca homenajeadxs ni quienes no deben enterarse).
   try { (items as Record<string, any[]>).sociales = await socialPorAprobar(adminEmail, _depsSocial()); } catch (e) { console.error('[bandeja] sociales:', e); }
   const total = Object.values(items).reduce((n, l) => n + l.length, 0);
-  return { exito: true, total, ...items, areas };
+  // Pagos sin terminar (Victor, 2026-11-27): quien salió a pagar o dejó la
+  // suscripción a medias hace más de 15 min. Solo informativo, no suma al total.
+  let sinTerminar: any[] = [];
+  if (areas.includes('finanzas')) {
+    const { data: enc } = await supabase.from('reservas_en_curso').select('nombre, detalle, creado_en, pago_en, medio_nombre')
+      .lt('creado_en', new Date(Date.now() - 15 * 60000).toISOString()).order('creado_en', { ascending: false }).limit(50);
+    const us = [...new Set((enc ?? []).map((f: any) => f.nombre))];
+    const { data: pe } = us.length ? await supabase.from('equipo').select('username, nombre_derby, foto_perfil').in('username', us) : { data: [] as any[] };
+    const q: Record<string, any> = {}; (pe ?? []).forEach((x: any) => { q[x.username] = x; });
+    sinTerminar = (enc ?? []).map((f: any) => ({
+      nombre: f.nombre, nombreMostrar: q[f.nombre]?.nombre_derby || f.nombre, foto: q[f.nombre]?.foto_perfil ?? '',
+      detalle: f.detalle ?? '', desde: f.creado_en, pagoEn: f.pago_en, medio: f.medio_nombre ?? '',
+    }));
+  }
+  return { exito: true, total, ...items, areas, sinTerminar };
 }
 
 // ─── Escrituras que la web y la app hacían directo a la base ───────────
@@ -7610,12 +7624,21 @@ async function _deudaClases(username: string, disp?: number): Promise<number> {
 async function reservaEnCurso(params: Record<string, any>): Promise<Record<string, any>> {
   const yo = await _validarToken(String(params.token ?? ''));
   if (!yo) return { exito: false, error: 'Sesión inválida.' };
+  if (params.accion === 'ver') {
+    const { data } = await supabase.from('reservas_en_curso').select('detalle, pantalla, pago_en, medio_nombre, creado_en').eq('nombre', yo).maybeSingle();
+    return { exito: true, enCurso: data ?? null };
+  }
+  // Salió a pagar con un enlace y todavía no subió la foto (Victor, 2026-11-27).
+  if (params.accion === 'pago') {
+    await supabase.from('reservas_en_curso').update({ pago_en: new Date().toISOString(), medio_nombre: String(params.medioNombre ?? '').slice(0, 60) || null, avisado_en: null }).eq('nombre', yo);
+    return { exito: true };
+  }
   if (params.accion === 'inicio') {
     let clases: string[] = [];
     try { clases = JSON.parse(String(params.clases ?? '[]')).map(String).slice(0, 20); } catch { /* sin clases */ }
     await supabase.from('reservas_en_curso').upsert(
             {
-        nombre: yo, detalle: String(params.detalle ?? '').slice(0, 200) || null, clases, creado_en: new Date().toISOString(), avisado_en: null,
+        nombre: yo, detalle: String(params.detalle ?? '').slice(0, 200) || null, clases, creado_en: new Date().toISOString(), avisado_en: null, // pago_en y medio_nombre se conservan: si ya pagó, al volver solo falta la foto.
         pantalla: /^suscribirse:(clase|mes):[\w,-]{1,400}$/.test(String(params.pantalla ?? '')) ? String(params.pantalla) : null,
       },
       { onConflict: 'liga_id,nombre' },
@@ -7626,25 +7649,49 @@ async function reservaEnCurso(params: Record<string, any>): Promise<Record<strin
   return { exito: true };
 }
 
+/** "Anotado/anotada/anotade/anotadx" según los pronombres de la persona. */
+async function _anotadxDe(username: string): Promise<string> {
+  const { data } = await supabase.from('equipo').select('pronombres').eq('username', username).maybeSingle();
+  const t = String(data?.pronombres ?? '').toLowerCase();
+  const ella = /\bella\b/.test(t), el = /(^|[^a-záéíóúñ])(él|el)([^a-záéíóúñ]|$)/.test(t), elle = /\belle\b/.test(t);
+  if ([ella, el, elle].filter(Boolean).length !== 1) return 'anotadx';
+  return ella ? 'anotada' : el ? 'anotado' : 'anotade';
+}
+
+// Suscripción a medias (Victor, 2026-11-27): aviso a los 15 minutos y otro
+// unas horas antes de la primera clase elegida. Sin comprobante (transferencia
+// o billetera) la suscripción no se crea, así que nadie queda "anotadx" sin saberlo.
 async function _avisarReservasSinTerminar(): Promise<void> {
-  const antes = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  await supabase.from('reservas_en_curso').delete().lt('creado_en', new Date(Date.now() - 86400000).toISOString());
-  const { data: filas } = await supabase.from('reservas_en_curso').select('*').is('avisado_en', null).lt('creado_en', antes);
+  const ahora = Date.now();
+  const antes = new Date(ahora - 15 * 60 * 1000).toISOString();
+  // Sin pago, se olvidan al día; si ya salió a pagar, a la semana.
+  await supabase.from('reservas_en_curso').delete().is('pago_en', null).lt('creado_en', new Date(ahora - 86400000).toISOString());
+  await supabase.from('reservas_en_curso').delete().lt('creado_en', new Date(ahora - 7 * 86400000).toISOString());
+  const { data: filas } = await supabase.from('reservas_en_curso').select('*').lt('creado_en', antes);
   if (!filas?.length) return;
-  const abiertas = new Set((await _proximosEntrenamientos()).map((e: any) => e.idEvento));
+  const proximos = await _proximosEntrenamientos();
+  const abiertas = new Set(proximos.map((e: any) => e.idEvento));
   for (const f of filas) {
-    await supabase.from('reservas_en_curso').update({ avisado_en: new Date().toISOString() }).eq('id', f.id);
     const { count } = await supabase.from('reservas').select('id', { count: 'exact', head: true }).eq('nombre_usuario', f.nombre).gte('created_at', f.creado_en);
-    if (count) continue;
+    if (count) { await supabase.from('reservas_en_curso').delete().eq('id', f.id); continue; }
     const clases: string[] = Array.isArray(f.clases) ? f.clases : [];
     if (clases.length && !clases.some((c) => abiertas.has(c))) continue; // ya cerró la reserva de esas clases
-    await sendPush({
-      tipo: 'reserva_sin_terminar', include_external_user_ids: [f.nombre], personal: true,
-            // Son suscripciones (Victor, 2026-11-22): se abre la suscripción con lo que había elegido.
-      headings: { es: 'Tu suscripción aún no se completó' },
-      contents: { es: f.detalle ? `Si quieres suscribirte a ${f.detalle}, completa el registro.` : 'Si quieres suscribirte a una clase o mensualidad, completa el registro.' },
-      pantalla: f.pantalla ?? 'pagos',
-    }).catch(() => {});
+    const anotadx = await _anotadxDe(f.nombre);
+    const titulo = f.pago_en ? `Todavía no estás ${anotadx}: falta tu comprobante` : 'Tu suscripción aún no se completó';
+    const texto = f.pago_en
+      ? `Sube la foto del pago${f.detalle ? ` de ${f.detalle}` : ''} para terminar tu suscripción.`
+      : (f.detalle ? `Si quieres suscribirte a ${f.detalle}, completa el registro.` : 'Si quieres suscribirte a una clase o mensualidad, completa el registro.');
+    const avisar = async (campo: string) => {
+      await supabase.from('reservas_en_curso').update({ [campo]: new Date().toISOString() }).eq('id', f.id);
+      await sendPush({ tipo: 'reserva_sin_terminar', include_external_user_ids: [f.nombre], personal: true, headings: { es: titulo }, contents: { es: texto }, pantalla: f.pantalla ?? 'pagos' }).catch(() => {});
+    };
+    if (!f.avisado_en) { await avisar('avisado_en'); continue; }
+    // Unas horas antes de la primera clase elegida (3 h).
+    if (!f.aviso_previo_en && clases.length) {
+      const inicio = proximos.filter((e: any) => clases.includes(e.idEvento))
+        .map((e: any) => _instanteEventoUTC(e.fecha, e.horaInicio)).filter((t: any) => typeof t === "number" && !isNaN(t)).sort((a: number, b: number) => a - b)[0];
+      if (inicio && inicio - ahora <= 3 * 3600e3 && inicio > ahora) await avisar('aviso_previo_en');
+    }
   }
 }
 
@@ -11417,6 +11464,17 @@ async function getMiBandeja(params: Record<string, any>): Promise<Record<string,
     ...(!fila?.fecha_nacimiento ? [{ clave: 'identidad', titulo: 'Agrega tu fecha de nacimiento', texto: 'Para tu ficha y, si quieres, para saludarte en tu cumpleaños.' }] : []),
     ...(fila && fila.necesita_patines == null && fila.necesita_protecciones == null ? [{ clave: 'equipamiento', titulo: 'Cuéntanos tu equipamiento', texto: 'Si tienes el tuyo o necesitas el del equipo.' }] : []),
     ...(fila && fila.push_notificaciones_activas === false ? [{ clave: 'notificaciones', titulo: 'Activa las notificaciones', texto: 'Para enterarte de entrenamientos, cambios y respuestas a tus pedidos.' }] : []),
+    // Suscripción a medias (Victor, 2026-11-27): se ve al volver a la app.
+    ...(await (async () => {
+      const { data: f } = await supabase.from('reservas_en_curso').select('detalle, pantalla, pago_en, creado_en').eq('nombre', yo).maybeSingle();
+      if (!f || (!f.pago_en && Date.parse(f.creado_en) > Date.now() - 15 * 60000)) return [];
+      const anotadx = await _anotadxDe(yo);
+      return [{
+        clave: 'suscripcion_sin_terminar', pantalla: f.pantalla ?? 'pagos',
+        titulo: f.pago_en ? `Todavía no estás ${anotadx}: falta tu comprobante` : 'Tu suscripción aún no se completó',
+        texto: f.pago_en ? 'Toca para subir la foto del pago y terminar.' : (f.detalle ? `Toca para terminar tu suscripción a ${f.detalle}.` : 'Toca para terminarla.'),
+      }];
+    })().catch(() => [])),
     // Curso a medio armar (Victor, 2026-11-27).
     ...(await (async () => {
       const { data: b } = await supabase.from('curso_borradores').select('datos').eq('username', yo).maybeSingle();

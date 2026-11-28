@@ -54,6 +54,7 @@ class Recomendacion {
   String get clave => '${m['clave']}';
   String get titulo => '${m['titulo'] ?? ''}';
   String get texto => '${m['texto'] ?? ''}';
+  String? get pantalla => m['pantalla'] == null ? null : '${m['pantalla']}';
 }
 
 /// Bandeja de Pivots (etapa 3, Victor 2026-11-12): pagos y reservas,
@@ -75,6 +76,9 @@ class BandejaRepo extends ChangeNotifier {
   bool get esPivot => sesion.esAdmin && sesion.adminToken != null;
 
   List<Pedido> pedidos = [];
+
+  /// Pagos sin terminar (Victor, 2026-11-27): solo para saber, no se resuelven.
+  List<Map<String, dynamic>> sinTerminar = const [];
   int get total => pedidos.length;
 
   // Bandeja de cada persona (Victor, 2026-11-13): sus pedidos y lo que la
@@ -223,6 +227,7 @@ class BandejaRepo extends ChangeNotifier {
   void usarDatos(Map<String, dynamic> r) => _leer(r);
 
   void _leer(Map<String, dynamic> r) {
+    sinTerminar = [for (final x in (r['sinTerminar'] as List? ?? const [])) (x as Map).cast<String, dynamic>()];
     List<Pedido> lista(String k, TipoPedido t) => [
       for (final x in (r[k] as List? ?? const []))
         if (x is Map<String, dynamic>) Pedido(t, x),

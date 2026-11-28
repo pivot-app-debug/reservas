@@ -11,6 +11,7 @@ import '../core/asistente.dart';
 import '../core/fechas.dart';
 import '../core/api.dart';
 import '../core/tema.dart';
+import '../core/pronombres.dart';
 import '../eventos/anticipada.dart';
 import '../eventos/eventos_repo.dart';
 import 'comprobante.dart';
@@ -43,7 +44,11 @@ class ReservaScreen extends StatefulWidget {
   State<ReservaScreen> createState() => _ReservaScreenState();
 }
 
-class _ReservaScreenState extends State<ReservaScreen> {
+class _ReservaScreenState extends State<ReservaScreen> with WidgetsBindingObserver {
+  /// Salió a pagar con un enlace y falta la foto del pago (Victor, 2026-11-27).
+  MedioPago? _esperandoFoto;
+  bool _salioAPagar = false;
+
   late final _r = ReservasRepo(widget.repo.sesion);
   _Paso _paso = _Paso.elegir;
   bool _adelante = true;
@@ -90,7 +95,15 @@ class _ReservaScreenState extends State<ReservaScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _cargar();
+    // Volvió después de pagar con un enlace: se recuerda con qué y se pide la foto.
+    _r.verEnCurso().then((x) {
+      final medio = '${x?['medio_nombre'] ?? ''}';
+      if (!mounted || x?['pago_en'] == null || medio.isEmpty) return;
+      final m = _cfg.mediosActivos.where((m) => m.nombre == medio).firstOrNull;
+      if (m != null) setState(() => _esperandoFoto = m);
+    });
   }
 
   Future<void> _cargar() async {
@@ -196,9 +209,58 @@ class _ReservaScreenState extends State<ReservaScreen> {
   bool _avisadoEnCurso = false;
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (_esperandoFoto == null) return;
+    if (s == AppLifecycleState.paused || s == AppLifecycleState.hidden) _salioAPagar = true;
+    // Volvió del banco o la billetera: se le pide la foto enseguida.
+    if (s == AppLifecycleState.resumed && _salioAPagar) {
+      _salioAPagar = false;
+      _pedirFoto(_esperandoFoto!);
+    }
+  }
+
+  @override
   void dispose() {
-    if (_avisadoEnCurso) _r.finEnCurso();
+    WidgetsBinding.instance.removeObserver(this);
+    // Si ya pagó y falta la foto, el aviso sigue: no se olvida al salir.
+    if (_avisadoEnCurso && _esperandoFoto == null) _r.finEnCurso();
     super.dispose();
+  }
+
+  String get _faltaComprobante => conPronombres('Todavía no estás anotadx: falta tu comprobante', _r.sesion.datos['pronombres']);
+
+  /// Transferencia o billetera: sin la foto del pago no se crea la suscripción.
+  Future<void> _pedirFoto(MedioPago m) async {
+    final si = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
+      context: context,
+      showDragHandle: true,
+      builder: (h) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_faltaComprobante, style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('Sube la captura del pago para terminar. Sin ella, la suscripción no se crea.'),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(h).pop(true),
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: const Text('Subir comprobante'),
+              ),
+              TextButton(onPressed: () => Navigator.of(h).pop(false), child: const Text('Más tarde')),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (si != true || !mounted) return;
+    final foto = await elegirFotoPago(context);
+    if (foto == null || !mounted) return;
+    await _confirmar(null, medio: m.id, medioNombre: m.nombre, foto: foto);
   }
 
   @override
@@ -820,6 +882,27 @@ class _ReservaScreenState extends State<ReservaScreen> {
             ),
           ),
         ],
+        // Salió a pagar y falta la foto (Victor, 2026-11-27).
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          child: _esperandoFoto == null || t.monto <= 0
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Material(
+                    color: p.suave,
+                    borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+                    child: ListTile(
+                      leading: Icon(Icons.receipt_long_outlined, color: p.marcaTexto),
+                      title: Text(_faltaComprobante, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text('Pagaste con ${_esperandoFoto!.nombre}. Sube la captura para terminar.'),
+                      trailing: const Icon(Icons.add_photo_alternate_outlined),
+                      onTap: _guardando ? null : () => _pedirFoto(_esperandoFoto!),
+                    ),
+                  ),
+                ),
+        ),
         // Formas de pago de la liga (Mi Liga → Cobros): cada medio con su color.
         if (t.monto > 0) ...[
           const SizedBox(height: 20),
@@ -894,7 +977,18 @@ class _ReservaScreenState extends State<ReservaScreen> {
     final color = PivotMedios.de(m.color);
     final abierto = _medioAbierto == m.id;
     final conDatos = m.datos.isNotEmpty || m.indicaciones.isNotEmpty;
-    Future<void> pagar() => _confirmar(m.enlace.isNotEmpty ? m.enlace : null, medio: m.id, medioNombre: m.nombre);
+    Future<void> pagar() async {
+      // Efectivo: un Pivot lo confirma cuando recibe el dinero.
+      if (m.tipo == 'efectivo') return _confirmar(null, medio: m.id, medioNombre: m.nombre);
+      if (m.enlace.isNotEmpty) {
+        setState(() => _esperandoFoto = m);
+        _r.pagoEnCurso(m.nombre);
+        await launchUrl(Uri.parse(m.enlace), mode: LaunchMode.inAppBrowserView);
+        return;
+      }
+      await _pedirFoto(m);
+    }
+
     return Material(
       color: p.tarjeta,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
@@ -957,9 +1051,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
                               child: FilledButton(
                                 style: FilledButton.styleFrom(backgroundColor: color, foregroundColor: PivotPaleta.sobreSeccion),
                                 onPressed: _guardando ? null : pagar,
-                                child: Text(
-                                  m.tipo == 'efectivo' ? 'Pagaré ${ReservasRepo.dinero(t.monto)} en efectivo' : 'Ya pagué ${ReservasRepo.dinero(t.monto)}',
-                                ),
+                                child: Text(m.tipo == 'efectivo' ? 'Pago en efectivo · ${ReservasRepo.dinero(t.monto)}' : 'Ya pagué: subir comprobante'),
                               ),
                             ),
                           ],
@@ -977,7 +1069,7 @@ class _ReservaScreenState extends State<ReservaScreen> {
 
   ConfigLiga get _cfg => ConfigLiga.de(widget.repo.sesion);
 
-  Future<void> _confirmar(String? urlPago, {String? medio, String? medioNombre}) async {
+  Future<void> _confirmar(String? urlPago, {String? medio, String? medioNombre, List<int>? foto}) async {
     if (_guardando) return;
     setState(() => _guardando = true);
     final total = _total;
@@ -1004,13 +1096,22 @@ class _ReservaScreenState extends State<ReservaScreen> {
     }
     // La reserva ya quedó registrada; recién ahí se abre el enlace de pago.
     if (urlPago != null) await launchUrl(Uri.parse(urlPago), mode: LaunchMode.inAppBrowserView);
+    // Con la foto ya elegida, se sube enseguida.
+    var subido = false;
+    if (foto != null && resultado.ids.isNotEmpty) {
+      try {
+        await _r.subirComprobante(resultado.ids, foto);
+        subido = true;
+      } catch (_) {}
+    }
+    _esperandoFoto = null;
     widget.repo.cargar(forzar: true);
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 320),
         pageBuilder: (_, _, _) => EspacioBarraAbajo(
-          child: ReservaExitoScreen(resultado: resultado, total: total, esClase: !_esMes, repo: _r),
+          child: ReservaExitoScreen(resultado: resultado, total: total, esClase: !_esMes, repo: _r, comprobanteSubido: subido),
         ),
         transitionsBuilder: (_, a, _, child) => FadeTransition(
           opacity: a,
@@ -1062,7 +1163,8 @@ class _ReservaScreenState extends State<ReservaScreen> {
 /// dentro de la app (Victor, 2026-11-14): la reserva ya quedó guardada; si
 /// la persona sale a pagar y vuelve, se le pide la captura en ese momento.
 class ReservaExitoScreen extends StatefulWidget {
-  const ReservaExitoScreen({super.key, required this.resultado, required this.total, required this.esClase, this.repo});
+  const ReservaExitoScreen({super.key, required this.resultado, required this.total, required this.esClase, this.repo, this.comprobanteSubido = false});
+  final bool comprobanteSubido;
   final ResultadoReserva resultado;
   final Total total;
   final bool esClase;
@@ -1073,7 +1175,8 @@ class ReservaExitoScreen extends StatefulWidget {
 }
 
 class _ReservaExitoScreenState extends State<ReservaExitoScreen> with WidgetsBindingObserver {
-  bool _subido = false, _salio = false, _preguntando = false;
+  late bool _subido = widget.comprobanteSubido;
+  bool _salio = false, _preguntando = false;
 
   ResultadoReserva get resultado => widget.resultado;
   Total get total => widget.total;
