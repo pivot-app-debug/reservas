@@ -174,11 +174,6 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                       final equipos = [for (final e in (c['equipos'] as List? ?? const [])) '$e'];
                       final pendiente = c['estado'] == 'pendiente';
                       final conMenu = _pivot || !pendiente || '${c['username']}' == s.nombre;
-                      // Bench y otras funciones del equipo técnico (2026-11-27).
-                      final funciones = [
-                        for (final f in (c['funciones'] as List? ?? const []))
-                          if ('$f' != 'Coach') '$f',
-                      ];
                       return tarjeta(
                         alTocar: conMenu ? () => _abrir(c) : null,
                         hijo: Stack(
@@ -197,7 +192,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    pendiente ? 'Pidió sumarse' : [...funciones, equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · ')].join(' · '),
+                                    pendiente ? 'Pidió sumarse' : (equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · ')),
                                     maxLines: 2,
                                     textAlign: TextAlign.center,
                                     overflow: TextOverflow.ellipsis,
@@ -252,10 +247,6 @@ class _PersonaTecnicaScreenState extends State<_PersonaTecnicaScreen> {
     final propio = '${c['username']}' == s.nombre;
     final pendiente = c['estado'] == 'pendiente';
     final equipos = [for (final e in (c['equipos'] as List? ?? const [])) '$e'];
-    final funciones = [
-      for (final f in (c['funciones'] as List? ?? const []))
-        if ('$f' != 'Coach') '$f',
-    ];
     Widget fila(IconData i, String t, String sub) => ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(i, color: p.textoSecundario),
@@ -292,7 +283,7 @@ class _PersonaTecnicaScreenState extends State<_PersonaTecnicaScreen> {
           // Lo que lleva este mes, solo si eres tú (antes en Mi perfil).
           if (propio && s.esCoach) ...[MiEstimado(sesion: s), const SizedBox(height: 12)],
           if (!pendiente) fila(Icons.groups_outlined, 'Equipos', equipos.isEmpty ? 'Todos los equipos' : equipos.join(', ')),
-          if (funciones.isNotEmpty) fila(Icons.badge_outlined, 'Funciones', funciones.join(', ')),
+          // Sin «Funciones» (Victor, 2026-11-28): los roles ya se ven en Liga.
           const SizedBox(height: 16),
           if (pendiente && widget.pivot)
             FilledButton.icon(onPressed: _ocupado ? null : () => _hacer('aprobar'), icon: const Icon(Icons.check_rounded), label: const Text('Aprobar')),

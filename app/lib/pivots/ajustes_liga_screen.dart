@@ -257,6 +257,21 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
                 // Equipos, Pivots, Coaches, Personas archivadas y Avisos viven en
                 // Liga → Equipos y Comunicación (Victor, QA 2026-11-26); el
                 // buscador de arriba sigue llevando a cada uno.
+                // Equipos y puntos visible de nuevo: ahí se crean equipos (Victor, 2026-11-28).
+                if (_pivot) ...[
+                  _titulo(context, 'EQUIPOS'),
+                  GrupoAjustes(
+                    filas: [
+                      FilaAjuste(
+                        icono: Icons.groups_rounded,
+                        seccion: 'organizacion',
+                        titulo: 'Equipos y puntos',
+                        valor: 'Crear equipos, enlaces de invitación y Personal de liga',
+                        alTocar: () => _abrir(CategoriasScreen(sesion: sesion)),
+                      ),
+                    ],
+                  ),
+                ],
                 _titulo(context, 'FUNCIONES DE LA LIGA'),
                 GrupoHerramientasLiga(sesion: sesion),
                 _titulo(context, 'DATOS DE LA LIGA'),

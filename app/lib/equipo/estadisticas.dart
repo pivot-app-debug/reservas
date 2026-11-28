@@ -76,11 +76,27 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
   EquipoRepo get repo => widget.repo;
   bool get _yo => widget.username.toLowerCase() == (repo.sesion.nombre ?? '').toLowerCase();
 
+  /// Pruebas de la persona con su mejor marca (Victor, 2026-11-28), según
+  /// lo que quien mira puede ver.
+  List<Map<String, dynamic>>? _pruebas;
+
+  Future<void> _cargarPruebas() async {
+    try {
+      final r = await repo.sesion.api.get('getFichaDeportiva', {
+        'username': widget.username,
+        if (repo.sesion.adminToken != null) 'adminToken': repo.sesion.adminToken,
+      });
+      final l = [for (final x in (r['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+      if (mounted) setState(() => _pruebas = l.where((x) => (x['marcas'] as List? ?? const []).isNotEmpty).toList());
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     repo.cargar();
     _cargar(_anio);
+    _cargarPruebas();
   }
 
   /// Ver el mes elegido o todo el año (Victor, 2026-11-16: reemplaza la
@@ -277,6 +293,7 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             const SizedBox(height: 12),
             _ProgresoCategoria(progreso: d.progreso!, yo: _yo, verPrivado: _yo || repo.esAdmin),
           ],
+          if ((_pruebas ?? const []).isNotEmpty) ...[const SizedBox(height: 12), _pruebasCaja()],
         ],
       );
     }
@@ -435,6 +452,42 @@ class _EstadisticasScreenState extends State<EstadisticasScreen> {
             alElegir: (m) => setState(() => (_mes = m.month, _verAnio = false)),
           );
         },
+      ),
+    );
+  }
+
+  Widget _pruebasCaja() {
+    final pal = context.pivot;
+    String n(num v) => v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(1);
+    return _Caja(
+      titulo: Text(
+        'Pruebas',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: pal.texto),
+      ),
+      hijo: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final x in _pruebas!)
+            Builder(
+              builder: (context) {
+                final marcas = [for (final m in (x['marcas'] as List? ?? const [])) Map<String, dynamic>.from(m as Map)];
+                final ultima = marcas.last;
+                final mejor = x['mejor'] as num?;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.timer_outlined, color: pal.marcaTexto),
+                  title: Text('${x['nombre']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    [
+                      if (mejor != null) 'Mejor: ${n(mejor)} ${x['unidad'] ?? ''}'.trim(),
+                      'Última: ${n((ultima['valor'] as num?) ?? 0)} el ${Fechas.corta(DateTime.parse('${ultima['fecha']}'))}',
+                      marcas.length == 1 ? '1 marca' : '${marcas.length} marcas',
+                    ].join(' · '),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../ajustes/componentes.dart';
 import '../core/api.dart';
 import '../core/esqueleto.dart';
+import '../core/encabezado_seccion.dart' show TarjetaCrear;
 import '../core/fechas.dart';
 import '../core/tema.dart';
 import '../core/vidrio.dart';
@@ -357,8 +358,16 @@ class _CoachScreenState extends State<CoachScreen> {
         alVer: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
         alAgregar: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true, nueva: true)),
       ),
+      // Vacía: tarjeta como la de Cursos (Victor, 2026-11-28).
       if (l.isEmpty)
-        _vacioSeccion(context, 'Todavía no hay habilidades en la lista de la liga.')
+        TarjetaCrear(
+          icono: Icons.military_tech_rounded,
+          seccion: 'entrenamientos',
+          titulo: 'Todavía no hay habilidades',
+          texto: 'Arma la lista de la liga: cada habilidad suma a los niveles de cada persona.',
+          boton: 'Agregar una habilidad',
+          alTocar: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true, nueva: true)),
+        )
       else
         for (final h in l)
           _filaSeccion(
@@ -379,7 +388,14 @@ class _CoachScreenState extends State<CoachScreen> {
     return [
       _encabezadoSeccion(context, 'PRUEBAS', alVer: abrir, alAgregar: abrir),
       if (l.isEmpty)
-        _vacioSeccion(context, 'Todavía no hay pruebas. Crea una para medir el progreso.')
+        TarjetaCrear(
+          icono: Icons.timer_rounded,
+          seccion: 'entrenamientos',
+          titulo: 'Todavía no hay pruebas',
+          texto: 'Crea una para medir el progreso: vueltas, tiempos o lo que quieras.',
+          boton: 'Crear una prueba',
+          alTocar: abrir,
+        )
       else
         for (final x in l)
           _filaSeccion(context, Icons.timer_outlined, '${x['nombre'] ?? ''}', '${x['unidad'] ?? ''}'.isEmpty ? 'Prueba' : 'En ${x['unidad']}', abrir),
@@ -400,11 +416,6 @@ class _CoachScreenState extends State<CoachScreen> {
         TextButton.icon(onPressed: alAgregar, icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Agregar')),
       ],
     ),
-  );
-
-  Widget _vacioSeccion(BuildContext context, String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(t, style: TextStyle(color: context.pivot.textoSecundario)),
   );
 
   Widget _filaSeccion(BuildContext context, IconData i, String titulo, String sub, VoidCallback alTocar) => Padding(
