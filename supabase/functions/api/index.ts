@@ -3661,7 +3661,7 @@ async function adminPrestamo(params: Record<string, any>): Promise<Record<string
     const texto = accion === 'rechazar'
       ? `Tu pedido de ${que} no se aprobó. Si tienes dudas, habla con un Pivot.`
       : `${accion === 'editar' ? 'Un Pivot cambió tu préstamo: ' : ''}${_textoPlazo(cambios, que)}`;
-    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: [p.username], headings: { es: 'Equipamiento del equipo' }, contents: { es: texto }, url: APP_URL + '/' });
+    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: [p.username], headings: { es: 'Equipamiento del equipo' }, contents: { es: texto }, url: APP_URL + '/', pantalla: 'inventario' });
   }
   return { exito: true };
 }
@@ -3761,7 +3761,7 @@ async function registrarUsoInventario(params: Record<string, any>): Promise<Reco
   if (f.minimo != null && queda <= Number(f.minimo)) {
     await sendPush({
       tipo: 'avisos_admin', include_external_user_ids: await _adminDestinatariosPush(undefined, 'inventario', 'botiquin'), headings: { es: `Reponer: ${variante}` },
-      contents: { es: `En ${l?.nombre ?? 'el inventario'} quedan ${queda} de ${variante} (mínimo ${f.minimo}).` }, url: APP_URL + '/',
+      contents: { es: `En ${l?.nombre ?? 'el inventario'} quedan ${queda} de ${variante} (mínimo ${f.minimo}).` }, url: APP_URL + '/', pantalla: 'inventario',
     });
   }
   await _sincronizarSistema(listaId);
@@ -3780,7 +3780,7 @@ async function responderPrestamo(params: Record<string, any>): Promise<Record<st
     const { data: f } = await supabase.from('equipo').select('nombre_derby, email').eq('username', yo).maybeSingle();
     await sendPush({
       tipo: 'avisos_admin', include_external_user_ids: await _adminDestinatariosPush(f?.email ?? undefined, 'inventario', 'pedidos'), headings: { es: 'Equipamiento del equipo' },
-      contents: { es: `${f?.nombre_derby || yo} avisa que devolvió ${p.detalle ?? 'el equipamiento'}.` }, url: APP_URL + '/',
+      contents: { es: `${f?.nombre_derby || yo} avisa que devolvió ${p.detalle ?? 'el equipamiento'}.` }, url: APP_URL + '/', pantalla: 'inventario',
     });
   } else {
     await supabase.from('inventario_prestamos').update({ aviso_persona_en: ahora }).eq('id', p.id);
@@ -3884,8 +3884,8 @@ async function _avisarPrestamosLargos(): Promise<void> {
   const pivots = await _adminDestinatariosPush(undefined, 'inventario', 'plazos');
   const pivotsBotiquin = await _adminDestinatariosPush(undefined, 'inventario', 'botiquin');
   const avisar = async (p: any, persona: string, aPivots: string) => {
-    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: [p.username], headings: { es: 'Equipamiento del equipo' }, contents: { es: persona }, url: APP_URL + '/' });
-    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivots, headings: { es: 'Equipamiento del equipo' }, contents: { es: aPivots }, url: APP_URL + '/' });
+    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: [p.username], headings: { es: 'Equipamiento del equipo' }, contents: { es: persona }, url: APP_URL + '/', pantalla: 'inventario' });
+    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivots, headings: { es: 'Equipamiento del equipo' }, contents: { es: aPivots }, url: APP_URL + '/', pantalla: 'inventario' });
   };
   for (const p of activos ?? []) {
     const quien = nom[p.username] ?? p.username, que = p.detalle ?? 'el equipamiento del equipo';
@@ -3913,7 +3913,7 @@ async function _avisarPrestamosLargos(): Promise<void> {
   const { data: venc } = await supabase.from('inventario_stock').select('variante, vence, lista_id').in('vence', fechas);
   if (venc?.length) {
     const txt = venc.map((v: any) => `${v.variante} (${v.vence === hoy ? 'vence hoy' : 'vence el ' + v.vence})`).join(', ');
-    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivotsBotiquin, headings: { es: 'Botiquín: vencimientos' }, contents: { es: txt }, url: APP_URL + '/' });
+    await sendPush({ tipo: 'avisos_admin', include_external_user_ids: pivotsBotiquin, headings: { es: 'Botiquín: vencimientos' }, contents: { es: txt }, url: APP_URL + '/', pantalla: 'inventario' });
   }
 }
 
@@ -11916,9 +11916,9 @@ const CATALOGO_NOTIFICACIONES: CatalogoNotifEntry[] = [
       { clave: 'reserva_sin_terminar', nombre: 'Suscripción sin terminar', descripcion: 'Si dejaste a medias una suscripción a una clase o mensualidad, te avisamos una vez para completarla.', categoria: 'Cuenta' },
   { clave: 'solicitud_resuelta', nombre: 'Respuesta a tus solicitudes', descripcion: 'Cuando aprueban o rechazan tus pagos, reservas o excepciones de cuota.', categoria: 'Cuenta' },
   // Notificaciones de entrenador (Victor, 2026-11-26).
-  { clave: 'aviso_entrenador', nombre: 'Avisos de tu entrenadorx', descripcion: 'Mensajes que lxs entrenadorxs te mandan.', categoria: 'Entrenamientos' },
+  { clave: 'aviso_entrenador', nombre: 'Avisos del equipo técnico', descripcion: 'Mensajes que te manda el equipo técnico.', categoria: 'Entrenamientos' },
   { clave: 'logro_nivel', nombre: 'Logros de nivel', descripcion: 'Cuando completas un nivel de habilidades.', categoria: 'Entrenamientos' },
-  { clave: 'novedades_progreso', nombre: 'Novedades en tu progreso', descripcion: 'Los lunes, si tu entrenadorx dejó notas o resultados nuevos.', categoria: 'Entrenamientos' },
+  { clave: 'novedades_progreso', nombre: 'Novedades en tu progreso', descripcion: 'Los lunes, si el equipo técnico dejó notas o resultados nuevos.', categoria: 'Entrenamientos' },
   { clave: 'coach_por_evaluar', nombre: 'Entrenamientos por evaluar', descripcion: 'El día siguiente a un entrenamiento, si falta evaluar a quienes vinieron.', categoria: 'Entrenamientos', soloCoach: true },
   { clave: 'coach_pedido_plan', nombre: 'Entrenamiento sin plan', descripcion: 'El día antes de un entrenamiento de tus equipos que todavía no tiene plan.', categoria: 'Entrenamientos', soloCoach: true },
             { clave: 'curso_nuevo', nombre: 'Cursos nuevos', descripcion: 'Cuando se abre un curso o una clínica que puedes tomar.', categoria: 'Entrenamientos' },

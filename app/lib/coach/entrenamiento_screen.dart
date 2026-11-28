@@ -237,11 +237,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                 // técnico pasó a una sección de la portada (QA 2026-11-27).
                 IconButton(tooltip: 'Habilidades', onPressed: () => ir('habilidades'), icon: const Icon(Icons.military_tech_outlined)),
                 IconButton(tooltip: 'Pruebas', onPressed: () => ir('pruebas'), icon: const Icon(Icons.timer_outlined)),
-                IconButton(
-                  tooltip: 'Notificaciones del equipo técnico',
-                  onPressed: () => ir('notificaciones'),
-                  icon: const Icon(Icons.notifications_active_outlined),
-                ),
+                // Las notificaciones del equipo técnico viven en Mi perfil › Notificaciones (QA 2026-11-27).
                 const SizedBox(width: 4),
               ]
             : null,

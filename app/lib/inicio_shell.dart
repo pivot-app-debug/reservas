@@ -173,8 +173,14 @@ class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
       setState(() {});
       // Al volver a la app: subir lo guardado sin señal.
       widget.repo.cola.sincronizar();
-      // Por si activó o apagó las notificaciones en los ajustes del teléfono.
-      EstadoAvisos.revisar(widget.sesion.api);
+      // Por si activó o apagó las notificaciones en los ajustes del teléfono:
+      // si las apagó, vuelve la pantalla obligatoria (QA 2026-11-27).
+      final est = '${widget.sesion.datos['estado_miembro'] ?? ''}'.trim();
+      if (est.isEmpty || est == 'Activx') {
+        PantallaAvisos.siCorresponde(context, widget.sesion.api);
+      } else {
+        EstadoAvisos.revisar(widget.sesion.api);
+      }
     }
   }
 

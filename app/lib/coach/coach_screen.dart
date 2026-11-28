@@ -18,7 +18,6 @@ import '../eventos/widgets_comunes.dart';
 import '../eventos/detalle_screen.dart' show DetalleScreen;
 import 'por_evaluar.dart';
 import 'armar_plan_screen.dart';
-import 'notificaciones_entrenador_screen.dart';
 import '../core/atajos_color.dart';
 import 'prueba_en_vivo.dart';
 import '../equipo/habilidades_screen.dart';
@@ -126,15 +125,6 @@ class _CoachScreenState extends State<CoachScreen> {
         _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs));
       case 'entrenadorxs':
         _abrir(CoachesScreen(sesion: s));
-      case 'notificaciones':
-        _abrir(
-          NotificacionesEntrenadorScreen(
-            sesion: s,
-            jugadorxs: _jugadorxs,
-            sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
-            avisarNovedades: _d?['avisarNovedades'] != false,
-          ),
-        );
     }
   }
 
@@ -352,22 +342,7 @@ class _CoachScreenState extends State<CoachScreen> {
             detalle: '${(_d?['coaches'] as List? ?? const []).length} en la liga',
             alTocar: () => _abrir(CoachesScreen(sesion: s)),
           ),
-        // Notificaciones de entrenador (Victor, 2026-11-26), al lado de Entrenadorxs.
-        if (s.esCoach)
-          AtajoColor(
-            icono: Symbols.notifications_active_rounded,
-            seccion: 'notificaciones',
-            titulo: 'Notificaciones',
-            detalle: _d?['avisarNovedades'] == false ? 'Aviso semanal apagado' : 'Aviso semanal de progreso y los tuyos',
-            alTocar: () => _abrir(
-              NotificacionesEntrenadorScreen(
-                sesion: s,
-                jugadorxs: _jugadorxs,
-                sinAvisos: [for (final x in (_d?['sinAvisos'] as List? ?? const [])) '$x'],
-                avisarNovedades: _d?['avisarNovedades'] != false,
-              ),
-            ),
-          ),
+        // Notificaciones del equipo técnico: en Mi perfil › Notificaciones (QA 2026-11-27).
       ],
     );
   }

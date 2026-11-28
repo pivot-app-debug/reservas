@@ -64,7 +64,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     _cacheTipos = [
       for (final t in (c['tipos'] as List? ?? const []))
         // Administración y Cuenta no se pueden apagar (Victor, 2026-11-08).
-        if (t is Map<String, dynamic> && t['soloAdmin'] != true && t['soloCoach'] != true && !_fija('${t['categoria'] ?? ''}')) t,
+        if (t is Map<String, dynamic> && t['soloAdmin'] != true && !_fija('${t['categoria'] ?? ''}')) t,
     ];
     _cacheActivas = p['activas'] != false;
     _cachePrefs = {for (final e in ((p['preferencias'] as Map?) ?? const {}).entries) '${e.key}': e.value == true};
@@ -124,70 +124,59 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
-  /// Avisos de Pivot de tus áreas, con "Personalizar" como los de arriba.
-  Widget _avisosPivot(BuildContext context) {
-    final p = context.pivot;
-    final mias = widget.sesion.areasPivot.isEmpty ? areasPivot.keys.toList() : widget.sesion.areasPivot;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-          child: Text(
-            'AVISOS DE PIVOT',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
-          ),
-        ),
+  /// Tema de Mi perfil donde va cada área de Pivot (QA 2026-11-27: un solo
+  /// lugar por tema, sin «Avisos de Pivot» aparte). Las que no tienen par
+  /// quedan como tema propio con el nombre del área.
+  static const _temaDeArea = {'tareas': 'Tareas', 'asistencia': 'Entrenamientos', 'equipo': 'Equipo', 'sociales': 'Equipo'};
 
-        // Cuándo llega el resumen de cada evento (Victor, 2026-11-22).
-        if (mias.contains('asistencia'))
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Resumen antes de cada evento', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text('Quiénes vienen y qué equipamiento llevar.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                  const SizedBox(height: 10),
-                  SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 1, label: Text('1 h antes')),
-                      ButtonSegment(value: 2, label: Text('2 h antes')),
-                      ButtonSegment(value: 3, label: Text('3 h antes')),
-                    ],
-                    selected: {_horas},
-                    onSelectionChanged: (v) {
-                      final antes = _horas;
-                      _guardar({'clave': 'resumenHoras', 'valor': '${v.first}'}, () => _horas = v.first, () => _horas = antes);
-                      _cacheHoras = v.first;
-                    },
-                  ),
-                ],
+  static const _horasTexto = {1: '1 hora antes', 2: '2 horas antes', 3: '3 horas antes'};
+
+  /// Cuándo llega el resumen de cada evento: abre las 3 opciones en un
+  /// bottom sheet para evitar toques accidentales (QA 2026-11-27).
+  Widget _resumenEvento(BuildContext context) {
+    final p = context.pivot;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: p.tarjeta,
+        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Icon(Icons.schedule_rounded, color: p.marcaTexto),
+          title: const Text('Resumen antes de cada evento', style: TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text('Quiénes vienen y qué equipamiento llevar · ${_horasTexto[_horas] ?? '1 hora antes'}'),
+          trailing: const Icon(Icons.unfold_more_rounded),
+          onTap: () async {
+            final v = await showModalBottomSheet<int>(
+              useRootNavigator: true,
+              context: context,
+              showDragHandle: true,
+              builder: (h) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      child: Text('¿Cuándo te llega el resumen?', style: Theme.of(h).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    ),
+                    for (final e in _horasTexto.entries)
+                      ListTile(
+                        leading: Icon(e.key == _horas ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: p.marcaTexto),
+                        title: Text(e.value),
+                        onTap: () => Navigator.of(h).pop(e.key),
+                      ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
-            ),
-          ),
-        for (final a in areasPivot.entries)
-          if (mias.contains(a.key) && avisosPivot[a.key] != null)
-            _Categoria(
-              nombre: a.value.$1,
-              icono: a.value.$3,
-              tipos: [
-                for (final (k, n) in avisosPivot[a.key]!) {'clave': 'pivot_${a.key}_$k', 'nombre': n},
-              ],
-              prefs: _prefs,
-              alCambiarTodo: (v) => _categoria([
-                for (final (k, _) in avisosPivot[a.key]!) {'clave': 'pivot_${a.key}_$k'},
-              ], v),
-              alCambiarUno: (t, v) {
-                final k = '${t['clave']}';
-                final antes = _prefs[k];
-                _guardar({'clave': k, 'valor': '$v'}, () => _prefs[k] = v, () => antes == null ? _prefs.remove(k) : _prefs[k] = antes);
-              },
-            ),
-      ],
+            );
+            if (v == null || v == _horas) return;
+            final antes = _horas;
+            _guardar({'clave': 'resumenHoras', 'valor': '$v'}, () => _horas = v, () => _horas = antes);
+            _cacheHoras = v;
+          },
+        ),
+      ),
     );
   }
 
@@ -195,7 +184,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     final x = c.toLowerCase();
     if (x.contains('evento') || x.contains('entren')) return Icons.event_rounded;
     if (x.contains('tarea')) return Icons.task_alt_rounded;
-    if (x.contains('pago') || x.contains('cuota') || x.contains('reserva')) return Icons.payments_outlined;
+    if (x.contains('finanz') || x.contains('pago') || x.contains('cuota') || x.contains('reserva')) return Icons.payments_outlined;
     if (x.contains('equipo') || x.contains('cumple')) return Icons.groups_rounded;
     if (x.contains('admin')) return Icons.admin_panel_settings_outlined;
     return Icons.notifications_none_rounded;
@@ -206,8 +195,27 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     final p = context.pivot;
     final tipos = _tipos;
     final categorias = <String, List<Map<String, dynamic>>>{};
+    final s = widget.sesion;
     for (final t in tipos ?? const <Map<String, dynamic>>[]) {
+      // Avisos del equipo técnico, en su tema (QA 2026-11-27: todo en Mi perfil).
+      if (t['soloCoach'] == true) {
+        if (!s.esCoach) continue;
+        (categorias['${t['categoria'] ?? 'Otras'}'] ??= []).add({...t, 'nombre': 'Equipo técnico: ${t['nombre']}'});
+        continue;
+      }
       (categorias['${t['categoria'] ?? 'Otras'}'] ??= []).add(t);
+    }
+    // Avisos de Pivot de tus áreas, dentro del mismo tema (sin sección aparte).
+    final mias = s.areasPivot.isEmpty ? areasPivot.keys.toList() : s.areasPivot;
+    final esPivot = s.esAdmin && s.adminToken != null;
+    if (esPivot) {
+      for (final a in areasPivot.entries) {
+        if (!mias.contains(a.key) || avisosPivot[a.key] == null) continue;
+        final tema = _temaDeArea[a.key] ?? a.value.$1;
+        for (final (k, n) in avisosPivot[a.key]!) {
+          (categorias[tema] ??= []).add({'clave': 'pivot_${a.key}_$k', 'nombre': 'Como Pivot: $n'});
+        }
+      }
     }
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -292,9 +300,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                                 _guardar({'clave': k, 'valor': '$v'}, () => _prefs[k] = v, () => antes == null ? _prefs.remove(k) : _prefs[k] = antes);
                               },
                             ),
-                          // Avisos de Pivot por área (Victor, 2026-11-13): solo las
-                          // áreas que tiene; encendidos por defecto.
-                          if (widget.sesion.esAdmin && widget.sesion.adminToken != null) _avisosPivot(context),
+                          if (esPivot && mias.contains('asistencia')) _resumenEvento(context),
                         ],
                       ),
                     ),

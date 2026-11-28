@@ -2,6 +2,13 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (notificaciones e inventario)
+- Mi perfil › Notificaciones junta todo por tema: los avisos de Pivot y del equipo técnico van dentro de Entrenamientos, Equipo o Tareas («Como Pivot: …», «Equipo técnico: …»), sin una sección aparte. Las áreas sin un tema equivalente (Finanzas, Salud, Inventario, Liga) aparecen como tema propio.
+- «Resumen antes de cada evento» se elige en un bottom sheet con las 3 opciones, para evitar toques accidentales.
+- Progreso ya no tiene pantalla propia de notificaciones ni el texto «Aviso semanal de su progreso»: el aviso de los lunes sale solo cuando hay notas o resultados nuevos.
+- Notificaciones obligatorias: la pantalla para activarlas ya no tiene «Ahora no» ni se puede cerrar, y muestra los pasos según el navegador (Chrome, Edge, Firefox, Safari), Android, iPhone o la app. También vuelve a aparecer si se apagan y se regresa a la app.
+- Los avisos del inventario (plazos, devoluciones, botiquín) abren el Inventario. Los pedidos por aprobar siguen yendo a Novedades.
+
 ## 2026-11-28 (Personal de liga y ficha)
 - Pago al equipo técnico: el entrenamiento del día entra al reparto cuando termina el día, así el estimado no baja en la mañana.
 - Pago al equipo técnico: solo cobra quien tiene el rol Coach. Bench y las demás funciones del equipo técnico no reciben pago.

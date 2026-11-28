@@ -4,6 +4,9 @@ import 'dart:async';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
+
+import 'equipo/inventario_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -243,6 +246,9 @@ class _RaizState extends State<_Raiz> {
             ),
           ),
         );
+      case 'inventario':
+        // Avisos del inventario abren el inventario (QA 2026-11-27).
+        _navegador.currentState?.push(MaterialPageRoute(builder: (_) => InventarioScreen(sesion: widget.sesion)));
       case 'equipo':
         Navegacion.ir.value = Pestana.equipo;
       // Entrenamiento en la barra (Victor, 2026-11-26): cursos, progreso y lo de entrenadorxs.

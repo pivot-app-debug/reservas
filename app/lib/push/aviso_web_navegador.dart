@@ -34,3 +34,15 @@ bool esIosWeb() {
   final ua = web.window.navigator.userAgent.toLowerCase();
   return ua.contains('iphone') || ua.contains('ipad') || (ua.contains('macintosh') && web.window.navigator.maxTouchPoints > 1);
 }
+
+/// Navegador y sistema para la guía de activar avisos (QA 2026-11-27):
+/// 'ios', 'android', 'safari', 'firefox', 'edge' o 'chrome' (el resto).
+String navegadorWeb() {
+  final ua = web.window.navigator.userAgent.toLowerCase();
+  if (esIosWeb()) return 'ios';
+  if (ua.contains('android')) return 'android';
+  if (ua.contains('firefox')) return 'firefox';
+  if (ua.contains('edg/')) return 'edge';
+  if (ua.contains('safari') && !ua.contains('chrome')) return 'safari';
+  return 'chrome';
+}
