@@ -151,6 +151,13 @@ const entradasPerfil = [
   EntradaAjuste('salud', 'Salud y emergencia', 'Mi perfil', 'contacto de emergencia ficha médica', dentro: 'salud'),
   EntradaAjuste('salud', 'Alergias', 'Mi perfil › Salud y emergencia', 'alergia alimentos medicamentos', dentro: 'salud'),
   EntradaAjuste('salud', 'Dieta', 'Mi perfil › Salud y emergencia', 'vegetariana vegana comida eventos fiestas', dentro: 'salud'),
+  EntradaAjuste(
+    'salud',
+    'Restricciones alimentarias',
+    'Mi perfil › Salud y emergencia',
+    'lactosa gluten intolerancia comida fiestas alergia maní',
+    dentro: 'salud',
+  ),
   EntradaAjuste('salud', 'Medicamentos y antecedentes', 'Mi perfil › Salud y emergencia', 'medicamentos enfermedades antecedentes', dentro: 'salud'),
   EntradaAjuste('salud', 'Seguro', 'Mi perfil › Salud y emergencia', 'seguro médico privado público contacto del seguro', dentro: 'salud'),
   EntradaAjuste('identidad', 'Identidad y dirección', 'Mi perfil', 'documento cédula pasaporte nombre legal dirección dónde vives', dentro: 'identidad'),

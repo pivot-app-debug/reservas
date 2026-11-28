@@ -2,6 +2,14 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (restricciones alimentarias y detalles)
+- Salud y emergencia: la dieta es una sola (vegetariano, vegano, pescetariano u otra) y debajo hay «Restricciones alimentarias», donde se agregan varias (intolerancia a la lactosa, sin gluten, alergia al maní…). La explicación va en un desplegable «¿Para qué sirve?». Se quitaron los interruptores de «Comida en eventos».
+- Fiestas: la dieta y las restricciones de quienes van se usan siempre, sin nombre. La dieta suma un plato para esa persona y las restricciones salen en el aviso de «Qué llevar».
+- Contactos de emergencia sin el avatar de iniciales.
+- Notificaciones: lo de Pivot y del equipo técnico se marca con una pill rojiza («Pivot», «Equipo técnico») en lugar de texto.
+- Ajustes de la liga › Funciones de la liga: Progreso con su ícono nuevo.
+- Inventario: «Nueva lista» pasa a ser un botón flotante.
+
 ## 2026-11-28 (Liga más limpia)
 - Liga: sin los botones con borde al final de cada sección. La acción va en el encabezado de la sección abierta: ícono de ajustes para Gestionar (Pivots), de archivadas en Inactivxs y flecha › para ver el equipo. «Crear equipo» queda en Equipos y puntos.
 

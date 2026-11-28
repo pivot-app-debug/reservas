@@ -1387,8 +1387,8 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              'Tienes una dieta o alergias en Salud que no se están tomando en cuenta. Si quieres que se usen (sin tu nombre), '
-              'préndelas en Mi perfil → Salud y emergencia → Comida en eventos.',
+              'Tienes alergias en Salud que no se están tomando en cuenta. Si quieres que se avisen (sin tu nombre), '
+              'agrégalas en Mi perfil › Salud y emergencia › Restricciones alimentarias.',
               style: TextStyle(fontSize: 13, color: p.textoSecundario),
             ),
           ),
@@ -1406,8 +1406,8 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Ten en cuenta: entre quienes van hay alergias o intolerancias a ${e.comidaAlergias.join(', ')}. '
-                    'Si lo que llevas lo tiene, avísalo en lo que escribes.',
+                    'Ten en cuenta: entre quienes van hay estas restricciones alimentarias: ${e.comidaAlergias.join(', ')}. '
+                    'Lleva algo que no les haga daño o avísalo en lo que escribes.',
                     style: TextStyle(color: p.sobreSuave),
                   ),
                 ),

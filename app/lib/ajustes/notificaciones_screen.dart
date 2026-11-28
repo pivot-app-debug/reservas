@@ -200,7 +200,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
       // Avisos del equipo técnico, en su tema (QA 2026-11-27: todo en Mi perfil).
       if (t['soloCoach'] == true) {
         if (!s.esCoach) continue;
-        (categorias['${t['categoria'] ?? 'Otras'}'] ??= []).add({...t, 'nombre': 'Equipo técnico: ${t['nombre']}'});
+        (categorias['${t['categoria'] ?? 'Otras'}'] ??= []).add({...t, 'etiqueta': 'Equipo técnico'});
         continue;
       }
       (categorias['${t['categoria'] ?? 'Otras'}'] ??= []).add(t);
@@ -213,7 +213,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         if (!mias.contains(a.key) || avisosPivot[a.key] == null) continue;
         final tema = _temaDeArea[a.key] ?? a.value.$1;
         for (final (k, n) in avisosPivot[a.key]!) {
-          (categorias[tema] ??= []).add({'clave': 'pivot_${a.key}_$k', 'nombre': 'Como Pivot: $n'});
+          (categorias[tema] ??= []).add({'clave': 'pivot_${a.key}_$k', 'nombre': n, 'etiqueta': 'Pivot'});
         }
       }
     }
@@ -400,7 +400,27 @@ class _CategoriaState extends State<_Categoria> {
                             value: widget.prefs['${t['clave']}'] != false,
                             onChanged: (v) => widget.alCambiarUno(t, v),
                             contentPadding: const EdgeInsets.fromLTRB(72, 0, 16, 0),
-                            title: Text('${t['nombre'] ?? t['clave']}'),
+                            // Pill rojiza para lo de Pivot o equipo técnico (Victor, 2026-11-28).
+                            title: Text.rich(
+                              TextSpan(
+                                children: [
+                                  if (t['etiqueta'] != null)
+                                    WidgetSpan(
+                                      alignment: PlaceholderAlignment.middle,
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(color: p.suave, borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                                        child: Text(
+                                          '${t['etiqueta']}',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: p.sobreSuave),
+                                        ),
+                                      ),
+                                    ),
+                                  TextSpan(text: '${t['nombre'] ?? t['clave']}'),
+                                ],
+                              ),
+                            ),
                           ),
                         const SizedBox(height: 6),
                       ],

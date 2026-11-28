@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/banner_ayuda.dart';
 import '../core/config_liga.dart';
 import '../core/iconos_marca.dart';
 import '../core/paises.dart';
@@ -34,7 +35,7 @@ class SaludEmergenciaScreen extends StatelessWidget {
     'Problemas osteomusculares crónicos',
   ];
   static const _antecedentes = ['Cirugías previas', 'Hospitalización en el último año', 'Lesiones deportivas previas'];
-  static const _dietas = ['Vegetariano', 'Vegano', 'Pescetariano', 'Sin gluten'];
+  static const _dietas = ['Vegetariano', 'Vegano', 'Pescetariano'];
 
   @override
   Widget build(BuildContext context) {
@@ -87,10 +88,11 @@ class SaludEmergenciaScreen extends StatelessWidget {
               ),
             ],
           ),
-          // Comida en eventos (Victor, 2026-11-20): apagado; cada dato se prende aparte.
+          // Restricciones alimentarias (Victor, 2026-11-28): se toman en cuenta,
+          // sin tu nombre, en la comida de fiestas y reuniones.
           const SizedBox(height: 22),
-          _titulo(context, 'Comida en eventos'),
-          _ComidaEventos(sesion: s),
+          _titulo(context, 'Restricciones alimentarias'),
+          _Restricciones(sesion: s),
         ];
       },
     );
@@ -277,7 +279,6 @@ class _TarjetaContacto extends StatelessWidget {
     final tel = Paises.telefono(valorDe(sesion, 'emerg${n}Prefijo'), valorDe(sesion, 'emerg${n}Telefono'));
     final completo = num.isEmpty ? '' : '${pref.isEmpty ? '593' : pref}${num.startsWith('0') ? num.substring(1) : num}';
     final vacio = nombre.isEmpty;
-    final iniciales = nombre.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).take(2).map((x) => x[0].toUpperCase()).join();
     return Material(
       color: vacio ? p.fondo : p.tarjeta,
       shape: RoundedRectangleBorder(
@@ -291,17 +292,7 @@ class _TarjetaContacto extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: vacio ? p.suave : p.marca,
-                child: vacio
-                    ? Icon(Icons.person_add_alt_1_outlined, size: 20, color: p.sobreSuave)
-                    : Text(
-                        iniciales,
-                        style: TextStyle(fontWeight: FontWeight.w800, color: p.sobreMarca),
-                      ),
-              ),
-              const SizedBox(width: 12),
+              // Sin avatar de iniciales (Victor, 2026-11-28).
               Expanded(
                 child: vacio
                     ? Text(n == '1' ? 'Agrega tu contacto principal' : 'Agrega un segundo contacto', style: TextStyle(fontSize: 14, color: p.textoSecundario))
@@ -359,14 +350,22 @@ extension on String {
   String ifEmpty(String otro) => isEmpty ? otro : this;
 }
 
-/// Qué datos de salud se usan, sin tu nombre, en la comida de fiestas y
-/// reuniones (Victor, 2026-11-20). Todo empieza apagado: cada dieta y cada
-/// alergia se prende aparte.
-class _ComidaEventos extends StatelessWidget {
-  const _ComidaEventos({required this.sesion});
+/// Restricciones alimentarias (Victor, 2026-11-28): se agregan varias y se
+/// guardan en `comidaEventos.restricciones`. Siempre se usan, sin nombre, en
+/// el aviso de la comida de fiestas; la dieta suma un plato para la persona.
+class _Restricciones extends StatelessWidget {
+  const _Restricciones({required this.sesion});
   final Sesion sesion;
 
-  static const _sinDieta = {'', 'ninguna', 'ninguno', 'no', 'sin restricciones', 'normal'};
+  static const _opciones = [
+    'Intolerancia a la lactosa',
+    'Sin gluten',
+    'Alergia al maní',
+    'Alergia a los frutos secos',
+    'Alergia a los mariscos',
+    'Sin azúcar',
+    'Sin cerdo',
+  ];
 
   Map<String, dynamic> _actual() {
     try {
@@ -377,65 +376,48 @@ class _ComidaEventos extends StatelessWidget {
     }
   }
 
-  Future<void> _guardar(BuildContext context, Map<String, dynamic> j) => guardarCampos(context, sesion, {'comidaEventos': jsonEncode(j)});
-
   @override
   Widget build(BuildContext context) {
-    final p = context.pivot;
-    final dieta = valorDe(sesion, 'dieta');
-    final hayDieta = !_sinDieta.contains(dieta.toLowerCase());
-    final alergias = ['sí', 'si'].contains(valorDe(sesion, 'alergias').toLowerCase())
-        ? [
-            for (final x in valorDe(sesion, 'alergiasDesc').split(RegExp(r'[,;\n]+')))
-              if (x.trim().isNotEmpty) x.trim(),
-          ]
-        : <String>[];
     final j = _actual();
-    final usadas = {for (final x in (j['alergias'] as List? ?? const [])) '$x'.toLowerCase()};
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-      decoration: BoxDecoration(color: p.tarjeta, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text(
-              'Si quieres que tu dieta o tus alergias se tomen en cuenta en la comida de fiestas y reuniones del equipo, prende cada una. '
-              'Se usan sin tu nombre: tu dieta suma una sección de comida para ti y tus alergias salen en un aviso.',
-              style: TextStyle(fontSize: 13, color: p.textoSecundario),
-            ),
-          ),
-          if (!hayDieta && alergias.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text('No tienes una dieta ni alergias registradas.', style: TextStyle(color: p.textoSecundario)),
-            ),
-          if (hayDieta)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('Dieta: $dieta'),
-              subtitle: const Text('Usar en la comida de eventos'),
-              value: j['dieta'] == true,
-              onChanged: (v) => _guardar(context, {...j, 'dieta': v}),
-            ),
-          for (final a in alergias)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('Alergia: $a'),
-              subtitle: const Text('Avisar en la comida de eventos'),
-              value: usadas.contains(a.toLowerCase()),
-              onChanged: (v) {
-                final l = [
-                  for (final x in (j['alergias'] as List? ?? const []))
-                    if ('$x'.toLowerCase() != a.toLowerCase()) '$x',
-                  if (v) a,
+    final lista = [for (final x in (j['restricciones'] as List? ?? const [])) '$x'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GrupoAjustes(
+          filas: [
+            FilaAjuste(
+              icono: Icons.no_food_outlined,
+              titulo: 'Restricciones alimentarias',
+              valor: lista.isEmpty ? 'Ninguna' : lista.join(', '),
+              alTocar: () async {
+                final v = await elegirOpciones(
+                  context,
+                  titulo: 'Restricciones alimentarias',
+                  opciones: _opciones,
+                  valor: lista.join(', '),
+                  multi: true,
+                  otro: true,
+                  ayuda: 'Elige todas las que apliquen o escribe otra.',
+                );
+                if (v == null || !context.mounted) return;
+                final nuevas = [
+                  for (final x in v.split(','))
+                    if (x.trim().isNotEmpty) x.trim(),
                 ];
-                _guardar(context, {...j, 'alergias': l});
+                await guardarCampos(context, sesion, {
+                  'comidaEventos': jsonEncode({...j, 'restricciones': nuevas}),
+                });
               },
             ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const BannerAyuda(
+          clave: 'ayuda.restricciones',
+          titulo: '¿Para qué sirve?',
+          texto: 'En fiestas y reuniones, quien lleva comida ve un aviso con las restricciones de quienes van, sin tu nombre. Tu dieta suma un plato para ti.',
+        ),
+      ],
     );
   }
 }

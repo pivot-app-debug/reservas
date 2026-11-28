@@ -100,7 +100,7 @@ class GrupoHerramientasLiga extends StatelessWidget {
               derecha: Switch(value: finanzas, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'finanzasActiva', v)),
             ),
             FilaAjuste(
-              icono: Icons.sports_rounded,
+              icono: Icons.trending_up_rounded,
               seccion: 'entrenamientos',
               titulo: 'Progreso',
               valor: coach ? 'Activado' : 'Desactivado',

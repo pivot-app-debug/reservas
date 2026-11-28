@@ -325,11 +325,17 @@ async function _asistentes(db: any, idEvento: string): Promise<Set<string>> {
 // porciones por persona; si quien organiza la quita, no vuelve. Las alergias
 // se devuelven como lista para un aviso en la comida.
 
-/// `equipo.comida_eventos`: {"dieta": bool, "alergias": [texto]}; vacío = nada.
-function _comidaEventos(v: unknown): { dieta: boolean; alergias: Set<string> } {
+/// `equipo.comida_eventos`: {"dieta": bool, "alergias": [texto], "restricciones": [texto]}.
+/// Desde el 2026-11-28 la dieta y las restricciones alimentarias se usan
+/// siempre (sin nombre); las alergias de salud solo si la persona las prendió antes.
+function _comidaEventos(v: unknown): { dieta: boolean; alergias: Set<string>; restricciones: string[] } {
   let j: any = {};
   try { j = JSON.parse(String(v ?? '') || '{}'); } catch { j = {}; }
-  return { dieta: j?.dieta === true, alergias: new Set((Array.isArray(j?.alergias) ? j.alergias : []).map((x: unknown) => String(x).trim().toLowerCase())) };
+  return {
+    dieta: true,
+    alergias: new Set((Array.isArray(j?.alergias) ? j.alergias : []).map((x: unknown) => String(x).trim().toLowerCase())),
+    restricciones: (Array.isArray(j?.restricciones) ? j.restricciones : []).map((x: unknown) => String(x).trim()).filter(Boolean).slice(0, 20),
+  };
 }
 
 const SIN_DIETA = new Set(['', 'ninguna', 'ninguno', 'no', 'sin restricciones', 'normal']);
@@ -356,6 +362,7 @@ async function _dietasYAlergias(db: any, liga: string, idEvento: string, cfg: an
     const usar = _comidaEventos(f.comida_eventos);
     const d = usar.dieta ? _nombreDieta(String(f.dieta ?? '')) : null;
     if (d) cuenta.set(d.clave, { nombre: d.nombre, n: (cuenta.get(d.clave)?.n ?? 0) + 1 });
+    for (const r of usar.restricciones) alergias.set(r.toLowerCase(), r);
     const a = String(f.alergias ?? '').trim().toLowerCase();
     if (a === 'sí' || a === 'si') {
       for (const parte of String(f.alergias_desc ?? '').split(/[,;\n]+/)) {
@@ -553,7 +560,7 @@ async function socialGet(params: Record<string, any>, deps: DepsSocial): Promise
     const { data: yoSalud } = await db.from('equipo').select('dieta, alergias, alergias_desc, comida_eventos').eq('username', q.username).maybeSingle();
     if (yoSalud) {
       const usar = _comidaEventos(yoSalud.comida_eventos);
-      const dieta = !!_nombreDieta(String(yoSalud.dieta ?? '')) && !usar.dieta;
+      const dieta = false; // la dieta ya se usa siempre
       const tieneAlergia = ['sí', 'si'].includes(String(yoSalud.alergias ?? '').trim().toLowerCase());
       const alergiasSinUsar = tieneAlergia && String(yoSalud.alergias_desc ?? '').split(/[,;\n]+/).some((x) => x.trim() && !usar.alergias.has(x.trim().toLowerCase()));
       out.yo.comidaSinUsar = dieta || alergiasSinUsar;
