@@ -893,7 +893,7 @@ class ComidaTarjeta extends StatelessWidget {
     final detalle = TextEditingController(text: sugerencia ?? '');
     bool? paraTodxs;
     final yaParte = e.miParte;
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: c.nombre,
       accion: 'Me anoto',
@@ -1078,7 +1078,7 @@ class ComidaTarjeta extends StatelessWidget {
   Future<void> _consumo(BuildContext context) async {
     final porciones = TextEditingController(text: cantidadSocial(estado.consumoPorciones));
     final litros = TextEditingController(text: cantidadSocial(estado.consumoLitros));
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: 'Cuánto come y toma cada persona',
       accion: 'Guardar',

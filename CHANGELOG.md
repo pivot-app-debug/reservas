@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (formularios de fiestas)
+- En fiestas y eventos sociales, los formularios con campos de texto (agregar algo para llevar, consumo por persona, tarjetas y juegos) se abren como subsección en lugar de bottom sheet. Los que solo tienen opciones siguen como bottom sheet.
+
 ## 2026-11-28 (rediseño de Progreso)
 - Progreso, de arriba hacia abajo: Mi progreso, Equipo técnico, entrenamientos de los próximos 7 días (si no hay, el que viene) con «Ver más entrenamientos», Cursos y, para el equipo técnico, Habilidades y Pruebas (las últimas 5, con «Ver todas» y «Agregar»). La barra queda sin íconos.
 - Cada entrenamiento muestra «Armar» si no tiene plan (abre el asistente directo en ese entrenamiento) o «Ver plan», que lo despliega ahí mismo. Se quitó el botón «Armar el plan de un entrenamiento». «Armar» desde el detalle del evento también usa el asistente.

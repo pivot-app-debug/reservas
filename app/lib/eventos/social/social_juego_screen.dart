@@ -73,7 +73,7 @@ class _RegaloRobadoJuegoScreenState extends State<RegaloRobadoJuegoScreen> {
   Future<void> _abrir() async {
     if (_reglas['describir'] == false) return _hacer('abrir');
     final desc = TextEditingController();
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: '${_j?['actual']?['nombre'] ?? ''} abrió un regalo',
       accion: 'Listo',

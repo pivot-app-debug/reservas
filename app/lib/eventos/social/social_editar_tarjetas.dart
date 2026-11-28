@@ -73,7 +73,7 @@ class EditarTarjetas {
     final puedeParticipar = estado.asiste && estado.inscripcionAbierta && !estado.sorteado;
     var participo = estado.participaAmigo;
     final evento = DateTime.tryParse('${estado.evento['fecha'] ?? ''}');
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: 'Amigo secreto',
       accion: 'Guardar',
@@ -224,7 +224,7 @@ class EditarTarjetas {
     final pl = estado.playlist ?? const {};
     final link = TextEditingController(text: '${pl['link'] ?? ''}');
     final nota = TextEditingController(text: '${pl['nota'] ?? ''}');
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: 'Playlist colaborativa',
       accion: 'Guardar',
@@ -255,7 +255,7 @@ class EditarTarjetas {
 
   Future<void> dress() async {
     final texto = TextEditingController(text: '${estado.dress?['texto'] ?? ''}');
-    final ok = await hojaFormulario(
+    final ok = await pantallaFormulario(
       context,
       titulo: 'Dress code',
       accion: 'Guardar',
