@@ -48,6 +48,7 @@ class EstadoAvisos {
       // iPhone en Safari (sin abrir desde la pantalla de inicio): ahí iOS no
       // permite avisos y los marca como bloqueados. Se pide abrir la app
       // instalada en vez de mandar a ajustes (caso Veneno, 2026-11-28).
+      if (esNavegadorInterno()) return 'sin_soporte';
       if (esIosWeb() && !esAppInstalada()) return 'instalar';
       final w = permisoAvisosWeb();
       return switch (w) {
@@ -118,6 +119,20 @@ class EstadoAvisos {
       ];
     }
     if (e == 'sin_soporte') {
+      // Abierto dentro de WhatsApp, Instagram u otra app: hay que salir a su navegador.
+      if (kIsWeb && esNavegadorInterno()) {
+        return esIosWeb()
+            ? const [
+                'Estás en el navegador de otra app (WhatsApp, Instagram…), y ahí no llegan notificaciones.',
+                'Toca los tres puntos o el ícono de compartir y elige «Abrir en Safari».',
+                'En Safari, agrega Pivot a tu pantalla de inicio (Compartir › Agregar a inicio) y ábrelo desde ese ícono.',
+              ]
+            : const [
+                'Estás en el navegador de otra app (WhatsApp, Instagram…), y ahí no llegan notificaciones.',
+                'Toca los tres puntos de arriba y elige «Abrir en Chrome» (o «Abrir en el navegador»).',
+                'En Chrome, toca «Activar» y permite las notificaciones.',
+              ];
+      }
       return const ['Abre Pivot en Chrome, Edge o Firefox, o instala la app de Android.', 'Inicia sesión y toca «Activar».'];
     }
     // Bloqueadas.
