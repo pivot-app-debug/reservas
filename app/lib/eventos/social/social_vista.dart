@@ -72,7 +72,11 @@ class _CardPieza extends StatelessWidget {
     this.estadoActivo = true,
     required this.alTocar,
     this.destacado,
+    this.gradiente,
   });
+
+  /// Fondo de regalo con degradado (amigo secreto y regalo robado, 2026-11-28).
+  final LinearGradient? gradiente;
   final IconData icono;
   final String titulo, texto;
 
@@ -84,6 +88,8 @@ class _CardPieza extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final g = gradiente;
+    if (g != null) return _conGradiente(context, g);
     final p = context.pivot;
     return SizedBox(
       child: Material(
@@ -126,6 +132,187 @@ class _CardPieza extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on _CardPieza {
+  Widget _conGradiente(BuildContext context, LinearGradient g) {
+    const t = PivotPaleta.sobreSeccion;
+    return Container(
+      decoration: BoxDecoration(gradient: g, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: alTocar,
+          child: Stack(
+            children: [
+              // Moño de regalo de fondo.
+              Positioned(right: -14, bottom: -18, child: Icon(icono, size: 96, color: t.withValues(alpha: 0.13))),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(color: t.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                          child: Icon(icono, size: 18, color: t),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            titulo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: t),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (estado != null) _pill(estado!, estadoActivo ? Icons.check_rounded : Icons.remove_rounded),
+                        if (destacado != null) _pill(destacado!, Icons.sell_outlined),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      texto,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, height: 1.3, color: t.withValues(alpha: 0.9)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pill(String texto, IconData i) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(color: PivotPaleta.sobreSeccion.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(PivotRadios.chip)),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(i, size: 14, color: PivotPaleta.sobreSeccion),
+        const SizedBox(width: 4),
+        Text(
+          texto,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: PivotPaleta.sobreSeccion),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Mis pistas y lista de deseos a simple vista (Victor, 2026-11-28): tarjeta
+/// de regalo con degradado, tus deseos y gustos en pastillas.
+class MisPistasTarjeta extends StatelessWidget {
+  const MisPistasTarjeta({super.key, required this.estado, required this.alTocar});
+  final EstadoSocial estado;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    const t = PivotPaleta.sobreSeccion;
+    final pf = estado.perfil;
+    final deseos = [...pf.wishlist]..sort((a, b) => (b.favorito ? 1 : 0) - (a.favorito ? 1 : 0));
+    final chips = [
+      for (final d in deseos.take(4)) (d.favorito ? Icons.favorite_rounded : Icons.redeem_rounded, d.texto),
+      for (final g in pf.gustos.take(3)) (Icons.auto_awesome_rounded, g),
+    ];
+    final (g, _, _, _) = PivotPaleta.festivo('');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Container(
+        decoration: BoxDecoration(gradient: g, borderRadius: BorderRadius.circular(PivotRadios.grande)),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: alTocar,
+            child: Stack(
+              children: [
+                Positioned(right: -10, top: -16, child: Icon(Icons.card_giftcard_rounded, size: 110, color: t.withValues(alpha: 0.12))),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.redeem_rounded, color: t),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Mis pistas y lista de deseos',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: t),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: t),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (chips.isEmpty)
+                        Text(
+                          'Cuéntale a tu amigo secreto qué te gusta y qué te haría ilusión recibir.',
+                          style: TextStyle(fontSize: 13.5, height: 1.35, color: t.withValues(alpha: 0.92)),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final (i, x) in chips)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(color: t.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(PivotRadios.chip)),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(i, size: 14, color: t),
+                                    const SizedBox(width: 5),
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 200),
+                                      child: Text(
+                                        x,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      if (chips.isNotEmpty && pf.wishlist.length + pf.gustos.length > chips.length) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'y ${pf.wishlist.length + pf.gustos.length - chips.length} más',
+                          style: TextStyle(fontSize: 12.5, color: t.withValues(alpha: 0.85)),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -189,10 +376,8 @@ class QueLlevaResumen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (cuenta)
-                      Flexible(
-                        child: Etiqueta(texto: 'Tu parte: ${(parte * 100).round()} %', apagada: parte >= 1),
-                      ),
+                    // Sin Flexible: el Spacer la cortaba (QA 2026-11-28).
+                    if (cuenta) Etiqueta(texto: 'Tu parte: ${(parte * 100).round()} %', apagada: parte >= 1),
                     const Spacer(),
                     Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                   ],
@@ -321,7 +506,10 @@ class _QueLlevarVistaState extends State<QueLlevarVista> {
 /// Actividades del evento en cards que se deslizan (amigo secreto, regalo
 /// robado, playlist, dress code, premios). Cada una abre su subsección.
 class ActividadesSocial extends StatelessWidget {
-  const ActividadesSocial({super.key, required this.estado, required this.alAbrir, this.simbolo});
+  const ActividadesSocial({super.key, required this.estado, required this.alAbrir, this.simbolo, this.alPistas});
+
+  /// Abre «Mis pistas»; si está, se muestra la tarjeta de deseos arriba.
+  final VoidCallback? alPistas;
   final EstadoSocial estado;
   final String? simbolo;
 
@@ -336,11 +524,12 @@ class ActividadesSocial extends StatelessWidget {
     final cards = <Widget>[
       if (e.modulo('amigoSecreto'))
         _CardPieza(
+          gradiente: PivotPaleta.degradadoMarca,
           icono: Icons.redeem_rounded,
           titulo: 'Amigo secreto',
           estado: e.asiste ? (e.participaAmigo ? 'Participas' : 'No participas') : null,
           estadoActivo: e.participaAmigo,
-          destacado: e.topeAmigo != null ? 'Tope del regalo: ${montoSocial(e.topeAmigo, simbolo)}' : null,
+          destacado: e.topeAmigo != null ? 'Tope ${montoSocial(e.topeAmigo, simbolo)}' : null,
           texto: !e.asiste
               ? 'Marca Asistiré para participar.'
               : !e.participaAmigo
@@ -354,11 +543,12 @@ class ActividadesSocial extends StatelessWidget {
         ),
       if (e.modulo('regaloRobado'))
         _CardPieza(
+          gradiente: PivotPaleta.festivo('navidad').$1,
           icono: Icons.card_giftcard_rounded,
           titulo: 'Regalo robado',
           estado: e.asiste ? (e.participaRobado ? 'Participas' : 'No participas') : null,
           estadoActivo: e.participaRobado,
-          destacado: e.topeRobado != null ? 'Tope del regalo: ${montoSocial(e.topeRobado, simbolo)}' : null,
+          destacado: e.topeRobado != null ? 'Tope ${montoSocial(e.topeRobado, simbolo)}' : null,
           texto: e.juegoRobado['fase'] != null ? 'El juego ya empezó' : 'Trae un regalo envuelto',
           alTocar: () => alAbrir('robado'),
         ),
@@ -395,6 +585,7 @@ class ActividadesSocial extends StatelessWidget {
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: p.textoSecundario),
           ),
         ),
+        if (alPistas != null && e.modulo('amigoSecreto') && e.asiste && e.participaAmigo) MisPistasTarjeta(estado: e, alTocar: alPistas!),
         SizedBox(
           height: 176,
           child: ListView.separated(

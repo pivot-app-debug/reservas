@@ -693,7 +693,18 @@ class SocialEnEventoState extends State<SocialEnEvento> {
               key: _kComida,
               child: QueLlevaResumen(repo: _social, estado: e, alCambiar: _cargar, alAbrir: abrirQueLleva),
             ),
-          ActividadesSocial(estado: e, alAbrir: abrirActividad),
+          ActividadesSocial(
+            estado: e,
+            alAbrir: abrirActividad,
+            alPistas: () async {
+              final cambio = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => PistasScreen(repo: _social, inicial: e.perfil),
+                ),
+              );
+              if (cambio == true) _cargar();
+            },
+          ),
         ],
       );
     }

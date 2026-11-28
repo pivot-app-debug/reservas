@@ -106,6 +106,51 @@ class IconoTarjetaSocial extends StatelessWidget {
   }
 }
 
+/// El tope del regalo bien a la vista (Victor, 2026-11-28): franja con
+/// degradado, ícono de regalo y el valor grande.
+class BannerTopeRegalo extends StatelessWidget {
+  const BannerTopeRegalo({super.key, required this.monto, required this.gradiente, this.texto});
+  final String monto;
+  final LinearGradient gradiente;
+  final String? texto;
+
+  @override
+  Widget build(BuildContext context) {
+    const t = PivotPaleta.sobreSeccion;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(gradient: gradiente, borderRadius: BorderRadius.circular(PivotRadios.tarjeta)),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: t.withValues(alpha: 0.2), shape: BoxShape.circle),
+            child: const Icon(Icons.redeem_rounded, color: t),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tope del regalo',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: t.withValues(alpha: 0.9)),
+                ),
+                if (texto != null) Text(texto!, style: TextStyle(fontSize: 12.5, color: t.withValues(alpha: 0.85))),
+              ],
+            ),
+          ),
+          Text(
+            monto,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: t),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Marca que una tarjeta va dentro de otra (filas de "Detalles").
 class SinMarcoSocial extends InheritedWidget {
   const SinMarcoSocial({super.key, required super.child, this.accion});
@@ -413,7 +458,7 @@ class FichaAmigoVista extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.texto),
                   ),
                   if (ficha.invitadxDe != null) Text('Invitadx de ${ficha.invitadxDe}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
-                  if (tope != null) Text('Tope del regalo: ${montoSocial(tope, simbolo)}', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+                  if (tope != null) ...[const SizedBox(height: 6), Etiqueta(texto: 'Tope ${montoSocial(tope, simbolo)}')],
                 ],
               ),
             ),
@@ -525,8 +570,8 @@ class _AmigoSecretoTarjetaState extends State<AmigoSecretoTarjeta> {
     final ficha = e.ficha;
     final List<Widget> contenido = [];
     if (e.topeAmigo != null) {
-      contenido.add(Text('Tope del regalo: ${montoSocial(e.topeAmigo, widget.simbolo)}', style: TextStyle(color: p.texto)));
-      contenido.add(const SizedBox(height: 6));
+      contenido.add(BannerTopeRegalo(monto: montoSocial(e.topeAmigo, widget.simbolo), gradiente: PivotPaleta.degradadoMarca));
+      contenido.add(const SizedBox(height: 12));
     }
     switch (estado) {
       case 'sin_sorteo' when e.asiste && !e.participaAmigo:
@@ -2066,12 +2111,15 @@ class RegaloRobadoTarjeta extends StatelessWidget {
           ? EditarTarjetas.boton(() => EditarTarjetas(context, repo!, estado, alCambiar ?? () {}).participacion(amigo: false))
           : null,
       children: [
-        Text(
-          estado.topeRobado != null
-              ? 'Lleva un regalo de hasta ${montoSocial(estado.topeRobado, simbolo)}.'
-              : 'Lleva un regalo para el juego del regalo robado.',
-          style: TextStyle(color: p.texto),
-        ),
+        if (estado.topeRobado != null) ...[
+          BannerTopeRegalo(
+            monto: montoSocial(estado.topeRobado, simbolo),
+            gradiente: PivotPaleta.festivo('navidad').$1,
+            texto: 'Lleva un regalo envuelto de hasta este valor.',
+          ),
+          const SizedBox(height: 12),
+        ] else
+          Text('Lleva un regalo para el juego del regalo robado.', style: TextStyle(color: p.texto)),
         if (estado.recordatorioRobado.isNotEmpty) ...[const SizedBox(height: 6), Text(estado.recordatorioRobado, style: TextStyle(color: p.textoSecundario))],
         // Reglas del juego siempre a la vista, en pasos numerados (Victor, 2026-11-22).
         // Salen de la plantilla con las opciones del evento, o de lo que escribió
