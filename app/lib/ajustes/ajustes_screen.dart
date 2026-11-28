@@ -21,6 +21,7 @@ import 'privacidad_screen.dart';
 import 'salud_screen.dart';
 import 'notificaciones_screen.dart';
 import 'pagos_screen.dart';
+import '../finanzas/transparencia_screen.dart';
 import 'recorte_foto.dart';
 import '../push/avisos_obligatorios.dart';
 import '../pivots/buscador_liga.dart' show BuscadorLigaScreen, EntradaAjuste, entradasPerfil;
@@ -65,6 +66,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
     if (e == null || !mounted) return;
     final Widget? pantalla = switch (e.dentro) {
       'pagos' => PagosScreen(repo: eventos),
+      'transparencia' => TransparenciaScreen(sesion: sesion),
       'excepcion' => ExcepcionesPanelScreen(sesion: sesion),
       'salud' => SaludEmergenciaScreen(sesion: sesion),
       'identidad' => IdentidadScreen(sesion: sesion),
@@ -92,6 +94,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
     super.initState();
     if (eventos.cuota == null) eventos.recargarCuota();
     NotificacionesScreen.precargar(sesion.api);
+    revisarTransparencia(sesion);
   }
 
   @override
@@ -136,7 +139,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
         ),
       ),
       body: ListenableBuilder(
-        listenable: Listenable.merge([sesion, eventos]),
+        listenable: Listenable.merge([sesion, eventos, transparenciaActiva]),
         builder: (context, _) {
           final d = sesion.datos;
           final conFicha = d.isNotEmpty; // admins "puros" no tienen fila en Equipo
@@ -180,6 +183,15 @@ class _AjustesScreenState extends State<AjustesScreen> {
                       alTocar: () => SubAjustes.abrir(context, ExcepcionesPanelScreen(sesion: sesion)),
                     ),
                   // Mi equipamiento se movió al Inventario (Victor, 2026-11-13).
+                  // Cuentas de la liga, si Finanzas las hace visibles (2026-11-27).
+                  if (transparenciaActiva.value)
+                    FilaAjuste(
+                      icono: Icons.account_balance_wallet_outlined,
+                      seccion: 'recaudacion',
+                      titulo: 'Cuentas de la liga',
+                      valor: 'Totales por mes y cierres de año',
+                      alTocar: () => SubAjustes.abrir(context, TransparenciaScreen(sesion: sesion)),
+                    ),
                 ],
               ),
               if (conFicha)

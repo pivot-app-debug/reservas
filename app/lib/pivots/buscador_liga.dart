@@ -146,6 +146,7 @@ const entradasPerfil = [
   EntradaAjuste('perfil', 'Roles en el equipo', 'Mi perfil', 'rol jammer blocker pivot jugadorx árbitro'),
   EntradaAjuste('perfil', 'Entraste al equipo', 'Mi perfil', 'fecha ingreso aniversario'),
   EntradaAjuste('pagos', 'Mis pagos y reservas', 'Mi perfil', 'recibos cuota suscripciones clases mensualidad deuda comprobante', dentro: 'pagos'),
+  EntradaAjuste('transparencia', 'Cuentas de la liga', 'Mi perfil', 'transparencia finanzas gastos ingresos cierre año dinero', dentro: 'transparencia'),
   EntradaAjuste('excepcion', 'Excepción de cuota', 'Mi perfil', 'no pagar mes viaje lesión pedir excepción', dentro: 'excepcion'),
   EntradaAjuste('salud', 'Salud y emergencia', 'Mi perfil', 'contacto de emergencia ficha médica', dentro: 'salud'),
   EntradaAjuste('salud', 'Alergias', 'Mi perfil › Salud y emergencia', 'alergia alimentos medicamentos', dentro: 'salud'),
