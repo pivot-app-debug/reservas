@@ -15,9 +15,12 @@ import 'coach_screen.dart';
 /// un bottom sheet enorme). 1) qué entrenamiento, 2) para quién (toda la
 /// liga, un equipo, un nivel o personas puntuales) y después el editor del plan.
 class ArmarPlanScreen extends StatefulWidget {
-  const ArmarPlanScreen({super.key, required this.sesion, required this.entrenamientos});
+  const ArmarPlanScreen({super.key, required this.sesion, required this.entrenamientos, this.inicial});
   final Sesion sesion;
   final List<Evento> entrenamientos;
+
+  /// Entrenamiento ya elegido (desde su tarjeta o su detalle): empieza en el paso 2.
+  final Evento? inicial;
 
   @override
   State<ArmarPlanScreen> createState() => _ArmarPlanScreenState();
@@ -38,6 +41,8 @@ class _ArmarPlanScreenState extends State<ArmarPlanScreen> {
         if (mounted) setState(() {});
       }, onError: (_) {});
     }
+    final i = widget.inicial;
+    if (i != null) WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _elegirEvento(i) : null);
   }
 
   Future<void> _elegirEvento(Evento e) async {

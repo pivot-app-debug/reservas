@@ -10,6 +10,7 @@ import '../core/vidrio.dart';
 import '../cursos/cursos_screen.dart';
 import '../eventos/detalle_screen.dart' show DetalleScreen;
 import '../eventos/eventos_repo.dart';
+import '../eventos/modelos.dart' show Evento;
 import '../sesion/sesion.dart';
 import 'coach_screen.dart';
 import 'equipo_tecnico.dart';
@@ -105,6 +106,12 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
         )
       : const SizedBox.shrink();
 
+  bool _verMas = false;
+  final _planAbierto = <String>{};
+
+  /// Si el entrenamiento tiene un plan que esta persona puede ver.
+  bool _tienePlan(Evento e) => (PlanEnEvento.cache[e.id]?['planes'] as List? ?? const []).isNotEmpty;
+
   /// Cursos en un carrusel (mockup A).
   Widget _carrusel(BuildContext context) {
     final p = context.pivot;
@@ -134,19 +141,22 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
                 ),
               ),
-              TextButton(onPressed: _abrirCursos, child: const Text('Ver todos')),
+              // Cursos en la portada, sin subsección (QA 2026-11-27); los Pivots los gestionan aparte.
+              if (s.esAdmin) TextButton(onPressed: _abrirCursos, child: const Text('Gestionar')),
             ],
           ),
         ),
+        QueEsUnCurso(persona: !s.esAdmin),
+        const SizedBox(height: 8),
         if (l.isEmpty)
           Material(
             color: p.tarjeta,
             borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
             child: ListTile(
-              leading: Icon(Icons.school_outlined, color: p.marcaTexto),
-              title: const Text('No hay cursos abiertos ahora'),
-              subtitle: const Text('Cuando abran uno para ti, aparece aquí.'),
-              onTap: _abrirCursos,
+              leading: Icon(s.esAdmin ? Icons.add_circle_outline_rounded : Icons.school_outlined, color: p.marcaTexto),
+              title: Text(s.esAdmin ? 'No hay cursos abiertos · Crear un curso' : 'No hay cursos abiertos ahora'),
+              subtitle: Text(s.esAdmin ? 'Arma uno en pasos: clases, precio, cupo y evaluación.' : 'Cuando abran uno para ti, aparece aquí.'),
+              onTap: s.esAdmin ? () => SubAjustes.abrir<void>(context, CursosScreen(sesion: s, nuevo: true)).then((_) => _cargar()) : null,
             ),
           )
         else
@@ -165,7 +175,10 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                     borderRadius: BorderRadius.circular(PivotRadios.tarjeta + 4),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: _abrirCursos,
+                      // Abre ese curso para inscribirse.
+                      onTap: () => s.esAdmin
+                          ? _abrirCursos()
+                          : SubAjustes.abrir<void>(context, CursosAbiertosScreen(sesion: s, destacado: '${c['id']}')).then((_) => _cargar()),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
                         child: Column(
@@ -221,7 +234,6 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    void ir(String h) => _herramienta.value = h;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -230,17 +242,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
         title: const Text('Progreso', style: TextStyle(fontWeight: FontWeight.w800)),
-        // Herramientas de entrenadorx en la barra (mockup B).
-        actions: _usaCoach
-            ? [
-                // Mismos íconos (y trazo) que el resto de la app; el equipo
-                // técnico pasó a una sección de la portada (QA 2026-11-27).
-                IconButton(tooltip: 'Habilidades', onPressed: () => ir('habilidades'), icon: const Icon(Icons.military_tech_outlined)),
-                IconButton(tooltip: 'Pruebas', onPressed: () => ir('pruebas'), icon: const Icon(Icons.timer_outlined)),
-                // Las notificaciones del equipo técnico viven en Mi perfil › Notificaciones (QA 2026-11-27).
-                const SizedBox(width: 4),
-              ]
-            : null,
+        // Habilidades y Pruebas están en la portada; las notificaciones, en Mi perfil (QA 2026-11-27).
       ),
       body: _usaCoach
           ? CoachScreen(
@@ -273,6 +275,17 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
           for (final e in widget.eventos.eventos)
             if (e.tipo == 'Entrenamiento' && !e.cancelado && !e.finalizado && !e.fecha.isBefore(hoy)) e,
         ]..sort((a, b) => '${Fechas.iso(a.fecha)} ${a.horaInicio}'.compareTo('${Fechas.iso(b.fecha)} ${b.horaInicio}'));
+        final limite = hoy.add(const Duration(days: 7));
+        var semana = proximos.where((e) => !e.fecha.isAfter(limite)).toList();
+        if (semana.isEmpty && proximos.isNotEmpty) semana = [proximos.first];
+        final visibles = _verMas ? proximos.take(semana.length + 6).toList() : semana;
+        for (final e in visibles) {
+          if (!PlanEnEvento.cache.containsKey(e.id)) {
+            PlanEnEvento.precargar(s, e.id).then((_) {
+              if (mounted) setState(() {});
+            }, onError: (_) {});
+          }
+        }
         return RefreshIndicator(
           onRefresh: _cargar,
           child: ListView(
@@ -280,32 +293,75 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
             children: [
               _hero(),
               if (_puedeNombrar) EquipoTecnicoSeccion(sesion: s),
-              _carrusel(context),
+              // Próximos 7 días (si no hay, el que viene) y luego Cursos (QA 2026-11-27).
               if (proximos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),
                   child: Text(
-                    proximos.length == 1 ? 'PRÓXIMO ENTRENAMIENTO' : 'PRÓXIMOS ENTRENAMIENTOS',
+                    visibles.length == 1 ? 'PRÓXIMO ENTRENAMIENTO' : 'PRÓXIMOS ENTRENAMIENTOS',
                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
                   ),
                 ),
-              for (final e in proximos.take(3))
-                Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: Icon(Icons.sports_rounded, color: p.marcaTexto),
-                    title: Text('${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(
-                      [if (e.lugar.isNotEmpty) e.lugar, e.cantidadAsisten == 1 ? 'Viene 1 persona' : 'Vienen ${e.cantidadAsisten} personas'].join(' · '),
-                    ),
-                    trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => DetalleScreen(repo: widget.eventos, eventoId: e.id),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final e in visibles)
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: Icon(Icons.sports_rounded, color: p.marcaTexto),
+                              title: Text(
+                                '${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}',
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (e.lugar.isNotEmpty) e.lugar,
+                                  e.cantidadAsisten == 1 ? 'Viene 1 persona' : 'Vienen ${e.cantidadAsisten} personas',
+                                ].join(' · '),
+                              ),
+                              // Plan compartido: «Ver plan» lo despliega aquí mismo.
+                              trailing: _tienePlan(e)
+                                  ? ActionChip(
+                                      label: const Text('Ver plan'),
+                                      onPressed: () => setState(() => _planAbierto.contains(e.id) ? _planAbierto.remove(e.id) : _planAbierto.add(e.id)),
+                                    )
+                                  : Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => DetalleScreen(repo: widget.eventos, eventoId: e.id),
+                                ),
+                              ),
+                            ),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 240),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: _planAbierto.contains(e.id) ? PlanEnEvento(sesion: s, evento: e) : const SizedBox(width: double.infinity),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                  ],
+                ),
+              ),
+              if (proximos.length > semana.length)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _verMas = !_verMas),
+                    icon: Icon(_verMas ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                    label: Text(_verMas ? 'Ver menos' : 'Ver más entrenamientos'),
                   ),
                 ),
+              _carrusel(context),
             ],
           ),
         );

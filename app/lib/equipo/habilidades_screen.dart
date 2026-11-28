@@ -28,8 +28,11 @@ import '../sesion/sesion.dart';
 /// Niveles en Coach (Victor, 2026-11-17).
 
 class HabilidadesEquipoScreen extends StatefulWidget {
-  const HabilidadesEquipoScreen({super.key, required this.sesion, this.lista = false});
+  const HabilidadesEquipoScreen({super.key, required this.sesion, this.lista = false, this.nueva = false});
   final Sesion sesion;
+
+  /// Desde Progreso › Habilidades › «Agregar»: abre el editor apenas entra.
+  final bool nueva;
 
   /// Abre directo en la lista de habilidades (desde Coach).
   final bool lista;
@@ -38,8 +41,17 @@ class HabilidadesEquipoScreen extends StatefulWidget {
 }
 
 class _HabilidadesEquipoScreenState extends State<HabilidadesEquipoScreen> {
-  late String _vista = widget.lista ? 'lista' : 'personas';
+  late String _vista = widget.lista || widget.nueva ? 'lista' : 'personas';
   final _lista = GlobalKey<_ListaHabilidadesState>();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.nueva) {
+      // Espera a que la lista cargue para abrir el editor.
+      Future<void>.delayed(const Duration(milliseconds: 600), () => mounted ? _lista.currentState?.editar() : null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

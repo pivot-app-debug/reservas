@@ -203,17 +203,6 @@ class _CoachScreenState extends State<CoachScreen> {
     ),
   );
 
-  /// Armar el plan de un entrenamiento, en pasos (Victor, 2026-11-26: antes
-  /// era un bottom sheet enorme).
-  Future<void> _armarPlan() async {
-    if (_proximos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay entrenamientos próximos en el calendario.')));
-      return;
-    }
-    final ok = await SubAjustes.abrir<bool>(context, ArmarPlanScreen(sesion: s, entrenamientos: _proximos));
-    if (ok == true && mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     final cuerpo = AnimatedSwitcher(
@@ -239,13 +228,8 @@ class _CoachScreenState extends State<CoachScreen> {
                     ?widget.despuesDelProximo,
                     // Lo que falta evaluar (antes en Próximos eventos).
                     TarjetasPorEvaluar(sesion: s),
-                    _titulo(context, 'PLANES'),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                      onPressed: _armarPlan,
-                      icon: const Icon(Icons.edit_calendar_outlined),
-                      label: const Text('Armar el plan de un entrenamiento'),
-                    ),
+                    // Habilidades y Pruebas bajan a la portada (QA 2026-11-27).
+                    if (widget.encabezado != null) ...[..._habilidades(context), ..._pruebas(context)],
                     ..._sinFecha(context),
                   ],
                 ),
@@ -256,60 +240,188 @@ class _CoachScreenState extends State<CoachScreen> {
     return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Progreso'), body: cuerpo);
   }
 
-  /// Próximo entrenamiento: fecha, quién viene y su plan, ya cargado.
+  /// Entrenamientos de los próximos 7 días (si no hay, el que viene), con
+  /// «Armar» o «Ver plan» en cada uno y «Ver más» (QA 2026-11-27).
+  bool _verMas = false;
+  final _planAbierto = <String>{};
+
+  Future<void> _armarEn(Evento e) async {
+    final ok = await SubAjustes.abrir<bool>(context, ArmarPlanScreen(sesion: s, entrenamientos: _proximos, inicial: e));
+    if (ok == true && mounted) setState(() {});
+  }
+
   List<Widget> _proximo(BuildContext context) {
     final p = context.pivot;
-    final e = _proximos.firstOrNull;
-    if (e == null) return const [];
-    final cache = PlanEnEvento.cache[e.id];
-    if (cache == null) {
-      PlanEnEvento.precargar(s, e.id).then((_) {
-        if (mounted) setState(() {});
-      }, onError: (_) {});
-    }
-    final planes = [for (final x in (cache?['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
-    return [
-      _titulo(context, 'PRÓXIMO ENTRENAMIENTO'),
-      Material(
-        color: p.tarjeta,
-        borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _abrirEvento(e),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                const IconoRecuadroCoach(icono: Icons.sports_rounded),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    final todos = _proximos;
+    if (todos.isEmpty) return const [];
+    final limite = Fechas.hoy().add(const Duration(days: 7));
+    var semana = todos.where((e) => !e.fecha.isAfter(limite)).toList();
+    if (semana.isEmpty) semana = [todos.first];
+    final lista = _verMas ? todos.take(semana.length + 6).toList() : semana;
+    final esCoach = s.esCoach;
+    Widget tarjeta(Evento e) {
+      final cache = PlanEnEvento.cache[e.id];
+      if (cache == null) {
+        PlanEnEvento.precargar(s, e.id).then((_) {
+          if (mounted) setState(() {});
+        }, onError: (_) {});
+      }
+      final planes = [for (final x in (cache?['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+      final abierto = _planAbierto.contains(e.id);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: p.tarjeta,
+          borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              InkWell(
+                onTap: () => _abrirEvento(e),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                  child: Row(
                     children: [
-                      Text(
-                        '${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}',
-                        style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                      const IconoRecuadroCoach(icono: Icons.sports_rounded),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${Fechas.dia(e.fecha)} ${Fechas.corta(e.fecha)} · ${e.horaInicio}',
+                              style: TextStyle(fontWeight: FontWeight.w800, color: p.texto),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                if (e.lugar.isNotEmpty) e.lugar,
+                                e.cantidadAsisten == 1 ? 'Viene 1 persona' : 'Vienen ${e.cantidadAsisten} personas',
+                              ].join(' · '),
+                              style: TextStyle(fontSize: 13, color: p.textoSecundario),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        [
-                          if (e.lugar.isNotEmpty) e.lugar,
-                          e.cantidadAsisten == 1 ? 'Viene 1 persona' : 'Vienen ${e.cantidadAsisten} personas',
-                          cache == null ? 'Cargando el plan…' : _resumenPlan(planes),
-                        ].join(' · '),
-                        style: TextStyle(fontSize: 13, color: p.textoSecundario),
-                      ),
+                      if (cache != null && planes.isNotEmpty)
+                        ActionChip(
+                          avatar: Icon(abierto ? Icons.expand_less_rounded : Icons.event_note_outlined, size: 18),
+                          label: const Text('Ver plan'),
+                          onPressed: () => setState(() => abierto ? _planAbierto.remove(e.id) : _planAbierto.add(e.id)),
+                        )
+                      else if (cache != null && esCoach)
+                        FilledButton.tonal(onPressed: () => _armarEn(e), child: const Text('Armar')),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
-              ],
-            ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: abierto ? PlanEnEvento(sesion: s, evento: e) : const SizedBox(width: double.infinity),
+              ),
+            ],
           ),
         ),
+      );
+    }
+
+    return [
+      _titulo(context, lista.length == 1 ? 'PRÓXIMO ENTRENAMIENTO' : 'PRÓXIMOS ENTRENAMIENTOS'),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (final e in lista) tarjeta(e)]),
       ),
+      if (todos.length > semana.length)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => setState(() => _verMas = !_verMas),
+            icon: Icon(_verMas ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+            label: Text(_verMas ? 'Ver menos' : 'Ver más entrenamientos'),
+          ),
+        ),
     ];
   }
+
+  /// Últimas 5 habilidades, con «Ver todas» y «Agregar» (QA 2026-11-27).
+  List<Widget> _habilidades(BuildContext context) {
+    final l = [for (final x in (_d?['habilidadesRecientes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    return [
+      _encabezadoSeccion(
+        context,
+        'HABILIDADES',
+        alVer: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
+        alAgregar: () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true, nueva: true)),
+      ),
+      if (l.isEmpty)
+        _vacioSeccion(context, 'Todavía no hay habilidades en la lista de la liga.')
+      else
+        for (final h in l)
+          _filaSeccion(
+            context,
+            Icons.military_tech_outlined,
+            '${h['nombre'] ?? ''}',
+            ['${h['categoria'] ?? ''}', NivelesCoach.nombre('${h['nivel'] ?? ''}')].where((x) => x.isNotEmpty).join(' · '),
+            () => _abrir(HabilidadesEquipoScreen(sesion: s, lista: true)),
+          ),
+    ];
+  }
+
+  /// Últimas 5 pruebas, con «Ver todas» y «Agregar».
+  List<Widget> _pruebas(BuildContext context) {
+    final todas = [for (final x in (_d?['pruebas'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
+    final l = todas.reversed.take(5).toList();
+    void abrir() => _abrir(PruebasCoachScreen(sesion: s, jugadorxs: _jugadorxs));
+    return [
+      _encabezadoSeccion(context, 'PRUEBAS', alVer: abrir, alAgregar: abrir),
+      if (l.isEmpty)
+        _vacioSeccion(context, 'Todavía no hay pruebas. Crea una para medir el progreso.')
+      else
+        for (final x in l)
+          _filaSeccion(context, Icons.timer_outlined, '${x['nombre'] ?? ''}', '${x['unidad'] ?? ''}'.isEmpty ? 'Prueba' : 'En ${x['unidad']}', abrir),
+    ];
+  }
+
+  Widget _encabezadoSeccion(BuildContext context, String t, {required VoidCallback alVer, required VoidCallback alAgregar}) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 14, 0, 4),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            t,
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.pivot.textoSecundario),
+          ),
+        ),
+        TextButton(onPressed: alVer, child: const Text('Ver todas')),
+        TextButton.icon(onPressed: alAgregar, icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Agregar')),
+      ],
+    ),
+  );
+
+  Widget _vacioSeccion(BuildContext context, String t) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(t, style: TextStyle(color: context.pivot.textoSecundario)),
+  );
+
+  Widget _filaSeccion(BuildContext context, IconData i, String titulo, String sub, VoidCallback alTocar) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Material(
+      color: context.pivot.tarjeta,
+      borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: Icon(i, color: context.pivot.marcaTexto),
+        title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: sub.isEmpty ? null : Text(sub),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: alTocar,
+      ),
+    ),
+  );
 
   /// Herramientas, con nombres que dicen qué hacen (Victor, 2026-11-26).
   Widget _atajos(BuildContext context) {
@@ -715,20 +827,9 @@ class _PlanEnEventoState extends State<PlanEnEvento> {
 
   List<Map<String, dynamic>> get _planes => [for (final x in (_r?['planes'] as List? ?? const [])) Map<String, dynamic>.from(x as Map)];
 
+  /// Desde el detalle usa el mismo asistente de Progreso (QA 2026-11-27).
   Future<void> _armar() async {
-    final hechos = _planes;
-    final equipo = await elegirEquipoPlan(context, _r ?? const {}, hechos);
-    if (equipo == null || !mounted) return;
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => PlanEventoScreen(
-          sesion: widget.sesion,
-          evento: widget.evento,
-          equipo: equipo,
-          plan: hechos.where((x) => '${x['equipo'] ?? ''}' == equipo).firstOrNull,
-        ),
-      ),
-    );
+    final ok = await SubAjustes.abrir<bool>(context, ArmarPlanScreen(sesion: widget.sesion, entrenamientos: [widget.evento], inicial: widget.evento));
     if (ok == true) _cargar();
   }
 

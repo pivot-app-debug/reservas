@@ -102,8 +102,8 @@ class Curso {
 
 /// Qué es un curso, para guiar a quien lo arma (Victor, 2026-11-16). Para
 /// quien no puede crear cursos, qué significa para ellxs (Victor, 2026-11-18).
-class _QueEsUnCurso extends StatelessWidget {
-  const _QueEsUnCurso({this.persona = false});
+class QueEsUnCurso extends StatelessWidget {
+  const QueEsUnCurso({super.key, this.persona = false});
   final bool persona;
   // Colapsable y recordado (Victor, 2026-11-20).
   @override
@@ -372,7 +372,7 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 24 + MediaQuery.paddingOf(context).bottom),
                 children: [
-                  const _QueEsUnCurso(persona: true),
+                  const QueEsUnCurso(persona: true),
                   const SizedBox(height: 14),
                   if (l.isEmpty)
                     Padding(
@@ -460,7 +460,10 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
 // ─── Pivots: crear y seguir cursos ─────────────────────────────────────────
 
 class CursosScreen extends StatefulWidget {
-  const CursosScreen({super.key, required this.sesion, this.embebida = false, this.reanudar = false});
+  const CursosScreen({super.key, required this.sesion, this.embebida = false, this.reanudar = false, this.nuevo = false});
+
+  /// Desde Progreso › «Crear un curso»: abre el asistente apenas carga.
+  final bool nuevo;
 
   /// Dentro de una pestaña de Actividad: sin barra propia.
   final bool embebida;
@@ -516,6 +519,10 @@ class _CursosScreenState extends State<CursosScreen> {
           if (r['nivelPersonas'] is Map) _nivelPersonas = {for (final e in (r['nivelPersonas'] as Map).entries) '${e.key}': '${e.value}'};
         });
         // Desde Notificaciones: «Reanudar» abre el asistente donde quedó.
+        if (widget.nuevo && !_reanudado) {
+          _reanudado = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _editar() : null);
+        }
         if (widget.reanudar && !_reanudado && _borrador != null) {
           _reanudado = true;
           WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _reanudar() : null);
@@ -630,7 +637,7 @@ class _CursosScreenState extends State<CursosScreen> {
                 key: const ValueKey('l'),
                 padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
                 children: [
-                  const _QueEsUnCurso(),
+                  const QueEsUnCurso(),
                   const SizedBox(height: 14),
                   // Curso a medio armar (Victor, 2026-11-27).
                   AnimatedSize(

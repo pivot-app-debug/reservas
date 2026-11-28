@@ -5669,6 +5669,11 @@ async function getCoach(params: Record<string, any>): Promise<Record<string, any
     })()),
     equipos: c.equipos,
     totalHabilidades: habs.length,
+    // Las últimas 5 habilidades agregadas, para la portada de Progreso (QA 2026-11-27).
+    habilidadesRecientes: await (async () => {
+      const { data } = await supabase.from('coach_habilidades').select('id, categoria, nombre, nivel').eq('activa', true).order('created_at', { ascending: false }).limit(5);
+      return data ?? [];
+    })(),
     jugadorxs: personas.map((p: any) => ({
       username: p.username, nombre: p.nombre_derby || p.username, foto: p.foto_perfil ?? '', equipo: p.categoria ?? '',
       // Solo el estado visible para el equipo: los motivos de salud quedan para admins.
