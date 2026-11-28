@@ -917,18 +917,23 @@ async function actualizarDatosPersona(params: Record<string, any>): Promise<Reco
       const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
       if (c?.estado !== 'aprobado') {
         update.roles = update.roles.filter((r: string) => r !== ROL_COACH);
-        if (c?.estado !== 'pendiente') await pedirCoach({ token: params.token, mensaje: 'Eligió Entrenadorx en sus roles.' });
+        if (c?.estado !== 'pendiente') await pedirCoach({ token: params.token, mensaje: 'Eligió Coach en sus roles.' });
         (params as any)._coachPendiente = true;
       }
     } else {
       // Quitar Coach de tus roles deja de ser coach.
       const { data: c } = await supabase.from('coaches').select('estado').eq('username', username).maybeSingle();
       if (c?.estado === 'aprobado') update.roles = [...update.roles, ROL_COACH];
+      // Bench también es equipo técnico (Victor, 2026-11-27): elegirlo pide sumarse.
+      else if (update.roles.some((r: string) => ROLES_TECNICOS.includes(r)) && c?.estado !== 'pendiente') {
+        await pedirCoach({ token: params.token, mensaje: 'Eligió Bench en sus roles.' });
+        (params as any)._coachPendiente = true;
+      }
     }
   }
   if (!Object.keys(update).length) return { exito: true };
   await supabase.from('equipo').update(update).eq('username', params.nombre);
-  return { exito: true, ...((params as any)._coachPendiente ? { aviso: 'Pediste ser entrenadorx: un Pivot lo revisa y, al aprobarlo, aparecerá en tu ficha.' } : {}) };
+  return { exito: true, ...((params as any)._coachPendiente ? { aviso: 'Pediste sumarte al equipo técnico: un Pivot lo revisa y te avisamos.' } : {}) };
 }
 
 // Equipamiento del club (patines/protecciones). `necesita_protecciones` puede
@@ -3920,6 +3925,9 @@ async function adminGuardarComunidad(params: Record<string, any>): Promise<Recor
 const ROLES_DEPORTE = ['Jammer', 'Pivot', 'Blocker', 'Bench', 'Coach', 'SO', 'NSO'];
 // Coach es fijo (Victor, 2026-11-17): no se borra ni se renombra, y pasa por revisión.
 const ROL_COACH = 'Coach';
+/// Roles que son parte del equipo técnico (Victor, 2026-11-27): quien los
+/// elige en su ficha pide sumarse al equipo técnico, como con Coach.
+const ROLES_TECNICOS = [ROL_COACH, 'Bench'];
 
 async function _rolesEquipo(): Promise<string[]> {
   const { data } = await supabase.from('config_app').select('value').eq('key', 'roles_equipo').maybeSingle();
@@ -5503,9 +5511,14 @@ async function getMiCoach(params: Record<string, any>): Promise<Record<string, a
 
 // Pivots: pedidos, nombrar, cambiar equipos, quitar.
 async function adminCoaches(params: Record<string, any>): Promise<Record<string, any>> {
-  const email = await _validarAdminToken(String(params.adminToken ?? ''));
-  if (!email) return { exito: false, error: 'Sesión de Pivot inválida.' };
+  // Equipo técnico (Victor, 2026-11-27): quien está en el equipo técnico
+  // también suma gente y cambia equipos; aprobar, rechazar y quitar, solo Pivots.
+  const emailPivot = params.adminToken ? await _validarAdminToken(String(params.adminToken)) : null;
+  const tecnico = emailPivot ? null : await _coachDe(String(params.token ?? ''));
+  if (!emailPivot && !tecnico) return { exito: false, error: 'Solo Pivots o el equipo técnico.' };
+  const email = emailPivot ?? tecnico!.user;
   const accion = String(params.accion ?? 'listar');
+  if (!emailPivot && !['listar', 'nombrar', 'equipos'].includes(accion)) return { exito: false, error: 'Eso lo hace un Pivot.' };
   const username = String(params.username ?? '').trim();
   let equipos: string[] = [];
   try { equipos = JSON.parse(String(params.equipos ?? '[]')).map((x: any) => String(x)).slice(0, 30); } catch { equipos = []; }
@@ -5530,13 +5543,18 @@ async function adminCoaches(params: Record<string, any>): Promise<Record<string,
     }
   }
   const { data } = await supabase.from('coaches').select('*').neq('estado', 'rechazado').order('pedido_en');
+  const { data: rolesT } = await supabase.from('equipo').select('username, roles').in('username', (data ?? []).map((c: any) => c.username));
+  const rolesDe: Record<string, string[]> = {};
+  for (const f of rolesT ?? []) rolesDe[f.username] = (Array.isArray(f.roles) ? f.roles : []).filter((r: string) => ROLES_TECNICOS.includes(r));
   const quien = await _mapaEquipoPorNombre();
   return {
     exito: true,
     coaches: (data ?? []).map((c: any) => {
       const q = quien[String(c.username).trim().toUpperCase()] ?? {};
-      return { username: c.username, nombre: q.nombreDerby || c.username, foto: q.fotoPerfil ?? '', estado: c.estado, equipos: c.equipos ?? [], mensaje: c.mensaje ?? '' };
+      return { username: c.username, nombre: q.nombreDerby || c.username, foto: q.fotoPerfil ?? '', estado: c.estado, equipos: c.equipos ?? [], mensaje: c.mensaje ?? '', funciones: rolesDe[c.username] ?? [] };
     }),
+    // Pendientes solo para Pivots.
+    ...(emailPivot ? {} : { soloTecnico: true }),
   };
 }
 

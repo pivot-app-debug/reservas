@@ -10,8 +10,9 @@ import 'mi_estimado.dart';
 
 /// Equipo técnico en Entreno (Victor, 2026-11-27): antes era un botón de la
 /// barra. Un carrusel con cada persona del equipo técnico y los equipos que
-/// entrena; los Pivots suman gente con «+» y cambian equipos o la quitan con
-/// los tres puntos. Quien entrena ve también lo que lleva este mes.
+/// entrena. Pivots y el mismo equipo técnico suman gente con «+» y cambian
+/// equipos con los tres puntos; aprobar pedidos y quitar, solo Pivots. Quien
+/// entrena ve también lo que lleva este mes.
 class EquipoTecnicoSeccion extends StatefulWidget {
   const EquipoTecnicoSeccion({super.key, required this.sesion});
   final Sesion sesion;
@@ -33,7 +34,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
 
   Future<void> _cargar([Map<String, Object?> q = const {'accion': 'listar'}]) async {
     try {
-      final Map<String, dynamic> r = _pivot ? await s.api.post('adminCoaches', {'adminToken': s.adminToken, ...q}) : await s.api.get('getCoach');
+      final Map<String, dynamic> r = await s.api.post('adminCoaches', {if (_pivot) 'adminToken': s.adminToken, ...q});
       if (r['exito'] == false) throw Exception('${r['error']}');
       if (mounted) setState(() => _l = [for (final c in (r['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)]);
     } catch (e) {
@@ -79,10 +80,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
 
   Future<void> _opciones(Map<String, dynamic> c) async {
     final propio = '${c['username']}' == s.nombre;
-    if (!_pivot) {
-      if (propio) await _dejar();
-      return;
-    }
+    if (!_pivot && propio) return _dejar();
     final pendiente = c['estado'] == 'pendiente';
     final a = await showModalBottomSheet<String>(
       useRootNavigator: true,
@@ -96,17 +94,19 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('${c['nombre']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             ),
-            if (pendiente) ListTile(leading: const Icon(Icons.check_rounded), title: const Text('Aprobar'), onTap: () => Navigator.of(h).pop('aprobar')),
+            if (pendiente && _pivot)
+              ListTile(leading: const Icon(Icons.check_rounded), title: const Text('Aprobar'), onTap: () => Navigator.of(h).pop('aprobar')),
             if (!pendiente)
               ListTile(leading: const Icon(Icons.groups_outlined), title: const Text('Cambiar equipos'), onTap: () => Navigator.of(h).pop('equipos')),
-            ListTile(
-              leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
-              title: Text(
-                pendiente ? 'Rechazar el pedido' : (propio ? 'Dejar el equipo técnico' : 'Quitar del equipo técnico'),
-                style: TextStyle(color: h.pivot.marcaTexto),
+            if (_pivot)
+              ListTile(
+                leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
+                title: Text(
+                  pendiente ? 'Rechazar el pedido' : (propio ? 'Dejar el equipo técnico' : 'Quitar del equipo técnico'),
+                  style: TextStyle(color: h.pivot.marcaTexto),
+                ),
+                onTap: () => Navigator.of(h).pop(pendiente ? 'rechazar' : 'quitar'),
               ),
-              onTap: () => Navigator.of(h).pop(pendiente ? 'rechazar' : 'quitar'),
-            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -158,7 +158,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     clipBehavior: Clip.none,
-                    itemCount: l.length + (_pivot ? 1 : 0),
+                    itemCount: l.length + 1,
                     separatorBuilder: (_, _) => const SizedBox(width: 10),
                     itemBuilder: (context, i) {
                       if (i == l.length) {
@@ -186,7 +186,12 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                       final c = l[i];
                       final equipos = [for (final e in (c['equipos'] as List? ?? const [])) '$e'];
                       final pendiente = c['estado'] == 'pendiente';
-                      final conMenu = _pivot || '${c['username']}' == s.nombre;
+                      final conMenu = _pivot || !pendiente;
+                      // Bench y otras funciones del equipo técnico (2026-11-27).
+                      final funciones = [
+                        for (final f in (c['funciones'] as List? ?? const []))
+                          if ('$f' != 'Coach') '$f',
+                      ];
                       return tarjeta(
                         alTocar: conMenu ? () => _opciones(c) : null,
                         hijo: Stack(
@@ -205,7 +210,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    pendiente ? 'Pidió sumarse' : (equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · ')),
+                                    pendiente ? 'Pidió sumarse' : [...funciones, equipos.isEmpty ? 'Todos los equipos' : equipos.join(' · ')].join(' · '),
                                     maxLines: 2,
                                     textAlign: TextAlign.center,
                                     overflow: TextOverflow.ellipsis,
