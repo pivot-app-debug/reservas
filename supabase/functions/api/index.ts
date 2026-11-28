@@ -5385,7 +5385,8 @@ async function _entrenamientosDelMes(mes: string): Promise<{ id: string; fecha: 
       out.set(e.id_evento, { id: e.id_evento, fecha: String(e.fecha).slice(0, 10), dado: !cancelado(String(e.estado ?? '')), equipos: [], horario: h, tarde: t, conLista: h.length + t.length > 0 });
     }
   } catch { /* sin tabla */ }
-  return [...out.values()].filter((e) => e.fecha <= _hoyEcuadorISO()).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  // El entrenamiento de hoy cuenta para el reparto cuando termina el día (Victor, 2026-11-28).
+  return [...out.values()].filter((e) => e.fecha < _hoyEcuadorISO()).sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
 /** Cálculo de un mes (no guarda nada). */

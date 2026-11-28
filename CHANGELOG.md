@@ -3,6 +3,7 @@
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
 ## 2026-11-28 (Personal de liga y ficha)
+- Pago al equipo técnico: el entrenamiento del día entra al reparto cuando termina el día, así el estimado no baja en la mañana.
 - Pago al equipo técnico: solo cobra quien tiene el rol Coach. Bench y las demás funciones del equipo técnico no reciben pago.
 - Personal de liga: gente que acompaña a la liga sin jugar (Bench, Coach, NSO, SO). No paga cuota, no suma puntos de asistencia y queda fuera de los cambios de equipo; sí confirma asistencia. En Liga se ve en su lugar de siempre, con la etiqueta «Personal de liga · Bench», y se encuentra buscando «personal».
 - Enlace de invitación propio (Equipos y puntos › Personal de liga). Quien se registra con él no pasa por los pasos de equipamiento y elige su función; con Bench o Coach pide sumarse al equipo técnico. Se puede crear un enlace nuevo, y el anterior deja de funcionar.
