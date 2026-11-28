@@ -2,6 +2,9 @@
 
 Historial de cambios del proyecto, reorganizado por área a partir del MANIFEST.md anterior (que mezclaba estado actual + historial en un solo archivo de ~7000 líneas). Dentro de cada sección, más reciente primero. Las fechas exactas están confirmadas cuando el MANIFEST las traía en formato ISO; el resto del historial (desarrollado a lo largo de 2025 y 2026 sin registrar fecha por entrada) queda con el mes/año aproximado que se pudo inferir del contexto (migraciones con fecha en su nombre, menciones explícitas de mes, o posición relativa en el archivo original).
 
+## 2026-11-28 (avisos en iPhone)
+- Arreglado: en iPhone, abrir Pivot en Safari (no desde el ícono de inicio) mostraba «bloqueadas» y mandaba a Ajustes, sin salida. Ahora pide abrir Pivot desde la pantalla de inicio (o agregarla si no está).
+
 ## 2026-11-28 (restricciones alimentarias y detalles)
 - Salud y emergencia: la dieta es una sola (vegetariano, vegano, pescetariano u otra) y debajo hay «Restricciones alimentarias», donde se agregan varias (intolerancia a la lactosa, sin gluten, alergia al maní…). La explicación va en un desplegable «¿Para qué sirve?». Se quitaron los interruptores de «Comida en eventos».
 - Fiestas: la dieta y las restricciones de quienes van se usan siempre, sin nombre. La dieta suma un plato para esa persona y las restricciones salen en el aviso de «Qué llevar».

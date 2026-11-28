@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../core/api.dart';
 import '../core/tema.dart';
 import 'aviso_web.dart';
+import '../core/instalar_web.dart' show esAppInstalada;
 import 'push.dart';
 
 /// Notificaciones "casi obligatorias" (Victor, 2026-11-18): ninguna app puede
@@ -44,6 +45,10 @@ class EstadoAvisos {
 
   static Future<String> _calcular() async {
     if (kIsWeb) {
+      // iPhone en Safari (sin abrir desde la pantalla de inicio): ahí iOS no
+      // permite avisos y los marca como bloqueados. Se pide abrir la app
+      // instalada en vez de mandar a ajustes (caso Veneno, 2026-11-28).
+      if (esIosWeb() && !esAppInstalada()) return 'instalar';
       final w = permisoAvisosWeb();
       return switch (w) {
         'granted' => 'activos',
@@ -105,7 +110,8 @@ class EstadoAvisos {
     if (e == 'activos' || e == 'pendiente') return const [];
     if (e == 'instalar') {
       return const [
-        'Abre Pivot en Safari.',
+        '¿Ya tienes Pivot en tu pantalla de inicio? Ábrelo desde ese ícono, no desde Safari.',
+        'Si no lo tienes: abre Pivot en Safari.',
         'Toca Compartir (el cuadrado con la flecha hacia arriba).',
         'Elige «Agregar a inicio» y luego «Agregar».',
         'Abre Pivot desde el ícono de tu pantalla de inicio y toca «Activar».',
