@@ -75,7 +75,20 @@ class BuscadorEquipo {
   /// [favoritos] son usernames; [esAdmin] habilita "admins".
   static List<ResultadoBusqueda> buscar(String consulta, List<Integrante> personas, {required Set<String> favoritos, required bool esAdmin, DateTime? hoy}) {
     final h = hoy ?? Fechas.hoy();
-    final tokens = normalizar(consulta).split(RegExp(r'\s+')).where((t) => t.isNotEmpty && !_vacias.contains(t)).toList();
+    var tokens = normalizar(consulta).split(RegExp(r'\s+')).where((t) => t.isNotEmpty && !_vacias.contains(t)).toList();
+    // Fecha exacta: "15 de abril" o "15/4" se busca como un solo dato
+    // (cumpleaños o aniversario ese día), no como número de camiseta (QA 2026-11-27).
+    tokens = [
+      for (var i = 0; i < tokens.length; i++)
+        if (i + 1 < tokens.length && RegExp(r'^\d{1,2}$').hasMatch(tokens[i]) && _meses.contains(tokens[i + 1]))
+          'fecha:${tokens[i]}:${_meses.indexOf(tokens[i++ + 1]) + 1}'
+        else if (RegExp(r'^\d{1,2}/\d{1,2}$').hasMatch(tokens[i]))
+          'fecha:${tokens[i].replaceAll('/', ':')}'
+        else
+          tokens[i],
+    ];
+    // "él" con tilde es pronombre; "el" sin tilde se ignora como artículo.
+    if (RegExp(r'(^|\s)él(\s|$)', caseSensitive: false).hasMatch(consulta)) tokens.add('el');
     if (tokens.isEmpty) return const [];
     final res = <ResultadoBusqueda>[];
     for (final p in personas) {
@@ -173,6 +186,21 @@ class BuscadorEquipo {
       return ('${p.aniosEnEquipo(a)} años en el equipo el ${a.day} de ${_meses[a.month - 1]}', Fechas.diasEntre(hoy, a));
     }
 
+    // Fecha exacta (ver `buscar`).
+    if (t.startsWith('fecha:')) {
+      final x = t.split(':');
+      final dia = int.parse(x[1]), m = int.parse(x[2]);
+      final c = p.proximoCumple(hoy), a = p.proximoAniversario(hoy);
+      if (c != null && c.month == m && c.day == dia) return ('Cumple el $dia de ${_meses[m - 1]}', 0);
+      if (a != null && a.month == m && a.day == dia) return ('${p.aniosEnEquipo(a)} años en el equipo el $dia de ${_meses[m - 1]}', 1);
+      return null;
+    }
+
+    // Pronombres: "ella", "el", "elle".
+    if (t == 'ella' || t == 'el' || t == 'elle') {
+      return normalizar(p.pronombres).split(RegExp(r'[\s/,·]+')).contains(t) ? (p.pronombres, sinOrden) : null;
+    }
+
     // Categoría y estado.
     if (s == 'quinde' || s == 'quind') return p.categoria == 'Quindes' && !p.inactivx ? ('Quindes', sinOrden) : null;
     if (s.startsWith('mirlx') || s.startsWith('mirlo')) return p.categoria != 'Quindes' && !p.inactivx ? ('Mirlxs', sinOrden) : null;
@@ -183,6 +211,8 @@ class BuscadorEquipo {
       final f = p.fechaIngreso;
       return f != null && !f.isAfter(hoy) && Fechas.diasEntre(f, hoy) < 60 ? ('Se unió el ${f.day} de ${_meses[f.month - 1]}', sinOrden) : null;
     }
+    // Cualquier otro equipo de la liga, por su nombre.
+    if (t.length >= 3 && !p.inactivx && normalizar(p.categoria).startsWith(t)) return (p.categoria, sinOrden);
     if (s.startsWith('favorit')) return favs.contains(p.username) ? ('Favorito', sinOrden) : null;
     if (s == 'admin' && esAdmin) return p.esAdminMiembro ? ('Admin', sinOrden) : null;
 

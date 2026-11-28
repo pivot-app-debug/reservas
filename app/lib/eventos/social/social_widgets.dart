@@ -952,12 +952,11 @@ class ComidaTarjeta extends StatelessWidget {
                 ),
               ),
             ],
-            if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false) ...[
+            // Sin «Ya cubriste tu parte» si ya tenías el 100 % (QA 2026-11-27).
+            if (e.asiste && e.cuentaParaParte(c) && paraTodxs != false && yaParte < 1) ...[
               const SizedBox(height: 10),
               Text(
-                yaParte >= 1
-                    ? 'Ya cubriste tu parte. Esto suma de más, ¡gracias!'
-                    : (yaParte + parte >= 1 ? 'Con esto cubres tu parte ✓' : 'Con esto llegas al ${((yaParte + parte) * 100).round()} % de tu parte.'),
+                yaParte + parte >= 1 ? 'Con esto cubres tu parte ✓' : 'Con esto llegas al ${((yaParte + parte) * 100).round()} % de tu parte.',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.marcaTexto),
               ),
             ],
@@ -1541,11 +1540,10 @@ class _ListaQueLlevaState extends State<_ListaQueLleva> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            v >= 1 ? 'Ya cubriste tu parte. Si quieres, puedes llevar más.' : 'Con comida o bebida en cualquier sección cubres tu parte.',
-            style: TextStyle(fontSize: 13, color: p.textoSecundario),
-          ),
+          if (v < 1) ...[
+            const SizedBox(height: 6),
+            Text('Con comida o bebida en cualquier sección cubres tu parte.', style: TextStyle(fontSize: 13, color: p.textoSecundario)),
+          ],
           const SizedBox(height: 12),
         ],
         if (!e.asiste)

@@ -77,8 +77,12 @@ class _AjustesScreenState extends State<AjustesScreen> {
       SubAjustes.abrir(context, pantalla);
     } else if (e.id == 'comentarios') {
       enviarComentarios(context);
+    } else if (e.id == 'perfil') {
+      // Lleva a la fila y la hace parpadear (QA 2026-11-27).
+      resaltadoPerfil.value = null;
+      resaltadoPerfil.value = e.titulo;
     } else if (_scroll.hasClients) {
-      // Lo de tu perfil está arriba; Ser coach, abajo.
+      // Lo de tu perfil está arriba; el equipo técnico, abajo.
       _scroll.animateTo(e.id == 'coach' ? _scroll.position.maxScrollExtent : 0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
     }
   }
@@ -107,9 +111,10 @@ class _AjustesScreenState extends State<AjustesScreen> {
         title: Semantics(
           button: true,
           label: 'Buscar un ajuste',
+          // Misma forma que el buscador del Calendario (QA 2026-11-27).
           child: Material(
             color: context.pivot.tarjeta,
-            borderRadius: BorderRadius.circular(PivotRadios.chip),
+            borderRadius: BorderRadius.circular(PivotRadios.boton),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: _buscar,

@@ -16,6 +16,7 @@ import 'ajustes_screen.dart';
 import '../equipo/inventario_asistentes.dart';
 import '../equipo/inventario_modelos.dart';
 import 'campos.dart';
+import '../pivots/buscador_liga.dart' show Resaltable;
 import 'componentes.dart';
 import '../core/vidrio.dart';
 
@@ -23,6 +24,10 @@ import '../core/vidrio.dart';
 
 /// Lo que ve el resto del equipo, editable desde tu propia ficha en Equipo
 /// (como en la web; Victor, 2026-11-07). Incluye Mi equipamiento.
+/// Fila de Mi perfil a resaltar desde el buscador (QA 2026-11-27: como
+/// cuando buscas un ajuste en Android).
+final resaltadoPerfil = ValueNotifier<String?>(null);
+
 class MiPerfilEditable extends StatelessWidget {
   const MiPerfilEditable({super.key, required this.sesion});
   final Sesion sesion;
@@ -44,14 +49,18 @@ class MiPerfilEditable extends StatelessWidget {
             GrupoAjustes(
               filas: [
                 // Foto como una fila más, sin avatar arriba (Victor, 2026-11-17).
-                FilaAjuste(
-                  icono: Icons.add_a_photo_rounded,
-                  seccion: 'foto',
-                  titulo: 'Foto de perfil',
-                  valor: s.fotoPerfil.isEmpty ? 'Agrega una foto' : 'Toca para cambiarla',
-                  pendiente: s.fotoPerfil.isEmpty,
-                  derecha: s.fotoPerfil.isEmpty ? null : AvatarPersona(nombre: s.nombreMostrar, foto: s.fotoPerfil, tamano: 36),
-                  alTocar: () => cambiarFoto(context, s),
+                Resaltable(
+                  id: 'Foto de perfil',
+                  resaltado: resaltadoPerfil,
+                  child: FilaAjuste(
+                    icono: Icons.add_a_photo_rounded,
+                    seccion: 'foto',
+                    titulo: 'Foto de perfil',
+                    valor: s.fotoPerfil.isEmpty ? 'Agrega una foto' : 'Toca para cambiarla',
+                    pendiente: s.fotoPerfil.isEmpty,
+                    derecha: s.fotoPerfil.isEmpty ? null : AvatarPersona(nombre: s.nombreMostrar, foto: s.fotoPerfil, tamano: 36),
+                    alTocar: () => cambiarFoto(context, s),
+                  ),
                 ),
                 FilaAjuste(
                   icono: Icons.badge_outlined,
@@ -67,13 +76,17 @@ class MiPerfilEditable extends StatelessWidget {
                   valor: valorDe(s, 'numeroDerby'),
                   alTocar: () => editarCampo(context, s, 'numeroDerby', Deporte.numero, maxLength: 4),
                 ),
-                FilaAjuste(
-                  icono: Icons.record_voice_over_outlined,
-                  seccion: 'pronombres',
-                  titulo: 'Pronombres',
-                  valor: valorDe(s, 'pronombres'),
-                  alTocar: () =>
-                      elegirCampo(context, s, 'pronombres', 'Pronombres', const ['Ella', 'Él', 'Elle'], multi: true, ayuda: 'Elige todos los que apliquen.'),
+                Resaltable(
+                  id: 'Pronombres',
+                  resaltado: resaltadoPerfil,
+                  child: FilaAjuste(
+                    icono: Icons.record_voice_over_outlined,
+                    seccion: 'pronombres',
+                    titulo: 'Pronombres',
+                    valor: valorDe(s, 'pronombres'),
+                    alTocar: () =>
+                        elegirCampo(context, s, 'pronombres', 'Pronombres', const ['Ella', 'Él', 'Elle'], multi: true, ayuda: 'Elige todos los que apliquen.'),
+                  ),
                 ),
                 ListenableBuilder(
                   listenable: equipo,
@@ -116,19 +129,27 @@ class MiPerfilEditable extends StatelessWidget {
                     );
                   },
                 ),
-                FilaAjuste(
-                  icono: Icons.phone_outlined,
-                  seccion: 'telefono',
-                  titulo: 'Teléfono',
-                  valor: Paises.telefono(valorDe(s, 'prefijo'), tel),
-                  alTocar: () => editarTelefono(context, s, 'prefijo', 'telefono', 'Teléfono'),
+                Resaltable(
+                  id: 'Teléfono',
+                  resaltado: resaltadoPerfil,
+                  child: FilaAjuste(
+                    icono: Icons.phone_outlined,
+                    seccion: 'telefono',
+                    titulo: 'Teléfono',
+                    valor: Paises.telefono(valorDe(s, 'prefijo'), tel),
+                    alTocar: () => editarTelefono(context, s, 'prefijo', 'telefono', 'Teléfono'),
+                  ),
                 ),
-                FilaAjuste(
-                  icono: Icons.event_outlined,
-                  seccion: 'ingreso',
-                  titulo: 'Entraste al equipo',
-                  valor: fechaLarga(s.datos['fechaIngreso']),
-                  alTocar: () => elegirFechaCampo(context, s, 'fechaIngreso', ayuda: 'Cuándo entraste al equipo', desde: DateTime(2010)),
+                Resaltable(
+                  id: 'Entraste al equipo',
+                  resaltado: resaltadoPerfil,
+                  child: FilaAjuste(
+                    icono: Icons.event_outlined,
+                    seccion: 'ingreso',
+                    titulo: 'Entraste al equipo',
+                    valor: fechaLarga(s.datos['fechaIngreso']),
+                    alTocar: () => elegirFechaCampo(context, s, 'fechaIngreso', ayuda: 'Cuándo entraste al equipo', desde: DateTime(2010)),
+                  ),
                 ),
               ],
             ),

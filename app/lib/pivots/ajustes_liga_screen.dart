@@ -12,7 +12,6 @@ import '../core/zonas_horarias.dart';
 import '../core/paises.dart';
 import '../core/tema.dart';
 import '../sesion/sesion.dart';
-import '../core/tour.dart';
 import '../core/vidrio.dart';
 import '../finanzas/tesoreria_screen.dart';
 import 'buscador_liga.dart';
@@ -153,17 +152,7 @@ class _AjustesLigaScreenState extends State<AjustesLigaScreen> {
   void initState() {
     super.initState();
     _cargarInicio();
-    // Tour de Mi Liga (Victor, 2026-11-15); solo si no está embebida en pestañas de Liga.
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted || !widget.pestana || widget.embebida || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
-      Tour.mostrarSiCorresponde(
-        context,
-        preferencia: 'tour.miliga.v1',
-        pasos: [
-          PasoTour(clave: _kLupa, titulo: 'Busca un ajuste', texto: 'Escribe lo que quieres cambiar (por ejemplo "tarde" o "precio") y te lleva directo.'),
-        ],
-      );
-    });
+    // Tours guiados solo en Calendario (QA 2026-11-27).
   }
 
   final _kLupa = GlobalKey(debugLabel: 'tour-liga-lupa');
