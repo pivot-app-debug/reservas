@@ -5394,7 +5394,7 @@ async function _pagoCoachesMes(mes: string, regla?: Awaited<ReturnType<typeof _r
   const [y, m] = mes.split('-').map(Number);
   const desde = `${mes}-01`, hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   const [{ data: gente }, { data: coachesT }, cuotas, clases, ents] = await Promise.all([
-    supabase.from('equipo').select('username, categoria'),
+    supabase.from('equipo').select('username, categoria, roles'),
     supabase.from('coaches').select('username, estado, equipos, resuelto_en'),
     r.incluye.cuotas ? _paginado((a, b) => supabase.from('tesoreria_movimientos').select('persona, monto').eq('anulado', false).eq('tipo', 'ingreso').eq('categoria', 'cuota').eq('periodo_anio', y).eq('periodo_mes', m).range(a, b)) : Promise.resolve([]),
     r.incluye.clases ? _paginado((a, b) => supabase.from('tesoreria_movimientos').select('persona, monto').eq('anulado', false).eq('tipo', 'ingreso').eq('categoria', 'clase').gte('fecha', desde).lte('fecha', hasta).range(a, b)) : Promise.resolve([]),
@@ -5408,7 +5408,9 @@ async function _pagoCoachesMes(mes: string, regla?: Awaited<ReturnType<typeof _r
   // Coaches que cobran y desde cuándo.
   const coaches: { u: string; desde: string; equipos: string[] }[] = [];
   const vistos = new Set<string>();
-  for (const c of coachesT ?? []) if (c.estado === 'aprobado') { vistos.add(c.username); coaches.push({ u: c.username, desde: r.coaches[c.username]?.desde ?? String(c.resuelto_en ?? desde).slice(0, 10), equipos: c.equipos ?? [] }); }
+  // Solo cobra quien tiene el rol Coach: Bench u otras funciones del equipo técnico no (Victor, 2026-11-28).
+  const esCoach = new Set((gente ?? []).filter((p: any) => Array.isArray(p.roles) && p.roles.includes(ROL_COACH)).map((p: any) => String(p.username)));
+  for (const c of coachesT ?? []) if (c.estado === 'aprobado' && esCoach.has(c.username)) { vistos.add(c.username); coaches.push({ u: c.username, desde: r.coaches[c.username]?.desde ?? String(c.resuelto_en ?? desde).slice(0, 10), equipos: c.equipos ?? [] }); }
   for (const [u, v] of Object.entries(r.coaches)) if (!vistos.has(u)) coaches.push({ u, desde: (v as any).desde, equipos: [] });
   const reglaDe = (e: string) => r.porEquipo[e] ?? r.liga;
   const por: Record<string, { monto: number; horario: number; tarde: number; sinLista: number }> = {};
