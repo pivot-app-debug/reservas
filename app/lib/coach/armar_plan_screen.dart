@@ -80,7 +80,8 @@ class _ArmarPlanScreenState extends State<ArmarPlanScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _paso == 0,
+      // Abierto desde un entrenamiento: atrás cierra el asistente (QA 2026-11-28).
+      canPop: _paso == 0 || widget.inicial != null,
       onPopInvokedWithResult: (hizo, _) {
         if (!hizo) setState(() => _paso = 0);
       },

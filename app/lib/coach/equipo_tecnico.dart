@@ -22,7 +22,9 @@ class EquipoTecnicoSeccion extends StatefulWidget {
 }
 
 class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
-  List<Map<String, dynamic>>? _l;
+  /// Lo último cargado: al volver a verse al hacer scroll no parpadea (QA 2026-11-28).
+  static List<Map<String, dynamic>>? _ultima;
+  List<Map<String, dynamic>>? _l = _ultima;
   Sesion get s => widget.sesion;
   bool get _pivot => s.esAdmin && s.adminToken != null;
 
@@ -36,7 +38,8 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
     try {
       final Map<String, dynamic> r = await s.api.post('adminCoaches', {if (_pivot) 'adminToken': s.adminToken, ...q});
       if (r['exito'] == false) throw Exception('${r['error']}');
-      if (mounted) setState(() => _l = [for (final c in (r['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)]);
+      _ultima = [for (final c in (r['coaches'] as List? ?? const [])) Map<String, dynamic>.from(c as Map)];
+      if (mounted) setState(() => _l = _ultima);
     } catch (e) {
       if (mounted && q['accion'] != 'listar') ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorCoach(e))));
       if (mounted && _l == null) setState(() => _l = const []);

@@ -460,7 +460,11 @@ class _CursosAbiertosScreenState extends State<CursosAbiertosScreen> {
 // ─── Pivots: crear y seguir cursos ─────────────────────────────────────────
 
 class CursosScreen extends StatefulWidget {
-  const CursosScreen({super.key, required this.sesion, this.embebida = false, this.reanudar = false, this.nuevo = false});
+  const CursosScreen({super.key, required this.sesion, this.embebida = false, this.reanudar = false, this.nuevo = false, this.directo});
+
+  /// Sin la subsección de Cursos (QA 2026-11-28): 'nuevo' abre el asistente y
+  /// el id de un curso abre su detalle; al volver, se regresa a Progreso.
+  final String? directo;
 
   /// Desde Progreso › «Crear un curso»: abre el asistente apenas carga.
   final bool nuevo;
@@ -519,6 +523,20 @@ class _CursosScreenState extends State<CursosScreen> {
           if (r['nivelPersonas'] is Map) _nivelPersonas = {for (final e in (r['nivelPersonas'] as Map).entries) '${e.key}': '${e.value}'};
         });
         // Desde Notificaciones: «Reanudar» abre el asistente donde quedó.
+        final d = widget.directo;
+        if (d != null && !_reanudado) {
+          _reanudado = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!mounted) return;
+            final c = _cursos?.where((x) => x.id == d).firstOrNull;
+            if (d == 'nuevo') {
+              await _editar();
+            } else if (c != null) {
+              await _abrir(c);
+            }
+            if (mounted) Navigator.of(context).pop();
+          });
+        }
         if (widget.nuevo && !_reanudado) {
           _reanudado = true;
           WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _editar() : null);
@@ -603,7 +621,7 @@ class _CursosScreenState extends State<CursosScreen> {
     }
   }
 
-  void _abrir(Curso c) => Navigator.of(context).push(
+  Future<void> _abrir(Curso c) => Navigator.of(context).push(
     MaterialPageRoute(
       builder: (_) => _DetalleCurso(id: c.id, cursos: () => _cursos ?? const [], equipos: _equipos, llamar: _llamar, editar: _editar),
     ),
@@ -619,6 +637,12 @@ class _CursosScreenState extends State<CursosScreen> {
   Widget build(BuildContext context) {
     final p = context.pivot;
     final l = _cursos;
+    // Directo: solo de paso hacia el asistente o el detalle, sin mostrar la lista.
+    if (widget.directo != null) {
+      return Scaffold(
+        body: _error == null ? const Center(child: CircularProgressIndicator()) : Center(child: Text(_error!)),
+      );
+    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: widget.embebida ? null : _barra('Cursos'),

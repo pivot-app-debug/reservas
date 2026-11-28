@@ -49,7 +49,12 @@ class _HabilidadesEquipoScreenState extends State<HabilidadesEquipoScreen> {
     super.initState();
     if (widget.nueva) {
       // Espera a que la lista cargue para abrir el editor.
-      Future<void>.delayed(const Duration(milliseconds: 600), () => mounted ? _lista.currentState?.editar() : null);
+      Future<void>.delayed(const Duration(milliseconds: 600), () async {
+        if (!mounted) return;
+        await _lista.currentState?.editar();
+        // Al terminar o volver del editor, se sale directo a Progreso (QA 2026-11-28).
+        if (mounted) Navigator.of(context).pop();
+      });
     }
   }
 

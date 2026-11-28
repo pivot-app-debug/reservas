@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../ajustes/componentes.dart' show SubAjustes;
 import '../ajustes/herramientas_liga.dart' show FuncionesLiga;
+import '../core/encabezado_seccion.dart' show TarjetaCrear;
 import '../core/fechas.dart';
 import '../core/navegacion.dart';
 import '../core/tema.dart';
@@ -80,6 +81,16 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
 
   void _abrirProgreso() => SubAjustes.abrir<void>(context, FichaDeportivaScreen(sesion: s)).then((_) => _cargar());
 
+  /// Curso nuevo o el detalle de uno, sin pasar por la lista de Cursos.
+  void _directo(String que) {
+    if (_cursos.nuevos) {
+      marcarCursosVistos(_cursos.ids);
+      setState(() => _cursos = EstadoCursos(_cursos.ids, false));
+      Navegacion.puntoEntrenamiento.value = false;
+    }
+    SubAjustes.abrir<void>(context, CursosScreen(sesion: s, directo: que)).then((_) => _cargar());
+  }
+
   void _abrirCursos() {
     if (_cursos.nuevos) {
       marcarCursosVistos(_cursos.ids);
@@ -141,22 +152,31 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: p.textoSecundario),
                 ),
               ),
-              // Cursos en la portada, sin subsección (QA 2026-11-27); los Pivots los gestionan aparte.
-              if (s.esAdmin) TextButton(onPressed: _abrirCursos, child: const Text('Gestionar')),
+              // Cursos solo en la portada, sin subsección (QA 2026-11-28).
+              if (s.esAdmin && l.isNotEmpty)
+                TextButton.icon(onPressed: () => _directo('nuevo'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Crear')),
             ],
           ),
         ),
         QueEsUnCurso(persona: !s.esAdmin),
         const SizedBox(height: 8),
-        if (l.isEmpty)
+        if (l.isEmpty && s.esAdmin)
+          TarjetaCrear(
+            icono: Icons.school_rounded,
+            seccion: 'entrenamientos',
+            titulo: 'Todavía no hay cursos',
+            texto: 'Arma el primero: sus clases quedan en el calendario.',
+            boton: 'Crear un curso',
+            alTocar: () => _directo('nuevo'),
+          )
+        else if (l.isEmpty)
           Material(
             color: p.tarjeta,
             borderRadius: BorderRadius.circular(PivotRadios.tarjeta),
             child: ListTile(
-              leading: Icon(s.esAdmin ? Icons.add_circle_outline_rounded : Icons.school_outlined, color: p.marcaTexto),
-              title: Text(s.esAdmin ? 'No hay cursos abiertos · Crear un curso' : 'No hay cursos abiertos ahora'),
-              subtitle: Text(s.esAdmin ? 'Arma uno en pasos: clases, precio, cupo y evaluación.' : 'Cuando abran uno para ti, aparece aquí.'),
-              onTap: s.esAdmin ? () => SubAjustes.abrir<void>(context, CursosScreen(sesion: s, nuevo: true)).then((_) => _cargar()) : null,
+              leading: Icon(Icons.school_outlined, color: p.marcaTexto),
+              title: const Text('No hay cursos abiertos ahora'),
+              subtitle: const Text('Cuando abran uno para ti, aparece aquí.'),
             ),
           )
         else
@@ -177,7 +197,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
                     child: InkWell(
                       // Abre ese curso para inscribirse.
                       onTap: () => s.esAdmin
-                          ? _abrirCursos()
+                          ? _directo('${c['id']}')
                           : SubAjustes.abrir<void>(context, CursosAbiertosScreen(sesion: s, destacado: '${c['id']}')).then((_) => _cargar()),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
