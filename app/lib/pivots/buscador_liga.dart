@@ -105,7 +105,7 @@ const entradasLiga = [
 
   EntradaAjuste(
     'coaches',
-    'Entreno',
+    'Progreso',
     'Barra de abajo',
     'entrenamiento coach entrenador entrenadorxs seguimiento jugadorxs progreso ficha deportiva habilidades',
   ),

@@ -1531,7 +1531,7 @@ class _TimelineScreenState extends State<TimelineScreen> with TickerProviderStat
         PasoTour(
           clave: ClavesTour.navegacion,
           ajuste: ClavesTour.pestana(1),
-          titulo: 'Entreno',
+          titulo: 'Progreso',
           texto: [
             if (FuncionesLiga.usaCoach(repo.sesion)) 'Tus herramientas del equipo técnico: el próximo entrenamiento, los planes y lo que falta evaluar.',
             if (FuncionesLiga.coach(repo.sesion)) 'Tu progreso: habilidades, pruebas y notas del equipo técnico.',

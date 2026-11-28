@@ -16,11 +16,9 @@ import '../core/vidrio.dart';
 import '../ajustes/pagos_screen.dart';
 import '../cursos/cursos_screen.dart';
 import '../eventos/tarjeta_cumple.dart';
-import '../eventos/crear_evento_screen.dart';
 import '../eventos/detalle_screen.dart';
 import '../eventos/eventos_repo.dart';
 import '../eventos/modelos.dart';
-import '../eventos/social/crear_social_screen.dart';
 import '../eventos/social/social_plantillas.dart';
 import '../eventos/tipos_evento.dart';
 import '../pivots/bandeja_repo.dart';
@@ -225,7 +223,7 @@ class _ActividadScreenState extends State<ActividadScreen> {
                         c.$2,
                         style: TextStyle(fontWeight: FontWeight.w600, color: p.texto),
                       ),
-                      subtitle: Text('Nuevo · míralo en Entreno → Cursos', style: TextStyle(color: p.textoSecundario)),
+                      subtitle: Text('Nuevo · míralo en Progreso → Cursos', style: TextStyle(color: p.textoSecundario)),
                       trailing: Icon(Icons.chevron_right_rounded, color: p.textoSecundario),
                       onTap: _irACursos,
                     ),
@@ -299,24 +297,6 @@ class _SeccionEventos extends StatelessWidget {
   final void Function(Map r)? alCrearSocial;
   final void Function(Object r)? alCrearEvento;
 
-  bool get _puede => eventos.sesion.esAdmin || eventos.sesion.puedeCrearSocial;
-
-  Future<void> _crear(BuildContext context) async {
-    final nav = Navigator.of(context);
-    final s = eventos.sesion;
-    if (s.esAdmin) {
-      final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearEventoScreen(repo: eventos)));
-      if (r == null) return;
-      nav.pop();
-      alCrearEvento?.call(r);
-      return;
-    }
-    final r = await nav.push<Object>(MaterialPageRoute(builder: (_) => CrearSocialScreen(sesion: s)));
-    if (r is! Map) return;
-    nav.pop();
-    alCrearSocial?.call(r);
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = context.pivot;
@@ -340,19 +320,7 @@ class _SeccionEventos extends StatelessWidget {
                 child: Text('No hay eventos en los próximos 7 días.', style: TextStyle(color: p.textoSecundario)),
               ),
             for (final e in semana) _fila(context, p, e),
-            // Crear, justo debajo de lo de esta semana (Victor, 2026-11-20).
-            // Como el recuadro de crear una tarea (Victor, 2026-11-22).
-            if (_puede)
-              TarjetaCrear(
-                icono: eventos.sesion.esAdmin ? Icons.event_rounded : Icons.celebration_rounded,
-                seccion: 'reservas',
-                titulo: eventos.sesion.esAdmin ? '¿Viene algo nuevo?' : '¿Armas una fiesta?',
-                texto: eventos.sesion.esAdmin
-                    ? 'Entrenamientos, partidos, reuniones o fiestas: quedan en el calendario.'
-                    : 'Se publica cuando un Pivot la aprueba.',
-                boton: eventos.sesion.esAdmin ? 'Crear un evento' : 'Crear una fiesta',
-                alTocar: () => _crear(context),
-              ),
+            // Crear un evento pasó al «+» del Calendario (QA 2026-11-27).
             if (cumples.isNotEmpty) ...[
               EncabezadoSeccion(titulo: 'Cumpleaños', icono: Icons.cake_outlined, cantidad: cumples.length),
               // Igual que en el timeline (Victor, 2026-11-22).

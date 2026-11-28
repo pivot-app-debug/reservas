@@ -492,16 +492,19 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
             );
           }
           final hijos = <Widget>[];
+          // Pagos y reservas van arriba de todo (QA 2026-11-27).
+          final pagos = <Widget>[];
           for (final (tipo, titulo, icono) in _grupos) {
             final l = repo.pedidos.where((x) => x.tipo == tipo).toList();
             if (l.isEmpty) continue;
+            final destino = tipo == TipoPedido.reserva ? pagos : hijos;
             final enc = _Encabezado(titulo: titulo, icono: icono, cantidad: l.length);
-            hijos.add(enc);
+            destino.add(enc);
             // Cambios de equipo: cuenta regresiva hasta el corte (Victor, 2026-11-13).
-            if (tipo == TipoPedido.equipo) hijos.add(_CuentaCorte(corte: DateTime.tryParse('${l.first.m['corte'] ?? ''}')));
+            if (tipo == TipoPedido.equipo) destino.add(_CuentaCorte(corte: DateTime.tryParse('${l.first.m['corte'] ?? ''}')));
             for (final x in l) {
               final c = _clave(x);
-              hijos.add(
+              destino.add(
                 AnimatedSize(
                   key: ValueKey(c),
                   duration: const Duration(milliseconds: 240),
@@ -585,10 +588,10 @@ class _BandejaPivotsScreenState extends State<BandejaPivotsScreen> {
               hijos.add(_TarjetaRecomendacion(r: r, alTocar: () => _abrirRecomendacion(r)));
             }
           }
-          final vacia = hijos.isEmpty && delEquipo.isEmpty;
+          final vacia = hijos.isEmpty && delEquipo.isEmpty && pagos.isEmpty;
           // Clases por evaluar (sale de Coach, Victor 2026-11-19): se ve 3 días; si no hay nada, no ocupa lugar.
           // Para coaches, lo que falta evaluar vive en Entrenamiento (Victor, 2026-11-26).
-          final arriba = <Widget>[...delEquipo, if (!repo.sesion.esCoach) TarjetasPorEvaluar(sesion: repo.sesion)];
+          final arriba = <Widget>[...pagos, ...delEquipo, if (!repo.sesion.esCoach) TarjetasPorEvaluar(sesion: repo.sesion)];
           if (_vigentes.isNotEmpty) {
             hijos.add(_Encabezado(titulo: 'Excepciones vigentes', icono: Icons.event_repeat_rounded, cantidad: _vigentes.length));
             hijos.add(
@@ -761,7 +764,7 @@ class _CuentaCorte extends StatelessWidget {
       return (
         'Pidió sumarse al equipo técnico',
         v('mensaje').isEmpty
-            ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas del equipo técnico en Entreno.'
+            ? 'Al aprobarlo eliges qué equipos lleva y le aparecen las herramientas del equipo técnico en Progreso.'
             : 'Mensaje: ${v('mensaje')}',
       );
     case TipoPedido.social:

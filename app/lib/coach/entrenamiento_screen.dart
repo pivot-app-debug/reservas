@@ -229,7 +229,7 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         flexibleSpace: const Vidrio(child: SizedBox.expand()),
-        title: const Text('Entreno', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Progreso', style: TextStyle(fontWeight: FontWeight.w800)),
         // Herramientas de entrenadorx en la barra (mockup B).
         actions: _usaCoach
             ? [
@@ -251,14 +251,15 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
               sesion: s,
               eventos: widget.eventos,
               embebida: true,
-              encabezado: _hero(compacto: true),
-              despuesDelProximo: Column(
+              // Equipo técnico encima del próximo entrenamiento (QA 2026-11-27).
+              encabezado: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _carrusel(context),
+                  _hero(compacto: true),
                   EquipoTecnicoSeccion(sesion: s),
                 ],
               ),
+              despuesDelProximo: _carrusel(context),
               herramienta: _herramienta,
             )
           : _paraTodxs(context),
@@ -282,8 +283,8 @@ class _EntrenamientoScreenState extends State<EntrenamientoScreen> {
             padding: EdgeInsets.fromLTRB(16, 8 + altoBarra(context), 16, 96 + MediaQuery.paddingOf(context).bottom),
             children: [
               _hero(),
-              _carrusel(context),
               if (_puedeNombrar) EquipoTecnicoSeccion(sesion: s),
+              _carrusel(context),
               if (proximos.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),

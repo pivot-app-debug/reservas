@@ -102,9 +102,9 @@ class GrupoHerramientasLiga extends StatelessWidget {
             FilaAjuste(
               icono: Icons.sports_rounded,
               seccion: 'entrenamientos',
-              titulo: 'Entreno',
+              titulo: 'Progreso',
               valor: coach ? 'Activado' : 'Desactivado',
-              alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Entreno', textoCoach),
+              alTocar: coach ? null : () => _activar(context, 'coachActivo', 'Progreso', textoCoach),
               derecha: Switch(value: coach, onChanged: (v) => FuncionesLiga.cambiar(context, sesion, 'coachActivo', v)),
             ),
           ],

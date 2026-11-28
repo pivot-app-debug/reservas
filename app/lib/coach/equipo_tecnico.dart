@@ -78,49 +78,33 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
     }
   }
 
-  Future<void> _opciones(Map<String, dynamic> c) async {
-    final propio = '${c['username']}' == s.nombre;
-    if (!_pivot && propio) return _dejar();
-    final pendiente = c['estado'] == 'pendiente';
-    final a = await showModalBottomSheet<String>(
-      useRootNavigator: true,
-      context: context,
-      showDragHandle: true,
-      builder: (h) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('${c['nombre']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            ),
-            if (pendiente && _pivot)
-              ListTile(leading: const Icon(Icons.check_rounded), title: const Text('Aprobar'), onTap: () => Navigator.of(h).pop('aprobar')),
-            if (!pendiente)
-              ListTile(leading: const Icon(Icons.groups_outlined), title: const Text('Cambiar equipos'), onTap: () => Navigator.of(h).pop('equipos')),
-            if (_pivot)
-              ListTile(
-                leading: Icon(Icons.person_remove_outlined, color: h.pivot.marcaTexto),
-                title: Text(
-                  pendiente ? 'Rechazar el pedido' : (propio ? 'Dejar el equipo técnico' : 'Quitar del equipo técnico'),
-                  style: TextStyle(color: h.pivot.marcaTexto),
-                ),
-                onTap: () => Navigator.of(h).pop(pendiente ? 'rechazar' : 'quitar'),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
+  /// Tocar a alguien abre su subsección (QA 2026-11-27: en lugar de los tres
+  /// puntos y la hoja de abajo).
+  Future<void> _abrir(Map<String, dynamic> c) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => _PersonaTecnicaScreen(sesion: s, c: c, pivot: _pivot, alAccion: (a) => _hacer(c, a)),
       ),
     );
-    if (a == null || !mounted) return;
+  }
+
+  /// Ejecuta una acción sobre alguien del equipo técnico; true si se hizo.
+  Future<bool> _hacer(Map<String, dynamic> c, String a) async {
+    final propio = '${c['username']}' == s.nombre;
+    if (a == 'dejar') {
+      await _dejar();
+      await _cargar();
+      return !s.esCoach;
+    }
     if (a == 'aprobar' || a == 'equipos') {
       final eq = await elegirEquiposCoach(context, s, [for (final e in (c['equipos'] as List? ?? const [])) '$e']);
-      if (eq == null) return;
+      if (eq == null) return false;
       await _cargar({'accion': a, 'username': c['username'], 'equipos': jsonEncode(eq)});
     } else {
       await _cargar({'accion': a, 'username': c['username']});
     }
     if (propio) await s.cargarCoach();
+    return true;
   }
 
   @override
@@ -175,7 +159,7 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                'Sumar a alguien',
+                                'Agregar',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
                               ),
@@ -186,14 +170,14 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                       final c = l[i];
                       final equipos = [for (final e in (c['equipos'] as List? ?? const [])) '$e'];
                       final pendiente = c['estado'] == 'pendiente';
-                      final conMenu = _pivot || !pendiente;
+                      final conMenu = _pivot || !pendiente || '${c['username']}' == s.nombre;
                       // Bench y otras funciones del equipo técnico (2026-11-27).
                       final funciones = [
                         for (final f in (c['funciones'] as List? ?? const []))
                           if ('$f' != 'Coach') '$f',
                       ];
                       return tarjeta(
-                        alTocar: conMenu ? () => _opciones(c) : null,
+                        alTocar: conMenu ? () => _abrir(c) : null,
                         hijo: Stack(
                           children: [
                             Padding(
@@ -219,17 +203,6 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                                 ],
                               ),
                             ),
-                            if (conMenu)
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: IconButton(
-                                  tooltip: 'Opciones',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: Icon(Icons.more_vert_rounded, size: 20, color: p.textoSecundario),
-                                  onPressed: () => _opciones(c),
-                                ),
-                              ),
                           ],
                         ),
                       );
@@ -237,14 +210,110 @@ class _EquipoTecnicoSeccionState extends State<EquipoTecnicoSeccion> {
                   ),
                 ),
         ),
-        // Lo que lleva este mes quien entrena (antes en Mi perfil).
-        if (s.esCoach)
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: MiEstimado(sesion: s),
-          ),
         const SizedBox(height: 6),
       ],
+    );
+  }
+}
+
+/// Subsección de alguien del equipo técnico (QA 2026-11-27): sus equipos y
+/// funciones, lo que lleva este mes si eres tú, y lo que se puede hacer.
+class _PersonaTecnicaScreen extends StatefulWidget {
+  const _PersonaTecnicaScreen({required this.sesion, required this.c, required this.pivot, required this.alAccion});
+  final Sesion sesion;
+  final Map<String, dynamic> c;
+  final bool pivot;
+  final Future<bool> Function(String accion) alAccion;
+
+  @override
+  State<_PersonaTecnicaScreen> createState() => _PersonaTecnicaScreenState();
+}
+
+class _PersonaTecnicaScreenState extends State<_PersonaTecnicaScreen> {
+  bool _ocupado = false;
+
+  Future<void> _hacer(String a, {bool salir = false}) async {
+    setState(() => _ocupado = true);
+    final ok = await widget.alAccion(a);
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+    if (ok && salir) Navigator.of(context).pop();
+    if (ok && !salir) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pivot;
+    final c = widget.c;
+    final s = widget.sesion;
+    final propio = '${c['username']}' == s.nombre;
+    final pendiente = c['estado'] == 'pendiente';
+    final equipos = [for (final e in (c['equipos'] as List? ?? const [])) '$e'];
+    final funciones = [
+      for (final f in (c['funciones'] as List? ?? const []))
+        if ('$f' != 'Coach') '$f',
+    ];
+    Widget fila(IconData i, String t, String sub) => ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(i, color: p.textoSecundario),
+      title: Text(
+        t,
+        style: TextStyle(fontWeight: FontWeight.w700, color: p.texto),
+      ),
+      subtitle: Text(sub, style: TextStyle(color: p.textoSecundario)),
+    );
+    return Scaffold(
+      appBar: AppBar(title: const Text('Equipo técnico')),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 32 + MediaQuery.paddingOf(context).bottom),
+        children: [
+          Center(
+            child: AvatarPersona(nombre: '${c['nombre']}', foto: '${c['foto'] ?? ''}', tamano: 88),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${c['nombre']}',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: p.texto),
+          ),
+          if (pendiente)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Pidió sumarse al equipo técnico${'${c['mensaje'] ?? ''}'.isEmpty ? '' : ': «${c['mensaje']}»'}',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.marcaTexto),
+              ),
+            ),
+          const SizedBox(height: 16),
+          // Lo que lleva este mes, solo si eres tú (antes en Mi perfil).
+          if (propio && s.esCoach) ...[MiEstimado(sesion: s), const SizedBox(height: 12)],
+          if (!pendiente) fila(Icons.groups_outlined, 'Equipos', equipos.isEmpty ? 'Todos los equipos' : equipos.join(', ')),
+          if (funciones.isNotEmpty) fila(Icons.badge_outlined, 'Funciones', funciones.join(', ')),
+          const SizedBox(height: 16),
+          if (pendiente && widget.pivot)
+            FilledButton.icon(onPressed: _ocupado ? null : () => _hacer('aprobar'), icon: const Icon(Icons.check_rounded), label: const Text('Aprobar')),
+          if (!pendiente)
+            OutlinedButton.icon(
+              onPressed: _ocupado ? null : () => _hacer('equipos'),
+              icon: const Icon(Icons.groups_outlined),
+              label: const Text('Cambiar equipos'),
+            ),
+          const SizedBox(height: 8),
+          if (propio && !pendiente)
+            TextButton.icon(
+              onPressed: _ocupado ? null : () => _hacer('dejar', salir: true),
+              icon: Icon(Icons.logout_rounded, color: p.marcaTexto),
+              label: Text('Dejar el equipo técnico', style: TextStyle(color: p.marcaTexto)),
+            )
+          else if (widget.pivot)
+            TextButton.icon(
+              onPressed: _ocupado ? null : () => _hacer(pendiente ? 'rechazar' : 'quitar', salir: true),
+              icon: Icon(Icons.person_remove_outlined, color: p.marcaTexto),
+              label: Text(pendiente ? 'Rechazar el pedido' : 'Quitar del equipo técnico', style: TextStyle(color: p.marcaTexto)),
+            ),
+        ],
+      ),
     );
   }
 }

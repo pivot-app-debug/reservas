@@ -263,7 +263,7 @@ class _CoachScreenState extends State<CoachScreen> {
             ),
     );
     if (widget.embebida) return cuerpo;
-    return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Entreno'), body: cuerpo);
+    return Scaffold(extendBodyBehindAppBar: true, appBar: barraCoach('Progreso'), body: cuerpo);
   }
 
   /// Próximo entrenamiento: fecha, quién viene y su plan, ya cargado.
@@ -1661,7 +1661,7 @@ class FilaSerCoach extends StatelessWidget {
             const Text('Quiero sumarme al equipo técnico', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(
-              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas del equipo técnico en Entreno para seguir el progreso de la gente que entrenas, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
+              'Un Pivot revisa tu pedido. Al aprobarlo tendrás las herramientas del equipo técnico en Progreso para seguir el progreso de la gente que entrenas, armar el plan de cada evento, evaluar los entrenamientos y tomar asistencia.',
               style: TextStyle(height: 1.35, color: c.pivot.textoSecundario),
             ),
             const SizedBox(height: 12),

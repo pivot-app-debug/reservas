@@ -1130,7 +1130,7 @@ class _BienvenidaPivotState extends State<_BienvenidaPivot> {
       (
         Icons.settings_rounded,
         'Todo se cambia en Liga → Ajustes',
-        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos y Pivots están en Liga → Equipos, y el equipo técnico en Entreno.',
+        'En Liga → Ajustes, con el ícono del engranaje, están las cuotas, las reglas y los datos de la liga; los equipos y Pivots están en Liga → Equipos, y el equipo técnico en Progreso.',
       ),
       (
         Icons.qr_code_2_rounded,
